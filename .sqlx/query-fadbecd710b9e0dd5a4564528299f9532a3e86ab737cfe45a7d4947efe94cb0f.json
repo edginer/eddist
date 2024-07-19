@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO threads\n                (\n                    id,\n                    board_id,\n                    thread_number,\n                    last_modified_at,\n                    sage_last_modified_at,\n                    title,\n                    authed_token_id,\n                    metadent,\n                    response_count\n                )\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "fadbecd710b9e0dd5a4564528299f9532a3e86ab737cfe45a7d4947efe94cb0f"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE authed_tokens SET validity = ? WHERE token = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6a8a178f2e0e4cbed124892df080258eb2a24c3dde1d636ecaaaa7b139ea7b6b"
+}
