@@ -4,7 +4,7 @@ use axum::{
     body::{Body, Bytes},
     extract::{MatchedPath, Path, State},
     http::{HeaderMap, Request, StatusCode},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Form, Router,
 };
@@ -319,7 +319,8 @@ BBS_NONAME_NAME={default_name}"
 
 // NOTE: this system will be changed in the future
 async fn get_auth_code() -> impl IntoResponse {
-    r#"<html>
+    Html(
+        r#"<html>
 <head>
     <title>コード認証画面</title>
     <meta charset="utf-8">
@@ -333,6 +334,8 @@ async fn get_auth_code() -> impl IntoResponse {
     </form>
 </body>
 </html>"#
+            .to_string(),
+    )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -356,7 +359,7 @@ async fn post_auth_code(
         .await
         .unwrap();
 
-    r##"<html>
+    Html(r##"<html>
 
 <head>
     <title>認証成功 - Successful</title>
@@ -369,7 +372,7 @@ async fn post_auth_code(
     <input type="text" value="#{token}" onfocus="this.select();" style="width: 50rem;"></input>
 </body>
 
-</html>"##.replace("{token}", &token)
+</html>"##.replace("{token}", &token))
 }
 
 async fn post_bbs_cgi(
@@ -408,7 +411,7 @@ async fn post_bbs_cgi(
     let Some(mail) = form.get("mail").map(|x| x.to_string()) else {
         return BbsCgiError::from(InsufficientParamType::Mail).into_response();
     };
-    let Some(body) = form.get("body").map(|x| x.to_string()) else {
+    let Some(body) = form.get("MESSAGE").map(|x| x.to_string()) else {
         return BbsCgiError::from(InsufficientParamType::Body).into_response();
     };
 
