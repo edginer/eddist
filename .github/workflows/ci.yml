@@ -24,6 +24,6 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: docker-dev/Dockerfile
+          file: docker-prod/Dockerfile
           push: true
           tags: ${{ secrets.REGISTRY_URL }}/eddist:${{ github.sha }}
