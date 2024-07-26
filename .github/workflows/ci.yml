@@ -26,4 +26,4 @@ jobs:
           context: .
           file: docker-prod/Dockerfile
           push: true
-          tags: ${{ secrets.REGISTRY_URL }}/eddist:${{ github.sha }}
+          tags: ${{ secrets.REGISTRY_URL }}/eddist-server:${{ github.sha }}
