@@ -65,4 +65,8 @@ impl Tinker {
     pub fn level(&self) -> u32 {
         self.level
     }
+
+    pub fn authed_token(&self) -> &str {
+        &self.authed_token
+    }
 }

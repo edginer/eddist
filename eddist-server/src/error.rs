@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use axum::response::{IntoResponse, Response};
 use hyper::StatusCode;
+use time::Duration;
 
 use crate::{shiftjis::SJisStr, SJisResponseBuilder, SjisContentType};
 
@@ -24,7 +25,11 @@ pub enum BbsCgiError {
     SameTimeThreadCration,
 
     #[error("認証コード'{auth_code}'を用いて、以下のURLから認証を行ってください \n {base_url}/auth_code")]
-    Unauthenticated { auth_code: String, base_url: String },
+    Unauthenticated {
+        auth_code: String,
+        base_url: String,
+        auth_token: String,
+    },
 
     // cause on failed to find authed token by given token (not found)
     #[error("与えられた認証トークンが不正です")]
@@ -55,13 +60,19 @@ impl BbsCgiError {
 
 impl IntoResponse for BbsCgiError {
     fn into_response(self) -> Response {
+        let edge_token = if let BbsCgiError::Unauthenticated { auth_token, .. } = &self {
+            Some(auth_token.to_string())
+        } else {
+            None
+        };
+
         let status_code = self.status_code();
         let e = match self {
             BbsCgiError::Other(_) => "内部エラーが発生しました".to_string(),
             e => e.to_string(),
         };
 
-        SJisResponseBuilder::new(SJisStr::from(&format!(
+        let resp = SJisResponseBuilder::new(SJisStr::from(&format!(
             r#"<html><!-- 2ch_X:error -->
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=x-sjis">
@@ -76,9 +87,14 @@ impl IntoResponse for BbsCgiError {
         .client_ttl(0)
         .server_ttl(0)
         .content_type(SjisContentType::TextHtml)
-        .status_code(status_code)
-        .build()
-        .into_response()
+        .status_code(status_code);
+        let resp = if let Some(token) = edge_token {
+            resp.add_set_cookie("edge_token".to_string(), token, Duration::days(365))
+        } else {
+            resp
+        };
+
+        resp.build().into_response()
     }
 }
 

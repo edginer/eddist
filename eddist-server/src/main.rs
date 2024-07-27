@@ -489,6 +489,11 @@ async fn post_bbs_cgi(
         .unwrap(),
         time::Duration::days(365),
     )
+    .add_set_cookie(
+        "edge-token".to_string(),
+        tinker.authed_token().to_string(),
+        time::Duration::days(365),
+    )
     .build()
     .into_response()
 }

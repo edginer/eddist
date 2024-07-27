@@ -79,7 +79,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
             self.0
                 .create_authed_token(CreatingAuthedToken {
-                    token: authed_token.token,
+                    token: authed_token.token.clone(),
                     writing_ua: authed_token.writing_ua,
                     origin_ip: authed_token.origin_ip,
                     created_at,
@@ -91,6 +91,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
                 base_url: "http://localhost:8080".to_string(),
+                auth_token: authed_token.token,
             });
         };
 
@@ -108,7 +109,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
                 self.0
                     .create_authed_token(CreatingAuthedToken {
-                        token: authed_token.token,
+                        token: authed_token.token.clone(),
                         writing_ua: authed_token.writing_ua,
                         origin_ip: authed_token.origin_ip,
                         created_at,
@@ -120,11 +121,13 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 return Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,
                     base_url: "http://localhost:8080".to_string(),
+                    auth_token: authed_token.token,
                 });
             } else {
                 Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,
                     base_url: "http://localhost:8080".to_string(),
+                    auth_token: authed_token.token,
                 })
             };
         }
