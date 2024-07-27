@@ -500,7 +500,7 @@ async fn post_bbs_cgi(
 
 fn get_origin_ip(headers: &HeaderMap) -> &str {
     headers
-        .get("Cf-Connectiong-IP")
+        .get("Cf-Connecting-IP")
         .or_else(|| headers.get("X-Forwarded-For"))
         .map(|x| x.to_str())
         .unwrap_or(Ok("localhost")) // FIXME: for development only
