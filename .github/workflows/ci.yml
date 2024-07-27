@@ -51,3 +51,4 @@ jobs:
           token: ${{ secrets.DEPLOY_REPO_PAT }}
           repository: ${{ secrets.DEPLOY_REPO_URL }}
           event-type: update-image
+          client-payload: '{"image-tag": "${{ github.sha }}"}'
