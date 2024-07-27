@@ -16,9 +16,9 @@ jobs:
       - name: Login to Docker registry
         uses: docker/login-action@v1
         with:
-          registry: ${{ secrets.REGISTRY_URL }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
@@ -26,4 +26,6 @@ jobs:
           context: .
           file: docker-prod/Dockerfile
           push: true
-          tags: ${{ secrets.REGISTRY_URL }}/eddist-server:${{ github.sha }}
+          tags: |
+            ghcr.io/eddist:${{ github.sha }}
+            ghcr.io/eddist:latest
