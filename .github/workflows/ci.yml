@@ -45,3 +45,9 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist:${{ github.sha }}
             ghcr.io/edginer/eddist:latest
+      - name: notify deploy server
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_REPO_PAT }}
+          repository: ${{ secrets.DEPLOY_REPO_URL }}
+          event-type: update-image

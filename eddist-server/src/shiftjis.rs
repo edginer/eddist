@@ -202,6 +202,12 @@ impl SJisResponseBuilder {
             })
             .unwrap(),
         );
+        for cookie in self.cookies.iter() {
+            headers.append(
+                "Set-Cookie",
+                HeaderValue::from_str(&cookie.to_string()).unwrap(),
+            );
+        }
 
         let status_code = resp.status_mut();
         *status_code = self.status_code;

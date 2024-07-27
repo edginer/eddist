@@ -464,6 +464,8 @@ impl BbsRepository for BbsRepositoryImpl {
         Ok(())
     }
 }
+
+#[derive(Debug)]
 struct SelectionBoard {
     id: Vec<u8>,
     name: String,
@@ -472,6 +474,7 @@ struct SelectionBoard {
     default_name: String,
 }
 
+#[derive(Debug)]
 struct SelectionThread {
     id: Vec<u8>,
     board_id: Vec<u8>,
@@ -487,6 +490,7 @@ struct SelectionThread {
     archived: i8, // TINYINT
 }
 
+#[derive(Debug)]
 struct SelectionRes {
     id: Vec<u8>,
     author_name: String,
@@ -502,6 +506,7 @@ struct SelectionRes {
     res_order: i32,
 }
 
+#[derive(Debug)]
 struct SelectionAuthedToken {
     id: Vec<u8>,
     token: String,
