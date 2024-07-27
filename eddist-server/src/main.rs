@@ -339,6 +339,7 @@ async fn get_auth_code() -> impl IntoResponse {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 struct PostAuthCodeForm {
     auth_code: u32,
 }
