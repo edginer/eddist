@@ -27,5 +27,5 @@ jobs:
           file: docker-prod/Dockerfile
           push: true
           tags: |
-            ghcr.io/eddist:${{ github.sha }}
-            ghcr.io/eddist:latest
+            ghcr.io/edginer/eddist:${{ github.sha }}
+            ghcr.io/edginer/eddist:latest
