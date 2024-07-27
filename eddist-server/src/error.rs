@@ -89,7 +89,7 @@ impl IntoResponse for BbsCgiError {
         .content_type(SjisContentType::TextHtml)
         .status_code(status_code);
         let resp = if let Some(token) = edge_token {
-            resp.add_set_cookie("edge_token".to_string(), token, Duration::days(365))
+            resp.add_set_cookie("edge-token".to_string(), token, Duration::days(365))
         } else {
             resp
         };
