@@ -4,13 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-graphql = { version = "7.0.7", features = ["dataloader"] }
+anyhow = "1.0.86"
+async-graphql = { version = "7.0.7", features = ["dataloader", "chrono"] }
 async-graphql-axum = "7.0.7"
+async-trait = "0.1.81"
 axum = "0.7.5"
+chrono = "0.4.38"
+dotenvy = "0.15.7"
 juniper = "0.16.1"
 juniper_axum = "0.1.0"
 log = "0.4.22"
+sqlx = { version = "0.8.0", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",
+    "chrono",
+    "macros",
+] }
 tokio = { version = "1.39.2", features = ["full"] }
 tower-http = { version = "0.5.2", features = ["trace"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+uuid = { version = "1.10.0", features = ["v7", "v4"] }

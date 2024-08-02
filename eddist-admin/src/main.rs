@@ -1,6 +1,5 @@
 use async_graphql::{
-    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, FieldResult, InputObject,
-    Object, Schema, ID,
+    http::GraphiQLSource, Context, EmptySubscription, FieldResult, InputObject, Object, Schema, ID,
 };
 use async_graphql_axum::GraphQL;
 use axum::{
@@ -9,11 +8,15 @@ use axum::{
     routing::{get, post_service},
     Router,
 };
+use chrono::Utc;
+use repository::{AdminBbsRepository, AdminBbsRepositoryImpl};
 use tokio::net::TcpListener;
 
 use std::net::SocketAddr;
 use tower_http::trace::TraceLayer;
 use tracing::info_span;
+
+pub(crate) mod repository;
 
 struct Query;
 
@@ -23,9 +26,17 @@ impl Query {
         Ok("Hello, world!".to_string())
     }
 
-    async fn boards(&self, ctx: &Context<'_>) -> FieldResult<Vec<Board>> {
-        // Implement your logic here
-        Ok(vec![]) // Replace with actual data retrieval
+    async fn boards(&self, ctx: &Context<'_>, board_keys: Vec<String>) -> FieldResult<Vec<Board>> {
+        let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
+        let boards = repo
+            .get_boards_by_key(if board_keys.is_empty() {
+                None
+            } else {
+                Some(board_keys)
+            })
+            .await?;
+
+        Ok(boards)
     }
 
     async fn audit_logs(&self, ctx: &Context<'_>) -> FieldResult<Vec<AuditLog>> {
@@ -39,13 +50,14 @@ impl Query {
     }
 }
 
+#[derive(Debug)]
 pub struct Board {
     pub id: ID,
     pub name: String,
     pub board_key: String,
     pub local_rule: String,
     pub default_name: String,
-    pub thread_count: i32,
+    pub thread_count: i64,
 }
 
 #[Object]
@@ -66,105 +78,118 @@ impl Board {
         &self.local_rule
     }
 
-    async fn thread_count(&self) -> i32 {
+    async fn thread_count(&self) -> i64 {
         self.thread_count
     }
 
     async fn threads(
         &self,
         ctx: &Context<'_>,
-        thread_number: Option<String>,
+        thread_number: Vec<u64>,
     ) -> FieldResult<Vec<Thread>> {
-        // Implement your logic here
-        Ok(vec![]) // Replace with actual data retrieval
-    }
+        let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
 
-    async fn archived_threads(
-        &self,
-        ctx: &Context<'_>,
-        page: Option<i32>,
-        query: Option<String>,
-        thread_id: Option<String>,
-    ) -> FieldResult<Vec<ArchivedThread>> {
-        // Implement your logic here
-        Ok(vec![]) // Replace with actual data retrieval
+        let threads = repo
+            .get_threads_by_thread_id(
+                &self.board_key,
+                if thread_number.is_empty() {
+                    None
+                } else {
+                    Some(thread_number)
+                },
+            )
+            .await?;
+        Ok(threads)
     }
 }
 
 pub struct Thread {
-    pub thread_number: String,
+    pub id: ID,
+    pub board_id: ID,
+    pub thread_number: u64,
+    pub last_modified: chrono::DateTime<Utc>,
+    pub sage_last_modified: chrono::DateTime<Utc>,
     pub title: String,
-    pub response_count: i32,
-    pub last_modified: String,
-    pub board_id: i32,
-    pub non_auth_thread: i32,
-    pub archived: i32,
-    pub active: i32,
-    pub authed_cookie: Option<String>,
-    pub modulo: i32,
+    pub authed_token_id: ID,
+    pub metadent: String,
+    pub response_count: u32,
+    pub no_pool: bool,
+    pub archived: bool,
+    pub active: bool,
 }
 
 #[Object]
 impl Thread {
-    async fn thread_number(&self) -> &String {
-        &self.thread_number
+    async fn id(&self) -> &ID {
+        &self.id
+    }
+
+    async fn thread_number(&self) -> u64 {
+        self.thread_number
     }
 
     async fn title(&self) -> &String {
         &self.title
     }
 
-    async fn response_count(&self) -> i32 {
+    async fn response_count(&self) -> u32 {
         self.response_count
     }
 
-    async fn last_modified(&self) -> &String {
-        &self.last_modified
+    async fn last_modified(&self) -> chrono::DateTime<Utc> {
+        self.last_modified
     }
 
-    async fn board_id(&self) -> i32 {
-        self.board_id
+    async fn board_id(&self) -> &ID {
+        &self.board_id
     }
 
-    async fn non_auth_thread(&self) -> i32 {
-        self.non_auth_thread
-    }
-
-    async fn archived(&self) -> i32 {
+    async fn archived(&self) -> bool {
         self.archived
     }
 
-    async fn active(&self) -> i32 {
+    async fn active(&self) -> bool {
         self.active
     }
 
-    async fn authed_cookie(&self) -> &Option<String> {
-        &self.authed_cookie
+    async fn no_pool(&self) -> bool {
+        self.no_pool
     }
 
-    async fn responses(&self, ctx: &Context<'_>, id: Option<i32>) -> FieldResult<Vec<Res>> {
-        // Implement your logic here
-        Ok(vec![]) // Replace with actual data retrieval
+    async fn metadent(&self) -> &str {
+        &self.metadent
     }
 
-    async fn modulo(&self) -> i32 {
-        self.modulo
+    async fn authed_token_id(&self) -> &ID {
+        &self.authed_token_id
+    }
+
+    async fn sage_last_modified(&self) -> chrono::DateTime<Utc> {
+        self.sage_last_modified
+    }
+
+    async fn responses(&self, ctx: &Context<'_>) -> FieldResult<Vec<Res>> {
+        let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
+        let reses = repo
+            .get_reses_by_thread_id(self.board_id.0.parse()?, self.id.0.parse()?)
+            .await?;
+        Ok(reses) // Replace with actual data retrieval
     }
 }
 
 pub struct Res {
     pub id: ID,
-    pub name: Option<String>,
+    pub author_name: Option<String>,
     pub mail: Option<String>,
-    pub date: String,
-    pub author_id: Option<String>,
     pub body: String,
-    pub thread_id: String,
+    pub created_at: chrono::DateTime<Utc>,
+    pub author_id: String,
     pub ip_addr: String,
-    pub authed_token: Option<String>,
-    pub timestamp: i32,
-    pub board_id: i32,
+    pub authed_token_id: ID,
+    pub board_id: ID,
+    pub thread_id: ID,
     pub is_abone: bool,
+    pub res_order: i32,
 }
 
 #[Object]
@@ -173,130 +198,48 @@ impl Res {
         &self.id
     }
 
-    async fn name(&self) -> &Option<String> {
-        &self.name
+    async fn author_name(&self) -> Option<&String> {
+        self.author_name.as_ref()
     }
 
-    async fn mail(&self) -> &Option<String> {
-        &self.mail
+    async fn mail(&self) -> Option<&String> {
+        self.mail.as_ref()
     }
 
-    async fn date(&self) -> &String {
-        &self.date
-    }
-
-    async fn author_id(&self) -> &Option<String> {
-        &self.author_id
-    }
-
-    async fn body(&self) -> &String {
+    async fn body(&self) -> &str {
         &self.body
     }
 
-    async fn thread_id(&self) -> &String {
+    async fn created_at(&self) -> &chrono::DateTime<Utc> {
+        &self.created_at
+    }
+
+    async fn author_id(&self) -> &str {
+        &self.author_id
+    }
+
+    async fn ip_addr(&self) -> &str {
+        &self.ip_addr
+    }
+
+    async fn authed_token_id(&self) -> &ID {
+        &self.authed_token_id
+    }
+
+    async fn board_id(&self) -> &ID {
+        &self.board_id
+    }
+
+    async fn thread_id(&self) -> &ID {
         &self.thread_id
     }
 
-    async fn ip_addr(&self) -> &String {
-        &self.ip_addr
-    }
-
-    async fn authed_token(&self) -> &Option<String> {
-        &self.authed_token
-    }
-
-    async fn timestamp(&self) -> i32 {
-        self.timestamp
-    }
-
-    async fn board_id(&self) -> i32 {
-        self.board_id
-    }
-
     async fn is_abone(&self) -> bool {
         self.is_abone
     }
-}
 
-pub struct ArchivedThread {
-    pub thread_number: String,
-    pub title: String,
-    pub response_count: i32,
-    pub board_id: i32,
-    pub last_modified: String,
-}
-
-#[Object]
-impl ArchivedThread {
-    async fn thread_number(&self) -> &String {
-        &self.thread_number
-    }
-
-    async fn title(&self) -> &String {
-        &self.title
-    }
-
-    async fn response_count(&self) -> i32 {
-        self.response_count
-    }
-
-    async fn board_id(&self) -> i32 {
-        self.board_id
-    }
-
-    async fn last_modified(&self) -> &String {
-        &self.last_modified
-    }
-
-    async fn responses(&self, ctx: &Context<'_>) -> FieldResult<Vec<ArchivedRes>> {
-        // Implement your logic here
-        Ok(vec![]) // Replace with actual data retrieval
-    }
-}
-
-pub struct ArchivedRes {
-    pub name: Option<String>,
-    pub mail: Option<String>,
-    pub date: String,
-    pub author_id: Option<String>,
-    pub body: String,
-    pub ip_addr: String,
-    pub authed_token: Option<String>,
-    pub is_abone: bool,
-}
-
-#[Object]
-impl ArchivedRes {
-    async fn name(&self) -> &Option<String> {
-        &self.name
-    }
-
-    async fn mail(&self) -> &Option<String> {
-        &self.mail
-    }
-
-    async fn date(&self) -> &String {
-        &self.date
-    }
-
-    async fn author_id(&self) -> &Option<String> {
-        &self.author_id
-    }
-
-    async fn body(&self) -> &String {
-        &self.body
-    }
-
-    async fn ip_addr(&self) -> &String {
-        &self.ip_addr
-    }
-
-    async fn authed_token(&self) -> &Option<String> {
-        &self.authed_token
-    }
-
-    async fn is_abone(&self) -> bool {
-        self.is_abone
+    async fn res_order(&self) -> i32 {
+        self.res_order
     }
 }
 
@@ -367,21 +310,17 @@ pub struct Mutation;
 #[Object]
 impl Mutation {
     async fn update_response(&self, ctx: &Context<'_>, res: ResInput) -> FieldResult<Res> {
-        // Implement your logic here
-        Ok(Res {
-            id: res.id,
-            name: res.name,
-            mail: res.mail,
-            date: "2023-01-01T00:00:00Z".to_string(),
-            author_id: None,
-            body: res.body,
-            thread_id: res.thread_id,
-            ip_addr: "127.0.0.1".to_string(),
-            authed_token: None,
-            timestamp: 0,
-            board_id: res.board_id,
-            is_abone: res.is_abone.unwrap_or(false),
-        })
+        let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
+
+        Ok(repo
+            .update_res(
+                res.id.0.parse()?,
+                res.name,
+                res.mail,
+                res.body,
+                res.is_abone,
+            )
+            .await?)
     }
 
     async fn delete_authed_token(
@@ -390,33 +329,27 @@ impl Mutation {
         token: String,
         using_origin_ip: bool,
     ) -> FieldResult<bool> {
-        // Implement your logic here
+        let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
+
+        if using_origin_ip {
+            repo.delete_authed_token(token.parse()?).await?;
+        } else {
+            repo.delete_authed_token_by_origin_ip(token.parse()?)
+                .await?;
+        }
         Ok(true)
     }
 
     async fn update_ng_word(&self, ctx: &Context<'_>, ng_word: NgWordInput) -> FieldResult<NgWord> {
-        // Implement your logic here
-        Ok(NgWord {
-            id: ng_word.id,
-            name: ng_word.name,
-            value: ng_word.value,
-            restriction_type: ng_word.restriction_type,
-        })
+        todo!()
     }
 
     async fn add_ng_word(&self, ctx: &Context<'_>, ng_word: NgWordAddInput) -> FieldResult<NgWord> {
-        // Implement your logic here
-        Ok(NgWord {
-            id: 1, // Replace with actual ID assignment
-            name: ng_word.name,
-            value: ng_word.value,
-            restriction_type: ng_word.restriction_type,
-        })
+        todo!()
     }
 
     async fn delete_ng_word(&self, ctx: &Context<'_>, id: i32) -> FieldResult<bool> {
-        // Implement your logic here
-        Ok(true)
+        todo!()
     }
 }
 
@@ -425,9 +358,7 @@ struct ResInput {
     id: ID,
     name: Option<String>,
     mail: Option<String>,
-    body: String,
-    thread_id: String,
-    board_id: i32,
+    body: Option<String>,
     is_abone: Option<bool>,
 }
 
@@ -454,7 +385,15 @@ async fn graphiql() -> impl IntoResponse {
 async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
 
-    let schema = Schema::build(Query, Mutation, EmptySubscription).finish();
+    dotenvy::dotenv().unwrap();
+
+    let pool = sqlx::mysql::MySqlPool::connect(&std::env::var("DATABASE_URL").unwrap())
+        .await
+        .unwrap();
+
+    let schema = Schema::build(Query, Mutation, EmptySubscription)
+        .data::<Box<dyn AdminBbsRepository>>(Box::new(AdminBbsRepositoryImpl::new(pool)))
+        .finish();
 
     let app = Router::new()
         .route("/api/graphiql", get(graphiql))
