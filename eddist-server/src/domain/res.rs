@@ -9,15 +9,10 @@ use super::{
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
     metadent::MetadentType,
+    res_core::ResCore,
+    res_view::ResView,
     utils::to_ja_datetime,
 };
-
-#[derive(Debug, Clone)]
-pub struct ResCore<'a> {
-    pub from: &'a str,
-    pub mail: &'a str,
-    pub body: String,
-}
 
 #[derive(Debug, Clone)]
 pub struct Res {
@@ -127,8 +122,6 @@ impl Res {
     pub fn get_sjis_bytes(&self, default_name: &str, thread_title: Option<&str>) -> SJisStr {
         let mail = if self.mail == "sage" { "sage" } else { "" };
 
-        self.pretty_author_name(default_name).to_string();
-
         if self.is_abone {
             SJisStr::from(
                 format!(
@@ -201,6 +194,19 @@ impl Res {
 
     pub fn authed_token(&self) -> Option<&String> {
         self.authed_token.as_ref()
+    }
+}
+
+impl From<Res> for ResView {
+    fn from(res: Res) -> Self {
+        Self {
+            author_name: res.author_name,
+            mail: res.mail,
+            body: res.body,
+            created_at: res.created_at,
+            author_id: res.author_id,
+            is_abone: res.is_abone,
+        }
     }
 }
 

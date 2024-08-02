@@ -178,7 +178,15 @@ impl BbsRepository for BbsRepositoryImpl {
 
         let query = query_as!(
             SelectionRes,
-            "SELECT * FROM responses WHERE thread_id = ? ORDER BY res_order",
+            "SELECT
+                author_name,
+                mail,
+                body,
+                created_at,
+                author_id,
+                is_abone
+            FROM responses WHERE thread_id = ? 
+            ORDER BY res_order",
             thread_id
         );
 
@@ -492,18 +500,12 @@ struct SelectionThread {
 
 #[derive(Debug)]
 struct SelectionRes {
-    id: Vec<u8>,
     author_name: String,
     mail: String,
     body: String,
     created_at: DateTime<Utc>,
     author_id: String,
-    ip_addr: String,
-    authed_token_id: Vec<u8>,
-    board_id: Vec<u8>,
-    thread_id: Vec<u8>,
     is_abone: i8, // TINYINT
-    res_order: i32,
 }
 
 #[derive(Debug)]

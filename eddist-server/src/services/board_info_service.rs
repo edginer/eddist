@@ -28,7 +28,6 @@ impl<T: BbsRepository> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
         Ok(BoardInfoServiceOutput {
             board_key: board.board_key,
             name: board.name,
-            local_rule: board.local_rule,
             default_name: board.default_name,
         })
     }
@@ -41,6 +40,5 @@ pub struct BoardInfoServiceInput {
 pub struct BoardInfoServiceOutput {
     pub board_key: String,
     pub name: String,
-    pub local_rule: String,
     pub default_name: String,
 }

@@ -54,6 +54,7 @@ mod domain {
     pub(crate) mod ip_addr;
     pub(crate) mod metadent;
     pub(crate) mod res;
+    pub(crate) mod res_core;
     pub(crate) mod res_view;
     pub(crate) mod thread;
     pub(crate) mod thread_list;
@@ -294,7 +295,6 @@ async fn get_setting_txt(
     let BoardInfoServiceOutput {
         board_key,
         name,
-        local_rule: _,
         default_name,
     } = state
         .services
@@ -361,18 +361,15 @@ async fn post_auth_code(
         .unwrap();
 
     Html(r##"<html>
-
 <head>
     <title>認証成功 - Successful</title>
     <meta charset="utf-8">
 </head>
-
 <body>
     <p>認証に成功しました</p>
-    <p>再びそのまま書き込みを行うか、メール欄に以下を貼り付けてください（#以降の内容は書き込み時に消えます、mateでは貼り付けなくても書けます）</p>
+    <p>再びそのまま書き込みを行うか、メール欄に以下を貼り付けてください（#以降の内容は書き込み時に消えます、いくつかのブラウザでは貼り付けなくても書けます）</p>
     <input type="text" value="#{token}" onfocus="this.select();" style="width: 50rem;"></input>
 </body>
-
 </html>"##.replace("{token}", &token))
 }
 

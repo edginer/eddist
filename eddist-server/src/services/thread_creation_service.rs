@@ -5,11 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        authed_token::AuthedToken,
-        client_info::ClientInfo,
-        metadent::MetadentType,
-        res::{Res, ResCore},
-        tinker::Tinker,
+        authed_token::AuthedToken, client_info::ClientInfo, metadent::MetadentType, res::Res,
+        res_core::ResCore, tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::bbs_repository::{BbsRepository, CreatingAuthedToken, CreatingThread},

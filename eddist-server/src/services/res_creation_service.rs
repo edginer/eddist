@@ -4,9 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        authed_token::AuthedToken,
-        client_info::ClientInfo,
-        res::{Res, ResCore},
+        authed_token::AuthedToken, client_info::ClientInfo, res::Res, res_core::ResCore,
         tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
