@@ -470,7 +470,6 @@ async fn main() {
         )
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
-        .layer(axum::middleware::from_fn(auth_simple_header))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 // Log the matched route's path (with placeholders not filled in).
@@ -487,7 +486,9 @@ async fn main() {
                     some_other_field = tracing::field::Empty,
                 )
             }),
-        );
+        )
+        .layer(axum::middleware::from_fn(add_cors_header));
+
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
