@@ -32,5 +32,15 @@ services:
     depends_on:
       - mysql
 
+  keycloak:
+    image: quay.io/keycloak/keycloak
+    container_name: keycloak_container
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8087:8080"
+    command: ["start-dev"]
+
 volumes:
   mysql_data:

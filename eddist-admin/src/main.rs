@@ -3,17 +3,24 @@ use async_graphql::{
 };
 use async_graphql_axum::GraphQL;
 use axum::{
+    body::Body,
     extract::{MatchedPath, Request},
-    response::{Html, IntoResponse},
+    http::{HeaderValue, StatusCode},
+    middleware::Next,
+    response::{Html, IntoResponse, Response},
     routing::{get, post_service},
     Router,
 };
 use chrono::Utc;
 use repository::{AdminBbsRepository, AdminBbsRepositoryImpl};
 use tokio::net::TcpListener;
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 use std::net::SocketAddr;
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 use tracing::info_span;
 
 pub(crate) mod repository;
@@ -76,6 +83,10 @@ impl Board {
 
     async fn local_rule(&self) -> &String {
         &self.local_rule
+    }
+
+    async fn default_name(&self) -> &String {
+        &self.default_name
     }
 
     async fn thread_count(&self) -> i64 {
@@ -315,7 +326,7 @@ impl Mutation {
         Ok(repo
             .update_res(
                 res.id.0.parse()?,
-                res.name,
+                res.author_name,
                 res.mail,
                 res.body,
                 res.is_abone,
@@ -326,15 +337,14 @@ impl Mutation {
     async fn delete_authed_token(
         &self,
         ctx: &Context<'_>,
-        token: String,
-        using_origin_ip: bool,
+        input: DeleteAuthedTokenInput,
     ) -> FieldResult<bool> {
         let repo = ctx.data::<Box<dyn AdminBbsRepository>>().unwrap();
 
-        if using_origin_ip {
-            repo.delete_authed_token(token.parse()?).await?;
+        if input.using_origin_ip {
+            repo.delete_authed_token(input.token_id.parse()?).await?;
         } else {
-            repo.delete_authed_token_by_origin_ip(token.parse()?)
+            repo.delete_authed_token_by_origin_ip(input.token_id.parse()?)
                 .await?;
         }
         Ok(true)
@@ -356,7 +366,7 @@ impl Mutation {
 #[derive(InputObject)]
 struct ResInput {
     id: ID,
-    name: Option<String>,
+    author_name: Option<String>,
     mail: Option<String>,
     body: Option<String>,
     is_abone: Option<bool>,
@@ -377,8 +387,51 @@ struct NgWordAddInput {
     restriction_type: String,
 }
 
+#[derive(InputObject)]
+struct DeleteAuthedTokenInput {
+    token_id: String,
+    using_origin_ip: bool,
+}
+
 async fn graphiql() -> impl IntoResponse {
     Html(GraphiQLSource::build().endpoint("/api/graphql").finish())
+}
+
+async fn add_cors_header(req: Request<Body>, next: Next) -> Response {
+    let mut res = next.run(req).await;
+    res.headers_mut()
+        .insert("Access-Control-Allow-Origin", HeaderValue::from_static("*"));
+    res.headers_mut().insert(
+        "Access-Control-Allow-Headers",
+        HeaderValue::from_static("*"),
+    );
+
+    res
+}
+
+async fn auth_simple_header(req: Request<Body>, next: Next) -> Response {
+    if !matches!(
+        std::env::var("RUST_ENV").as_deref(),
+        Ok("prod" | "production")
+    ) {
+        return next.run(req).await;
+    }
+
+    if let Some(authorization) = req.headers().get("Authorization") {
+        let env_simple_auth = std::env::var("SIMPLE_AUTH").unwrap();
+        if authorization.to_str().unwrap() == env_simple_auth {
+            return next.run(req).await;
+        }
+    }
+
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .body(Body::empty())
+        .unwrap()
+}
+
+async fn ok() -> impl IntoResponse {
+    StatusCode::OK
 }
 
 #[tokio::main]
@@ -386,6 +439,14 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
 
     dotenvy::dotenv().unwrap();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::CLOSE)
+        .with_ansi(false)
+        .init();
+
+    let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
     let pool = sqlx::mysql::MySqlPool::connect(&std::env::var("DATABASE_URL").unwrap())
         .await
@@ -397,7 +458,13 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/graphiql", get(graphiql))
-        .route("/api/graphql", post_service(GraphQL::new(schema)))
+        .route(
+            "/api/graphql",
+            post_service(GraphQL::new(schema)).options(ok),
+        )
+        .nest_service("/dist", serve_dir.clone())
+        .fallback_service(serve_dir)
+        .layer(axum::middleware::from_fn(auth_simple_header))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 // Log the matched route's path (with placeholders not filled in).
@@ -414,7 +481,8 @@ async fn main() {
                     some_other_field = tracing::field::Empty,
                 )
             }),
-        );
+        )
+        .layer(axum::middleware::from_fn(add_cors_header));
 
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
