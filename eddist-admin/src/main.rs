@@ -465,7 +465,7 @@ async fn main() {
         .route(
             "/api/graphql",
             post_service(GraphQL::new(schema))
-                .layer(axum::middleware::from_fn(add_cors_header))
+                .layer(axum::middleware::from_fn(auth_simple_header))
                 .options(ok),
         )
         .nest_service("/dist", serve_dir.clone())
