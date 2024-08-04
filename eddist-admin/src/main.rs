@@ -437,8 +437,12 @@ async fn ok() -> impl IntoResponse {
 #[tokio::main]
 async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
-
-    dotenvy::dotenv().unwrap();
+    if !matches!(
+        std::env::var("RUST_ENV").as_deref(),
+        Ok("prod" | "production")
+    ) {
+        dotenvy::dotenv().unwrap();
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
