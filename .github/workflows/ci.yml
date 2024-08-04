@@ -76,6 +76,9 @@ jobs:
           node-version: "20"
           cache: "pnpm"
           cache-dependency-path: "eddist-admin/client/pnpm-lock.yaml"
+      - name: Install pnpm dependencies
+        working-directory: eddist-admin/client
+        run: pnpm install
       - name: Load cache
         uses: actions/cache@v2
         with:
