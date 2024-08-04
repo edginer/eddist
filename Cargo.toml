@@ -1,4 +1,4 @@
 [workspace]
-members = ["eddist-admin", "eddist-core", "eddist-server"]
+members = ["eddist-admin", "eddist-core", "eddist-cron", "eddist-server"]
 resolver = "2"
 default-members = ["eddist-server"]
