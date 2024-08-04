@@ -464,7 +464,9 @@ async fn main() {
         .route("/api/graphiql", get(graphiql))
         .route(
             "/api/graphql",
-            post_service(GraphQL::new(schema)).options(ok),
+            post_service(GraphQL::new(schema))
+                .layer(axum::middleware::from_fn(add_cors_header))
+                .options(ok),
         )
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
@@ -485,9 +487,7 @@ async fn main() {
                     some_other_field = tracing::field::Empty,
                 )
             }),
-        )
-        .layer(axum::middleware::from_fn(add_cors_header));
-
+        );
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
