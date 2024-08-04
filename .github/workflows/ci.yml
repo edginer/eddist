@@ -57,6 +57,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      VITE_EDDIST_ADMIN_AUTH_SERVER_URL: ${{ secrets.VITE_EDDIST_ADMIN_AUTH_SERVER_URL }}
 
     steps:
       - name: Checkout code
