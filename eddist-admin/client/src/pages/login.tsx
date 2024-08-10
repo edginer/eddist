@@ -7,6 +7,9 @@ import { ThemedTitleV2 } from "@refinedev/mui";
 
 export const Login: React.FC = () => {
   const { mutate: login } = useLogin();
+  if (document.location.search.includes("code=")) {
+    login({});
+  }
 
   return (
     <Container

@@ -1,0 +1,53 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use super::res::Res;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NgWord {
+    pub id: Uuid,
+    pub name: String,
+    pub word: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+pub trait NgWordRestrictable {
+    fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool;
+}
+
+impl NgWordRestrictable for str {
+    fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
+        ng_words.iter().any(|ng_word| self.contains(&ng_word.word))
+    }
+}
+
+impl NgWordRestrictable for String {
+    fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
+        ng_words.iter().any(|ng_word| self.contains(&ng_word.word))
+    }
+}
+
+impl NgWordRestrictable for Res {
+    fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
+        ng_words.iter().any(|ng_word| {
+            self.body().contains(&ng_word.word)
+                || self.mail().contains(&ng_word.word)
+                || self.author_name().contains(&ng_word.word)
+        })
+    }
+}
+
+// for thread
+impl NgWordRestrictable for (Res, String) {
+    fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
+        let (res, thread_name) = self;
+        ng_words.iter().any(|ng_word| {
+            res.body().contains(&ng_word.word)
+                || res.mail().contains(&ng_word.word)
+                || res.author_name().contains(&ng_word.word)
+                || thread_name.contains(&ng_word.word)
+        })
+    }
+}

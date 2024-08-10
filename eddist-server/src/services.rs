@@ -76,28 +76,3 @@ impl<B: BbsRepository + 'static> AppServiceContainer<B> {
         &self.thread_retrival
     }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct BbsCgiServiceContainer<B: BbsRepository + 'static> {
-//     res_creation: ResCreationService<B>,
-//     thread_creation: TheradCreationService<B>,
-// }
-
-// impl<B: BbsRepository + Clone> BbsCgiServiceContainer<B> {
-//     pub fn new(bbs_repo: B, redis_conn: MultiplexedConnection) -> Self {
-//         BbsCgiServiceContainer {
-//             res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone()),
-//             thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
-//         }
-//     }
-// }
-
-// impl<B: BbsRepository + 'static> BbsCgiServiceContainer<B> {
-//     pub fn res_creation(&self) -> &ResCreationService<B> {
-//         &self.res_creation
-//     }
-
-//     pub fn thread_creation(&self) -> &TheradCreationService<B> {
-//         &self.thread_creation
-//     }
-// }

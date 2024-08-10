@@ -7,6 +7,7 @@ use crate::domain::{
     board::Board,
     ip_addr::{IpAddr, ReducedIpAddr},
     metadent::MetadentType,
+    ng_word::NgWord,
     res_view::ResView,
     thread::Thread,
 };
@@ -42,6 +43,8 @@ pub trait BbsRepository: Send + Sync + 'static {
         authed_time: DateTime<Utc>,
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
+
+    async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
 }
 
 #[derive(Debug, Clone)]
@@ -471,6 +474,39 @@ impl BbsRepository for BbsRepositoryImpl {
 
         Ok(())
     }
+
+    async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>> {
+        let ng_words = sqlx::query_as!(
+            SelectionNgWord,
+            "SELECT
+                nw.id AS id,
+                nw.name AS name,
+                nw.word AS word,
+                nw.created_at AS created_at,
+                nw.updated_at AS updated_at
+            FROM ng_words AS nw
+            JOIN boards_ng_words AS bnw 
+            ON nw.id = bnw.ng_word_id
+            JOIN boards AS b
+            ON bnw.board_id = b.id
+            WHERE b.board_key = ?
+        ",
+            board_key
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(ng_words
+            .into_iter()
+            .map(|x| NgWord {
+                id: x.id.try_into().unwrap(),
+                name: x.name,
+                word: x.word,
+                created_at: x.created_at,
+                updated_at: x.updated_at,
+            })
+            .collect())
+    }
 }
 
 #[derive(Debug)]
@@ -574,4 +610,13 @@ pub struct CreatingAuthedToken {
     pub writing_ua: String,
     pub auth_code: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectionNgWord {
+    pub id: Vec<u8>,
+    pub name: String,
+    pub word: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

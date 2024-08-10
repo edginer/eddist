@@ -80,7 +80,10 @@ export const ThreadList = () => {
         title={<Typography variant="h4">Threads</Typography>}
         breadcrumb={
           <Breadcrumbs sx={{ px: 3, pt: 2, cursor: "default" }}>
-            <Link underline="hover" onClick={() => navigator("/boards")}>
+            <Link
+              underline="hover"
+              onClick={() => navigator("/dashboard/boards")}
+            >
               Boards
             </Link>
             <Typography>{params.boardKey}</Typography>
@@ -92,7 +95,9 @@ export const ThreadList = () => {
           columns={columns}
           autoHeight
           onRowClick={(x) => {
-            navigator(`/boards/${params.boardKey}/${x.row.threadNumber}`);
+            navigator(
+              `/dashboard/boards/${params.boardKey}/${x.row.threadNumber}`
+            );
           }}
           checkboxSelection
           sx={{

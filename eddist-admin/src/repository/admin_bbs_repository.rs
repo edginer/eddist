@@ -2,7 +2,7 @@ use chrono::Utc;
 use sqlx::{query, query_as, FromRow, MySqlPool};
 use uuid::Uuid;
 
-use crate::{Board, Res, Thread};
+use crate::graphql::{Board, Res, Thread};
 
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {

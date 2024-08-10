@@ -64,3 +64,39 @@ CREATE TABLE caps (
     cap_name TEXT NOT NULL,
     cap_password_hash TEXT NOT NULL
 );
+
+CREATE TABLE ng_words (
+    id BINARY(16) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    word VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE boards_ng_words (
+    id BINARY(16) PRIMARY KEY,
+    board_id BINARY(16) NOT NULL,
+    ng_word_id BINARY(16) NOT NULL,
+    FOREIGN KEY (board_id) REFERENCES boards(id),
+    FOREIGN KEY (ng_word_id) REFERENCES ng_words(id)
+);
+
+CREATE TABLE admin_roles (
+    id BINARY(16) PRIMARY KEY,
+    role_name VARCHAR(255) NOT NULL,
+    role_description TEXT NOT NULL
+);
+
+CREATE TABLE admin_role_scopes (
+    id BINARY(16) PRIMARY KEY,
+    role_id BINARY(16) NOT NULL,
+    scope_key VARCHAR(255) NOT NULL,
+    FOREIGN KEY (role_id) REFERENCES admin_roles(id),
+    INDEX (role_id)
+);
+
+CREATE TABLE admin_users (
+    id BINARY(16) PRIMARY KEY,
+    user_role_id BINARY(16) NOT NULL,
+    FOREIGN KEY (user_role_id) REFERENCES admin_roles(id)
+);

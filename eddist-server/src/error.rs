@@ -38,6 +38,9 @@ pub enum BbsCgiError {
     #[error("その認証トークンは無効化されました")]
     RevokedAuthedToken,
 
+    #[error("NGワードが含まれています")]
+    NgWordDetected,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -53,6 +56,7 @@ impl BbsCgiError {
             BbsCgiError::Unauthenticated { .. } => StatusCode::OK,
             BbsCgiError::InvalidAuthedToken => StatusCode::BAD_REQUEST,
             BbsCgiError::RevokedAuthedToken => StatusCode::FORBIDDEN,
+            BbsCgiError::NgWordDetected => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

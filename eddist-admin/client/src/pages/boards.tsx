@@ -67,7 +67,7 @@ export const Boards = () => {
           columns={columns}
           autoHeight
           onRowClick={(x) => {
-            navigator(`/boards/${x.row.boardKey}`);
+            navigator(`/dashboard/boards/${x.row.boardKey}`);
           }}
           sx={{
             "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {

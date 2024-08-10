@@ -26,9 +26,6 @@ importers:
       '@mui/x-data-grid':
         specifier: ^6.20.4
         version: 6.20.4(@mui/material@5.16.6(@emotion/react@11.13.0(@types/react@18.3.3)(react@18.3.1))(@emotion/styled@11.13.0(@emotion/react@11.13.0(@types/react@18.3.3)(react@18.3.1))(@types/react@18.3.3)(react@18.3.1))(@types/react@18.3.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@mui/system@5.16.6(@emotion/react@11.13.0(@types/react@18.3.3)(react@18.3.1))(@emotion/styled@11.13.0(@emotion/react@11.13.0(@types/react@18.3.3)(react@18.3.1))(@types/react@18.3.3)(react@18.3.1))(@types/react@18.3.3)(react@18.3.1))(@types/react@18.3.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@react-keycloak/web':
-        specifier: ^3.4.0
-        version: 3.4.0(keycloak-js@20.0.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.5.4)
       '@refinedev/cli':
         specifier: ^2.16.21
         version: 2.16.36(@types/react-dom@18.3.0)(@types/react@18.3.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -65,9 +62,6 @@ importers:
       graphql-tag:
         specifier: ^2.12.6
         version: 2.12.6(graphql@15.9.0)
-      keycloak-js:
-        specifier: ^20.0.3
-        version: 20.0.5
       react:
         specifier: ^18.0.0
         version: 18.3.1
@@ -80,6 +74,9 @@ importers:
       react-router-dom:
         specifier: ^6.8.1
         version: 6.26.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      recoil:
+        specifier: ^0.7.7
+        version: 0.7.7(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@types/node':
         specifier: ^18.16.2
@@ -786,22 +783,6 @@ packages:
 
   '@reach/observe-rect@1.2.0':
     resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
-
-  '@react-keycloak/core@3.2.0':
-    resolution: {integrity: sha512-1yzU7gQzs+6E1v6hGqxy0Q+kpMHg9sEcke2yxZR29WoU8KNE8E50xS6UbI8N7rWsgyYw8r9W1cUPCOF48MYjzw==}
-    peerDependencies:
-      react: '>=16'
-
-  '@react-keycloak/web@3.4.0':
-    resolution: {integrity: sha512-yKKSCyqBtn7dt+VckYOW1IM5NW999pPkxDZOXqJ6dfXPXstYhOQCkTZqh8l7UL14PkpsoaHDh7hSJH8whah01g==}
-    peerDependencies:
-      keycloak-js: '>=9.0.2'
-      react: '>=16.8'
-      react-dom: '>=16.8'
-      typescript: '>=3.8'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
 
   '@refinedev/cli@2.16.36':
     resolution: {integrity: sha512-iky2zLHnXYErN4DbFe5QwyuGla1Dt1jxi/FZg0bAipMOw1WVixUIVl/KphpgbayLRTVQERE1Jz6xmCEvARzRkQ==}
@@ -1782,6 +1763,9 @@ packages:
     resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
     engines: {node: '>=6.0'}
 
+  hamt_plus@1.0.2:
+    resolution: {integrity: sha512-t2JXKaehnMb9paaYA7J0BX8QQAY8lwfQ9Gjf4pg/mk4krt+cmwmU652HOoWonf+7+EQV97ARPMhhVgU1ra2GhA==}
+
   handlebars@4.7.8:
     resolution: {integrity: sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==}
     engines: {node: '>=0.4.7'}
@@ -1961,9 +1945,6 @@ packages:
     resolution: {integrity: sha512-WhB9zCku7EGTj/HQQRz5aUQEUeoQZH2bWcltRErOpymJ4boYE6wL9Tbr23krRPSZ+C5zqNSrSw+Cc7sZZ4b7vg==}
     engines: {node: '>=0.10.0'}
 
-  js-sha256@0.9.0:
-    resolution: {integrity: sha512-sga3MHh9sgQN2+pJ9VYZ+1LPwXOxuBJBA5nrR5/ofPfuiJBE2hnjsaN8se8JznOmGLN2p49Pe5U/ttafcs/apA==}
-
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -2020,9 +2001,6 @@ packages:
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0
       react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0
-
-  keycloak-js@20.0.5:
-    resolution: {integrity: sha512-7+M5Uni4oNlAmbjM/lDJzFHu2+PGqU6/bvmTBuQssE1fJ7ZyNeCRHgFoaVfFpIU3m6aAFwPUko4lVcn4kPXP5Q==}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -2480,9 +2458,6 @@ packages:
     peerDependencies:
       react: ^18.3.1
 
-  react-fast-compare@3.2.2:
-    resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
-
   react-hook-form@7.52.2:
     resolution: {integrity: sha512-pqfPEbERnxxiNMPd0bzmt1tuaPcVccywFDpyk2uV5xCIBphHV5T8SVnX9/o3kplPE1zzKt77+YIoq+EMwJp56A==}
     engines: {node: '>=18.0.0'}
@@ -2549,6 +2524,18 @@ packages:
   recast@0.23.9:
     resolution: {integrity: sha512-Hx/BGIbwj+Des3+xy5uAtAbdCyqK9y9wbBcDFDYanLS9JnMqf7OeF87HQwUimE87OEc72mr6tkKUKMBBL+hF9Q==}
     engines: {node: '>= 4'}
+
+  recoil@0.7.7:
+    resolution: {integrity: sha512-8Og5KPQW9LwC577Vc7Ug2P0vQshkv1y3zG3tSSkWMqkWSwHmE+by06L8JtnGocjW6gcCvfwB3YtrJG6/tWivNQ==}
+    peerDependencies:
+      react: '>=16.13.1'
+      react-dom: '*'
+      react-native: '*'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
 
   redeyed@2.1.1:
     resolution: {integrity: sha512-FNpGGo1DycYAdnrKFxCMmKYgo/mILAqtRYbkdQD8Ep/Hk2PQ5+aEAEx+IU713RTDmuBaH0c8P5ZozurNu5ObRQ==}
@@ -3731,22 +3718,6 @@ snapshots:
       '@types/react': 18.3.3
 
   '@reach/observe-rect@1.2.0': {}
-
-  '@react-keycloak/core@3.2.0(react@18.3.1)':
-    dependencies:
-      react: 18.3.1
-      react-fast-compare: 3.2.2
-
-  '@react-keycloak/web@3.4.0(keycloak-js@20.0.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.5.4)':
-    dependencies:
-      '@babel/runtime': 7.25.0
-      '@react-keycloak/core': 3.2.0(react@18.3.1)
-      hoist-non-react-statics: 3.3.2
-      keycloak-js: 20.0.5
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-    optionalDependencies:
-      typescript: 5.5.4
 
   '@refinedev/cli@2.16.36(@types/react-dom@18.3.0)(@types/react@18.3.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
@@ -4936,6 +4907,8 @@ snapshots:
       section-matter: 1.0.0
       strip-bom-string: 1.0.0
 
+  hamt_plus@1.0.2: {}
+
   handlebars@4.7.8:
     dependencies:
       minimist: 1.2.8
@@ -5109,8 +5082,6 @@ snapshots:
 
   isobject@3.0.1: {}
 
-  js-sha256@0.9.0: {}
-
   js-tokens@4.0.0: {}
 
   js-yaml@3.14.1:
@@ -5181,11 +5152,6 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
-
-  keycloak-js@20.0.5:
-    dependencies:
-      base64-js: 1.5.1
-      js-sha256: 0.9.0
 
   keyv@4.5.4:
     dependencies:
@@ -5662,8 +5628,6 @@ snapshots:
       react: 18.3.1
       scheduler: 0.23.2
 
-  react-fast-compare@3.2.2: {}
-
   react-hook-form@7.52.2(react@18.3.1):
     dependencies:
       react: 18.3.1
@@ -5745,6 +5709,13 @@ snapshots:
       source-map: 0.6.1
       tiny-invariant: 1.3.3
       tslib: 2.6.3
+
+  recoil@0.7.7(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      hamt_plus: 1.0.2
+      react: 18.3.1
+    optionalDependencies:
+      react-dom: 18.3.1(react@18.3.1)
 
   redeyed@2.1.1:
     dependencies:

@@ -102,12 +102,15 @@ export const Thread = () => {
         title={<Typography variant="h4">Thread: {thread?.title}</Typography>}
         breadcrumb={
           <Breadcrumbs sx={{ px: 3, pt: 2, cursor: "default" }}>
-            <Link underline="hover" onClick={() => navigator("/boards")}>
+            <Link
+              underline="hover"
+              onClick={() => navigator("/dashboard/boards")}
+            >
               Boards
             </Link>
             <Link
               underline="hover"
-              onClick={() => navigator(`/boards/${params.boardKey}`)}
+              onClick={() => navigator(`/dashboard/boards/${params.boardKey}`)}
             >
               {params.boardKey}
             </Link>

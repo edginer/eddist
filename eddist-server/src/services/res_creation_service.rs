@@ -4,11 +4,17 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        authed_token::AuthedToken, client_info::ClientInfo, res::Res, res_core::ResCore,
+        client_info::ClientInfo,
+        ng_word::NgWordRestrictable,
+        res::Res,
+        res_core::ResCore,
+        service::{
+            bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
+        },
         tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::bbs_repository::{BbsRepository, CreatingAuthedToken, CreatingRes},
+    repositories::bbs_repository::{BbsRepository, CreatingRes},
 };
 
 use super::BbsCgiService;
@@ -73,61 +79,21 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             false,
         );
 
-        let Some(authed_token) = res.authed_token() else {
-            let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
-            self.0
-                .create_authed_token(CreatingAuthedToken {
-                    token: authed_token.token.clone(),
-                    writing_ua: authed_token.writing_ua,
-                    origin_ip: authed_token.origin_ip,
-                    created_at,
-                    auth_code: authed_token.auth_code.clone(),
-                    id: authed_token.id,
-                })
-                .await?;
+        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let authed_token = auth_service
+            .check_validity(
+                res.authed_token().map(|x| x.as_str()),
+                input.ip_addr.clone(),
+                input.user_agent,
+                created_at,
+            )
+            .await?;
 
-            return Err(BbsCgiError::Unauthenticated {
-                auth_code: authed_token.auth_code,
-                base_url: "http://localhost:8080".to_string(),
-                auth_token: authed_token.token,
-            });
-        };
-
-        let authed_token = self
-            .0
-            .get_authed_token(authed_token)
-            .await
-            .map_err(BbsCgiError::Other)?
-            .ok_or_else(|| BbsCgiError::InvalidAuthedToken)?;
-
-        if !authed_token.validity {
-            return if authed_token.authed_at.is_some() {
-                Err(BbsCgiError::RevokedAuthedToken)
-            } else if authed_token.is_activation_expired(Utc::now()) {
-                let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
-                self.0
-                    .create_authed_token(CreatingAuthedToken {
-                        token: authed_token.token.clone(),
-                        writing_ua: authed_token.writing_ua,
-                        origin_ip: authed_token.origin_ip,
-                        created_at,
-                        auth_code: authed_token.auth_code.clone(),
-                        id: authed_token.id,
-                    })
-                    .await?;
-
-                return Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: "http://localhost:8080".to_string(),
-                    auth_token: authed_token.token,
-                });
-            } else {
-                Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: "http://localhost:8080".to_string(),
-                    auth_token: authed_token.token,
-                })
-            };
+        let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
+            .get_ng_words(&input.board_key)
+            .await?;
+        if res.contains_ng_word(&ng_words) {
+            return Err(BbsCgiError::NgWordDetected);
         }
 
         if let Value::Int(order) = redis_conn

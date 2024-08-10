@@ -48,11 +48,17 @@ mod repositories {
     pub(crate) mod bbs_repository;
 }
 mod domain {
+    pub(crate) mod service {
+        pub mod bbscgi_auth_service;
+        pub mod ng_word_reading_service;
+    }
+
     pub(crate) mod authed_token;
     pub(crate) mod board;
     pub(crate) mod client_info;
     pub(crate) mod ip_addr;
     pub(crate) mod metadent;
+    pub(crate) mod ng_word;
     pub(crate) mod res;
     pub(crate) mod res_core;
     pub(crate) mod res_view;

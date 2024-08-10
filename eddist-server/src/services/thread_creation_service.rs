@@ -5,11 +5,11 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        authed_token::AuthedToken, client_info::ClientInfo, metadent::MetadentType, res::Res,
-        res_core::ResCore, tinker::Tinker,
+        client_info::ClientInfo, metadent::MetadentType, res::Res, res_core::ResCore,
+        service::bbscgi_auth_service::BbsCgiAuthService, tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::bbs_repository::{BbsRepository, CreatingAuthedToken, CreatingThread},
+    repositories::bbs_repository::{BbsRepository, CreatingThread},
 };
 
 use super::BbsCgiService;
@@ -75,63 +75,15 @@ impl<T: BbsRepository + Clone>
             false,
         );
 
-        let Some(authed_token) = res.authed_token() else {
-            let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
-            self.0
-                .create_authed_token(CreatingAuthedToken {
-                    token: authed_token.token.clone(),
-                    writing_ua: authed_token.writing_ua,
-                    origin_ip: authed_token.origin_ip,
-                    created_at,
-                    auth_code: authed_token.auth_code.to_string(),
-                    id: authed_token.id,
-                })
-                .await?;
-
-            return Err(BbsCgiError::Unauthenticated {
-                auth_code: authed_token.auth_code.to_string(),
-                base_url: "http://localhost:8080".to_string(),
-                auth_token: authed_token.token,
-            });
-        };
-
-        let authed_token = self
-            .0
-            .get_authed_token(authed_token)
-            .await
-            .map_err(BbsCgiError::Other)?
-            .ok_or_else(|| BbsCgiError::InvalidAuthedToken)?;
-
-        // NOTE: duplication code from res_creation_service.rs
-        if !authed_token.validity {
-            return if authed_token.authed_at.is_some() {
-                Err(BbsCgiError::RevokedAuthedToken)
-            } else if authed_token.is_activation_expired(Utc::now()) {
-                let authed_token = AuthedToken::new(input.ip_addr, input.user_agent);
-                self.0
-                    .create_authed_token(CreatingAuthedToken {
-                        token: authed_token.token.clone(),
-                        writing_ua: authed_token.writing_ua,
-                        origin_ip: authed_token.origin_ip,
-                        created_at,
-                        auth_code: authed_token.auth_code.clone(),
-                        id: authed_token.id,
-                    })
-                    .await?;
-
-                return Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: "http://localhost:8080".to_string(),
-                    auth_token: authed_token.token,
-                });
-            } else {
-                Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: "http://localhost:8080".to_string(),
-                    auth_token: authed_token.token,
-                })
-            };
-        }
+        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let authed_token = auth_service
+            .check_validity(
+                res.authed_token().map(|x| x.as_str()),
+                input.ip_addr.clone(),
+                input.user_agent,
+                created_at,
+            )
+            .await?;
 
         let creating_th = CreatingThread {
             thread_id: th_id,
