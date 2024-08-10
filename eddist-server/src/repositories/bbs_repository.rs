@@ -1,15 +1,14 @@
 use chrono::{DateTime, Utc};
+use eddist_core::domain::{
+    client_info::ClientInfo,
+    ip_addr::{IpAddr, ReducedIpAddr},
+};
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
-    authed_token::AuthedToken,
-    board::Board,
-    ip_addr::{IpAddr, ReducedIpAddr},
-    metadent::MetadentType,
-    ng_word::NgWord,
-    res_view::ResView,
-    thread::Thread,
+    authed_token::AuthedToken, board::Board, metadent::MetadentType, ng_word::NgWord,
+    res_view::ResView, thread::Thread,
 };
 
 #[mockall::automock]
@@ -268,6 +267,7 @@ impl BbsRepository for BbsRepositoryImpl {
             thread.thread_id.as_bytes().to_vec(),
             thread.board_id.as_bytes().to_vec(),
         );
+        let client_info_json = serde_json::to_string(&thread.client_info)?;
 
         let th_query = query!(
             r"INSERT INTO threads
@@ -307,13 +307,14 @@ impl BbsRepository for BbsRepositoryImpl {
                     ip_addr,
                     authed_token_id,
                     created_at,
+                    client_info,
                     res_order
                 )
                 VALUES 
                 (
                     ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?,
-                    1
+                    ?, 1
                 )",
             response_id,
             thread.name,
@@ -324,7 +325,8 @@ impl BbsRepository for BbsRepositoryImpl {
             board_id,
             thread.ip_addr,
             thread.authed_token_id.as_bytes().to_vec(),
-            thread.created_at
+            thread.created_at,
+            client_info_json,
         );
 
         let mut tx = self.pool.begin().await?;
@@ -351,6 +353,7 @@ impl BbsRepository for BbsRepositoryImpl {
             res.thread_id.as_bytes().to_vec(),
             res.board_id.as_bytes().to_vec(),
         );
+        let client_info_json = serde_json::to_string(&res.client_info)?;
 
         let th_query = query!(
             "UPDATE threads SET
@@ -382,13 +385,14 @@ impl BbsRepository for BbsRepositoryImpl {
                     ip_addr,
                     authed_token_id,
                     created_at,
+                    client_info,
                     res_order
                 )
                 VALUES 
                 (
                     ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?,
-                    ?
+                    ?, ?
                 )",
             res_id,
             res.name,
@@ -400,6 +404,7 @@ impl BbsRepository for BbsRepositoryImpl {
             res.ip_addr,
             res.authed_token_id.as_bytes().to_vec(),
             res.created_at.clone(),
+            client_info_json,
             res.res_order,
         );
 
@@ -585,6 +590,7 @@ pub struct CreatingThread {
     pub ip_addr: String,
     pub board_id: Uuid,
     pub metadent: MetadentType,
+    pub client_info: ClientInfo,
 }
 
 #[derive(Debug, Clone)]
@@ -599,6 +605,7 @@ pub struct CreatingRes {
     pub ip_addr: String,
     pub thread_id: Uuid,
     pub board_id: Uuid,
+    pub client_info: ClientInfo,
     pub res_order: i32,
 }
 

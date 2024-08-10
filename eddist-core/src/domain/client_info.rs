@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::{ip_addr::IpAddr, tinker::Tinker};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientInfo {
     pub user_agent: String,
     pub asn_num: u32,

@@ -1,17 +1,16 @@
 use chrono::Utc;
+use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
 use uuid::Uuid;
 
 use crate::{
     domain::{
-        client_info::ClientInfo,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
         service::{
             bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
         },
-        tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::bbs_repository::{BbsRepository, CreatingRes},
@@ -60,6 +59,12 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             return Err(BbsCgiError::InactiveThread);
         }
 
+        let client_info = ClientInfo {
+            user_agent: input.user_agent.clone(),
+            asn_num: input.asn_num,
+            ip_addr: input.ip_addr.clone(),
+            tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
+        };
         let res = Res::new_from_res(
             ResCore {
                 from: &input.name,
@@ -69,12 +74,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             &input.board_key,
             created_at,
             (&th.metadent as &str).into(),
-            ClientInfo {
-                user_agent: input.user_agent.clone(),
-                asn_num: input.asn_num,
-                ip_addr: input.ip_addr.clone(),
-                tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
-            },
+            client_info.clone(),
             input.authed_token_cookie,
             false,
         );
@@ -115,6 +115,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 ip_addr: input.ip_addr,
                 thread_id: th.id,
                 board_id: th.board_id,
+                client_info,
                 res_order: order as i32,
             };
             tokio::spawn(async move { bbs_repo.create_response(cres).await });

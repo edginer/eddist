@@ -54,6 +54,7 @@ CREATE TABLE responses (
     thread_id BINARY(16) NOT NULL,
     is_abone BOOLEAN NOT NULL DEFAULT FALSE,
     res_order INTEGER NOT NULL,
+    client_info JSON NOT NULL,
     FOREIGN KEY (board_id) REFERENCES boards(id),
     FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE,
     INDEX (thread_id)

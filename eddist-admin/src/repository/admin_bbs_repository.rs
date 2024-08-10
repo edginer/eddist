@@ -1,5 +1,6 @@
 use chrono::Utc;
-use sqlx::{query, query_as, FromRow, MySqlPool};
+use eddist_core::domain::client_info::ClientInfo;
+use sqlx::{query, query_as, types::Json, FromRow, MySqlPool};
 use uuid::Uuid;
 
 use crate::graphql::{Board, Res, Thread};
@@ -79,6 +80,7 @@ pub struct SelectionRes {
     pub thread_id: Vec<u8>,
     pub is_abone: i8,
     pub res_order: i32,
+    pub client_info: Json<ClientInfo>,
 }
 
 #[async_trait::async_trait]
@@ -227,7 +229,19 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             SelectionRes,
             r#"
             SELECT
-                *
+                id,
+                author_name,
+                mail,
+                body,
+                created_at,
+                author_id,
+                ip_addr,
+                authed_token_id,
+                board_id,
+                thread_id,
+                is_abone,
+                client_info AS "client_info!: Json<ClientInfo>",
+                res_order
             FROM
                 responses
             WHERE
@@ -259,6 +273,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 board_id: Uuid::from_slice(&res.board_id).unwrap().to_string().into(),
                 thread_id: Uuid::from_slice(&res.thread_id).unwrap().to_string().into(),
                 is_abone: res.is_abone != 0,
+                client_info: res.client_info.0,
                 res_order: res.res_order,
             })
             .collect())
@@ -320,7 +335,19 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             SelectionRes,
             r#"
             SELECT
-                *
+                id,
+                author_name,
+                mail,
+                body,
+                created_at,
+                author_id,
+                ip_addr,
+                authed_token_id,
+                board_id,
+                thread_id,
+                is_abone,
+                client_info AS "client_info!: Json<ClientInfo>",
+                res_order
             FROM
                 responses
             WHERE
@@ -346,6 +373,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             board_id: Uuid::from_slice(&res.board_id).unwrap().to_string().into(),
             thread_id: Uuid::from_slice(&res.thread_id).unwrap().to_string().into(),
             is_abone: res.is_abone != 0,
+            client_info: res.client_info.0,
             res_order: res.res_order,
         })
     }

@@ -805,6 +805,7 @@ dependencies = [
  "brotli",
  "chrono",
  "dotenvy",
+ "eddist-core",
  "encoding_rs",
  "env_logger",
  "hyper 1.4.1",
@@ -841,6 +842,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dotenvy",
+ "eddist-core",
  "jsonwebtoken",
  "juniper",
  "juniper_axum",
@@ -861,6 +863,10 @@ dependencies = [
 [[package]]
 name = "eddist-core"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+]
 
 [[package]]
 name = "eddist-cron"

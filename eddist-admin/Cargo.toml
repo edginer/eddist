@@ -30,6 +30,8 @@ uuid = { version = "1.10.0", features = ["v7", "v4"] }
 oauth2 = "4.4.2"
 time = "0.3.36"
 serde = { version = "1.0.205", features = ["derive"] }
-serde_json = "1.0.122"
+serde_json = { version = "1.0.122" }
 jsonwebtoken = "9.3.0"
 base64 = "0.22.1"
+
+eddist-core = { path = "../eddist-core" }

@@ -1,11 +1,11 @@
 use chrono::Utc;
+use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd};
 use tokio::join;
 use uuid::Uuid;
 
 use crate::{
     domain::{
-        client_info::ClientInfo,
         metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
@@ -13,7 +13,6 @@ use crate::{
         service::{
             bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
         },
-        tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::bbs_repository::{BbsRepository, CreatingThread},
@@ -64,6 +63,12 @@ impl<T: BbsRepository + Clone>
 
         let title = input.title.clone();
 
+        let client_info = ClientInfo {
+            user_agent: input.user_agent.clone(),
+            asn_num: input.asn_num,
+            ip_addr: input.ip_addr.clone(),
+            tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
+        };
         let res = Res::new_from_thread(
             ResCore {
                 from: &input.name,
@@ -72,12 +77,7 @@ impl<T: BbsRepository + Clone>
             },
             &input.board_key,
             created_at,
-            ClientInfo {
-                user_agent: input.user_agent.clone(),
-                asn_num: input.asn_num,
-                ip_addr: input.ip_addr.clone(),
-                tinker: None,
-            },
+            client_info.clone(),
             input.authed_token,
             false,
         );
@@ -106,6 +106,7 @@ impl<T: BbsRepository + Clone>
             ip_addr: input.ip_addr.to_string(),
             board_id: board.id,
             metadent: MetadentType::None,
+            client_info,
         };
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())

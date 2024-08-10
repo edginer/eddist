@@ -69,4 +69,20 @@ impl Tinker {
     pub fn authed_token(&self) -> &str {
         &self.authed_token
     }
+
+    pub fn wrote_count(&self) -> u32 {
+        self.wrote_count
+    }
+
+    pub fn created_thread_count(&self) -> u32 {
+        self.created_thread_count
+    }
+
+    pub fn last_level_up_at(&self) -> u64 {
+        self.last_level_up_at
+    }
+
+    pub fn last_wrote_at(&self) -> u64 {
+        self.last_wrote_at
+    }
 }

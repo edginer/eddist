@@ -1,9 +1,7 @@
 use chrono::Utc;
+use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 
-use crate::{
-    domain::ip_addr::{IpAddr, ReducedIpAddr},
-    repositories::bbs_repository::BbsRepository,
-};
+use crate::repositories::bbs_repository::BbsRepository;
 
 use super::AppService;
 

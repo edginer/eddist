@@ -10,7 +10,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use base64::Engine;
-use domain::tinker::Tinker;
+use eddist_core::domain::tinker::Tinker;
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -55,8 +55,6 @@ mod domain {
 
     pub(crate) mod authed_token;
     pub(crate) mod board;
-    pub(crate) mod client_info;
-    pub(crate) mod ip_addr;
     pub(crate) mod metadent;
     pub(crate) mod ng_word;
     pub(crate) mod res;
@@ -65,7 +63,6 @@ mod domain {
     pub(crate) mod thread;
     pub(crate) mod thread_list;
     pub(crate) mod thread_res_list;
-    pub(crate) mod tinker;
 
     mod utils;
 }

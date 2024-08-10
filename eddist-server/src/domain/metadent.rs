@@ -1,10 +1,9 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
+use eddist_core::domain::client_info::ClientInfo;
 use md5::{Digest, Md5};
 use rand::{Rng, SeedableRng};
-
-use super::client_info::ClientInfo;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MetadentType {

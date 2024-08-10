@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
+use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 use md5::{self, Digest};
 use rand::Rng;
 use uuid::Uuid;
-
-use super::ip_addr::{IpAddr, ReducedIpAddr};
 
 #[derive(Debug, Clone)]
 pub struct AuthedToken {

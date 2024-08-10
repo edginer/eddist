@@ -5,11 +5,11 @@ DROP TABLE IF EXISTS responses;
 
 DROP TABLE IF EXISTS threads;
 
+DROP TABLE IF EXISTS boards_ng_words;
+
 DROP TABLE IF EXISTS boards;
 
 DROP TABLE IF EXISTS authed_tokens;
-
-DROP TABLE IF EXISTS boards_ng_words;
 
 DROP TABLE IF EXISTS ng_words;
 

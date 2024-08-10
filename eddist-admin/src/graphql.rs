@@ -1,5 +1,6 @@
 use async_graphql::{Context, FieldResult, InputObject, Object, ID};
 use chrono::Utc;
+use eddist_core::domain::client_info::ClientInfo;
 
 use crate::repository::admin_bbs_repository::AdminBbsRepository;
 
@@ -178,6 +179,7 @@ pub struct Res {
     pub board_id: ID,
     pub thread_id: ID,
     pub is_abone: bool,
+    pub client_info: ClientInfo,
     pub res_order: i32,
 }
 
@@ -227,8 +229,86 @@ impl Res {
         self.is_abone
     }
 
+    async fn client_info(&self) -> GqlClientInfo {
+        GqlClientInfo {
+            user_agent: self.client_info.user_agent.clone(),
+            asn_num: self.client_info.asn_num as i32,
+            ip_addr: self.client_info.ip_addr.clone(),
+            tinker: self.client_info.tinker.as_ref().map(|x| GqlTinker {
+                authed_token: x.authed_token().to_string(),
+                wrote_count: x.wrote_count(),
+                created_thread_count: x.created_thread_count(),
+                level: x.level(),
+                last_level_up_at: x.last_level_up_at(),
+                last_wrote_at: x.last_wrote_at(),
+            }),
+        }
+    }
+
     async fn res_order(&self) -> i32 {
         self.res_order
+    }
+}
+
+pub struct GqlClientInfo {
+    pub user_agent: String,
+    pub asn_num: i32,
+    pub ip_addr: String,
+    pub tinker: Option<GqlTinker>,
+}
+
+#[Object]
+impl GqlClientInfo {
+    async fn user_agent(&self) -> &String {
+        &self.user_agent
+    }
+
+    async fn asn_num(&self) -> i32 {
+        self.asn_num
+    }
+
+    async fn ip_addr(&self) -> &String {
+        &self.ip_addr
+    }
+
+    async fn tinker(&self) -> Option<&GqlTinker> {
+        self.tinker.as_ref()
+    }
+}
+
+pub struct GqlTinker {
+    authed_token: String,
+    wrote_count: u32,
+    created_thread_count: u32,
+    level: u32,
+    last_level_up_at: u64,
+    last_wrote_at: u64,
+}
+
+#[Object]
+impl GqlTinker {
+    async fn authed_token(&self) -> &String {
+        &self.authed_token
+    }
+
+    async fn wrote_count(&self) -> u32 {
+        self.wrote_count
+    }
+
+    async fn created_thread_count(&self) -> u32 {
+        self.created_thread_count
+    }
+
+    async fn level(&self) -> u32 {
+        self.level
+    }
+
+    async fn last_level_up_at(&self) -> u64 {
+        self.last_level_up_at
+    }
+
+    async fn last_wrote_at(&self) -> u64 {
+        self.last_wrote_at
     }
 }
 

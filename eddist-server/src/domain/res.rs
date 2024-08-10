@@ -1,18 +1,15 @@
 use std::ops::Add;
 
 use chrono::{DateTime, Datelike, Utc};
+use eddist_core::domain::{
+    client_info::ClientInfo,
+    ip_addr::{IpAddr, ReducedIpAddr},
+};
 use pwhash::unix;
 
 use crate::{domain::metadent::Metadent, shiftjis::SJisStr};
 
-use super::{
-    client_info::ClientInfo,
-    ip_addr::{IpAddr, ReducedIpAddr},
-    metadent::MetadentType,
-    res_core::ResCore,
-    res_view::ResView,
-    utils::to_ja_datetime,
-};
+use super::{metadent::MetadentType, res_core::ResCore, res_view::ResView, utils::to_ja_datetime};
 
 #[derive(Debug, Clone)]
 pub struct Res {
