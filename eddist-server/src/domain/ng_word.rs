@@ -40,7 +40,7 @@ impl NgWordRestrictable for Res {
 }
 
 // for thread
-impl NgWordRestrictable for (Res, String) {
+impl NgWordRestrictable for (&Res, String) {
     fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
         let (res, thread_name) = self;
         ng_words.iter().any(|ng_word| {

@@ -5,8 +5,15 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        client_info::ClientInfo, metadent::MetadentType, res::Res, res_core::ResCore,
-        service::bbscgi_auth_service::BbsCgiAuthService, tinker::Tinker,
+        client_info::ClientInfo,
+        metadent::MetadentType,
+        ng_word::NgWordRestrictable,
+        res::Res,
+        res_core::ResCore,
+        service::{
+            bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
+        },
+        tinker::Tinker,
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::bbs_repository::{BbsRepository, CreatingThread},
@@ -100,6 +107,13 @@ impl<T: BbsRepository + Clone>
             board_id: board.id,
             metadent: MetadentType::None,
         };
+
+        let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
+            .get_ng_words(&input.board_key)
+            .await?;
+        if (&res, input.title.clone()).contains_ng_word(&ng_words) {
+            return Err(BbsCgiError::NgWordDetected);
+        }
 
         let db_req = tokio::spawn(async move { bbs_repo.create_thread(creating_th).await });
         let redis_req = tokio::spawn(async move {
