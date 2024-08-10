@@ -50,3 +50,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
 
 eddist-core = { path = "../eddist-core" }
+regex = "1.10.6"

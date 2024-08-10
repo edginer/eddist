@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
@@ -69,7 +71,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             ResCore {
                 from: &input.name,
                 mail: &input.mail,
-                body: input.body.clone(),
+                body: Cow::Borrowed(&input.body),
             },
             &input.board_key,
             created_at,
@@ -88,6 +90,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 created_at,
             )
             .await?;
+        let res = res.set_author_id(&authed_token);
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)

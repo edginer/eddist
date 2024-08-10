@@ -64,7 +64,7 @@ mod domain {
     pub(crate) mod thread_list;
     pub(crate) mod thread_res_list;
 
-    mod utils;
+    pub(crate) mod utils;
 }
 mod error;
 mod services;

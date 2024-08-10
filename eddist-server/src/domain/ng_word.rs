@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::res::Res;
+use super::res::{Res, ResState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NgWord {
@@ -29,7 +29,7 @@ impl NgWordRestrictable for String {
     }
 }
 
-impl NgWordRestrictable for Res {
+impl<T: ResState> NgWordRestrictable for Res<T> {
     fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
         ng_words.iter().any(|ng_word| {
             self.body().contains(&ng_word.word)
@@ -40,7 +40,7 @@ impl NgWordRestrictable for Res {
 }
 
 // for thread
-impl NgWordRestrictable for (&Res, String) {
+impl<T: ResState> NgWordRestrictable for (&Res<T>, String) {
     fn contains_ng_word(&self, ng_words: &[NgWord]) -> bool {
         let (res, thread_name) = self;
         ng_words.iter().any(|ng_word| {

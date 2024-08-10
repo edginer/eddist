@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd};
@@ -13,6 +15,7 @@ use crate::{
         service::{
             bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
         },
+        utils::{sanitize_base, sanitize_num_refs},
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::bbs_repository::{BbsRepository, CreatingThread},
@@ -61,7 +64,7 @@ impl<T: BbsRepository + Clone>
             return Err(BbsCgiError::SameTimeThreadCration);
         }
 
-        let title = input.title.clone();
+        let title = sanitize_thread_name(&input.title);
 
         let client_info = ClientInfo {
             user_agent: input.user_agent.clone(),
@@ -73,7 +76,7 @@ impl<T: BbsRepository + Clone>
             ResCore {
                 from: &input.name,
                 mail: &input.mail,
-                body: input.body.clone(),
+                body: Cow::Borrowed(&input.body),
             },
             &input.board_key,
             created_at,
@@ -91,11 +94,12 @@ impl<T: BbsRepository + Clone>
                 created_at,
             )
             .await?;
+        let res = res.set_author_id(&authed_token);
 
         let creating_th = CreatingThread {
             thread_id: th_id,
             response_id: res_id,
-            title: input.title.to_string(),
+            title: title.to_string(),
             unix_time: unix_time as u64,
             body: input.body.to_string(),
             name: input.name.to_string(),
@@ -112,7 +116,7 @@ impl<T: BbsRepository + Clone>
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)
             .await?;
-        if (&res, input.title.clone()).contains_ng_word(&ng_words) {
+        if (&res, title.clone()).contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
         }
 
@@ -168,4 +172,8 @@ pub struct TheradCreationServiceInput {
 
 pub struct TheradCreationServiceOutput {
     pub tinker: Tinker,
+}
+
+pub fn sanitize_thread_name(name: &str) -> String {
+    sanitize_num_refs(&sanitize_base(name, true))
 }
