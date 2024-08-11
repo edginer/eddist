@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+
 use chrono::Utc;
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 
-use crate::repositories::bbs_repository::BbsRepository;
+use crate::{
+    domain::captcha_like::CaptchaLikeConfig, external::captcha_like_client::TurnstileClient,
+    repositories::bbs_repository::BbsRepository,
+};
 
 use super::AppService;
 
@@ -22,7 +27,11 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         &self,
         input: AuthWithCodeServiceInput,
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
-        let ip_addr = IpAddr::new(input.origin_ip);
+        let CaptchaLikeConfig::Turnstile { secret, .. } = &input.captcha_like_configs[0] else {
+            return Err(anyhow::anyhow!("failed to find turnstile config"));
+        };
+
+        let ip_addr = IpAddr::new(input.origin_ip.clone());
         let reduced = ReducedIpAddr::from(ip_addr);
         let Some(token) = self
             .0
@@ -41,6 +50,18 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             return Err(anyhow::anyhow!("activation code is expired"));
         }
 
+        let turnstile_client = TurnstileClient::new(secret.clone());
+        let result = turnstile_client
+            .verify_captcha(
+                &input.responses["cf-turnstile-response"].to_string(),
+                &input.origin_ip,
+            )
+            .await?;
+
+        if !result {
+            return Err(anyhow::anyhow!("failed to verify captcha"));
+        }
+
         self.0
             .activate_authed_status(&token.token, &input.user_agent, now)
             .await?;
@@ -53,6 +74,8 @@ pub struct AuthWithCodeServiceInput {
     pub code: String,
     pub origin_ip: String,
     pub user_agent: String,
+    pub captcha_like_configs: Vec<CaptchaLikeConfig>,
+    pub responses: HashMap<String, String>,
 }
 
 pub struct AuthWithCodeServiceOutput {

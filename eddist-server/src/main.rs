@@ -1,4 +1,4 @@
-use std::{convert::Infallible, env, time::Duration};
+use std::{collections::HashMap, convert::Infallible, env, time::Duration};
 
 use axum::{
     body::{Body, Bytes},
@@ -10,13 +10,13 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use base64::Engine;
+use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::domain::tinker::Tinker;
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
 use repositories::bbs_repository::BbsRepositoryImpl;
-use serde::Deserialize;
 use services::{
     auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
@@ -55,6 +55,7 @@ mod domain {
 
     pub(crate) mod authed_token;
     pub(crate) mod board;
+    pub(crate) mod captcha_like;
     pub(crate) mod metadent;
     pub(crate) mod ng_word;
     pub(crate) mod res;
@@ -68,11 +69,15 @@ mod domain {
 }
 mod error;
 mod services;
+pub(crate) mod external {
+    pub mod captcha_like_client;
+}
 
 #[derive(Debug, Clone)]
 struct AppState {
     services: AppServiceContainer<BbsRepositoryImpl>,
     tinker_secret: Vec<u8>,
+    captcha_like_configs: Vec<CaptchaLikeConfig>,
 }
 
 impl AppState {
@@ -111,9 +116,16 @@ async fn main() -> anyhow::Result<()> {
         .decode(tinker_secret.as_bytes())
         .unwrap();
 
+    let captcha_like_configs_path =
+        env::var("CAPTCHA_CONFIG_PATH").unwrap_or("./captcha-config.json".to_string());
+    let captcha_like_configs = std::fs::read_to_string(captcha_like_configs_path)?;
+    let captcha_like_configs =
+        serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
+
     let app_state = AppState {
         services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), con),
         tinker_secret,
+        captcha_like_configs,
     };
 
     log::info!("Start application server with 0.0.0.0:8080");
@@ -321,7 +333,11 @@ BBS_NONAME_NAME={default_name}"
 }
 
 // NOTE: this system will be changed in the future
-async fn get_auth_code() -> impl IntoResponse {
+async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
+    let CaptchaLikeConfig::Turnstile { site_key, .. } = &state.captcha_like_configs[0] else {
+        panic!("invalid captcha config")
+    };
+
     Html(
         r#"<html>
 <head>
@@ -331,34 +347,36 @@ async fn get_auth_code() -> impl IntoResponse {
 <body>
     <p>認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください</p>
     <form action="/auth-code" method="POST">
-        <!--<div class="cf-turnstile" data-sitekey="{cf_site_key}" data-theme="light"></div>-->
+        <div class="cf-turnstile" data-sitekey="{cf_site_key}" data-theme="light"></div>
         <input type="number" name="auth-code" placeholder="6桁の認証コード">
         <input type="submit" value="Submit">
     </form>
 </body>
 </html>"#
-            .to_string(),
+            .replace("{cf_site_key}", site_key),
     )
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct PostAuthCodeForm {
-    auth_code: u32,
-}
+// #[derive(Debug, Clone, Deserialize)]
+// #[serde(rename_all = "kebab-case")]
+// struct PostAuthCodeForm {
+//     auth_code: u32,
+// }
 
 async fn post_auth_code(
     headers: HeaderMap,
     State(state): State<AppState>,
-    Form(form): Form<PostAuthCodeForm>,
+    Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
     let AuthWithCodeServiceOutput { token } = state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
-            code: form.auth_code.to_string(),
+            code: form["auth-code"].to_string(),
             origin_ip: get_origin_ip(&headers).to_string(),
             user_agent: get_ua(&headers).to_string(),
+            captcha_like_configs: state.captcha_like_configs.clone(),
+            responses: form,
         })
         .await
         .unwrap();
