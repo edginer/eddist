@@ -7,14 +7,20 @@ use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
-    authed_token::AuthedToken, board::Board, cap::Cap, metadent::MetadentType, ng_word::NgWord,
-    res_view::ResView, thread::Thread,
+    authed_token::AuthedToken,
+    board::{Board, BoardInfo},
+    cap::Cap,
+    metadent::MetadentType,
+    ng_word::NgWord,
+    res_view::ResView,
+    thread::Thread,
 };
 
 #[mockall::automock]
 #[async_trait::async_trait]
 pub trait BbsRepository: Send + Sync + 'static {
-    async fn get_board_info(&self, board_key: &str) -> anyhow::Result<Option<Board>>;
+    async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>>;
+    async fn get_board_info(&self, board_id: Uuid) -> anyhow::Result<Option<BoardInfo>>;
     async fn get_threads(
         &self,
         board_id: Uuid,
@@ -64,22 +70,55 @@ impl BbsRepositoryImpl {
 
 #[async_trait::async_trait]
 impl BbsRepository for BbsRepositoryImpl {
-    async fn get_board_info(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
+    async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
         let query = query_as!(
-            SelectionBoard,
-            "SELECT * FROM boards WHERE board_key = ?",
+            Board,
+            r#"
+        SELECT
+            id AS "id: Uuid",
+            name,
+            board_key,
+            default_name
+        FROM boards 
+        WHERE board_key = ?"#,
             board_key
         );
 
         let board = query.fetch_optional(&self.pool).await?;
 
         Ok(board.map(|x| Board {
-            id: x.id.try_into().unwrap(),
+            id: x.id,
             name: x.name,
             board_key: x.board_key,
-            local_rule: x.local_rule,
             default_name: x.default_name,
         }))
+    }
+
+    async fn get_board_info(&self, board_id: Uuid) -> anyhow::Result<Option<BoardInfo>> {
+        let query = query_as!(
+            BoardInfo,
+            r#"
+        SELECT
+            id AS "id: Uuid",
+            local_rules,
+            base_thread_creation_span_sec,
+            base_response_creation_span_sec,
+            max_thread_name_byte_length,
+            max_author_name_byte_length,
+            max_email_byte_length,
+            max_response_body_byte_length,
+            max_response_body_lines,
+            threads_archive_cron,
+            threads_archive_trigger_thread_count,
+            created_at,
+            updated_at
+        FROM boards_info
+        WHERE id = ?
+        "#,
+            board_id
+        );
+
+        Ok(query.fetch_optional(&self.pool).await?)
     }
 
     async fn get_threads(
@@ -487,9 +526,9 @@ impl BbsRepository for BbsRepositoryImpl {
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>> {
         let ng_words = sqlx::query_as!(
-            SelectionNgWord,
-            "SELECT
-                nw.id AS id,
+            NgWord,
+            r#"SELECT
+                nw.id AS "id: Uuid",
                 nw.name AS name,
                 nw.word AS word,
                 nw.created_at AS created_at,
@@ -500,22 +539,13 @@ impl BbsRepository for BbsRepositoryImpl {
             JOIN boards AS b
             ON bnw.board_id = b.id
             WHERE b.board_key = ?
-        ",
+        "#,
             board_key
         )
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(ng_words
-            .into_iter()
-            .map(|x| NgWord {
-                id: x.id.try_into().unwrap(),
-                name: x.name,
-                word: x.word,
-                created_at: x.created_at,
-                updated_at: x.updated_at,
-            })
-            .collect())
+        Ok(ng_words)
     }
 
     async fn get_cap_by_board_key(
@@ -524,9 +554,9 @@ impl BbsRepository for BbsRepositoryImpl {
         board_key: &str,
     ) -> anyhow::Result<Option<Cap>> {
         let cap = sqlx::query_as!(
-            SelectionCap,
-            "SELECT
-                c.id AS id,
+            Cap,
+            r#"SELECT
+                c.id AS "id: Uuid",
                 c.name AS name,
                 c.password_hash AS password_hash,
                 c.description AS description,
@@ -538,31 +568,15 @@ impl BbsRepository for BbsRepositoryImpl {
             JOIN boards AS b
             ON bc.board_id = b.id
             WHERE c.password_hash = ? AND b.board_key = ?
-        ",
+        "#,
             cap_hash,
             board_key
         )
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(cap.map(|cap| Cap {
-            id: cap.id.try_into().unwrap(),
-            name: cap.name,
-            description: cap.description,
-            password_hash: cap.password_hash,
-            created_at: cap.created_at,
-            updated_at: cap.updated_at,
-        }))
+        Ok(cap)
     }
-}
-
-#[derive(Debug)]
-struct SelectionBoard {
-    id: Vec<u8>,
-    name: String,
-    board_key: String,
-    local_rule: String,
-    default_name: String,
 }
 
 #[derive(Debug)]
@@ -659,23 +673,4 @@ pub struct CreatingAuthedToken {
     pub writing_ua: String,
     pub auth_code: String,
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SelectionNgWord {
-    pub id: Vec<u8>,
-    pub name: String,
-    pub word: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SelectionCap {
-    pub id: Vec<u8>,
-    pub name: String,
-    pub description: String,
-    pub password_hash: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
 }

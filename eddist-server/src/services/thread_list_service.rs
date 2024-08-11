@@ -19,7 +19,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadList> for ThreadListService<T>
     async fn execute(&self, input: BoardKey) -> anyhow::Result<ThreadList> {
         let board = self
             .0
-            .get_board_info(&input.0)
+            .get_board(&input.0)
             .await?
             .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
 

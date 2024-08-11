@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS boards_caps;
 
 DROP TABLE IF EXISTS caps;
 
+DROP TABLE IF EXISTS boards_info;
+
 DROP TABLE IF EXISTS boards;
 
 DROP TABLE IF EXISTS authed_tokens;

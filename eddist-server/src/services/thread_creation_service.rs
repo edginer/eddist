@@ -48,7 +48,7 @@ impl<T: BbsRepository + Clone>
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
         let board = self
             .0
-            .get_board_info(&input.board_key)
+            .get_board(&input.board_key)
             .await
             .map_err(BbsCgiError::Other)?
             .ok_or_else(|| BbsCgiError::NotFound(NotFoundParamType::Board))?;

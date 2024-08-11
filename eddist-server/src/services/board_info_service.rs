@@ -1,4 +1,4 @@
-use crate::repositories::bbs_repository::BbsRepository;
+use crate::{domain::board::BoardInfo, repositories::bbs_repository::BbsRepository};
 
 use super::AppService;
 
@@ -21,7 +21,13 @@ impl<T: BbsRepository> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
     ) -> anyhow::Result<BoardInfoServiceOutput> {
         let board = self
             .0
-            .get_board_info(&input.board_key)
+            .get_board(&input.board_key)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
+
+        let board_info = self
+            .0
+            .get_board_info(board.id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
 
@@ -29,6 +35,7 @@ impl<T: BbsRepository> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
             board_key: board.board_key,
             name: board.name,
             default_name: board.default_name,
+            board_info,
         })
     }
 }
@@ -41,4 +48,5 @@ pub struct BoardInfoServiceOutput {
     pub board_key: String,
     pub name: String,
     pub default_name: String,
+    pub board_info: BoardInfo,
 }

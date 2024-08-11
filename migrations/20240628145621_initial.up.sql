@@ -16,10 +16,27 @@ CREATE TABLE authed_tokens (
 
 CREATE TABLE boards (
     id BINARY(16) PRIMARY KEY,
-    name TEXT NOT NULL,
+    name VARCHAR(255) NOT NULL,
     board_key VARCHAR(255) UNIQUE NOT NULL,
-    local_rule TEXT NOT NULL,
     default_name TEXT NOT NULL
+);
+
+CREATE TABLE boards_info (
+    -- id is same as board_id
+    id BINARY(16) PRIMARY KEY,
+    local_rules TEXT NOT NULL,
+    base_thread_creation_span_sec INT NOT NULL DEFAULT 120,
+    base_response_creation_span_sec INT NOT NULL DEFAULT 5,
+    max_thread_name_byte_length INT NOT NULL DEFAULT 256,
+    max_author_name_byte_length INT NOT NULL DEFAULT 128,
+    max_email_byte_length INT NOT NULL DEFAULT 128,
+    max_response_body_byte_length INT NOT NULL DEFAULT 9192,
+    max_response_body_lines INT NOT NULL DEFAULT 32,
+    threads_archive_cron VARCHAR(255),
+    threads_archive_trigger_thread_count INT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (id) REFERENCES boards(id)
 );
 
 CREATE TABLE threads (

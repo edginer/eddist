@@ -44,7 +44,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
         let res_id = Uuid::now_v7();
         let board = self
             .0
-            .get_board_info(&input.board_key)
+            .get_board(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
         let created_at = Utc::now();

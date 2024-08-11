@@ -10,7 +10,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use base64::Engine;
-use domain::captcha_like::CaptchaLikeConfig;
+use domain::{board::BoardInfo, captcha_like::CaptchaLikeConfig};
 use eddist_core::domain::tinker::Tinker;
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
@@ -137,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
         .route("/:boardKey/subject.txt", get(get_subject_txt))
-        .route("/:boardKey/head.txt", get(get_subject_txt))
+        .route("/:boardKey/head.txt", get(get_head_txt))
         .route("/:boardKey/SETTING.TXT", get(get_setting_txt))
         .route("/:boardKey/dat/:threadId", get(get_dat_txt))
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
@@ -312,20 +312,57 @@ async fn get_setting_txt(
         board_key,
         name,
         default_name,
+        board_info:
+            BoardInfo {
+                max_thread_name_byte_length,
+                max_author_name_byte_length,
+                max_email_byte_length,
+                max_response_body_byte_length,
+                max_response_body_lines,
+                ..
+            },
     } = state
         .services
         .board_info()
         .execute(BoardInfoServiceInput { board_key })
         .await
         .unwrap();
+    let max_response_body_lines = max_response_body_lines / 2;
     let setting_txt = format!(
         "{board_key}@{board_key}
 BBS_TITLE={name}
 BBS_TITLE_ORIG={name}
-BBS_NONAME_NAME={default_name}"
+BBS_LINE_NUMBER={max_response_body_lines}
+BBS_NONAME_NAME={default_name}
+BBS_SUBJECT_COUNT={max_thread_name_byte_length}
+BBS_NAME_COUNT={max_author_name_byte_length}
+BBS_MAIL_COUNT={max_email_byte_length}
+BBS_MESSAGE_COUNT={max_response_body_byte_length}"
     );
 
     SJisResponseBuilder::new((&setting_txt as &str).into())
+        .client_ttl(120)
+        .server_ttl(300)
+        .content_type(SjisContentType::TextPlain)
+        .build()
+        .into_response()
+}
+
+async fn get_head_txt(
+    Path(board_key): Path<String>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let BoardInfoServiceOutput {
+        board_info: BoardInfo { local_rules, .. },
+        ..
+    } = state
+        .services
+        .board_info()
+        .execute(BoardInfoServiceInput { board_key })
+        .await
+        .unwrap();
+
+    SJisResponseBuilder::new((&local_rules as &str).into())
         .client_ttl(120)
         .server_ttl(300)
         .content_type(SjisContentType::TextPlain)

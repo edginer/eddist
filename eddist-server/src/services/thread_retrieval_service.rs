@@ -50,7 +50,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
                 Ok(ThreadResListRaw { raw: sjis_result })
             }
             _ => {
-                let Some(board) = self.0.get_board_info(&input.board_key).await? else {
+                let Some(board) = self.0.get_board(&input.board_key).await? else {
                     return Err(anyhow!("failed to find board"));
                 };
 
