@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        cap::calculate_cap_hash,
         metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
@@ -94,7 +95,16 @@ impl<T: BbsRepository + Clone>
                 created_at,
             )
             .await?;
-        let res = res.set_author_id(&authed_token);
+        let cap_name = if let Some(cap) = res.cap() {
+            let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
+            self.0
+                .get_cap_by_board_key(&hash, &input.board_key)
+                .await?
+                .map(|x| x.name)
+        } else {
+            None
+        };
+        let res = res.set_author_id(&authed_token, cap_name);
 
         let creating_th = CreatingThread {
             thread_id: th_id,

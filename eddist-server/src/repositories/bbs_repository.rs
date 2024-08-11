@@ -7,7 +7,7 @@ use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
-    authed_token::AuthedToken, board::Board, metadent::MetadentType, ng_word::NgWord,
+    authed_token::AuthedToken, board::Board, cap::Cap, metadent::MetadentType, ng_word::NgWord,
     res_view::ResView, thread::Thread,
 };
 
@@ -44,6 +44,11 @@ pub trait BbsRepository: Send + Sync + 'static {
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
+    async fn get_cap_by_board_key(
+        &self,
+        cap_hash: &str,
+        board_key: &str,
+    ) -> anyhow::Result<Option<Cap>>;
 }
 
 #[derive(Debug, Clone)]
@@ -512,6 +517,43 @@ impl BbsRepository for BbsRepositoryImpl {
             })
             .collect())
     }
+
+    async fn get_cap_by_board_key(
+        &self,
+        cap_hash: &str,
+        board_key: &str,
+    ) -> anyhow::Result<Option<Cap>> {
+        let cap = sqlx::query_as!(
+            SelectionCap,
+            "SELECT
+                c.id AS id,
+                c.name AS name,
+                c.password_hash AS password_hash,
+                c.description AS description,
+                c.created_at AS created_at,
+                c.updated_at AS updated_at
+            FROM caps AS c
+            JOIN boards_caps AS bc
+            ON c.id = bc.cap_id
+            JOIN boards AS b
+            ON bc.board_id = b.id
+            WHERE c.password_hash = ? AND b.board_key = ?
+        ",
+            cap_hash,
+            board_key
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(cap.map(|cap| Cap {
+            id: cap.id.try_into().unwrap(),
+            name: cap.name,
+            description: cap.description,
+            password_hash: cap.password_hash,
+            created_at: cap.created_at,
+            updated_at: cap.updated_at,
+        }))
+    }
 }
 
 #[derive(Debug)]
@@ -626,4 +668,14 @@ pub struct SelectionNgWord {
     pub word: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectionCap {
+    pub id: Vec<u8>,
+    pub name: String,
+    pub description: String,
+    pub password_hash: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }

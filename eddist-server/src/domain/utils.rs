@@ -1,5 +1,26 @@
+use std::fmt::Debug;
+
 use chrono::{DateTime, Datelike, Weekday};
 use regex::Regex;
+
+#[derive(Clone)]
+pub struct SimpleSecret(String);
+
+impl SimpleSecret {
+    pub fn new(secret: &str) -> Self {
+        Self(secret.to_string())
+    }
+
+    pub fn get(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Debug for SimpleSecret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[REDACTED]")
+    }
+}
 
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {
     let weekday = datetime.weekday();

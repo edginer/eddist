@@ -55,6 +55,7 @@ mod domain {
 
     pub(crate) mod authed_token;
     pub(crate) mod board;
+    pub(crate) mod cap;
     pub(crate) mod captcha_like;
     pub(crate) mod metadent;
     pub(crate) mod ng_word;
@@ -356,12 +357,6 @@ async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
             .replace("{cf_site_key}", site_key),
     )
 }
-
-// #[derive(Debug, Clone, Deserialize)]
-// #[serde(rename_all = "kebab-case")]
-// struct PostAuthCodeForm {
-//     auth_code: u32,
-// }
 
 async fn post_auth_code(
     headers: HeaderMap,

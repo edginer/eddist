@@ -1,11 +1,13 @@
 -- Add down migration script here
-DROP TABLE IF EXISTS caps;
-
 DROP TABLE IF EXISTS responses;
 
 DROP TABLE IF EXISTS threads;
 
 DROP TABLE IF EXISTS boards_ng_words;
+
+DROP TABLE IF EXISTS boards_caps;
+
+DROP TABLE IF EXISTS caps;
 
 DROP TABLE IF EXISTS boards;
 

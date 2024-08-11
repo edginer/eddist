@@ -62,8 +62,19 @@ CREATE TABLE responses (
 
 CREATE TABLE caps (
     id BINARY(16) PRIMARY KEY,
-    cap_name TEXT NOT NULL,
-    cap_password_hash TEXT NOT NULL
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE boards_caps (
+    id BINARY(16) PRIMARY KEY,
+    board_id BINARY(16) NOT NULL,
+    cap_id BINARY(16) NOT NULL,
+    FOREIGN KEY (board_id) REFERENCES boards(id),
+    FOREIGN KEY (cap_id) REFERENCES caps(id)
 );
 
 CREATE TABLE ng_words (

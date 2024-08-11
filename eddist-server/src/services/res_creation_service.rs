@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        cap::calculate_cap_hash,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -90,7 +91,16 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 created_at,
             )
             .await?;
-        let res = res.set_author_id(&authed_token);
+        let cap_name = if let Some(cap) = res.cap() {
+            let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
+            self.0
+                .get_cap_by_board_key(&hash, &input.board_key)
+                .await?
+                .map(|x| x.name)
+        } else {
+            None
+        };
+        let res = res.set_author_id(&authed_token, cap_name);
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)

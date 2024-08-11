@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
-use crate::domain::captcha_like::{TurnstileResponse, TURNSTILE_URL};
-
-pub struct Secret(String);
+use crate::domain::{
+    captcha_like::{TurnstileResponse, TURNSTILE_URL},
+    utils::SimpleSecret,
+};
 
 pub struct TurnstileClient {
     client: reqwest::Client,
-    secret: Secret,
+    secret: SimpleSecret,
 }
 
 impl TurnstileClient {
     pub fn new(secret: String) -> Self {
         Self {
             client: reqwest::Client::new(),
-            secret: Secret(secret),
+            secret: SimpleSecret::new(&secret),
         }
     }
 
@@ -25,12 +26,12 @@ impl TurnstileClient {
         let mut form_data = HashMap::new();
         form_data.insert("response", response);
         form_data.insert("remoteip", ip_addr);
-        form_data.insert("secret", &self.secret.0);
+        form_data.insert("secret", self.secret.get());
 
         let res = self
             .client
             .post(TURNSTILE_URL)
-            .header("Authorization", self.secret.0.clone())
+            .header("Authorization", self.secret.get())
             .form(&form_data)
             .send()
             .await?;

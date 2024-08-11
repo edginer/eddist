@@ -11,7 +11,7 @@ use super::{
     metadent::MetadentType,
     res_core::ResCore,
     res_view::ResView,
-    utils::{sanitize_base, sanitize_num_refs, to_ja_datetime},
+    utils::{sanitize_base, sanitize_num_refs, to_ja_datetime, SimpleSecret},
 };
 
 pub trait ResState {}
@@ -23,9 +23,15 @@ impl ResState for AuthorIdInitialized {}
 impl ResState for AuthorIdUninitialized {}
 
 #[derive(Debug, Clone)]
+enum CapState {
+    RawPassword(SimpleSecret),
+    Retrieved(String),
+}
+
+#[derive(Debug, Clone)]
 pub struct Res<T: ResState> {
     author_name: String,
-    cap: Option<String>,
+    cap: Option<CapState>,
     trip: Option<String>,
     authed_token: Option<String>,
     author_id: Option<String>,
@@ -42,36 +48,6 @@ pub struct Res<T: ResState> {
 }
 
 impl<T: ResState> Res<T> {
-    pub fn pretty_author_name(&self, default_name: &str) -> String {
-        let author_name = if self.author_name.is_empty() {
-            default_name
-        } else {
-            &self.author_name
-        };
-
-        // base_name [ ★ cap_name ] [ ◆ trip_name ] [</b>(metadent info)<b>]
-        let metadent = Metadent::new(self.metadent_type, &self.client_info, self.created_at);
-
-        format!(
-            "{}{}{}{}{}",
-            author_name,
-            self.cap
-                .as_ref()
-                .map(|x| format!(" ★{x}"))
-                .unwrap_or_default(),
-            self.trip
-                .as_ref()
-                .map(|x| format!(" ◆{x}"))
-                .unwrap_or_default(),
-            if self.metadent_type == MetadentType::None {
-                ""
-            } else {
-                " "
-            },
-            metadent,
-        )
-    }
-
     pub fn mail(&self) -> &str {
         &self.mail
     }
@@ -100,15 +76,19 @@ impl Res<AuthorIdUninitialized> {
         is_abone: bool,
     ) -> Self {
         let (author_name, trip) = if let Some(split) = from.split_once('#') {
-            (sanitize_author_name(split.0), Some(split.1.to_string()))
+            (sanitize_author_name(split.0), Some(calculate_trip(split.1)))
         } else {
             (sanitize_author_name(from), None)
         };
         let (mail, cap, mail_authed_token) =
             if let Some((mail, after_delimiter)) = mail.split_once('#') {
-                // #@ -> cap, # -> mail_authed_token
+                // #@ -> cap, # -> mail_authed_token, cannot use both
                 if let Some(stripped) = after_delimiter.strip_prefix('@') {
-                    (sanitize_email(mail), Some(stripped.to_string()), None)
+                    (
+                        sanitize_email(mail),
+                        Some(CapState::RawPassword(SimpleSecret::new(stripped))),
+                        None,
+                    )
                 } else {
                     (
                         sanitize_email(mail),
@@ -185,7 +165,11 @@ impl Res<AuthorIdUninitialized> {
         )
     }
 
-    pub fn set_author_id(self, authed_token: &AuthedToken) -> Res<AuthorIdInitialized> {
+    pub fn set_author_id(
+        self,
+        authed_token: &AuthedToken,
+        retrieved_cap_name: Option<String>,
+    ) -> Res<AuthorIdInitialized> {
         let author_id = get_author_id(
             &self.board_key,
             self.created_at,
@@ -194,7 +178,7 @@ impl Res<AuthorIdUninitialized> {
 
         Res {
             author_name: self.author_name,
-            cap: self.cap,
+            cap: retrieved_cap_name.map(CapState::Retrieved),
             trip: self.trip,
             mail: self.mail,
             authed_token: self.authed_token,
@@ -209,11 +193,50 @@ impl Res<AuthorIdUninitialized> {
             _state: std::marker::PhantomData,
         }
     }
+
+    pub fn cap(&self) -> Option<&SimpleSecret> {
+        match &self.cap {
+            Some(CapState::RawPassword(secret)) => Some(secret),
+            _ => None,
+        }
+    }
 }
 
 impl Res<AuthorIdInitialized> {
     pub fn author_id(&self) -> &str {
         self.author_id.as_ref().unwrap()
+    }
+
+    pub fn pretty_author_name(&self, default_name: &str) -> String {
+        let author_name = if self.author_name.is_empty() {
+            default_name
+        } else {
+            &self.author_name
+        };
+
+        // base_name [ ★ cap_name ] [ ◆ trip_name ] [</b>(metadent info)<b>]
+        let metadent = Metadent::new(self.metadent_type, &self.client_info, self.created_at);
+        let cap = if let Some(CapState::Retrieved(ref cap)) = self.cap {
+            Some(cap)
+        } else {
+            None
+        };
+
+        format!(
+            "{}{}{}{}{}",
+            author_name,
+            cap.as_ref().map(|x| format!(" ★{x}")).unwrap_or_default(),
+            self.trip
+                .as_ref()
+                .map(|x| format!(" ◆{x}"))
+                .unwrap_or_default(),
+            if self.metadent_type == MetadentType::None {
+                ""
+            } else {
+                " "
+            },
+            metadent,
+        )
     }
 
     pub fn get_sjis_bytes(&self, default_name: &str, thread_title: Option<&str>) -> SJisStr {
