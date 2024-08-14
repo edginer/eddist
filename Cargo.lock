@@ -872,6 +872,7 @@ dependencies = [
  "redis",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]

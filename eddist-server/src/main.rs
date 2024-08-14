@@ -10,8 +10,8 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use base64::Engine;
-use domain::{board::BoardInfo, captcha_like::CaptchaLikeConfig};
-use eddist_core::domain::tinker::Tinker;
+use domain::captcha_like::CaptchaLikeConfig;
+use eddist_core::domain::{board::BoardInfo, tinker::Tinker};
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -55,7 +55,6 @@ mod domain {
     }
 
     pub(crate) mod authed_token;
-    pub(crate) mod board;
     pub(crate) mod cap;
     pub(crate) mod captcha_like;
     pub(crate) mod metadent;

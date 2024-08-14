@@ -10,3 +10,4 @@ chrono = "0.4.38"
 redis = { version = "0.25.4", features = ["tokio-comp"] }
 anyhow = "1.0.86"
 serde_json = { version = "1.0.118" }
+uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }

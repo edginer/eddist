@@ -1,6 +1,7 @@
+use eddist_core::domain::board::Board;
 use encoding_rs::SHIFT_JIS;
 
-use super::{board::Board, thread::Thread};
+use super::thread::Thread;
 
 #[derive(Debug, Clone)]
 pub struct ThreadList {

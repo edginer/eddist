@@ -1,7 +1,6 @@
-use crate::{
-    domain::{self, board::BoardInfo},
-    repositories::bbs_repository::BbsRepository,
-};
+use eddist_core::domain::board::BoardInfo;
+
+use crate::{domain, repositories::bbs_repository::BbsRepository};
 
 use super::AppService;
 

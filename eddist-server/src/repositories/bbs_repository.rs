@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use eddist_core::domain::{
+    board::{Board, BoardInfo},
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
 };
@@ -7,13 +8,8 @@ use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
-    authed_token::AuthedToken,
-    board::{Board, BoardInfo},
-    cap::Cap,
-    metadent::MetadentType,
-    ng_word::NgWord,
-    res_view::ResView,
-    thread::Thread,
+    authed_token::AuthedToken, cap::Cap, metadent::MetadentType, ng_word::NgWord,
+    res_view::ResView, thread::Thread,
 };
 
 #[mockall::automock]

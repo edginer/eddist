@@ -8,14 +8,16 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        board::{BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable},
         cap::calculate_cap_hash,
         metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::BbsCgiAuthService, board_info_service::BoardInfoService,
+            bbscgi_auth_service::BbsCgiAuthService,
+            board_info_service::{
+                BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
+            },
             ng_word_reading_service::NgWordReadingService,
         },
         utils::{sanitize_base, sanitize_num_refs},
