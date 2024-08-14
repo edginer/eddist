@@ -8,13 +8,15 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        board::{BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable},
         cap::calculate_cap_hash,
         metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::BbsCgiAuthService, ng_word_reading_service::NgWordReadingService,
+            bbscgi_auth_service::BbsCgiAuthService, board_info_service::BoardInfoService,
+            ng_word_reading_service::NgWordReadingService,
         },
         utils::{sanitize_base, sanitize_num_refs},
     },
@@ -46,12 +48,11 @@ impl<T: BbsRepository + Clone>
         let bbs_repo = self.0.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
-        let board = self
-            .0
-            .get_board(&input.board_key)
-            .await
-            .map_err(BbsCgiError::Other)?
-            .ok_or_else(|| BbsCgiError::NotFound(NotFoundParamType::Board))?;
+        let board_info_svc = BoardInfoService::new(self.0.clone());
+        let (board, board_info) = board_info_svc
+            .get_board_info_by_key(&input.board_key)
+            .await?
+            .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
         let created_at = Utc::now();
         let unix_time = created_at.timestamp();
 
@@ -67,18 +68,23 @@ impl<T: BbsRepository + Clone>
 
         let title = sanitize_thread_name(&input.title);
 
+        let res_core = ResCore {
+            from: &input.name,
+            mail: &input.mail,
+            body: Cow::Borrowed(&input.body),
+        };
         let client_info = ClientInfo {
             user_agent: input.user_agent.clone(),
             asn_num: input.asn_num,
             ip_addr: input.ip_addr.clone(),
             tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
         };
+
+        (&res_core, &input.title as &str).validate_content_length(&board_info)?;
+        client_info.validate_client_info(&board_info, true)?;
+
         let res = Res::new_from_thread(
-            ResCore {
-                from: &input.name,
-                mail: &input.mail,
-                body: Cow::Borrowed(&input.body),
-            },
+            res_core,
             &input.board_key,
             created_at,
             client_info.clone(),

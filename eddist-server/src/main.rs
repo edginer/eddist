@@ -50,6 +50,7 @@ mod repositories {
 mod domain {
     pub(crate) mod service {
         pub mod bbscgi_auth_service;
+        pub mod board_info_service;
         pub mod ng_word_reading_service;
     }
 

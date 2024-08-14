@@ -41,6 +41,18 @@ pub enum BbsCgiError {
     #[error("NGワードが含まれています")]
     NgWordDetected,
 
+    #[error("{0}が長すぎます")]
+    ContentLengthExceeded(ContentLengthExceededParamType),
+
+    #[error("短期間に書き込みすぎです ({0}秒以内に1回書き込むことができます)")]
+    TooManyCreatingRes(i32),
+
+    #[error("短期間にスレ立てすぎです (Lv{tinker_level}は{span_sec}秒以内に1回スレを立てることができます)")]
+    TooManyCreatingThread { tinker_level: u32, span_sec: i32 },
+
+    #[error("初回書き込み時にはスレッドを立てることができません")]
+    TmpCanNotCreateThread,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -57,6 +69,10 @@ impl BbsCgiError {
             BbsCgiError::InvalidAuthedToken => StatusCode::BAD_REQUEST,
             BbsCgiError::RevokedAuthedToken => StatusCode::FORBIDDEN,
             BbsCgiError::NgWordDetected => StatusCode::OK,
+            BbsCgiError::ContentLengthExceeded(_) => StatusCode::OK,
+            BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
+            BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
+            BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -184,5 +200,30 @@ impl Display for NotFoundParamType {
 impl From<NotFoundParamType> for BbsCgiError {
     fn from(t: NotFoundParamType) -> Self {
         BbsCgiError::NotFound(t)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ContentLengthExceededParamType {
+    Name,
+    Mail,
+    Body,
+    ThreadName,
+    BodyLines,
+}
+
+impl Display for ContentLengthExceededParamType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ContentLengthExceededParamType::Name => "名前",
+                ContentLengthExceededParamType::Mail => "メール",
+                ContentLengthExceededParamType::Body => "本文",
+                ContentLengthExceededParamType::ThreadName => "スレッド名",
+                ContentLengthExceededParamType::BodyLines => "本文の行数",
+            }
+        )
     }
 }

@@ -9,6 +9,7 @@ pub struct Tinker {
     level: u32,
     last_level_up_at: u64,
     last_wrote_at: u64,
+    last_created_thread_at: Option<u64>,
 }
 
 impl Tinker {
@@ -20,6 +21,7 @@ impl Tinker {
             level: 1,
             last_level_up_at: datetime.timestamp() as u64,
             last_wrote_at: 0,
+            last_created_thread_at: None,
         }
     }
 
@@ -39,6 +41,7 @@ impl Tinker {
                 self.last_level_up_at
             },
             last_wrote_at: timestamp,
+            last_created_thread_at: self.last_created_thread_at,
         }
     }
 
@@ -59,6 +62,7 @@ impl Tinker {
                 self.last_level_up_at
             },
             last_wrote_at: timestamp,
+            last_created_thread_at: Some(timestamp),
         }
     }
 
@@ -84,5 +88,9 @@ impl Tinker {
 
     pub fn last_wrote_at(&self) -> u64 {
         self.last_wrote_at
+    }
+
+    pub fn last_created_thread_at(&self) -> Option<u64> {
+        self.last_created_thread_at
     }
 }

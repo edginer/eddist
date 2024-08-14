@@ -1,4 +1,5 @@
-use redis::{aio::MultiplexedConnection, AsyncCommands};
+use eddist_core::cache_aside::{cache_aside, AsCache};
+use redis::aio::MultiplexedConnection;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,52 +15,29 @@ struct NgWordCache {
     expired_at: u64,
 }
 
-impl<T: BbsRepository> NgWordReadingService<T> {
+impl AsCache<Vec<NgWord>> for NgWordCache {
+    fn expired_at(&self) -> u64 {
+        self.expired_at
+    }
+
+    fn get(self) -> Vec<NgWord> {
+        self.ng_words
+    }
+}
+
+impl<T: BbsRepository + Clone> NgWordReadingService<T> {
     pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
         Self(repo, redis_conn)
     }
 
     pub async fn get_ng_words(&self, board_key: &str) -> Result<Vec<NgWord>, BbsCgiError> {
-        // Cache-aside
-        let mut redis_conn = self.1.clone();
-        let cache_key = format!("ng_words:{board_key}");
-        let cache_ng_words = redis_conn
-            .get::<_, Option<String>>(&cache_key)
-            .await
-            .map_err(|e| BbsCgiError::Other(e.into()))?;
-
-        if let Some(cache_ng_words) = cache_ng_words {
-            let cache_ng_words = serde_json::from_str::<NgWordCache>(&cache_ng_words);
-            match cache_ng_words {
-                Ok(c) if c.expired_at > chrono::Utc::now().timestamp() as u64 => {
-                    return Ok(c.ng_words)
-                }
-                Err(_) => {
-                    redis_conn
-                        .del::<_, u32>(&cache_key)
-                        .await
-                        .map_err(|ex| BbsCgiError::Other(ex.into()))?;
-                }
-                _ => {}
-            }
-        }
-
-        let ng_words = self
-            .0
-            .get_ng_words_by_board_key(board_key)
-            .await
-            .map_err(BbsCgiError::Other)?;
-
-        let cache_ng_words = NgWordCache {
-            ng_words: ng_words.clone(),
-            expired_at: chrono::Utc::now().timestamp() as u64 + 60,
-        };
-
-        redis_conn
-            .set::<_, _, _>(&cache_key, serde_json::to_string(&cache_ng_words).unwrap())
-            .await
-            .map_err(|e| BbsCgiError::Other(e.into()))?;
-
-        Ok(ng_words)
+        let board_key = board_key.to_string();
+        let repo = self.0.clone();
+        cache_aside::<NgWordCache, _, _>(&board_key, "ng_words", &mut self.1.clone(), || {
+            let board_key = board_key.clone();
+            Box::pin(async move { repo.get_ng_words_by_board_key(&board_key).await })
+        })
+        .await
+        .map_err(BbsCgiError::Other)
     }
 }

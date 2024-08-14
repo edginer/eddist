@@ -1,4 +1,7 @@
-use crate::{domain::board::BoardInfo, repositories::bbs_repository::BbsRepository};
+use crate::{
+    domain::{self, board::BoardInfo},
+    repositories::bbs_repository::BbsRepository,
+};
 
 use super::AppService;
 
@@ -12,24 +15,19 @@ impl<T: BbsRepository> BoardInfoService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
+impl<T: BbsRepository + Clone> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
     for BoardInfoService<T>
 {
     async fn execute(
         &self,
         input: BoardInfoServiceInput,
     ) -> anyhow::Result<BoardInfoServiceOutput> {
-        let board = self
-            .0
-            .get_board(&input.board_key)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
+        let svc = domain::service::board_info_service::BoardInfoService::new(self.0.clone());
 
-        let board_info = self
-            .0
-            .get_board_info(board.id)
+        let (board, board_info) = svc
+            .get_board_info_by_key(&input.board_key)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
+            .ok_or_else(|| anyhow::anyhow!("board not found"))?;
 
         Ok(BoardInfoServiceOutput {
             board_key: board.board_key,
