@@ -5,3 +5,17 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.39.2", features = ["full"] }
+sqlx = { version = "0.8.0", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",
+    "macros",
+    "chrono",
+    "json",
+    "uuid",
+] }
+anyhow = "1.0.86"
+cron = "0.12.1"
+chrono = { version = "0.4.38", features = ["serde"] }
+
+eddist-core = { path = "../eddist-core" }
