@@ -1,0 +1,44 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT\n                b.board_key AS board_key,\n                bi.threads_archive_cron AS threads_archive_cron,\n                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count\n            FROM\n                boards AS b\n            JOIN\n                boards_info AS bi\n            ON\n                b.id = bi.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "board_key",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "threads_archive_cron",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "threads_archive_trigger_thread_count",
+        "type_info": {
+          "type": "Long",
+          "flags": "",
+          "max_size": 11
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "78aee0b7a11b4c7aaaf9e8c769a96d33c8e4cdf861e09bcbe796529ca9335673"
+}

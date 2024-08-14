@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE threads SET archived = 1 WHERE active = 0\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "dfdcc6fd9a64ce2b05f0a2bef250f6455e692b0b7fa19cd2aa9c7b4d451742b8"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                *\n            FROM\n                responses\n            WHERE\n                board_id = ?\n                AND thread_id = ?\n            ORDER BY\n                res_order ASC\n            ",
+  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                board_id = ?\n                AND thread_id = ?\n            ORDER BY\n                res_order ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -104,6 +104,15 @@
       },
       {
         "ordinal": 11,
+        "name": "client_info!: Json<ClientInfo>",
+        "type_info": {
+          "type": "Json",
+          "flags": "NOT_NULL | BLOB | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 4294967295
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "res_order",
         "type_info": {
           "type": "Long",
@@ -127,8 +136,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "ee320d028cdb224f21f67795f915c2fa8fc861b8381f488b2c4f632a24379121"
+  "hash": "3cdef0bf94e4e239a4de62d8d23aa87df5a118bf6c61269b31cb95285e95673e"
 }
