@@ -1,6 +1,6 @@
 use std::{env, str::FromStr, time::Duration};
 
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use cron::Schedule;
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -18,6 +18,9 @@ async fn main() {
         eprintln!("Usage: eddist-cron <job> [args...]");
         std::process::exit(1);
     }
+
+    let executed_time = Utc::now();
+
     // TODO: logging
     match args[1].as_str() {
         "inactivate" => {
@@ -39,9 +42,12 @@ async fn main() {
                     let schedule = Schedule::from_str(&cron).unwrap();
                     let next = schedule.upcoming(Utc).next().unwrap();
 
-                    if next > Utc::now() {
+                    // Execute when current time is next(only minute)
+                    let next = next.with_second(0).unwrap();
+                    if executed_time.with_second(0).unwrap() != next {
                         continue;
                     }
+
                     repo.update_threads_to_inactive(&b.board_key, trigger as u32)
                         .await
                         .unwrap();
@@ -60,6 +66,20 @@ async fn main() {
         job => {
             eprintln!("Unknown job: {job}");
             std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name() {
+        let cron = "0 */1 * * * *";
+        let schedule = Schedule::from_str(cron).unwrap();
+        for datetime in schedule.upcoming(Utc).take(10) {
+            println!("{datetime}");
         }
     }
 }
