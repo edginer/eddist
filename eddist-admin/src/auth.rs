@@ -13,6 +13,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 use tower_sessions::Session;
+use tracing::info_span;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KeycloakAccessToken {
@@ -199,7 +200,7 @@ pub struct LoginCallbackQuery {
     state: String,
 }
 
-// GET: /login/callback
+// GET: /auth/callback
 pub async fn get_login_callback(
     session: Session,
     admin_session: AdminSession,
@@ -207,6 +208,8 @@ pub async fn get_login_callback(
     State((oauth_client, _)): State<(BasicClient, MySqlPool)>,
 ) -> impl IntoResponse {
     let Some(oauth_session) = session.get::<OAuthSession>("oauth").await.unwrap() else {
+        info_span!("oauth_session is not found");
+
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
             .body(Body::empty())
@@ -217,6 +220,12 @@ pub async fn get_login_callback(
     let csrf_state = CsrfToken::new(query.state.clone());
 
     if csrf_state.secret() != oauth_session.csrf_state.secret() {
+        // HACK: this is for testing, should be removed in production (csrf_state)
+        info_span!("csrf_state is not matched",
+          server_state = ?oauth_session.csrf_state.secret(),
+          client_state = ?csrf_state.secret()
+        );
+
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
             .body(Body::empty())
@@ -229,21 +238,32 @@ pub async fn get_login_callback(
         .request_async(reqwest::async_http_client)
         .await;
 
-    if let Ok(token) = token {
-        let new_session = AdminSession {
-            access_token: Some(token.access_token().secret().to_string()),
-            refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
-            ..admin_session
-        };
+    match token {
+        Ok(token) => {
+            let new_session = AdminSession {
+                access_token: Some(token.access_token().secret().to_string()),
+                refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
+                ..admin_session
+            };
 
-        session.insert("data", new_session).await.unwrap();
+            // HACK: this is for testing, should be removed in production (access_token and refresh_token)
+            info_span!("success to get token from auth server",
+                refresh_token = ?new_session.refresh_token,
+                access_token = ?new_session.access_token
+            );
 
-        Redirect::to("/dashboard").into_response()
-    } else {
-        Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .body(Body::empty())
-            .unwrap()
+            session.insert("data", new_session).await.unwrap();
+
+            Redirect::to("/dashboard").into_response()
+        }
+        Err(e) => {
+            info_span!("failed to get token from auth server", error = ?e);
+
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Body::empty())
+                .unwrap()
+        }
     }
 }
 
