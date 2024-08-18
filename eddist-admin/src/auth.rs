@@ -7,8 +7,8 @@ use axum::{
 };
 use chrono::Utc;
 use oauth2::{
-    basic::BasicClient, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier,
-    RefreshToken, Scope, TokenResponse,
+    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, CsrfToken,
+    PkceCodeChallenge, PkceCodeVerifier, RefreshToken, Scope, TokenResponse,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
@@ -230,43 +230,6 @@ pub async fn get_login_callback(
             .status(StatusCode::UNAUTHORIZED)
             .body(Body::empty())
             .unwrap();
-    }
-
-    async fn async_http_client(
-        request: oauth2::HttpRequest,
-    ) -> Result<oauth2::HttpResponse, oauth2::reqwest::Error<reqwest::Error>> {
-        let client = {
-            let builder = reqwest::Client::builder();
-            let builder = builder.redirect(reqwest::redirect::Policy::limited(10));
-            builder.build().map_err(oauth2::reqwest::Error::Reqwest)?
-        };
-
-        let mut request_builder = client
-            .request(request.method, request.url.as_str())
-            .body(request.body);
-        for (name, value) in &request.headers {
-            request_builder = request_builder.header(name.as_str(), value.as_bytes());
-        }
-        let request = request_builder
-            .build()
-            .map_err(oauth2::reqwest::Error::Reqwest)?;
-
-        let response = client
-            .execute(request)
-            .await
-            .map_err(oauth2::reqwest::Error::Reqwest)?;
-
-        let status_code = response.status();
-        let headers = response.headers().to_owned();
-        let chunks = response
-            .bytes()
-            .await
-            .map_err(oauth2::reqwest::Error::Reqwest)?;
-        Ok(oauth2::HttpResponse {
-            status_code,
-            headers,
-            body: chunks.to_vec(),
-        })
     }
 
     let token = oauth_client

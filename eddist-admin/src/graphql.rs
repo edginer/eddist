@@ -41,7 +41,6 @@ pub struct Board {
     pub id: ID,
     pub name: String,
     pub board_key: String,
-    pub local_rule: String,
     pub default_name: String,
     pub thread_count: i64,
 }
@@ -58,10 +57,6 @@ impl Board {
 
     async fn board_key(&self) -> &String {
         &self.board_key
-    }
-
-    async fn local_rule(&self) -> &String {
-        &self.local_rule
     }
 
     async fn default_name(&self) -> &String {

@@ -45,7 +45,6 @@ pub struct SelectionBoardWithThreadCount {
     pub id: Vec<u8>,
     pub name: String,
     pub board_key: String,
-    pub local_rule: String,
     pub default_name: String,
     pub thread_count: i64,
 }
@@ -102,7 +101,6 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 id,
                 name,
                 board_key,
-                local_rule,
                 default_name,
                 (
                     SELECT
@@ -134,7 +132,6 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 id: Uuid::from_slice(&board.id).unwrap().to_string().into(),
                 name: board.name,
                 board_key: board.board_key,
-                local_rule: board.local_rule,
                 default_name: board.default_name,
                 thread_count: board.thread_count,
             })
