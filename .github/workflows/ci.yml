@@ -11,6 +11,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      VITE_EDDIST_ADMIN_AUTH_SERVER_URL: ${{ secrets.VITE_EDDIST_ADMIN_AUTH_SERVER_URL }}
 
     steps:
       - name: Checkout code
@@ -25,46 +27,6 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: cargo build --package eddist --release
-      - name: rm .dockerignore
-        run: rm .dockerignore
-      - name: Login to Docker registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker-prod/eddist/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/edginer/eddist:${{ github.sha }}
-            ghcr.io/edginer/eddist:latest
-      - name: notify deploy server
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.DEPLOY_REPO_PAT }}
-          repository: ${{ secrets.DEPLOY_REPO_URL }}
-          event-type: update-image
-          client-payload: '{"image-tag": "${{ github.sha }}"}'
-  build-eddist-admin:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      VITE_EDDIST_ADMIN_AUTH_SERVER_URL: ${{ secrets.VITE_EDDIST_ADMIN_AUTH_SERVER_URL }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: hecrj/setup-rust-action@v2
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -79,19 +41,11 @@ jobs:
       - name: Install pnpm dependencies
         working-directory: eddist-admin/client
         run: pnpm install
-      - name: Load cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-admin-${{ hashFiles('**/Cargo.lock') }}
       - name: Build eddist-admin-client
         working-directory: eddist-admin/client
         run: pnpm build
-      - name: Build eddist-admin-server
-        run: cargo build --package eddist-admin --release
+      - name: Build
+        run: cargo build --release
       - name: rm .dockerignore
         run: rm .dockerignore
       - name: Login to Docker registry
@@ -101,7 +55,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (eddist)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist:${{ github.sha }}
+            ghcr.io/edginer/eddist:latest
+      - name: Build and push Docker image (eddist-admin)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -110,37 +73,7 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-admin:${{ github.sha }}
             ghcr.io/edginer/eddist-admin:latest
-  build-eddist-cron:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: hecrj/setup-rust-action@v2
-      - name: Load cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-cron-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: cargo build --package eddist-cron --release
-      - name: rm .dockerignore
-        run: rm .dockerignore
-      - name: Login to Docker registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
+      - name: Build and push Docker image (eddist-cron)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -149,3 +82,107 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-cron:${{ github.sha }}
             ghcr.io/edginer/eddist-cron:latest
+      - name: notify deploy server
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_REPO_PAT }}
+          repository: ${{ secrets.DEPLOY_REPO_URL }}
+          event-type: update-image
+          client-payload: '{"image-tag": "${{ github.sha }}"}'
+  # build-eddist-admin:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   env:
+  #     VITE_EDDIST_ADMIN_AUTH_SERVER_URL: ${{ secrets.VITE_EDDIST_ADMIN_AUTH_SERVER_URL }}
+
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Setup Rust
+  #       uses: hecrj/setup-rust-action@v2
+  #     - uses: pnpm/action-setup@v4
+  #       name: Install pnpm
+  #       with:
+  #         run_install: false
+  #         version: "latest"
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "pnpm"
+  #         cache-dependency-path: "eddist-admin/client/pnpm-lock.yaml"
+  #     - name: Install pnpm dependencies
+  #       working-directory: eddist-admin/client
+  #       run: pnpm install
+  #     - name: Load cache
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: |
+  #           ~/.cargo/registry
+  #           ~/.cargo/git
+  #           target
+  #         key: ${{ runner.os }}-cargo-admin-${{ hashFiles('**/Cargo.lock') }}
+  #     - name: Build eddist-admin-client
+  #       working-directory: eddist-admin/client
+  #       run: pnpm build
+  #     - name: Build eddist-admin-server
+  #       run: cargo build --package eddist-admin --release
+  #     - name: rm .dockerignore
+  #       run: rm .dockerignore
+  #     - name: Login to Docker registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+
+  #     - name: Build and push Docker image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         file: docker-prod/eddist-admin/Dockerfile
+  #         push: true
+  #         tags: |
+  #           ghcr.io/edginer/eddist-admin:${{ github.sha }}
+  #           ghcr.io/edginer/eddist-admin:latest
+  # build-eddist-cron:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Setup Rust
+  #       uses: hecrj/setup-rust-action@v2
+  #     - name: Load cache
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: |
+  #           ~/.cargo/registry
+  #           ~/.cargo/git
+  #           target
+  #         key: ${{ runner.os }}-cargo-cron-${{ hashFiles('**/Cargo.lock') }}
+  #     - name: Build
+  #       run: cargo build --package eddist-cron --release
+  #     - name: rm .dockerignore
+  #       run: rm .dockerignore
+  #     - name: Login to Docker registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+
+  #     - name: Build and push Docker image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         file: docker-prod/eddist-cron/Dockerfile
+  #         push: true
+  #         tags: |
+  #           ghcr.io/edginer/eddist-cron:${{ github.sha }}
+  #           ghcr.io/edginer/eddist-cron:latest
