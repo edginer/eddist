@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env,
     sync::{OnceLock, RwLock},
 };
 
@@ -192,7 +193,10 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
 
             Ok(())
         } else {
-            if is_thread {
+            if is_thread
+                && env::var("RESTRICT_THREAD_CREATION_ON_NO_TINKER").unwrap_or("true".to_string())
+                    == "true"
+            {
                 return Err(BbsCgiError::TmpCanNotCreateThread);
             }
             Ok(())
