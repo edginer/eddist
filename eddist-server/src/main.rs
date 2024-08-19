@@ -40,7 +40,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{error_span, info_span, Span};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
@@ -488,7 +488,12 @@ async fn post_bbs_cgi(
             .await
         {
             Ok(TheradCreationServiceOutput { tinker }) => tinker,
-            Err(e) => return e.into_response(),
+            Err(e) => {
+                if matches!(e, BbsCgiError::Other(_)) {
+                    error_span!("thread_creation_error", error = ?e);
+                }
+                return e.into_response();
+            }
         }
     } else {
         let Some(thread_number) = form.get("key").map(|x| x.to_string()) else {
@@ -515,7 +520,12 @@ async fn post_bbs_cgi(
             .await
         {
             Ok(ResCreationServiceOutput { tinker }) => tinker,
-            Err(e) => return e.into_response(),
+            Err(e) => {
+                if matches!(e, BbsCgiError::Other(_)) {
+                    error_span!("res_creation_error", error = ?e);
+                }
+                return e.into_response();
+            }
         }
     };
 

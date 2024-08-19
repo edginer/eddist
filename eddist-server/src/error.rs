@@ -24,7 +24,7 @@ pub enum BbsCgiError {
     #[error("既に同時刻にスレッドが作成されています")]
     SameTimeThreadCration,
 
-    #[error("認証コード'{auth_code}'を用いて、以下のURLから認証を行ってください \n {base_url}/auth_code")]
+    #[error("認証コード'{auth_code}'を用いて、以下のURLから認証を行ってください \n {base_url}/auth-code")]
     Unauthenticated {
         auth_code: String,
         base_url: String,

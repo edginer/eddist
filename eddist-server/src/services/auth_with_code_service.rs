@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
+use tracing::info_span;
 
 use crate::{
     domain::captcha_like::CaptchaLikeConfig, external::captcha_like_client::TurnstileClient,
@@ -32,12 +33,13 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         };
 
         let ip_addr = IpAddr::new(input.origin_ip.clone());
-        let reduced = ReducedIpAddr::from(ip_addr);
+        let reduced = ReducedIpAddr::from(ip_addr.clone());
         let Some(token) = self
             .0
             .get_authed_token_by_origin_ip_and_auth_code(&reduced.to_string(), &input.code)
             .await?
         else {
+            info_span!("failed to find authed token", reduced_ip = %reduced.to_string(), origin_ip = %ip_addr, code = %input.code);
             return Err(anyhow::anyhow!("failed to find authed token"));
         };
 
