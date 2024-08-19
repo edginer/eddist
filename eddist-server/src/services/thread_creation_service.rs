@@ -1,6 +1,6 @@
 use std::{borrow::Cow, env};
 
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd};
 use tokio::join;
@@ -55,7 +55,7 @@ impl<T: BbsRepository + Clone>
             .get_board_info_by_key(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
-        let created_at = Utc::now();
+        let created_at = Utc::now().checked_add_signed(TimeDelta::hours(9)).unwrap();
         let unix_time = created_at.timestamp();
 
         if self
@@ -142,7 +142,7 @@ impl<T: BbsRepository + Clone>
         let redis_req = tokio::spawn(async move {
             redis_conn
                 .send_packed_command(&Cmd::rpush(
-                    format!("thread/{}/{unix_time}", input.board_key),
+                    format!("thread:{}:{unix_time}", input.board_key),
                     res.get_sjis_bytes(&board.default_name, Some(&title))
                         .get_inner(),
                 ))

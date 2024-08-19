@@ -26,7 +26,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
 
         match redis_conn
             .send_packed_command(&Cmd::lrange(
-                &format!("thread/{}/{}", input.board_key, input.thread_number),
+                &format!("thread:{}:{}", input.board_key, input.thread_number),
                 0,
                 -1,
             ))

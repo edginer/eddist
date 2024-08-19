@@ -1,6 +1,6 @@
 use std::{borrow::Cow, env};
 
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
 use uuid::Uuid;
@@ -51,7 +51,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             .get_board_info_by_key(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
-        let created_at = Utc::now();
+        let created_at = Utc::now().checked_add_signed(TimeDelta::hours(9)).unwrap();
 
         let Some(th) = self
             .0
@@ -120,7 +120,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
 
         if let Value::Int(order) = redis_conn
             .send_packed_command(&Cmd::rpush(
-                format!("thread/{}/{}", input.board_key, input.thread_number),
+                format!("thread:{}:{}", input.board_key, input.thread_number),
                 res.get_sjis_bytes(&board.default_name, None).get_inner(),
             ))
             .await
