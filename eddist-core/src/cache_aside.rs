@@ -11,15 +11,20 @@ pub trait AsCacheRef<T> {
     fn get(&self) -> &T;
 }
 
+pub trait ToCache<R, T: AsCache<R>> {
+    fn into_cache(self, expired_at: u64) -> T;
+}
+
 pub async fn cache_aside<T, R, F>(
     key: &str,
     cache_prefix: &str,
     redis_conn: &mut MultiplexedConnection,
+    expired_at: u64,
     db_call: F,
 ) -> anyhow::Result<R>
 where
     T: Serialize + DeserializeOwned + Clone + AsCache<R>,
-    R: Serialize + DeserializeOwned + Clone,
+    R: Serialize + DeserializeOwned + Clone + ToCache<R, T>,
     F: FnOnce() -> std::pin::Pin<
         Box<dyn std::future::Future<Output = Result<R, anyhow::Error>> + Send>,
     >,
@@ -38,9 +43,10 @@ where
 
     // Fetch the data using the provided closure/function
     let result = db_call().await?;
+    let cache = result.clone().into_cache(expired_at);
 
     // Cache the result
-    let cache_data = serde_json::to_string(&result)?;
+    let cache_data = serde_json::to_string(&cache)?;
     redis_conn.set::<_, _, _>(&cache_key, cache_data).await?;
 
     Ok(result)

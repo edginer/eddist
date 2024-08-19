@@ -1,4 +1,4 @@
-use eddist_core::cache_aside::{cache_aside, AsCache};
+use eddist_core::cache_aside::{cache_aside, AsCache, ToCache};
 use redis::aio::MultiplexedConnection;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,15 @@ impl AsCache<Vec<NgWord>> for NgWordCache {
     }
 }
 
+impl ToCache<Vec<NgWord>, NgWordCache> for Vec<NgWord> {
+    fn into_cache(self, expired_at: u64) -> NgWordCache {
+        NgWordCache {
+            ng_words: self,
+            expired_at,
+        }
+    }
+}
+
 impl<T: BbsRepository + Clone> NgWordReadingService<T> {
     pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
         Self(repo, redis_conn)
@@ -33,10 +42,17 @@ impl<T: BbsRepository + Clone> NgWordReadingService<T> {
     pub async fn get_ng_words(&self, board_key: &str) -> Result<Vec<NgWord>, BbsCgiError> {
         let board_key = board_key.to_string();
         let repo = self.0.clone();
-        cache_aside::<NgWordCache, _, _>(&board_key, "ng_words", &mut self.1.clone(), || {
-            let board_key = board_key.clone();
-            Box::pin(async move { repo.get_ng_words_by_board_key(&board_key).await })
-        })
+        let expired_at = chrono::Utc::now().timestamp() as u64 + 120;
+        cache_aside::<NgWordCache, _, _>(
+            &board_key,
+            "ng_words",
+            &mut self.1.clone(),
+            expired_at,
+            || {
+                let board_key = board_key.clone();
+                Box::pin(async move { repo.get_ng_words_by_board_key(&board_key).await })
+            },
+        )
         .await
         .map_err(BbsCgiError::Other)
     }
