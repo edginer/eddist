@@ -1,5 +1,6 @@
 use std::{borrow::Cow, env};
 
+use anyhow::anyhow;
 use chrono::{TimeDelta, Utc};
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
@@ -118,30 +119,52 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             return Err(BbsCgiError::NgWordDetected);
         }
 
-        if let Value::Int(order) = redis_conn
-            .send_packed_command(&Cmd::rpush(
-                format!("thread:{}:{}", input.board_key, input.thread_number),
-                res.get_sjis_bytes(&board.default_name, None).get_inner(),
-            ))
-            .await
-            .map_err(|e| BbsCgiError::Other(e.into()))?
-        {
-            let cres = CreatingRes {
-                id: res_id,
-                created_at,
-                body: res.body().to_string(),
-                name: res.author_name().to_string(),
-                mail: res.mail().to_string(),
-                author_ch5id: res.author_id().to_string(),
-                authed_token_id: authed_token.id,
-                ip_addr: input.ip_addr,
-                thread_id: th.id,
-                board_id: th.board_id,
-                client_info,
-                res_order: order as i32,
+        // Check thread:{board_key}:{thread_number} exists. If not, does not rpush to the list but still creates the response in the database.
+        let is_exists = matches!(
+            redis_conn
+                .send_packed_command(&Cmd::exists(format!(
+                    "thread:{}:{}",
+                    input.board_key, input.thread_number
+                )))
+                .await
+                .map_err(|e| BbsCgiError::Other(e.into()))?,
+            Value::Int(_)
+        );
+        let order = if is_exists {
+            let Value::Int(order) = redis_conn
+                .send_packed_command(&Cmd::rpush(
+                    format!("thread:{}:{}", input.board_key, input.thread_number),
+                    res.get_sjis_bytes(&board.default_name, None).get_inner(),
+                ))
+                .await
+                .map_err(|e| BbsCgiError::Other(e.into()))?
+            else {
+                return Err(BbsCgiError::Other(anyhow!(
+                    "failed to parse redis response"
+                )));
             };
-            tokio::spawn(async move { bbs_repo.create_response(cres).await });
-        }
+            order as i32
+        } else {
+            // Sort by order, and then by id (uuidv7), thus the order of non-cache-existence response is over 1000.
+            10000
+        };
+
+        let cres = CreatingRes {
+            id: res_id,
+            created_at,
+            body: res.body().to_string(),
+            name: res.author_name().to_string(),
+            mail: res.mail().to_string(),
+            author_ch5id: res.author_id().to_string(),
+            authed_token_id: authed_token.id,
+            ip_addr: input.ip_addr,
+            thread_id: th.id,
+            board_id: th.board_id,
+            client_info,
+            res_order: order as i32,
+        };
+        tokio::spawn(async move { bbs_repo.create_response(cres).await });
+
         let tinker = if let Some(tinker) = input.tinker {
             tinker
         } else {

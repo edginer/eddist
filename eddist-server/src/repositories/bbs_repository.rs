@@ -228,7 +228,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 author_id,
                 is_abone
             FROM responses WHERE thread_id = ? 
-            ORDER BY res_order",
+            ORDER BY res_order, id",
             thread_id
         );
 
