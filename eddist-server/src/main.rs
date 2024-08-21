@@ -432,6 +432,8 @@ async fn post_bbs_cgi(
     State(state): State<AppState>,
     body: String,
 ) -> Response {
+    info_span!("bbs_cgi", cookie = ?headers.get("Cookie"));
+
     let form = shift_jis_url_encodeded_body_to_vec(&body).unwrap();
     let is_thread = {
         let Some(submit) = form.get("submit") else {

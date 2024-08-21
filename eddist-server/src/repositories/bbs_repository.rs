@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::{
     board::{Board, BoardInfo},
     client_info::ClientInfo,
@@ -240,7 +240,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 author_name: x.author_name,
                 mail: x.mail,
                 body: x.body,
-                created_at: x.created_at,
+                created_at: Utc.from_local_datetime(&x.created_at).unwrap(),
                 author_id: x.author_id,
                 is_abone: x.is_abone != 0,
             })
@@ -596,7 +596,7 @@ struct SelectionRes {
     author_name: String,
     mail: String,
     body: String,
-    created_at: DateTime<Utc>,
+    created_at: NaiveDateTime,
     author_id: String,
     is_abone: i8, // TINYINT
 }

@@ -63,7 +63,7 @@ CREATE TABLE responses (
     author_name TEXT NOT NULL,
     mail TEXT NOT NULL,
     body TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL,
+    created_at DATETIME(3) NOT NULL,
     author_id TEXT NOT NULL,
     ip_addr TEXT NOT NULL,
     authed_token_id BINARY(16) NOT NULL,
@@ -129,3 +129,33 @@ CREATE TABLE admin_users (
     user_role_id BINARY(16) NOT NULL,
     FOREIGN KEY (user_role_id) REFERENCES admin_roles(id)
 );
+
+INSERT INTO
+    boards (
+        id,
+        name,
+        board_key,
+        default_name
+    )
+VALUES
+    (
+        UUID_TO_BIN('01815522-2d2b-728f-af94-a234aabb6b20'),
+        'vエッヂk',
+        'livedgek',
+        'ポッドの名無し'
+    );
+
+INSERT INTO
+    boards_info (
+        id,
+        local_rules,
+        created_at,
+        updated_at
+    )
+VALUES
+    (
+        UUID_TO_BIN('01815522-2d2b-728f-af94-a234aabb6b20'),
+        'ローカルルール',
+        NOW(),
+        NOW()
+    );

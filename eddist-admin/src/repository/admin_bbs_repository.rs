@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{query, query_as, types::Json, FromRow, MySqlPool};
 use uuid::Uuid;
@@ -71,7 +71,7 @@ pub struct SelectionRes {
     pub author_name: String,
     pub mail: String,
     pub body: String,
-    pub created_at: chrono::DateTime<Utc>,
+    pub created_at: chrono::NaiveDateTime,
     pub author_id: String,
     pub ip_addr: String,
     pub authed_token_id: Vec<u8>,
@@ -260,7 +260,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 author_name: Some(res.author_name),
                 mail: Some(res.mail),
                 body: res.body,
-                created_at: res.created_at,
+                created_at: Utc.from_local_datetime(&res.created_at).unwrap(),
                 author_id: res.author_id,
                 ip_addr: res.ip_addr,
                 authed_token_id: Uuid::from_slice(&res.authed_token_id)
@@ -360,7 +360,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             author_name: Some(res.author_name),
             mail: Some(res.mail),
             body: res.body,
-            created_at: res.created_at,
+            created_at: Utc.from_local_datetime(&res.created_at).unwrap(),
             author_id: res.author_id,
             ip_addr: res.ip_addr,
             authed_token_id: Uuid::from_slice(&res.authed_token_id)

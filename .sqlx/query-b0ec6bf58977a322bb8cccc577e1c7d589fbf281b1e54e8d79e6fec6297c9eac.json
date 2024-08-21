@@ -34,9 +34,9 @@
         "ordinal": 3,
         "name": "created_at",
         "type_info": {
-          "type": "Timestamp",
+          "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 19
+          "max_size": 23
         }
       },
       {
