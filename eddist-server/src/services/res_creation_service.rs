@@ -128,7 +128,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
                 )))
                 .await
                 .map_err(|e| BbsCgiError::Other(e.into()))?,
-            Value::Int(_)
+            Value::Int(i) if i > 0
         );
         let order = if is_exists {
             let Value::Int(order) = redis_conn
