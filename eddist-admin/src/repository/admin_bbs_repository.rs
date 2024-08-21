@@ -260,7 +260,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 author_name: Some(res.author_name),
                 mail: Some(res.mail),
                 body: res.body,
-                created_at: Utc.from_local_datetime(&res.created_at).unwrap(),
+                created_at: Utc.from_utc_datetime(&res.created_at),
                 author_id: res.author_id,
                 ip_addr: res.ip_addr,
                 authed_token_id: Uuid::from_slice(&res.authed_token_id)
@@ -360,7 +360,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             author_name: Some(res.author_name),
             mail: Some(res.mail),
             body: res.body,
-            created_at: Utc.from_local_datetime(&res.created_at).unwrap(),
+            created_at: Utc.from_utc_datetime(&res.created_at),
             author_id: res.author_id,
             ip_addr: res.ip_addr,
             authed_token_id: Uuid::from_slice(&res.authed_token_id)
