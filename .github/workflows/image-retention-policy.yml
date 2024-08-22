@@ -1,3 +1,5 @@
+name: Image retention policy
+
 on:
   workflow_dispatch:
   schedule:
@@ -11,7 +13,7 @@ jobs:
       - name: Delete old images (eddist)
         uses: snok/container-retention-policy@v3.0.0
         with:
-          account: edginer
+          account: user
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist"
           image-tags: "!v*"
@@ -20,7 +22,7 @@ jobs:
       - name: Delete old images (eddist-admin)
         uses: snok/container-retention-policy@v3.0.0
         with:
-          account: edginer
+          account: user
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist-admin"
           image-tags: "!v*"
@@ -29,7 +31,7 @@ jobs:
       - name: Delete old images (eddist-cron)
         uses: snok/container-retention-policy@v3.0.0
         with:
-          account: edginer
+          account: user
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist-cron"
           image-tags: "!v*"
