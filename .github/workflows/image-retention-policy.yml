@@ -1,0 +1,37 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "5 * * * *" # every hour
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    name: Delete old test images
+    steps:
+      - name: Delete old images (eddist)
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: edginer
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "eddist"
+          image-tags: "!v*"
+          cut-off: 1w
+          keep-n-most-recent: 3
+      - name: Delete old images (eddist-admin)
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: edginer
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "eddist-admin"
+          image-tags: "!v*"
+          cut-off: 1w
+          keep-n-most-recent: 3
+      - name: Delete old images (eddist-cron)
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: edginer
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "eddist-cron"
+          image-tags: "!v*"
+          cut-off: 1w
+          keep-n-most-recent: 3

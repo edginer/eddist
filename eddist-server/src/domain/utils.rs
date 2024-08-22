@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use chrono::{DateTime, Datelike, Weekday};
+use chrono::{DateTime, Datelike, TimeDelta, Weekday};
 use regex::Regex;
 
 #[derive(Clone)]
@@ -23,6 +23,7 @@ impl Debug for SimpleSecret {
 }
 
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {
+    let datetime = datetime.checked_add_signed(TimeDelta::hours(9)).unwrap();
     let weekday = datetime.weekday();
     datetime
         .format("%Y/%m/%d({weekday}) %H:%M:%S.%3f")

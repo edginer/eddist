@@ -1,7 +1,7 @@
 use std::{borrow::Cow, env};
 
 use anyhow::anyhow;
-use chrono::{TimeDelta, Utc};
+use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
 use uuid::Uuid;
@@ -52,7 +52,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             .get_board_info_by_key(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
-        let created_at = Utc::now().checked_add_signed(TimeDelta::hours(9)).unwrap();
+        let created_at = Utc::now();
 
         let Some(th) = self
             .0
