@@ -17,7 +17,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist"
           image-tags: "!v*"
-          cut-off: 1w
+          cut-off: 1d
           keep-n-most-recent: 3
       - name: Delete old images (eddist-admin)
         uses: snok/container-retention-policy@v3.0.0
@@ -26,7 +26,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist-admin"
           image-tags: "!v*"
-          cut-off: 1w
+          cut-off: 1d
           keep-n-most-recent: 3
       - name: Delete old images (eddist-cron)
         uses: snok/container-retention-policy@v3.0.0
@@ -35,5 +35,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: "eddist-cron"
           image-tags: "!v*"
-          cut-off: 1w
+          cut-off: 1d
           keep-n-most-recent: 3
