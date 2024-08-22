@@ -8,6 +8,8 @@ on:
 jobs:
   clean:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     name: Delete old test images
     steps:
       - name: Delete old images (eddist)
