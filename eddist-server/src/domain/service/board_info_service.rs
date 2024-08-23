@@ -185,7 +185,7 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
                     if span < span_limit {
                         return Err(BbsCgiError::TooManyCreatingThread {
                             tinker_level: tinker.level(),
-                            span_sec: board_info.base_thread_creation_span_sec,
+                            span_sec: span_limit as i32,
                         });
                     }
                 }

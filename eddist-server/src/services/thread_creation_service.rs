@@ -19,6 +19,7 @@ use crate::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
             ng_word_reading_service::NgWordReadingService,
+            res_creation_span_management_service::ResCreationSpanManagementService,
         },
         utils::{sanitize_base, sanitize_num_refs},
     },
@@ -131,6 +132,18 @@ impl<T: BbsRepository + Clone>
             client_info,
         };
 
+        let res_span_svc = ResCreationSpanManagementService::new(
+            redis_conn.clone(),
+            board_info.base_response_creation_span_sec as u64,
+        );
+        if res_span_svc
+            .is_within_creation_span(&authed_token.token, unix_time as u64)
+            .await
+        {
+            return Err(BbsCgiError::TooManyCreatingRes(
+                board_info.base_response_creation_span_sec,
+            ));
+        };
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)
             .await?;
@@ -138,6 +151,7 @@ impl<T: BbsRepository + Clone>
             return Err(BbsCgiError::NgWordDetected);
         }
 
+        let authed_token_clone = authed_token.token.clone();
         let db_req = tokio::spawn(async move { bbs_repo.create_thread(creating_th).await });
         let redis_req = tokio::spawn(async move {
             redis_conn
@@ -145,6 +159,15 @@ impl<T: BbsRepository + Clone>
                     format!("thread:{}:{unix_time}", input.board_key),
                     res.get_sjis_bytes(&board.default_name, Some(&title))
                         .get_inner(),
+                ))
+                .await?;
+            res_span_svc
+                .update_last_res_creation_time(&authed_token_clone, unix_time as u64)
+                .await;
+            redis_conn
+                .send_packed_command(&Cmd::expire(
+                    format!("thread:{}:{unix_time}", input.board_key),
+                    60 * 60 * 24 * 7,
                 ))
                 .await
         });

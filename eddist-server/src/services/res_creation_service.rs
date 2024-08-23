@@ -18,6 +18,7 @@ use crate::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
             ng_word_reading_service::NgWordReadingService,
+            res_creation_span_management_service::ResCreationSpanManagementService,
         },
     },
     error::{BbsCgiError, NotFoundParamType},
@@ -119,6 +120,19 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             return Err(BbsCgiError::NgWordDetected);
         }
 
+        let res_span_svc = ResCreationSpanManagementService::new(
+            redis_conn.clone(),
+            board_info.base_response_creation_span_sec as u64,
+        );
+        if res_span_svc
+            .is_within_creation_span(&authed_token.token, created_at.timestamp() as u64)
+            .await
+        {
+            return Err(BbsCgiError::TooManyCreatingRes(
+                board_info.base_response_creation_span_sec,
+            ));
+        };
+
         // Check thread:{board_key}:{thread_number} exists. If not, does not rpush to the list but still creates the response in the database.
         let is_exists = matches!(
             redis_conn
@@ -148,6 +162,10 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             // Sort by order, and then by id (uuidv7), thus the order of non-cache-existence response is over 1000.
             10000
         };
+
+        res_span_svc
+            .update_last_res_creation_time(&authed_token.token, created_at.timestamp() as u64)
+            .await;
 
         let cres = CreatingRes {
             id: res_id,

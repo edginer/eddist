@@ -15,7 +15,8 @@ use eddist_core::domain::{board::BoardInfo, tinker::Tinker};
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
+use jsonwebtoken::EncodingKey;
+use jwt_simple::prelude::MACLike;
 use repositories::bbs_repository::BbsRepositoryImpl;
 use services::{
     auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
@@ -52,6 +53,7 @@ mod domain {
         pub mod bbscgi_auth_service;
         pub mod board_info_service;
         pub mod ng_word_reading_service;
+        pub mod res_creation_span_management_service;
     }
 
     pub(crate) mod authed_token;
@@ -587,12 +589,12 @@ fn get_asn_num(headers: &HeaderMap) -> u32 {
 }
 
 fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
-    let tinker = jsonwebtoken::decode::<Tinker>(
-        tinker,
-        &DecodingKey::from_base64_secret(secret).unwrap(),
-        &Validation::new(Algorithm::HS256),
-    )
-    .ok()?;
+    let key = jwt_simple::prelude::HS256Key::from_bytes(
+        &base64::engine::general_purpose::STANDARD
+            .decode(secret)
+            .unwrap(),
+    );
+    let tinker = key.verify_token::<Tinker>(tinker, None).ok()?;
 
-    Some(tinker.claims)
+    Some(tinker.custom)
 }
