@@ -77,7 +77,7 @@ pub(crate) mod external {
 #[derive(Debug, Clone)]
 struct AppState {
     services: AppServiceContainer<BbsRepositoryImpl>,
-    tinker_secret: Vec<u8>,
+    tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
 }
 
@@ -86,7 +86,7 @@ impl AppState {
         &self.services
     }
 
-    pub fn tinker_secret(&self) -> &[u8] {
+    pub fn tinker_secret(&self) -> &str {
         &self.tinker_secret
     }
 }
@@ -113,9 +113,6 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     let tinker_secret = env::var("TINKER_SECRET").unwrap();
-    let tinker_secret = base64::engine::general_purpose::STANDARD
-        .decode(tinker_secret.as_bytes())
-        .unwrap();
 
     let captcha_like_configs_path =
         env::var("CAPTCHA_CONFIG_PATH").unwrap_or("./captcha-config.json".to_string());
@@ -546,7 +543,7 @@ async fn post_bbs_cgi(
         jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
             &tinker,
-            &EncodingKey::from_secret(state.tinker_secret()),
+            &EncodingKey::from_base64_secret(state.tinker_secret()).unwrap(),
         )
         .unwrap(),
         time::Duration::days(365),
@@ -589,10 +586,10 @@ fn get_asn_num(headers: &HeaderMap) -> u32 {
         .unwrap()
 }
 
-fn get_tinker(tinker: &str, secret: &[u8]) -> Option<Tinker> {
+fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
     let tinker = jsonwebtoken::decode::<Tinker>(
         tinker,
-        &DecodingKey::from_secret(secret),
+        &DecodingKey::from_base64_secret(secret).unwrap(),
         &Validation::new(Algorithm::HS256),
     )
     .ok()?;
