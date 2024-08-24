@@ -233,8 +233,19 @@ async fn health_check() -> StatusCode {
     StatusCode::OK
 }
 
-async fn get_home(headers: HeaderMap) -> String {
-    format!("{headers:?}")
+async fn get_home() -> impl IntoResponse {
+    Html(
+        r#"<html>
+<head>
+    <title>Eddist server</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Hello, Eddist server!</h1>
+    <a href="https://github.com/edginer/eddist">GitHub Repo Link</a>
+</body>
+</html>"#,
+    )
 }
 
 async fn get_subject_txt(
