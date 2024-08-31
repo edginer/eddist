@@ -13,7 +13,7 @@ const Title = () => {
 };
 
 const BaseRoutes = () => {
-  const { isLoading: isLoadingLogin, ...t } = useLogin();
+  const { ...t } = useLogin();
   console.log(t);
 
   return (
@@ -38,7 +38,6 @@ const BaseRoutes = () => {
           <Authenticated
             key="authentication-root"
             fallback={<Navigate replace to="/login" />}
-            loading={isLoadingLogin}
           >
             <ThemedLayoutV2 Header={Header} Title={Title}>
               <Outlet />
