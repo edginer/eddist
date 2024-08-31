@@ -41,6 +41,7 @@ use tower_http::{
         predicate::{NotForContentType, SizeAbove},
         CompressionLayer, Predicate,
     },
+    services::{ServeDir, ServeFile},
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
@@ -131,10 +132,17 @@ async fn main() -> anyhow::Result<()> {
         captcha_like_configs,
     };
 
+    let serve_dir = if is_prod() {
+        "dist"
+    } else {
+        "eddist-server/client/dist"
+    };
+    let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
+    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file);
+
     log::info!("Start application server with 0.0.0.0:8080");
 
     let app = Router::new()
-        .route("/", get(get_home))
         .route("/health-check", get(health_check))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
@@ -145,6 +153,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
         .route("/api/terms", get(get_home))
         .route("/api/boards", get(get_api_boards))
+        .nest_service("/dist", serve_dir.clone())
+        .fallback_service(serve_dir)
         .with_state(app_state)
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(
@@ -583,12 +593,18 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 fn get_origin_ip(headers: &HeaderMap) -> &str {
-    headers
+    let origin_ip = headers
         .get("Cf-Connecting-IP")
         .or_else(|| headers.get("X-Forwarded-For"))
-        .map(|x| x.to_str())
-        .unwrap_or(Ok("localhost")) // FIXME: for development only
-        .unwrap()
+        .map(|x| x.to_str());
+
+    if is_prod() {
+        origin_ip.unwrap().unwrap()
+    } else {
+        origin_ip
+            .unwrap_or(Ok("localhost")) // FIXME: for development only
+            .unwrap()
+    }
 }
 
 fn get_ua(headers: &HeaderMap) -> &str {

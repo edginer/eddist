@@ -37,13 +37,16 @@ jobs:
         with:
           node-version: "20"
           cache: "pnpm"
-          cache-dependency-path: "eddist-admin/client/pnpm-lock.yaml"
+          cache-dependency-path: |
+            "pnpm-lock.yaml"
+            "eddist/client/pnpm-lock.yaml"
+            "eddist-admin/client/pnpm-lock.yaml"
       - name: Install pnpm dependencies
-        working-directory: eddist-admin/client
         run: pnpm install
+      - name: Build eddist-client
+        run: pnpm -F eddist-client build
       - name: Build eddist-admin-client
-        working-directory: eddist-admin/client
-        run: pnpm build
+        run: pnpm -F eddist-admin-client build
       - name: Build
         run: cargo build --release
       - name: rm .dockerignore
