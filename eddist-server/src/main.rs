@@ -6,12 +6,15 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
-    Form, Router,
+    Form, Json, Router,
 };
 use axum_extra::extract::CookieJar;
 use base64::Engine;
 use domain::captcha_like::CaptchaLikeConfig;
-use eddist_core::domain::{board::BoardInfo, tinker::Tinker};
+use eddist_core::{
+    domain::{board::BoardInfo, tinker::Tinker},
+    utils::is_prod,
+};
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -95,7 +98,7 @@ impl AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if !matches!(env::var("RUST_ENV").as_deref(), Ok("prod" | "production")) {
+    if !is_prod() {
         dotenvy::dotenv()?;
     }
 
@@ -140,6 +143,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/SETTING.TXT", get(get_setting_txt))
         .route("/:boardKey/dat/:threadId", get(get_dat_txt))
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
+        .route("/api/terms", get(get_home))
+        .route("/api/boards", get(get_api_boards))
         .with_state(app_state)
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(
@@ -568,6 +573,13 @@ async fn post_bbs_cgi(
     )
     .build()
     .into_response()
+}
+
+async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
+    let svc = state.get_container().list_boards();
+    let boards = svc.execute(()).await.unwrap();
+
+    Json(boards)
 }
 
 fn get_origin_ip(headers: &HeaderMap) -> &str {

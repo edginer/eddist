@@ -76,6 +76,25 @@ impl BbsCgiError {
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
+
+    pub fn error_tag(&self) -> &'static str {
+        match self {
+            BbsCgiError::InsufficientClientRequest(_) => "InsufficientClientRequest",
+            BbsCgiError::InvalidClientRequestParameter(_) => "InvalidClientRequestParameter",
+            BbsCgiError::NotFound(_) => "NotFound",
+            BbsCgiError::InactiveThread => "InactiveThread",
+            BbsCgiError::SameTimeThreadCration => "SameTimeThreadCration",
+            BbsCgiError::Unauthenticated { .. } => "Unauthenticated",
+            BbsCgiError::InvalidAuthedToken => "InvalidAuthedToken",
+            BbsCgiError::RevokedAuthedToken => "RevokedAuthedToken",
+            BbsCgiError::NgWordDetected => "NgWordDetected",
+            BbsCgiError::ContentLengthExceeded(_) => "ContentLengthExceeded",
+            BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
+            BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
+            BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
+            BbsCgiError::Other(_) => "InternalError",
+        }
+    }
 }
 
 impl IntoResponse for BbsCgiError {
@@ -86,6 +105,7 @@ impl IntoResponse for BbsCgiError {
             None
         };
 
+        let error_code = self.error_tag();
         let status_code = self.status_code();
         let e = match self {
             BbsCgiError::Other(_) => "内部エラーが発生しました".to_string(),
@@ -96,6 +116,7 @@ impl IntoResponse for BbsCgiError {
             r#"<html><!-- 2ch_X:error -->
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=x-sjis">
+    <meta name="error_code" content="E-{error_code}">
     <title>ＥＲＲＯＲ</title>
 </head>
 <body>

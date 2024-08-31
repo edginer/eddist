@@ -15,6 +15,7 @@ use crate::domain::{
 #[mockall::automock]
 #[async_trait::async_trait]
 pub trait BbsRepository: Send + Sync + 'static {
+    async fn get_boards(&self) -> anyhow::Result<Vec<Board>>;
     async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>>;
     async fn get_board_info(&self, board_id: Uuid) -> anyhow::Result<Option<BoardInfo>>;
     async fn get_threads(
@@ -66,6 +67,24 @@ impl BbsRepositoryImpl {
 
 #[async_trait::async_trait]
 impl BbsRepository for BbsRepositoryImpl {
+    async fn get_boards(&self) -> anyhow::Result<Vec<Board>> {
+        let boards = query_as!(
+            Board,
+            r#"
+        SELECT
+            id AS "id: Uuid",
+            name,
+            board_key,
+            default_name
+        FROM boards
+        "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(boards)
+    }
+
     async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
         let query = query_as!(
             Board,

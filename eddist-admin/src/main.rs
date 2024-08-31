@@ -10,6 +10,7 @@ use axum::{
     routing::{get, post_service},
     Router,
 };
+use eddist_core::utils::is_prod;
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use repository::admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl};
 use time::Duration;
@@ -50,13 +51,6 @@ async fn add_cors_header(req: Request<Body>, next: Next) -> Response {
 
 async fn ok() -> impl IntoResponse {
     StatusCode::OK
-}
-
-fn is_prod() -> bool {
-    matches!(
-        std::env::var("RUST_ENV").as_deref(),
-        Ok("prod" | "production")
-    )
 }
 
 #[tokio::main]

@@ -1,5 +1,6 @@
 use auth_with_code_service::AuthWithCodeService;
 use board_info_service::BoardInfoService;
+use list_boards_service::ListBoardsService;
 use redis::aio::MultiplexedConnection;
 
 use res_creation_service::ResCreationService;
@@ -11,6 +12,7 @@ use crate::{error::BbsCgiError, repositories::bbs_repository::BbsRepository};
 
 pub(crate) mod auth_with_code_service;
 pub(crate) mod board_info_service;
+pub(crate) mod list_boards_service;
 pub(crate) mod res_creation_service;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
@@ -32,6 +34,7 @@ pub trait BbsCgiService<I: Send + Sync, O: Send + Sync> {
 pub struct AppServiceContainer<B: BbsRepository + 'static> {
     auth_with_code: AuthWithCodeService<B>,
     board_info: BoardInfoService<B>,
+    list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B>,
     thread_creation: TheradCreationService<B>,
     thread_list: ThreadListService<B>,
@@ -43,6 +46,7 @@ impl<B: BbsRepository + Clone> AppServiceContainer<B> {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
+            list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone()),
             thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
             thread_list: ThreadListService::new(bbs_repo.clone()),
@@ -74,5 +78,9 @@ impl<B: BbsRepository + 'static> AppServiceContainer<B> {
 
     pub fn thread_retrival(&self) -> &ThreadRetrievalService<B> {
         &self.thread_retrival
+    }
+
+    pub fn list_boards(&self) -> &ListBoardsService<B> {
+        &self.list_boards
     }
 }
