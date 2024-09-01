@@ -22,18 +22,19 @@ impl Debug for SimpleSecret {
 
 pub fn sanitize_base(input: &str, is_body: bool) -> String {
     input
+        .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&#39;")
         .replace('\r', "")
         .replace('\n', if is_body { "<br>" } else { "" })
 }
 
 pub fn sanitize_num_refs(input: &str) -> String {
-    let sanitized = sanitize_base(input, false);
     // Delete all of semicolon closing \n character references
     let re = Regex::new(r"&#([Xx]0*[aA]|0*10);").unwrap();
-    let rn_sanitized = re.replace_all(&sanitized, "");
+    let rn_sanitized = re.replace_all(input, "");
 
     sanitize_non_semi_closing_num_char_refs(&rn_sanitized)
 }
