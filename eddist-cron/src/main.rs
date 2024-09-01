@@ -98,7 +98,7 @@ async fn main() {
             // - convert (to dat text file compressed by gzip and delete responses, and publish to S3 compatible storage)
             let boards = repo.get_all_boards_info().await.unwrap();
             let s3_client = s3::bucket::Bucket::new(
-                "eddist-test",
+                &env::var("S3_BUCKET_NAME").unwrap(),
                 s3::Region::R2 {
                     account_id: env::var("R2_ACCOUNT_ID").unwrap(),
                 },
