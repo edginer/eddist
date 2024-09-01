@@ -12,7 +12,7 @@ use axum_extra::extract::CookieJar;
 use base64::Engine;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::{board::BoardInfo, tinker::Tinker},
+    domain::{board::BoardInfo, sjis_str::SJisStr, tinker::Tinker},
     utils::is_prod,
 };
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
@@ -30,9 +30,7 @@ use services::{
     thread_retrieval_service::ThreadRetrievalServiceInput,
     AppService, AppServiceContainer, BbsCgiService,
 };
-use shiftjis::{
-    shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SJisStr, SjisContentType,
-};
+use shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
@@ -67,7 +65,6 @@ mod domain {
     pub(crate) mod ng_word;
     pub(crate) mod res;
     pub(crate) mod res_core;
-    pub(crate) mod res_view;
     pub(crate) mod thread;
     pub(crate) mod thread_list;
     pub(crate) mod thread_res_list;

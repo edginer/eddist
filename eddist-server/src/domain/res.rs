@@ -1,17 +1,21 @@
 use std::{borrow::Cow, ops::Add};
 
 use chrono::{DateTime, Datelike, Utc};
-use eddist_core::domain::{client_info::ClientInfo, ip_addr::ReducedIpAddr};
+use eddist_core::domain::{
+    client_info::ClientInfo,
+    ip_addr::ReducedIpAddr,
+    res::{ResView, ResViewRef},
+    sjis_str::SJisStr,
+};
 use pwhash::unix;
 
-use crate::{domain::metadent::Metadent, shiftjis::SJisStr};
+use crate::domain::metadent::Metadent;
 
 use super::{
     authed_token::AuthedToken,
     metadent::MetadentType,
     res_core::ResCore,
-    res_view::ResView,
-    utils::{sanitize_base, sanitize_num_refs, to_ja_datetime, SimpleSecret},
+    utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
 };
 
 pub trait ResState {}
@@ -44,7 +48,6 @@ pub struct Res<T: ResState> {
     is_email_authed: bool,
     board_key: String,
     _state: std::marker::PhantomData<T>,
-    // NOTE: add is_mail_authed token when implement a feature distinguishes between mail_authed_token and cookie_authed_token
 }
 
 impl<T: ResState> Res<T> {
@@ -240,30 +243,16 @@ impl Res<AuthorIdInitialized> {
     }
 
     pub fn get_sjis_bytes(&self, default_name: &str, thread_title: Option<&str>) -> SJisStr {
-        let mail = if self.mail == "sage" { "sage" } else { "" };
+        let res_view_ref = ResViewRef {
+            author_name: &self.pretty_author_name(default_name),
+            mail: self.mail(),
+            body: self.body(),
+            created_at: self.created_at,
+            author_id: self.author_id(),
+            is_abone: self.is_abone,
+        };
 
-        if self.is_abone {
-            SJisStr::from(
-                format!(
-                    "あぼーん<>あぼーん<><> あぼーん<> {}\n",
-                    thread_title.unwrap_or_default()
-                )
-                .as_str(),
-            )
-        } else {
-            SJisStr::from(
-                format!(
-                    "{}<>{}<>{} ID:{}<> {}<> {}\n",
-                    self.pretty_author_name(default_name),
-                    &mail,
-                    &to_ja_datetime(self.created_at),
-                    &self.author_id(),
-                    &self.body,
-                    thread_title.unwrap_or_default()
-                )
-                .as_str(),
-            )
-        }
+        eddist_core::domain::res::get_sjis_bytes(res_view_ref, default_name, thread_title)
     }
 }
 

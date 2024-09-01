@@ -3,13 +3,13 @@ use eddist_core::domain::{
     board::{Board, BoardInfo},
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
+    res::ResView,
 };
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
-    authed_token::AuthedToken, cap::Cap, metadent::MetadentType, ng_word::NgWord,
-    res_view::ResView, thread::Thread,
+    authed_token::AuthedToken, cap::Cap, metadent::MetadentType, ng_word::NgWord, thread::Thread,
 };
 
 #[mockall::automock]
@@ -605,9 +605,10 @@ struct SelectionThread {
     authed_token_id: Vec<u8>,
     metadent: String,
     response_count: i32,
-    no_pool: i8,  // TINYINT
-    active: i8,   // TINYINT
-    archived: i8, // TINYINT
+    no_pool: i8,           // TINYINT
+    active: i8,            // TINYINT
+    archived: i8,          // TINYINT
+    archive_converted: i8, // TINYINT
 }
 
 #[derive(Debug)]

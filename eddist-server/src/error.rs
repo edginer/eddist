@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use axum::response::{IntoResponse, Response};
+use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
 use time::Duration;
 
-use crate::{shiftjis::SJisStr, SJisResponseBuilder, SjisContentType};
+use crate::{SJisResponseBuilder, SjisContentType};
 
 #[derive(thiserror::Error, Debug)]
 pub enum BbsCgiError {

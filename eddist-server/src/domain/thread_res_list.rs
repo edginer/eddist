@@ -1,4 +1,6 @@
-use super::{res_view::ResView, thread::Thread};
+use eddist_core::domain::res::ResView;
+
+use super::thread::Thread;
 
 #[derive(Debug, Clone)]
 pub struct ThreadResList {
