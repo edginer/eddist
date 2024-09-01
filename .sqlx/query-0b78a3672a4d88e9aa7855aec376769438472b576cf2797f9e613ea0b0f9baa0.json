@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE threads SET archive_converted = 1 WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "0b78a3672a4d88e9aa7855aec376769438472b576cf2797f9e613ea0b0f9baa0"
+}

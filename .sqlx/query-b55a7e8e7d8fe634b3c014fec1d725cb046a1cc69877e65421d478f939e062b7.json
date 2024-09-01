@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO archived_responses \n                (\n                    id,\n                    author_name,\n                    mail,\n                    body,\n                    created_at,\n                    author_id,\n                    ip_addr,\n                    authed_token_id,\n                    board_id,\n                    thread_id,\n                    is_abone,\n                    res_order,\n                    client_info\n                ) SELECT\n                    id,\n                    author_name,\n                    mail,\n                    body,\n                    created_at,\n                    author_id,\n                    ip_addr,\n                    authed_token_id,\n                    board_id,\n                    thread_id,\n                    is_abone,\n                    res_order,\n                    client_info\n                FROM\n                    responses\n                WHERE\n                    thread_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b55a7e8e7d8fe634b3c014fec1d725cb046a1cc69877e65421d478f939e062b7"
+}

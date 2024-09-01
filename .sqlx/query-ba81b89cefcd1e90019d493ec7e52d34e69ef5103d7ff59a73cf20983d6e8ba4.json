@@ -110,12 +110,22 @@
           "flags": "NOT_NULL",
           "max_size": 1
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "archive_converted",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
       "Right": 2
     },
     "nullable": [
+      false,
       false,
       false,
       false,

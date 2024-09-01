@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO archived_threads \n                (\n                    id,\n                    board_id,\n                    thread_number,\n                    last_modified_at,\n                    sage_last_modified_at,\n                    title,\n                    authed_token_id,\n                    metadent,\n                    response_count,\n                    no_pool,\n                    active,\n                    archived\n                ) SELECT\n                    id,\n                    board_id,\n                    thread_number,\n                    last_modified_at,\n                    sage_last_modified_at,\n                    title,\n                    authed_token_id,\n                    metadent,\n                    response_count,\n                    no_pool,\n                    active,\n                    archived\n                FROM\n                    threads\n                WHERE\n                    id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "5eb15f22b278bbbcccaefe8173819229525f5559c30cc35532922016bf5317a4"
+}
