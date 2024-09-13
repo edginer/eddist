@@ -47,7 +47,7 @@ where
 
     // Cache the result
     let cache_data = serde_json::to_string(&cache)?;
-    redis_conn.set::<_, _, _>(&cache_key, cache_data).await?;
+    redis_conn.set::<_, _, ()>(&cache_key, cache_data).await?;
 
     Ok(result)
 }

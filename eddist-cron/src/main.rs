@@ -183,6 +183,18 @@ async fn main() {
                         }
                     }
 
+                    let client = redis::Client::open(env::var("REDIS_URL").unwrap()).unwrap();
+                    client
+                        .get_multiplexed_async_connection()
+                        .await
+                        .unwrap()
+                        .send_packed_command(&redis::Cmd::del(format!(
+                            "thread:{}:{}",
+                            board.board_key, thread_number
+                        )))
+                        .await
+                        .unwrap();
+
                     repo.update_archive_converted(id).await.unwrap();
                 }
             }

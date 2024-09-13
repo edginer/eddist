@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 COPY ./target/release/eddist-admin .
-COPY ./eddist-admin/client/dist ./dist
+COPY ./eddist-admin/client/build/client ./dist
 
 ENV RUST_ENV=prod
 ENV RUST_LOG=info

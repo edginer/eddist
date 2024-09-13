@@ -6,14 +6,16 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use chrono::Utc;
+use jsonwebtoken::errors::ErrorKind;
 use oauth2::{
-    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RefreshToken, Scope, TokenResponse,
+    reqwest::async_http_client, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier,
+    RefreshToken, Scope, TokenResponse,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
 use tower_sessions::Session;
 use tracing::info_span;
+
+use crate::{repository::admin_bbs_repository::AdminBbsRepositoryImpl, AppState};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KeycloakAccessToken {
@@ -24,7 +26,7 @@ pub struct KeycloakAccessToken {
     pub email: String,
 }
 
-pub fn verify_access_token(access_token: &str) -> KeycloakAccessToken {
+pub fn verify_access_token(access_token: &str) -> Result<KeycloakAccessToken, ErrorKind> {
     let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
     validation.set_audience(&["account"]);
@@ -33,12 +35,19 @@ pub fn verify_access_token(access_token: &str) -> KeycloakAccessToken {
         &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
         &validation,
     );
-    token.unwrap().claims
+
+    match token {
+        Ok(t) => Ok(t.claims),
+        Err(e) => Err(e.kind().clone()),
+    }
 }
 
 pub async fn auth_simple_header(
     session: Session,
-    State((client, _pool)): State<(BasicClient, MySqlPool)>,
+    State(AppState {
+        oauth2_client: client,
+        ..
+    }): State<AppState<AdminBbsRepositoryImpl>>,
     admin_session: AdminSession,
     mut req: Request<Body>,
     next: Next,
@@ -49,6 +58,58 @@ pub async fn auth_simple_header(
 
     if let Some(access_token) = admin_session.access_token {
         let access_token = verify_access_token(&access_token);
+        let access_token = match access_token {
+            Ok(token) => token,
+            Err(ErrorKind::ExpiredSignature) => {
+                let Some(refresh_token) = &admin_session.refresh_token else {
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .body(Body::empty())
+                        .unwrap();
+                };
+
+                let Ok(token) = client
+                    .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
+                    .add_scopes(
+                        ["openid", "profile", "email"]
+                            .iter()
+                            .map(|s| Scope::new(s.to_string())),
+                    )
+                    .request_async(oauth2::reqwest::async_http_client)
+                    .await
+                else {
+                    session.delete().await.unwrap();
+
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .body(Body::empty())
+                        .unwrap();
+                };
+
+                let new_session = AdminSession {
+                    access_token: Some(token.access_token().secret().to_string()),
+                    refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
+                    ..admin_session
+                };
+                session.insert("data", new_session).await.unwrap();
+
+                match verify_access_token(token.access_token().secret()) {
+                    Ok(token) => {
+                        info_span!("success to verify access token from refresh token", token = ?token);
+                        token
+                    }
+                    Err(e) => {
+                        info_span!("failed to verify access token", error = ?e);
+                        return Response::builder()
+                            .status(StatusCode::UNAUTHORIZED)
+                            .body(Body::empty())
+                            .unwrap();
+                    }
+                }
+            }
+            Err(_) => panic!(),
+        };
+
         let adding_headers = [
             ("X-User-Id", access_token.sub),
             ("X-User-Email", access_token.email),
@@ -58,38 +119,6 @@ pub async fn auth_simple_header(
         for (key, value) in adding_headers.into_iter() {
             req.headers_mut()
                 .insert(key, HeaderValue::from_str(&value).unwrap());
-        }
-
-        if access_token.exp < Utc::now().timestamp() {
-            let Some(refresh_token) = &admin_session.refresh_token else {
-                return Response::builder()
-                    .status(StatusCode::UNAUTHORIZED)
-                    .body(Body::empty())
-                    .unwrap();
-            };
-
-            let Ok(token) = client
-                .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
-                .add_scopes(
-                    ["openid", "profile", "email"]
-                        .iter()
-                        .map(|s| Scope::new(s.to_string())),
-                )
-                .request_async(oauth2::reqwest::async_http_client)
-                .await
-            else {
-                return Response::builder()
-                    .status(StatusCode::UNAUTHORIZED)
-                    .body(Body::empty())
-                    .unwrap();
-            };
-
-            let new_session = AdminSession {
-                access_token: Some(token.access_token().secret().to_string()),
-                refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
-                ..admin_session
-            };
-            session.insert("data", new_session).await.unwrap();
         }
 
         // TODO: this only executes after getting access token or refresh token
@@ -114,12 +143,12 @@ pub async fn auth_simple_header(
         return next.run(req).await;
     }
 
-    if !matches!(
-        std::env::var("RUST_ENV").as_deref(),
-        Ok("prod" | "production")
-    ) {
-        return next.run(req).await;
-    }
+    // if !matches!(
+    //     std::env::var("RUST_ENV").as_deref(),
+    //     Ok("prod" | "production")
+    // ) {
+    //     return next.run(req).await;
+    // }
 
     if let Some(authorization) = req.headers().get("Authorization") {
         let env_simple_auth = std::env::var("SIMPLE_AUTH").unwrap();
@@ -167,9 +196,12 @@ struct OAuthSession {
 
 // GET: /login
 pub async fn get_login(
+    State(AppState {
+        oauth2_client: oauth_client,
+        ..
+    }): State<AppState<AdminBbsRepositoryImpl>>,
     session: Session,
     _: AdminSession,
-    State((oauth_client, _)): State<(BasicClient, MySqlPool)>,
 ) -> impl IntoResponse {
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (authorize_url, csrf_state) = oauth_client
@@ -202,10 +234,13 @@ pub struct LoginCallbackQuery {
 
 // GET: /auth/callback
 pub async fn get_login_callback(
+    State(AppState {
+        oauth2_client: oauth_client,
+        ..
+    }): State<AppState<AdminBbsRepositoryImpl>>,
     session: Session,
     admin_session: AdminSession,
     query: axum::extract::Query<LoginCallbackQuery>,
-    State((oauth_client, _)): State<(BasicClient, MySqlPool)>,
 ) -> impl IntoResponse {
     let Some(oauth_session) = session.get::<OAuthSession>("oauth").await.unwrap() else {
         info_span!("oauth_session is not found");
@@ -289,7 +324,7 @@ where
                     .to_string(),
                 req.headers
                     .get("User-Agent")
-                    .unwrap()
+                    .unwrap_or(&HeaderValue::from_str("Mozilla/5.0").unwrap()) // for testing
                     .to_str()
                     .unwrap()
                     .to_string(),

@@ -5,14 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-async-graphql = { version = "7.0.7", features = ["dataloader", "chrono"] }
-async-graphql-axum = "7.0.7"
 async-trait = "0.1.81"
 axum = "0.7.5"
 chrono = "0.4.38"
 dotenvy = "0.15.7"
-juniper = "0.16.1"
-juniper_axum = "0.1.0"
 log = "0.4.22"
 tower-sessions = "0.12.2"
 sqlx = { version = "0.8.0", default-features = false, features = [
@@ -22,9 +18,10 @@ sqlx = { version = "0.8.0", default-features = false, features = [
     "chrono",
     "macros",
     "json",
+    "uuid",
 ] }
 tokio = { version = "1.39.2", features = ["full"] }
-tower-http = { version = "0.5.2", features = ["fs", "trace"] }
+tower-http = { version = "0.5.2", features = ["fs", "trace", "normalize-path"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.10.0", features = ["v7", "v4"] }
@@ -37,5 +34,7 @@ serde = { version = "1.0.205", features = ["derive"] }
 serde_json = { version = "1.0.122" }
 jsonwebtoken = "9.3.0"
 base64 = "0.22.1"
-
+redis = { version = "0.25.4", features = ["tokio-comp"] }
 eddist-core = { path = "../eddist-core" }
+utoipa = { version = "4.2.3", features = ["uuid", "axum_extras", "chrono"] }
+tower-layer = "0.3.3"

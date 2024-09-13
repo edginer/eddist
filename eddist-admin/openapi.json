@@ -1,0 +1,834 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "eddist-admin",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/authed_tokens/{authed_token_id}/": {
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_authed_token",
+        "parameters": [
+          {
+            "name": "authed_token_id",
+            "in": "path",
+            "description": "Authed token ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "using_origin_ip",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete authed token successfully"
+          }
+        }
+      }
+    },
+    "/boards/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_boards",
+        "responses": {
+          "200": {
+            "description": "List boards successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Board"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "create_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBoardInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create board successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateBoardInput"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_board",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get board successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/threads/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_threads",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List threads successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Thread"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/threads/{thread_id}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_thread",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get thread successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/threads/{thread_id}/responses/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_responses",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "board_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List responses successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Res"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/threads/{thread_id}/responses/{res_id}/": {
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_response",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "res_id",
+            "in": "path",
+            "description": "Response ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update response successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Res"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ng_words/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_ng_words",
+        "responses": {
+          "200": {
+            "description": "List ng words successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NgWord"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "create_ng_word",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreationNgWordInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create ng word successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NgWord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ng_words/{ng_word_id}/": {
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_ng_word",
+        "parameters": [
+          {
+            "name": "ng_word_id",
+            "in": "path",
+            "description": "NG word ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete ng word successfully"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_ng_word",
+        "parameters": [
+          {
+            "name": "ng_word_id",
+            "in": "path",
+            "description": "NG word ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNgWordInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update ng word successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NgWord"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Board": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "board_key",
+          "default_name",
+          "thread_count"
+        ],
+        "properties": {
+          "board_key": {
+            "type": "string"
+          },
+          "default_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thread_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ClientInfo": {
+        "type": "object",
+        "required": [
+          "user_agent",
+          "asn_num",
+          "ip_addr"
+        ],
+        "properties": {
+          "asn_num": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "ip_addr": {
+            "type": "string"
+          },
+          "tinker": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Tinker"
+              }
+            ],
+            "nullable": true
+          },
+          "user_agent": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateBoardInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "board_key",
+          "default_name",
+          "local_rule"
+        ],
+        "properties": {
+          "base_response_creation_span_sec": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "base_thread_creation_span_sec": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "board_key": {
+            "type": "string"
+          },
+          "default_name": {
+            "type": "string"
+          },
+          "local_rule": {
+            "type": "string"
+          },
+          "max_author_name_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_email_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_response_body_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_response_body_lines": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_thread_name_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "threads_archive_cron": {
+            "type": "string",
+            "nullable": true
+          },
+          "threads_archive_trigger_thread_count": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
+      },
+      "CreationNgWordInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "word"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "word": {
+            "type": "string"
+          }
+        }
+      },
+      "NgWord": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "word",
+          "created_at",
+          "updated_at",
+          "board_ids"
+        ],
+        "properties": {
+          "board_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "word": {
+            "type": "string"
+          }
+        }
+      },
+      "Res": {
+        "type": "object",
+        "required": [
+          "id",
+          "body",
+          "created_at",
+          "author_id",
+          "ip_addr",
+          "authed_token_id",
+          "board_id",
+          "thread_id",
+          "is_abone",
+          "client_info",
+          "res_order"
+        ],
+        "properties": {
+          "authed_token_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author_id": {
+            "type": "string"
+          },
+          "author_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string"
+          },
+          "client_info": {
+            "$ref": "#/components/schemas/ClientInfo"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_addr": {
+            "type": "string"
+          },
+          "is_abone": {
+            "type": "boolean"
+          },
+          "mail": {
+            "type": "string",
+            "nullable": true
+          },
+          "res_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "thread_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Thread": {
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "thread_number",
+          "last_modified",
+          "sage_last_modified",
+          "title",
+          "authed_token_id",
+          "metadent",
+          "response_count",
+          "no_pool",
+          "archived",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "authed_token_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_modified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metadent": {
+            "type": "string"
+          },
+          "no_pool": {
+            "type": "boolean"
+          },
+          "response_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sage_last_modified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "thread_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "Tinker": {
+        "type": "object",
+        "required": [
+          "authed_token",
+          "wrote_count",
+          "created_thread_count",
+          "level",
+          "last_level_up_at",
+          "last_wrote_at"
+        ],
+        "properties": {
+          "authed_token": {
+            "type": "string"
+          },
+          "created_thread_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "last_created_thread_at": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "minimum": 0
+          },
+          "last_level_up_at": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "last_wrote_at": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "wrote_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "UpdateNgWordInput": {
+        "type": "object",
+        "properties": {
+          "board_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "word": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateResInput": {
+        "type": "object",
+        "properties": {
+          "author_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_abone": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "mail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}
