@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            DELETE FROM\n                ng_words\n            WHERE\n                id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "4daa1bdc0c3ac6f092af437385af8e4385b659353b4038cb3e5f24991005d8a2"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                    INSERT INTO\n                        boards_ng_words (id, board_id, ng_word_id)\n                    VALUES\n                        (?, ?, ?)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4f2342ee0a8090d182982387b59e5cc2f40e4a97d16355f0af45086b3682e4b7"
+}

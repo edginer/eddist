@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO\n                ng_words (id, name, word, created_at, updated_at)\n            VALUES\n                (?, ?, ?, NOW(), NOW())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "617a168ab0a74e6a6f77699380e64347284168edab981dc6a7efd708bd4f1c58"
+}

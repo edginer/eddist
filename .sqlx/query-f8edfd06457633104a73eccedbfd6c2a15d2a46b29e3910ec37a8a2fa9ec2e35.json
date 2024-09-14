@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                board_id = ?\n                AND thread_id = ?\n            ORDER BY\n                res_order ASC\n            ",
+  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                thread_id = (\n                    SELECT\n                        id\n                    FROM\n                        threads\n                    WHERE\n                        board_id = (\n                        SELECT\n                            id\n                        FROM\n                            boards\n                        WHERE\n                            board_key = ?\n                        )\n                    AND\n                        thread_number = ?\n                )\n            ORDER BY\n                res_order ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -140,5 +140,5 @@
       false
     ]
   },
-  "hash": "3cdef0bf94e4e239a4de62d8d23aa87df5a118bf6c61269b31cb95285e95673e"
+  "hash": "f8edfd06457633104a73eccedbfd6c2a15d2a46b29e3910ec37a8a2fa9ec2e35"
 }

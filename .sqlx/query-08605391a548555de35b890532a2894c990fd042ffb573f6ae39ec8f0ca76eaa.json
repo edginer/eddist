@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO\n                boards (id, name, board_key, default_name)\n            VALUES\n                (?, ?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "08605391a548555de35b890532a2894c990fd042ffb573f6ae39ec8f0ca76eaa"
+}
