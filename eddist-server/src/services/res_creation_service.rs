@@ -7,6 +7,7 @@ use eddist_core::domain::{
     pubsub_repository::{CreatingRes, PubSubItem},
     tinker::Tinker,
 };
+use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
 use tracing::error_span;
 use uuid::Uuid;
@@ -205,6 +206,8 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             Tinker::new(authed_token.token, created_at)
         }
         .action_on_write(created_at);
+
+        counter!("response_creation", "board_key" => input.board_key).increment(1);
 
         Ok(ResCreationServiceOutput { tinker })
     }

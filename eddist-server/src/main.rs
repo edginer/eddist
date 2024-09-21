@@ -22,6 +22,7 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use jsonwebtoken::EncodingKey;
 use jwt_simple::prelude::MACLike;
+use metrics::describe_counter;
 use repositories::{bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl};
 use services::{
     auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
@@ -149,6 +150,12 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Start application server with 0.0.0.0:8080");
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    describe_counter!(
+        "issue_authed_token",
+        "issue authed token count by state and reason if failed"
+    );
+    describe_counter!("response_creation", "response creation count if success");
+    describe_counter!("thread_creation", "thread creation count if success");
 
     let app = Router::new()
         .route("/health-check", get(health_check))

@@ -2,6 +2,7 @@ use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
+use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
 use uuid::Uuid;
 
@@ -114,6 +115,7 @@ impl<T: BbsRepository + Clone>
         };
         let res = res.set_author_id(&authed_token, cap_name);
 
+        let board_key = input.board_key.clone();
         let creating_th = CreatingThread {
             thread_id: th_id,
             response_id: res_id,
@@ -189,6 +191,9 @@ impl<T: BbsRepository + Clone>
             Tinker::new(authed_token.token, created_at)
         }
         .action_on_create_thread(created_at);
+
+        counter!("response_creation", "board_key" => board_key.clone()).increment(1);
+        counter!("thread_creation", "board_key" => board_key.clone()).increment(1);
 
         Ok(TheradCreationServiceOutput { tinker })
     }

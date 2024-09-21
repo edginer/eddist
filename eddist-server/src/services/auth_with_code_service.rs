@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use chrono::Utc;
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 use futures::future::join_all;
+use metrics::counter;
 use tracing::{error_span, info_span};
 
 use crate::{
-    domain::{captcha_like::CaptchaLikeConfig, res},
+    domain::captcha_like::CaptchaLikeConfig,
     external::captcha_like_client::{
         CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
     },
@@ -69,6 +70,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                 Some((client, req_params))
             })
             .collect::<Vec<_>>();
+        counter!("issue_authed_token", "state" => "request").increment(1);
 
         let ip_addr = IpAddr::new(input.origin_ip.clone());
         let reduced = ReducedIpAddr::from(ip_addr.clone());
@@ -77,16 +79,21 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .get_authed_token_by_origin_ip_and_auth_code(&reduced.to_string(), &input.code)
             .await?
         else {
+            counter!("issue_authed_token", "state" => "failed", "reason" => "ip_check")
+                .increment(1);
             info_span!("failed to find authed token", reduced_ip = %reduced.to_string(), origin_ip = %ip_addr, code = %input.code);
             return Err(anyhow::anyhow!("failed to find authed token"));
         };
 
         if token.validity {
+            counter!("issue_authed_token" , "state" => "failed", "reason" => "already_valid")
+                .increment(1);
             return Err(anyhow::anyhow!("authed token is already valid"));
         }
 
         let now = Utc::now();
         if token.is_activation_expired(now) {
+            counter!("issue_authed_token", "state" => "failed", "reason" => "expired").increment(1);
             return Err(anyhow::anyhow!("activation code is expired"));
         }
 
@@ -98,6 +105,8 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         for r in results {
             match r {
                 Ok(CaptchaLikeResult::Failure(e)) => {
+                    counter!("issue_authed_token", "state" => "failed", "reason" => "captcha")
+                        .increment(1);
                     return Err(e.into());
                 }
                 Err(e) => return Err(e.into()),
@@ -108,6 +117,8 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         self.0
             .activate_authed_status(&token.token, &input.user_agent, now)
             .await?;
+
+        counter!("issue_authed_token", "state" => "success").increment(1);
 
         Ok(AuthWithCodeServiceOutput { token: token.token })
     }
