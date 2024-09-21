@@ -9,6 +9,7 @@ pub const GRECAPTCHA_ENTERPRISE_URL: &str =
     "https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments";
 pub const TURNSTILE_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const HCAPTCHA_URL: &str = "https://api.hcaptcha.com/siteverify";
+pub const MONOCLE_URL: &str = "https://decrypt.mcl.spur.us/api/v1/assessment";
 
 pub struct CaptchaLikeRequest {
     pub secret: String,
@@ -81,7 +82,7 @@ pub struct TurnstileResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct HcaptchaResponse {
+pub struct HCaptchaResponse {
     pub success: bool,
     pub challenge_ts: String,
     pub hostname: String,
@@ -92,6 +93,19 @@ pub struct HcaptchaResponse {
     pub score_reason: Option<String>, // Enterprise feature
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MonocleResponse {
+    pub vpn: Option<bool>,
+    pub proxied: Option<bool>,
+    pub anon: Option<bool>,
+    pub ip: Option<String>,
+    pub ipv6: Option<String>,
+    pub ts: Option<String>,
+    pub complete: Option<bool>,
+    pub id: Option<String>,
+    pub sid: Option<String>,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum CaptchaLikeConfig {
     GrecaptchaV2 { site_key: String, secret: String },
@@ -99,6 +113,7 @@ pub enum CaptchaLikeConfig {
     GrecaptchaEnterprise { site_key: String, secret: String },
     Turnstile { site_key: String, secret: String },
     Hcaptcha { site_key: String, secret: String },
+    Monocle { site_key: String, token: String },
 }
 
 impl Debug for CaptchaLikeConfig {
@@ -128,6 +143,11 @@ impl Debug for CaptchaLikeConfig {
                 .debug_struct("Hcaptcha")
                 .field("site_key", site_key)
                 .field("secret", &"[REDACTED]")
+                .finish(),
+            CaptchaLikeConfig::Monocle { site_key, .. } => f
+                .debug_struct("Monocle")
+                .field("site_key", site_key)
+                .field("token", &"[REDACTED]")
                 .finish(),
         }
     }

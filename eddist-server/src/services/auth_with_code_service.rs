@@ -60,7 +60,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             )
             .await?;
 
-        if !result {
+        if !result.is_success() {
             return Err(anyhow::anyhow!("failed to verify captcha"));
         }
 

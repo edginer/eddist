@@ -1,0 +1,30 @@
+<html>
+<head>
+    <title>コード認証画面</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{#if cf_site_key}}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    {{/if}}
+    {{#if hcaptcha_site_key}}
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    {{/if}}
+    {{#if monocle_site_key}}
+    <script async
+        src="https://mcl.spur.us/d/mcl.js?tk={{monocle_site_key}}"
+        id="_mcl"></script>
+    {{/if}}
+<body>
+    <p>認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください</p>
+    <form action="/auth-code" method="POST" id="login-form" class="monocle-enriched">
+        {{#if cf_site_key}}
+        <div class="cf-turnstile" data-sitekey="{{cf_site_key}}" data-theme="light"></div>
+        {{/if}}
+        {{#if hcaptcha_site_key}}
+        <div class="h-captcha" data-sitekey="{{hcaptcha_site_key}}"></div>
+        {{/if}}
+        <input type="number" name="auth-code" placeholder="6桁の認証コード">
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>

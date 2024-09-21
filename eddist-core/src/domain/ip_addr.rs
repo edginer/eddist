@@ -21,6 +21,16 @@ pub enum ReducedIpAddr {
     V6([String; 4]),
 }
 
+impl ReducedIpAddr {
+    pub fn is_v4(&self) -> bool {
+        matches!(self, Self::V4(_))
+    }
+
+    pub fn is_v6(&self) -> bool {
+        matches!(self, Self::V6(_))
+    }
+}
+
 impl From<IpAddr> for ReducedIpAddr {
     fn from(value: IpAddr) -> Self {
         value.0.into()

@@ -16,6 +16,7 @@ use eddist_core::{
     utils::is_prod,
 };
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
+use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use jsonwebtoken::EncodingKey;
@@ -43,7 +44,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{error_span, info_span, Span};
+use tracing::{error_span, info_span, warn_span, Span};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
@@ -83,6 +84,7 @@ struct AppState {
     services: AppServiceContainer<BbsRepositoryImpl, RedisPubRepository>,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
+    template_engine: Handlebars<'static>,
 }
 
 impl AppState {
@@ -125,10 +127,15 @@ async fn main() -> anyhow::Result<()> {
     let captcha_like_configs =
         serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
 
+    let mut template_engine = Handlebars::new();
+    template_engine
+        .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))?;
+
     let app_state = AppState {
         services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), conn_mgr, pub_repo),
         tinker_secret,
         captcha_like_configs,
+        template_engine,
     };
 
     let serve_dir = if is_prod() {
@@ -396,27 +403,29 @@ async fn get_head_txt(
 
 // NOTE: this system will be changed in the future
 async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let CaptchaLikeConfig::Turnstile { site_key, .. } = &state.captcha_like_configs[0] else {
-        panic!("invalid captcha config")
-    };
+    let site_keys = state
+        .captcha_like_configs
+        .iter()
+        .filter_map(|config| match config {
+            CaptchaLikeConfig::Turnstile { site_key, .. } => Some(("cf_site_key", site_key)),
+            CaptchaLikeConfig::Hcaptcha { site_key, .. } => Some(("hcaptcha_site_key", site_key)),
+            CaptchaLikeConfig::Monocle { site_key, .. } => Some(("monocle_site_key", site_key)),
+            _ => {
+                warn_span!(
+                    "not implemented yet such captcha like config, ignored",
+                    ?config
+                );
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
 
-    Html(
-        r#"<html>
-<head>
-    <title>コード認証画面</title>
-    <meta charset="utf-8">
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<body>
-    <p>認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください</p>
-    <form action="/auth-code" method="POST">
-        <div class="cf-turnstile" data-sitekey="{cf_site_key}" data-theme="light"></div>
-        <input type="number" name="auth-code" placeholder="6桁の認証コード">
-        <input type="submit" value="Submit">
-    </form>
-</body>
-</html>"#
-            .replace("{cf_site_key}", site_key),
-    )
+    let html = state
+        .template_engine
+        .render("auth-code.get", &serde_json::json!(site_keys))
+        .unwrap();
+
+    Html(html)
 }
 
 async fn post_auth_code(
