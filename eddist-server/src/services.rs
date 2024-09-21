@@ -8,7 +8,10 @@ use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
 
-use crate::{error::BbsCgiError, repositories::bbs_repository::BbsRepository};
+use crate::{
+    error::BbsCgiError,
+    repositories::{bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository},
+};
 
 pub(crate) mod auth_with_code_service;
 pub(crate) mod board_info_service;
@@ -31,23 +34,23 @@ pub trait BbsCgiService<I: Send + Sync, O: Send + Sync> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AppServiceContainer<B: BbsRepository + 'static> {
+pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
     auth_with_code: AuthWithCodeService<B>,
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
-    res_creation: ResCreationService<B>,
+    res_creation: ResCreationService<B, P>,
     thread_creation: TheradCreationService<B>,
     thread_list: ThreadListService<B>,
     thread_retrival: ThreadRetrievalService<B>,
 }
 
-impl<B: BbsRepository + Clone> AppServiceContainer<B> {
-    pub fn new(bbs_repo: B, redis_conn: MultiplexedConnection) -> Self {
+impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
+    pub fn new(bbs_repo: B, redis_conn: MultiplexedConnection, pub_repo: P) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
-            res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone()),
+            res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone(), pub_repo),
             thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             thread_retrival: ThreadRetrievalService::new(bbs_repo, redis_conn),
@@ -55,7 +58,7 @@ impl<B: BbsRepository + Clone> AppServiceContainer<B> {
     }
 }
 
-impl<B: BbsRepository + 'static> AppServiceContainer<B> {
+impl<B: BbsRepository + 'static, P: PubRepository> AppServiceContainer<B, P> {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
         &self.auth_with_code
     }
@@ -64,7 +67,7 @@ impl<B: BbsRepository + 'static> AppServiceContainer<B> {
         &self.board_info
     }
 
-    pub fn res_creation(&self) -> &ResCreationService<B> {
+    pub fn res_creation(&self) -> &ResCreationService<B, P> {
         &self.res_creation
     }
 

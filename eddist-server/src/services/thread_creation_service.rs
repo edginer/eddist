@@ -3,7 +3,6 @@ use std::{borrow::Cow, env};
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
 use redis::{aio::MultiplexedConnection, Cmd};
-use tokio::join;
 use uuid::Uuid;
 
 use crate::{
@@ -152,8 +151,15 @@ impl<T: BbsRepository + Clone>
         }
 
         let authed_token_clone = authed_token.token.clone();
-        let db_req = tokio::spawn(async move { bbs_repo.create_thread(creating_th).await });
-        let redis_req = tokio::spawn(async move {
+        let db_result = bbs_repo.create_thread(creating_th).await;
+        db_result.map_err(|e| {
+            if e.to_string() == "Given thread number is already exists" {
+                BbsCgiError::SameTimeThreadCration
+            } else {
+                BbsCgiError::Other(e)
+            }
+        })?;
+        let redis_result = tokio::spawn(async move {
             redis_conn
                 .send_packed_command(&Cmd::rpush(
                     format!("thread:{}:{unix_time}", input.board_key),
@@ -170,19 +176,9 @@ impl<T: BbsRepository + Clone>
                     60 * 60 * 24 * 7,
                 ))
                 .await
-        });
+        })
+        .await;
 
-        let (db_result, redis_result) = join!(db_req, redis_req);
-
-        db_result
-            .map_err(|e| BbsCgiError::Other(e.into()))?
-            .map_err(|e| {
-                if e.to_string() == "Given thread number is already exists" {
-                    BbsCgiError::SameTimeThreadCration
-                } else {
-                    BbsCgiError::Other(e)
-                }
-            })?;
         redis_result
             .map_err(|e| BbsCgiError::Other(e.into()))?
             .map_err(|e| BbsCgiError::Other(e.into()))?;

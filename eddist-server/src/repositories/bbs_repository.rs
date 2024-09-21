@@ -3,8 +3,10 @@ use eddist_core::domain::{
     board::{Board, BoardInfo},
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
+    pubsub_repository::CreatingRes,
     res::ResView,
 };
+use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
@@ -647,7 +649,7 @@ pub enum ThreadStatus {
     Unarchived,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreatingThread {
     pub thread_id: Uuid,
     pub response_id: Uuid,
@@ -665,21 +667,21 @@ pub struct CreatingThread {
     pub client_info: ClientInfo,
 }
 
-#[derive(Debug, Clone)]
-pub struct CreatingRes {
-    pub id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub body: String,
-    pub name: String,
-    pub mail: String,
-    pub author_ch5id: String,
-    pub authed_token_id: Uuid,
-    pub ip_addr: String,
-    pub thread_id: Uuid,
-    pub board_id: Uuid,
-    pub client_info: ClientInfo,
-    pub res_order: i32,
-}
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct CreatingRes {
+//     pub id: Uuid,
+//     pub created_at: DateTime<Utc>,
+//     pub body: String,
+//     pub name: String,
+//     pub mail: String,
+//     pub author_ch5id: String,
+//     pub authed_token_id: Uuid,
+//     pub ip_addr: String,
+//     pub thread_id: Uuid,
+//     pub board_id: Uuid,
+//     pub client_info: ClientInfo,
+//     pub res_order: i32,
+// }
 
 #[derive(Debug, Clone)]
 pub struct CreatingAuthedToken {

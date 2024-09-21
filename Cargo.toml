@@ -1,3 +1,9 @@
 [workspace]
-members = ["eddist-admin", "eddist-core", "eddist-cron", "eddist-server"]
+members = [
+    "eddist-admin",
+    "eddist-core",
+    "eddist-cron",
+    "eddist-persistence",
+    "eddist-server",
+]
 resolver = "2"

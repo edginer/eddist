@@ -2,8 +2,13 @@ use std::{borrow::Cow, env};
 
 use anyhow::anyhow;
 use chrono::Utc;
-use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
+use eddist_core::domain::{
+    client_info::ClientInfo,
+    pubsub_repository::{CreatingRes, PubSubItem},
+    tinker::Tinker,
+};
 use redis::{aio::MultiplexedConnection, Cmd, Value};
+use tracing::error_span;
 use uuid::Uuid;
 
 use crate::{
@@ -22,23 +27,23 @@ use crate::{
         },
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::bbs_repository::{BbsRepository, CreatingRes},
+    repositories::{bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository},
 };
 
 use super::BbsCgiService;
 
 #[derive(Debug, Clone)]
-pub struct ResCreationService<T: BbsRepository>(T, MultiplexedConnection);
+pub struct ResCreationService<T: BbsRepository, P: PubRepository>(T, MultiplexedConnection, P);
 
-impl<T: BbsRepository> ResCreationService<T> {
-    pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
-        Self(repo, redis_conn)
+impl<T: BbsRepository, P: PubRepository> ResCreationService<T, P> {
+    pub fn new(repo: T, redis_conn: MultiplexedConnection, pub_repo: P) -> Self {
+        Self(repo, redis_conn, pub_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
-    for ResCreationService<T>
+impl<T: BbsRepository + Clone, P: PubRepository>
+    BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput> for ResCreationService<T, P>
 {
     async fn execute(
         &self,
@@ -46,6 +51,7 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
     ) -> Result<ResCreationServiceOutput, BbsCgiError> {
         let mut redis_conn = self.1.clone();
         let bbs_repo = self.0.clone();
+        let pub_repo = self.2.clone();
 
         let res_id = Uuid::now_v7();
         let board_info_svc = BoardInfoService::new(self.0.clone());
@@ -181,7 +187,17 @@ impl<T: BbsRepository + Clone> BbsCgiService<ResCreationServiceInput, ResCreatio
             client_info,
             res_order: order as i32,
         };
-        tokio::spawn(async move { bbs_repo.create_response(cres).await });
+        tokio::spawn(async move {
+            if let Err(e) = bbs_repo.create_response(cres.clone()).await {
+                error_span!("failed to create response in database",
+                    error = %e
+                );
+                pub_repo
+                    .publish(PubSubItem::CreatingRes(Box::new(cres)))
+                    .await
+                    .unwrap();
+            }
+        });
 
         let tinker = if let Some(tinker) = input.tinker {
             tinker

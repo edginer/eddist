@@ -4,8 +4,9 @@ use chrono::{DateTime, Utc};
 use eddist_core::domain::client_info::ClientInfo;
 use md5::{Digest, Md5};
 use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MetadentType {
     None,
     Verbose,

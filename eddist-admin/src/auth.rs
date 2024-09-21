@@ -150,13 +150,6 @@ pub async fn auth_simple_header(
     //     return next.run(req).await;
     // }
 
-    if let Some(authorization) = req.headers().get("Authorization") {
-        let env_simple_auth = std::env::var("SIMPLE_AUTH").unwrap();
-        if authorization.to_str().unwrap() == env_simple_auth {
-            return next.run(req).await;
-        }
-    }
-
     Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .body(Body::empty())

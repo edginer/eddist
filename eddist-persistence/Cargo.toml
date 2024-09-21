@@ -1,0 +1,26 @@
+[package]
+name = "eddist-persistence"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+chrono = { version = "0.4.38", features = ["serde"] }
+dotenvy = "0.15.7"
+redis = { version = "0.25.4", features = ["tokio-comp", "connection-manager"] }
+serde = { version = "1.0.205", features = ["derive"] }
+serde_json = { version = "1.0.118" }
+sqlx = { version = "0.8.0", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",
+    "macros",
+    "chrono",
+    "json",
+    "uuid",
+] }
+tokio = { version = "1.39.2", features = ["full"] }
+futures = "0.3.30"
+eddist-core = { path = "../eddist-core" }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

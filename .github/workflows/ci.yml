@@ -85,10 +85,26 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-cron:${{ github.sha }}
             ghcr.io/edginer/eddist-cron:latest
+      - name: Build and push Docker image (eddist-persistence)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-persistence/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-persistence:${{ github.sha }}
+            ghcr.io/edginer/eddist-persistence:latest
       - name: notify deploy server
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.DEPLOY_REPO_PAT }}
           repository: ${{ secrets.DEPLOY_REPO_URL }}
+          event-type: update-image
+          client-payload: '{"image-tag": "${{ github.sha }}"}'
+      - name: notify deploy server
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_REPO_PAT }}
+          repository: ${{ secrets.DEPLOY_REPO_URL2 }}
           event-type: update-image
           client-payload: '{"image-tag": "${{ github.sha }}"}'

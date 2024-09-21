@@ -20,7 +20,7 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use jsonwebtoken::EncodingKey;
 use jwt_simple::prelude::MACLike;
-use repositories::bbs_repository::BbsRepositoryImpl;
+use repositories::{bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl};
 use services::{
     auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
@@ -48,6 +48,7 @@ use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
 mod repositories {
+    pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
 }
 mod domain {
@@ -79,13 +80,13 @@ pub(crate) mod external {
 
 #[derive(Debug, Clone)]
 struct AppState {
-    services: AppServiceContainer<BbsRepositoryImpl>,
+    services: AppServiceContainer<BbsRepositoryImpl, RedisPubRepository>,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
 }
 
 impl AppState {
-    pub fn get_container(&self) -> &AppServiceContainer<BbsRepositoryImpl> {
+    pub fn get_container(&self) -> &AppServiceContainer<BbsRepositoryImpl, RedisPubRepository> {
         &self.services
     }
 
@@ -108,6 +109,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let con = client.get_multiplexed_tokio_connection().await?;
+    let pub_repo = RedisPubRepository::new(con.clone());
 
     let pool = MySqlPoolOptions::new()
         .max_connections(8)
@@ -124,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
         serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
 
     let app_state = AppState {
-        services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), con),
+        services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), con, pub_repo),
         tinker_secret,
         captcha_like_configs,
     };

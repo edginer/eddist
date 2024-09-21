@@ -34,7 +34,7 @@ serde = { version = "1.0.205", features = ["derive"] }
 serde_json = { version = "1.0.122" }
 jsonwebtoken = "9.3.0"
 base64 = "0.22.1"
-redis = { version = "0.25.4", features = ["tokio-comp"] }
+redis = { version = "0.25.4", features = ["tokio-comp", "connection-manager"] }
 eddist-core = { path = "../eddist-core" }
 utoipa = { version = "4.2.3", features = ["uuid", "axum_extras", "chrono"] }
 tower-layer = "0.3.3"
