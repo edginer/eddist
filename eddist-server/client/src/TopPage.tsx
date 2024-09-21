@@ -42,18 +42,10 @@ function TopPage() {
       </section>
       <section className="py-4 pt-4">
         <h2 className="text-2xl lg:text-4xl">利用規約</h2>
-        {
-          // Fill sample terms of service (Lorem ipsum)
-        }
         <p className="text-left py-2 lg:text-lg">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-          malesuada, nunc nec ultricies ultricies, justo odio fermentum ligula,
-          vel lacinia orci purus eget libero. Sed euismod, nisl eget pharetra
-          tincidunt, velit odio ultrices nunc, nec scelerisque purus libero nec
-          nisl. Nulla facilisi. Nullam fringilla, metus ac ultricies fermentum,
-          odio elit ultricies nisi, nec ultricies purus tellus id libero. Nulla
-          facilisi. Nullam fringilla, metus ac ultricies fermentum, odio elit
-          ultricies nisi, nec ultricies purus tellus id libero.
+          <a href="/terms" className="text-blue-500">
+            利用規約はこちら
+          </a>
         </p>
       </section>
     </div>

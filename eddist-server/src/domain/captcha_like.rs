@@ -2,20 +2,12 @@ use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
-// Initially, we only support Cloudflare Turnstile.
-
 pub const GRECAPTCHA_URL: &str = "https://www.google.com/recaptcha/api/siteverify";
 pub const GRECAPTCHA_ENTERPRISE_URL: &str =
     "https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments";
 pub const TURNSTILE_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const HCAPTCHA_URL: &str = "https://api.hcaptcha.com/siteverify";
 pub const MONOCLE_URL: &str = "https://decrypt.mcl.spur.us/api/v1/assessment";
-
-pub struct CaptchaLikeRequest {
-    pub secret: String,
-    pub response: String,
-    pub remoteip: String,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GrecaptchaV2Response {

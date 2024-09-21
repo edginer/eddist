@@ -132,6 +132,10 @@ async fn main() -> anyhow::Result<()> {
     let mut template_engine = Handlebars::new();
     template_engine
         .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))?;
+    template_engine.register_template_string(
+        "term-of-usage.get",
+        include_str!("templates/term-of-usage.get.hbs"),
+    )?;
 
     let app_state = AppState {
         services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), conn_mgr, pub_repo),
@@ -166,7 +170,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/SETTING.TXT", get(get_setting_txt))
         .route("/:boardKey/dat/:threadId", get(get_dat_txt))
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
-        .route("/api/terms", get(get_home))
+        .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .nest_service("/dist", serve_dir.clone())
@@ -263,21 +267,6 @@ async fn graceful_shutdown_http() {
 
 async fn health_check() -> StatusCode {
     StatusCode::OK
-}
-
-async fn get_home() -> impl IntoResponse {
-    Html(
-        r#"<html>
-<head>
-    <title>Eddist server</title>
-    <meta charset="utf-8">
-</head>
-<body>
-    <h1>Hello, Eddist server!</h1>
-    <a href="https://github.com/edginer/eddist">GitHub Repo Link</a>
-</body>
-</html>"#,
-    )
 }
 
 async fn get_subject_txt(
@@ -410,6 +399,15 @@ async fn get_head_txt(
         .content_type(SjisContentType::TextPlain)
         .build()
         .into_response()
+}
+
+async fn get_term_of_usage(State(state): State<AppState>) -> impl IntoResponse {
+    let html = state
+        .template_engine
+        .render("term-of-usage.get", &serde_json::json!({}))
+        .unwrap();
+
+    Html(html)
 }
 
 // NOTE: this system will be changed in the future

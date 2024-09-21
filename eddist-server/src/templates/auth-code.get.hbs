@@ -15,6 +15,8 @@
         id="_mcl"></script>
     {{/if}}
 <body>
+    <p>認証を進める前に、本掲示板における利用規約への同意が必要です</p>
+    <a href="/terms">利用規約</a>
     <p>認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください</p>
     <form action="/auth-code" method="POST" id="login-form" class="monocle-enriched">
         {{#if cf_site_key}}
@@ -24,7 +26,7 @@
         <div class="h-captcha" data-sitekey="{{hcaptcha_site_key}}"></div>
         {{/if}}
         <input type="number" name="auth-code" placeholder="6桁の認証コード">
-        <input type="submit" value="Submit">
+        <input type="submit" value="利用規約に同意して認証を行う">
     </form>
 </body>
 </html>
