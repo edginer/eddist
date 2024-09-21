@@ -59,7 +59,7 @@ async fn ok() -> impl IntoResponse {
 struct AppState<T: AdminBbsRepository + Clone> {
     oauth2_client: oauth2::basic::BasicClient,
     repo: T,
-    redis_conn: redis::aio::MultiplexedConnection,
+    redis_conn: redis::aio::ConnectionManager,
 }
 
 #[tokio::main]
@@ -140,7 +140,7 @@ async fn main() {
         repo: AdminBbsRepositoryImpl::new(pool),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
-            .get_multiplexed_tokio_connection()
+            .get_connection_manager()
             .await
             .unwrap(),
     };

@@ -43,10 +43,10 @@ impl<T: BbsRepository + Clone> NgWordReadingService<T> {
         let board_key = board_key.to_string();
         let repo = self.0.clone();
         let expired_at = chrono::Utc::now().timestamp() as u64 + 120;
-        cache_aside::<NgWordCache, _, _>(
+        cache_aside::<NgWordCache, _, _, _>(
             &board_key,
             "ng_words",
-            &mut self.1.clone(),
+            Box::new(self.1.clone()),
             expired_at,
             || {
                 let board_key = board_key.clone();

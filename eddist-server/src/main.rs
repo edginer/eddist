@@ -78,7 +78,7 @@ pub(crate) mod external {
     pub mod captcha_like_client;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct AppState {
     services: AppServiceContainer<BbsRepositoryImpl, RedisPubRepository>,
     tinker_secret: String,
@@ -109,7 +109,8 @@ async fn main() -> anyhow::Result<()> {
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let con = client.get_multiplexed_tokio_connection().await?;
-    let pub_repo = RedisPubRepository::new(con.clone());
+    let conn_mgr = client.get_connection_manager().await?;
+    let pub_repo = RedisPubRepository::new(conn_mgr);
 
     let pool = MySqlPoolOptions::new()
         .max_connections(8)

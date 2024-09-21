@@ -1,13 +1,13 @@
 use eddist_core::domain::pubsub_repository::PubSubItem;
-use redis::{aio::MultiplexedConnection, AsyncCommands};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RedisPubRepository {
-    redis_conn: MultiplexedConnection,
+    redis_conn: ConnectionManager,
 }
 
 impl RedisPubRepository {
-    pub fn new(redis_conn: MultiplexedConnection) -> Self {
+    pub fn new(redis_conn: ConnectionManager) -> Self {
         Self { redis_conn }
     }
 }
