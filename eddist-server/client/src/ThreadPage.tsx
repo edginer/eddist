@@ -24,7 +24,25 @@ const convertThreadTextToResponseList = (text: string) => {
     const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
     const match = line.match(lineRegex);
     if (match == null) {
-      throw new Error(`Invalid response line: ${line}`);
+      // あぼーん<>あぼーん<><> あぼーん<> てす
+      const aboneRegex = /^(.*)<>(.*)<><> あぼーん<>(.*)$/;
+      const aboneMatch = line.match(aboneRegex);
+      if (aboneMatch == null) {
+        throw new Error(`Invalid response line: ${line}`);
+      }
+
+      if (idx === 0) {
+        threadTitle = aboneMatch[3];
+      }
+
+      return {
+        name: aboneMatch[1],
+        mail: "",
+        date: "",
+        authorId: "",
+        body: "あぼーん",
+        id: idx + 1,
+      };
     }
     const name = match[1];
     const mail = match[2];
