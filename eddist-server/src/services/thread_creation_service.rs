@@ -2,7 +2,7 @@ use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
-use redis::{aio::MultiplexedConnection, Cmd};
+use redis::{aio::ConnectionManager, Cmd};
 use uuid::Uuid;
 
 use crate::{
@@ -28,11 +28,11 @@ use crate::{
 
 use super::BbsCgiService;
 
-#[derive(Debug, Clone)]
-pub struct TheradCreationService<T: BbsRepository>(T, MultiplexedConnection);
+#[derive(Clone)]
+pub struct TheradCreationService<T: BbsRepository>(T, ConnectionManager);
 
 impl<T: BbsRepository> TheradCreationService<T> {
-    pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
         Self(repo, redis_conn)
     }
 }

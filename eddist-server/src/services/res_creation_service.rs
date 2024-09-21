@@ -7,7 +7,7 @@ use eddist_core::domain::{
     pubsub_repository::{CreatingRes, PubSubItem},
     tinker::Tinker,
 };
-use redis::{aio::MultiplexedConnection, Cmd, Value};
+use redis::{aio::ConnectionManager, Cmd, Value};
 use tracing::error_span;
 use uuid::Uuid;
 
@@ -32,11 +32,11 @@ use crate::{
 
 use super::BbsCgiService;
 
-#[derive(Debug, Clone)]
-pub struct ResCreationService<T: BbsRepository, P: PubRepository>(T, MultiplexedConnection, P);
+#[derive(Clone)]
+pub struct ResCreationService<T: BbsRepository, P: PubRepository>(T, ConnectionManager, P);
 
 impl<T: BbsRepository, P: PubRepository> ResCreationService<T, P> {
-    pub fn new(repo: T, redis_conn: MultiplexedConnection, pub_repo: P) -> Self {
+    pub fn new(repo: T, redis_conn: ConnectionManager, pub_repo: P) -> Self {
         Self(repo, redis_conn, pub_repo)
     }
 }

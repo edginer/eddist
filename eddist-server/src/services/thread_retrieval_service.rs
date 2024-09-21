@@ -1,15 +1,15 @@
 use anyhow::anyhow;
-use redis::{aio::MultiplexedConnection, Cmd, Value};
+use redis::{aio::ConnectionManager, Cmd, Value};
 
 use crate::{domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository};
 
 use super::AppService;
 
-#[derive(Debug, Clone)]
-pub struct ThreadRetrievalService<T: BbsRepository>(T, MultiplexedConnection);
+#[derive(Clone)]
+pub struct ThreadRetrievalService<T: BbsRepository>(T, ConnectionManager);
 
 impl<T: BbsRepository> ThreadRetrievalService<T> {
-    pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
         Self(repo, redis_conn)
     }
 }

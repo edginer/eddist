@@ -1,13 +1,13 @@
-use redis::{aio::MultiplexedConnection, AsyncCommands};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ResCreationSpanManagementService {
-    redis_conn: MultiplexedConnection,
+    redis_conn: ConnectionManager,
     span: u64,
 }
 
 impl ResCreationSpanManagementService {
-    pub fn new(redis_conn: MultiplexedConnection, span: u64) -> Self {
+    pub fn new(redis_conn: ConnectionManager, span: u64) -> Self {
         Self { redis_conn, span }
     }
 

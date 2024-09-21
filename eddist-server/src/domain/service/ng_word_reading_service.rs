@@ -1,5 +1,5 @@
 use eddist_core::cache_aside::{cache_aside, AsCache, ToCache};
-use redis::aio::MultiplexedConnection;
+use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct NgWordReadingService<T: BbsRepository>(T, MultiplexedConnection);
+pub struct NgWordReadingService<T: BbsRepository>(T, ConnectionManager);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NgWordCache {
@@ -35,7 +35,7 @@ impl ToCache<Vec<NgWord>, NgWordCache> for Vec<NgWord> {
 }
 
 impl<T: BbsRepository + Clone> NgWordReadingService<T> {
-    pub fn new(repo: T, redis_conn: MultiplexedConnection) -> Self {
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
         Self(repo, redis_conn)
     }
 

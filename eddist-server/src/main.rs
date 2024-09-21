@@ -108,9 +108,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
-    let con = client.get_multiplexed_tokio_connection().await?;
     let conn_mgr = client.get_connection_manager().await?;
-    let pub_repo = RedisPubRepository::new(conn_mgr);
+    let pub_repo = RedisPubRepository::new(conn_mgr.clone());
 
     let pool = MySqlPoolOptions::new()
         .max_connections(8)
@@ -127,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
         serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
 
     let app_state = AppState {
-        services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), con, pub_repo),
+        services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), conn_mgr, pub_repo),
         tinker_secret,
         captcha_like_configs,
     };

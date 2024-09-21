@@ -1,7 +1,7 @@
 use auth_with_code_service::AuthWithCodeService;
 use board_info_service::BoardInfoService;
 use list_boards_service::ListBoardsService;
-use redis::aio::MultiplexedConnection;
+use redis::aio::ConnectionManager;
 
 use res_creation_service::ResCreationService;
 use thread_creation_service::TheradCreationService;
@@ -33,7 +33,7 @@ pub trait BbsCgiService<I: Send + Sync, O: Send + Sync> {
     async fn execute(&self, input: I) -> Result<O, BbsCgiError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
     auth_with_code: AuthWithCodeService<B>,
     board_info: BoardInfoService<B>,
@@ -45,7 +45,7 @@ pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
 }
 
 impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
-    pub fn new(bbs_repo: B, redis_conn: MultiplexedConnection, pub_repo: P) -> Self {
+    pub fn new(bbs_repo: B, redis_conn: ConnectionManager, pub_repo: P) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
