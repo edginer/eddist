@@ -9,6 +9,7 @@ use axum::{
     Form, Json, Router,
 };
 use axum_extra::extract::CookieJar;
+use axum_prometheus::PrometheusMetricLayer;
 use base64::Engine;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
@@ -147,6 +148,7 @@ async fn main() -> anyhow::Result<()> {
     let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file);
 
     log::info!("Start application server with 0.0.0.0:8080");
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 
     let app = Router::new()
         .route("/health-check", get(health_check))
@@ -159,6 +161,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
         .route("/api/terms", get(get_home))
         .route("/api/boards", get(get_api_boards))
+        .route("/metrics", get(|| async move { metric_handle.render() }))
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
         .with_state(app_state)
@@ -208,7 +211,8 @@ async fn main() -> anyhow::Result<()> {
                         // ...
                     },
                 ),
-        );
+        )
+        .layer(prometheus_layer);
     let listener = TcpListener::bind((
         "0.0.0.0",
         env::var("PORT")

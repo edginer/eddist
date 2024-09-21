@@ -11,6 +11,15 @@ use crate::domain::{
     utils::SimpleSecret,
 };
 
+#[async_trait::async_trait]
+pub trait CaptchaClient: Send {
+    async fn verify_captcha(
+        &self,
+        response: &str,
+        ip_addr: &str,
+    ) -> Result<CaptchaLikeResult, reqwest::Error>;
+}
+
 pub struct TurnstileClient {
     client: reqwest::Client,
     secret: SimpleSecret,
@@ -23,8 +32,11 @@ impl TurnstileClient {
             secret: SimpleSecret::new(&secret),
         }
     }
+}
 
-    pub async fn verify_captcha(
+#[async_trait::async_trait]
+impl CaptchaClient for TurnstileClient {
+    async fn verify_captcha(
         &self,
         response: &str,
         ip_addr: &str,
@@ -67,8 +79,11 @@ impl HCaptchaClient {
             site_key,
         }
     }
+}
 
-    pub async fn verify_captcha(
+#[async_trait::async_trait]
+impl CaptchaClient for HCaptchaClient {
+    async fn verify_captcha(
         &self,
         response: &str,
         ip_addr: &str,
@@ -108,8 +123,11 @@ impl MonocleClient {
             token: SimpleSecret::new(&token),
         }
     }
+}
 
-    pub async fn verify_captcha(
+#[async_trait::async_trait]
+impl CaptchaClient for MonocleClient {
+    async fn verify_captcha(
         &self,
         response: &str,
         ip_addr: &str,

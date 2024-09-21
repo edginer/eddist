@@ -2,10 +2,14 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
-use tracing::info_span;
+use futures::future::join_all;
+use tracing::{error_span, info_span};
 
 use crate::{
-    domain::captcha_like::CaptchaLikeConfig, external::captcha_like_client::TurnstileClient,
+    domain::{captcha_like::CaptchaLikeConfig, res},
+    external::captcha_like_client::{
+        CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
+    },
     repositories::bbs_repository::BbsRepository,
 };
 
@@ -28,9 +32,43 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         &self,
         input: AuthWithCodeServiceInput,
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
-        let CaptchaLikeConfig::Turnstile { secret, .. } = &input.captcha_like_configs[0] else {
-            return Err(anyhow::anyhow!("failed to find turnstile config"));
-        };
+        let clients_responses = input
+            .captcha_like_configs
+            .iter()
+            .filter_map(|config| {
+                let client: Box<dyn CaptchaClient> = match config {
+                    CaptchaLikeConfig::Turnstile { secret, .. } => {
+                        Box::new(TurnstileClient::new(secret.clone()))
+                    }
+                    CaptchaLikeConfig::Hcaptcha { site_key, secret } => {
+                        Box::new(HCaptchaClient::new(site_key.clone(), secret.clone()))
+                    }
+                    CaptchaLikeConfig::Monocle { token, .. } => {
+                        Box::new(MonocleClient::new(token.clone()))
+                    }
+                    _ => {
+                        error_span!("unsupported captcha like config, ignored", config = ?config);
+                        return None;
+                    }
+                };
+                let req_params = match config {
+                    CaptchaLikeConfig::Turnstile { .. } => (
+                        input.responses["cf-turnstile-response"].to_string(),
+                        input.origin_ip.clone(),
+                    ),
+                    CaptchaLikeConfig::Hcaptcha { .. } => (
+                        input.responses["h-captcha-response"].to_string(),
+                        input.origin_ip.clone(),
+                    ),
+                    CaptchaLikeConfig::Monocle { .. } => (
+                        input.responses["monocle"].to_string(),
+                        input.origin_ip.clone(),
+                    ),
+                    _ => unreachable!(),
+                };
+                Some((client, req_params))
+            })
+            .collect::<Vec<_>>();
 
         let ip_addr = IpAddr::new(input.origin_ip.clone());
         let reduced = ReducedIpAddr::from(ip_addr.clone());
@@ -52,16 +90,19 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             return Err(anyhow::anyhow!("activation code is expired"));
         }
 
-        let turnstile_client = TurnstileClient::new(secret.clone());
-        let result = turnstile_client
-            .verify_captcha(
-                &input.responses["cf-turnstile-response"].to_string(),
-                &input.origin_ip,
-            )
-            .await?;
-
-        if !result.is_success() {
-            return Err(anyhow::anyhow!("failed to verify captcha"));
+        let handles = clients_responses
+            .iter()
+            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
+            .collect::<Vec<_>>();
+        let results = join_all(handles).await;
+        for r in results {
+            match r {
+                Ok(CaptchaLikeResult::Failure(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => return Err(e.into()),
+                _ => {}
+            }
         }
 
         self.0
