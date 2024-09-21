@@ -24,3 +24,5 @@ futures = "0.3.30"
 eddist-core = { path = "../eddist-core" }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+hyper = { version = "1.4.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1.6", features = ["tokio"] }

@@ -961,6 +961,8 @@ dependencies = [
  "dotenvy",
  "eddist-core",
  "futures",
+ "hyper 1.4.1",
+ "hyper-util",
  "redis",
  "serde",
  "serde_json",

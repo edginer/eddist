@@ -1,10 +1,17 @@
-use std::env;
+use std::{convert::Infallible, env};
 
 use eddist_core::{
     domain::pubsub_repository::{CreatingRes, PubSubItem},
     utils::is_prod,
 };
 use futures::StreamExt;
+use hyper::{
+    body::{Body, Bytes},
+    server::conn::http1,
+    service::service_fn,
+    Response,
+};
+use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
 use sqlx::{query, Connection, QueryBuilder};
 use tokio::net::TcpListener;
@@ -30,8 +37,19 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(async move {
         let listener = TcpListener::bind("0.0.0.0:9874").await.unwrap();
-        if let Ok((socket, _)) = listener.accept().await {
-            drop(socket);
+        if let Ok((stream, _)) = listener.accept().await {
+            let svc = service_fn(|_| async move {
+                let response = Response::new("Request received. Shutting down.\n".to_string());
+
+                Ok::<_, Infallible>(response)
+            });
+
+            let mut builder = http1::Builder::new();
+            let builder = builder.timer(TokioTimer::new());
+            builder
+                .serve_connection(TokioIo::new(stream), svc)
+                .await
+                .unwrap();
         }
 
         error_span!(
