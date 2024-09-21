@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            WITH response_count AS (\n                SELECT COUNT(*) AS cnt\n                FROM responses     \n                WHERE thread_id = ?\n            ) UPDATE threads\n            SET response_count = (SELECT cnt FROM response_count),\n                last_modified_at = ?,\n                active = (SELECT cnt FROM response_count) <= 1000\n            WHERE id = ?;\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "ba7592e1fc7490a6095da7ac642dc4f2e5c66442c2ffbf3ebcdb4088ccccaafc"
+}
