@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f64::consts::E};
+use std::collections::HashMap;
 
 use eddist_core::domain::ip_addr::ReducedIpAddr;
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,7 @@ impl CaptchaClient for TurnstileClient {
         Ok(if resp.success {
             CaptchaLikeResult::Success
         } else {
+            log::info!("Turnstile response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         })
     }
@@ -118,6 +119,7 @@ impl CaptchaClient for HCaptchaClient {
         Ok(if resp.success {
             CaptchaLikeResult::Success
         } else {
+            log::info!("HCaptcha response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         })
     }
@@ -182,8 +184,10 @@ impl CaptchaClient for MonocleClient {
         };
 
         Ok(if matches!(resp.anon, Some(true)) {
+            log::info!("Monocle response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess)
         } else if !verify_ip(resp.ip.as_deref(), resp.ipv6.as_deref()) {
+            log::info!("Monocle response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)
         } else {
             CaptchaLikeResult::Success
