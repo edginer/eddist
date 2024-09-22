@@ -75,15 +75,13 @@ impl CaptchaClient for TurnstileClient {
 pub struct HCaptchaClient {
     client: reqwest::Client,
     secret: SimpleSecret,
-    site_key: String,
 }
 
 impl HCaptchaClient {
-    pub fn new(secret: String, site_key: String) -> Self {
+    pub fn new(secret: String) -> Self {
         Self {
             client: reqwest::Client::new(),
             secret: SimpleSecret::new(&secret),
-            site_key,
         }
     }
 }
@@ -98,7 +96,6 @@ impl CaptchaClient for HCaptchaClient {
         let mut form_data = HashMap::new();
         form_data.insert("response", response);
         form_data.insert("secret", self.secret.get());
-        form_data.insert("sitekey", &self.site_key);
         form_data.insert("remoteip", ip_addr);
 
         let res = self

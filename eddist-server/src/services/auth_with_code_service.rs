@@ -41,8 +41,8 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     CaptchaLikeConfig::Turnstile { secret, .. } => {
                         Box::new(TurnstileClient::new(secret.clone()))
                     }
-                    CaptchaLikeConfig::Hcaptcha { site_key, secret } => {
-                        Box::new(HCaptchaClient::new(site_key.clone(), secret.clone()))
+                    CaptchaLikeConfig::Hcaptcha { secret, .. } => {
+                        Box::new(HCaptchaClient::new(secret.clone()))
                     }
                     CaptchaLikeConfig::Monocle { token, .. } => {
                         Box::new(MonocleClient::new(token.clone()))
