@@ -76,7 +76,7 @@ pub struct TurnstileResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HCaptchaResponse {
     pub success: bool,
-    pub challenge_ts: String,
+    pub challenge_ts: Option<String>,
     pub hostname: String,
     pub credit: Option<bool>,
     #[serde(rename = "error-codes")]
