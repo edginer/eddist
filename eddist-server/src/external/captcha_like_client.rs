@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, f64::consts::E};
 
 use eddist_core::domain::ip_addr::ReducedIpAddr;
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,13 @@ impl CaptchaClient for TurnstileClient {
             .send()
             .await?;
 
-        let resp = res.json::<TurnstileResponse>().await?;
+        let resp = match res.json::<TurnstileResponse>().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                log::error!("Failed to parse Turnstile response");
+                return Err(e);
+            }
+        };
 
         Ok(if resp.success {
             CaptchaLikeResult::Success
@@ -101,7 +107,13 @@ impl CaptchaClient for HCaptchaClient {
             .send()
             .await?;
 
-        let resp = res.json::<HCaptchaResponse>().await?;
+        let resp = match res.json::<HCaptchaResponse>().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                log::error!("Failed to parse HCaptcha response");
+                return Err(e);
+            }
+        };
 
         Ok(if resp.success {
             CaptchaLikeResult::Success
@@ -161,7 +173,13 @@ impl CaptchaClient for MonocleClient {
             .send()
             .await?;
 
-        let resp = res.json::<MonocleResponse>().await?;
+        let resp = match res.json::<MonocleResponse>().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                log::error!("Failed to parse Monocle response");
+                return Err(e);
+            }
+        };
 
         Ok(if matches!(resp.anon, Some(true)) {
             CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess)

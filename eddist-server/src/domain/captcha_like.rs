@@ -77,7 +77,7 @@ pub struct TurnstileResponse {
 pub struct HCaptchaResponse {
     pub success: bool,
     pub challenge_ts: Option<String>,
-    pub hostname: String,
+    pub hostname: Option<String>,
     pub credit: Option<bool>,
     #[serde(rename = "error-codes")]
     pub error_codes: Option<Vec<String>>,
