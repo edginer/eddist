@@ -29,7 +29,6 @@ where
         Box<dyn std::future::Future<Output = Result<R, anyhow::Error>> + Send>,
     >,
 {
-    println!("cache_aside");
     let cache_key = format!("{cache_prefix}:{key}");
 
     let cached_data = redis_conn
@@ -45,16 +44,6 @@ where
                 .await?;
         }
     }
-
-    // Attempt to get the data from the cache
-    // if let Some(cached_data) = redis_conn.get::<_, Option<String>>(&cache_key).await? {
-    //     let cached_value = serde_json::from_str::<T>(&cached_data)?;
-    //     if cached_value.expired_at() > chrono::Utc::now().timestamp() as u64 {
-    //         return Ok(cached_value.get());
-    //     } else {
-    //         redis_conn.del::<_, u32>(&cache_key).await?;
-    //     }
-    // }
 
     // Fetch the data using the provided closure/function
     let result = db_call().await?;
