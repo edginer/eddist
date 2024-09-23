@@ -14,7 +14,7 @@ impl ResCreationSpanManagementService {
     /// Check if the timestamp is within the creation restriction span.
     pub async fn is_within_creation_span(&self, authed_token: &str, timestamp: u64) -> bool {
         if self.span == 0 {
-            return true;
+            return false;
         }
 
         let mut redis_conn = self.redis_conn.clone();
