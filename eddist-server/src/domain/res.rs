@@ -1,5 +1,6 @@
 use std::{borrow::Cow, ops::Add};
 
+use base64::Engine;
 use chrono::{DateTime, Datelike, Utc};
 use eddist_core::domain::{
     client_info::ClientInfo,
@@ -8,6 +9,7 @@ use eddist_core::domain::{
     sjis_str::SJisStr,
 };
 use pwhash::unix;
+use sha1::{Digest, Sha1};
 
 use crate::domain::metadent::Metadent;
 
@@ -65,6 +67,10 @@ impl<T: ResState> Res<T> {
 
     pub fn authed_token(&self) -> Option<&String> {
         self.authed_token.as_ref()
+    }
+
+    pub fn is_sage(&self) -> bool {
+        self.mail == "sage"
     }
 }
 
@@ -177,7 +183,8 @@ impl Res<AuthorIdUninitialized> {
             &self.board_key,
             self.created_at,
             authed_token.reduced_ip.clone(),
-        );
+        )[..9]
+            .to_string();
 
         Res {
             author_name: self.author_name,
@@ -279,22 +286,31 @@ pub fn get_author_id(board_key: &str, datetime: DateTime<Utc>, ip_addr: ReducedI
 pub fn calculate_trip(target: &str) -> String {
     let bytes = encoding_rs::SHIFT_JIS.encode(target).0.into_owned();
 
-    let mut salt = Vec::from(if bytes.len() >= 3 { &bytes[1..=2] } else { &[] });
-    salt.push(0x48);
-    salt.push(0x2e);
-    let salt = salt
-        .into_iter()
-        .map(|x| match x {
-            0x3a..=0x40 => x + 7,
-            0x5b..=0x60 => x + 6,
-            46..=122 => x,
-            _ => 0x2e,
-        })
-        .collect::<Vec<_>>();
+    if bytes.len() >= 12 {
+        let mut hasher = Sha1::new();
+        hasher.update(&bytes);
 
-    let salt = std::str::from_utf8(&salt).unwrap();
-    let result = unix::crypt(bytes.as_slice(), salt).unwrap();
-    result[3..].to_string()
+        let calc_bytes = Vec::from(hasher.finalize().as_slice());
+        let result = &base64::engine::general_purpose::STANDARD.encode(calc_bytes)[0..12];
+        result.to_string().replace('+', ".")
+    } else {
+        let mut salt = Vec::from(if bytes.len() >= 3 { &bytes[1..=2] } else { &[] });
+        salt.push(0x48);
+        salt.push(0x2e);
+        let salt = salt
+            .into_iter()
+            .map(|x| match x {
+                0x3a..=0x40 => x + 7,
+                0x5b..=0x60 => x + 6,
+                46..=122 => x,
+                _ => 0x2e,
+            })
+            .collect::<Vec<_>>();
+
+        let salt = std::str::from_utf8(&salt).unwrap();
+        let result = unix::crypt(bytes.as_slice(), salt).unwrap();
+        result[3..].to_string()
+    }
 }
 
 fn sanitize_author_name(author_name: &str) -> String {

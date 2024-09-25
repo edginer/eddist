@@ -176,7 +176,7 @@ impl BbsRepository for BbsRepositoryImpl {
             ThreadStatus::Unarchived => {
                 query_as!(
                     SelectionThread,
-                    "SELECT * FROM threads WHERE board_id = ? AND archived = 0",
+                    "SELECT * FROM threads WHERE board_id = ? AND archived = 0 ORDER BY sage_last_modified_at DESC",
                     board_id
                 )
                 .fetch_all(&self.pool)
@@ -420,14 +420,22 @@ impl BbsRepository for BbsRepositoryImpl {
             "UPDATE threads SET
                 last_modified_at = ?,
                 response_count = response_count + 1,
+                sage_last_modified_at = (
+                    CASE
+                        WHEN ? THEN sage_last_modified_at
+                        ELSE ?
+                    END
+                ),
                 active = (
-                CASE
-                    WHEN response_count >= 1000 THEN 0
-                    ELSE 1
-                END
-            )
+                    CASE
+                        WHEN response_count >= 1000 THEN 0
+                        ELSE 1
+                    END
+                )
             WHERE id = ?
         ",
+            res.created_at,
+            res.is_sage,
             res.created_at,
             th_id,
         );

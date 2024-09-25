@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
 import { postThread } from "./utils";
 import AuthCodeModal from "./AuthCodeModal";
+import ErrorModal from "./ErrorModal";
 
 interface Thread {
   title: string;
@@ -57,10 +58,16 @@ const convertSubjectTextToThreadList = (text: string): Thread[] => {
 };
 
 const convertLinuxTimeToDateString = (linuxTime: number): string => {
-  const date = new Date(linuxTime * 1000);
-  return `${date.getFullYear()}/${
-    date.getMonth() + 1
-  }/${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+  const dateTime = new Date(linuxTime * 1000);
+
+  const datetimeStr = dateTime.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return datetimeStr;
 };
 
 const ThreadListPage = () => {
@@ -93,6 +100,8 @@ const ThreadListPage = () => {
   const [creatingThread, setCreatingThread] = useState(false);
   const [openAuthCodeModal, setOpenAuthCodeModal] = useState(false);
   const [authCode, setAuthCode] = useState("");
+  const [errorModal, serErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   return (
     <div>
@@ -101,6 +110,11 @@ const ThreadListPage = () => {
         size="5xl"
         onClose={() => setCreatingThread(false)}
       >
+        <ErrorModal
+          openErrorModal={errorModal}
+          setOpenErrorModal={serErrorModal}
+          errorMessage={errorMessage}
+        />
         <AuthCodeModal
           openAuthCodeModal={openAuthCodeModal}
           setOpenAuthCodeModal={setOpenAuthCodeModal}
@@ -120,9 +134,18 @@ const ThreadListPage = () => {
                 boardKey: params.boardKey!,
               });
               if (!result.success) {
-                setOpenAuthCodeModal(true);
-                setAuthCode(result.authCode);
-                return;
+                switch (result.error.kind) {
+                  case "auth-code":
+                    setAuthCode(result.error.authCode);
+                    setOpenAuthCodeModal(true);
+                    break;
+                  case "unknown":
+                    serErrorModal(true);
+                    setErrorMessage(result.error.errorHtml);
+                    return;
+                  default:
+                    break;
+                }
               }
               setCreatingThread(false);
               await refetch();

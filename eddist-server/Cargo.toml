@@ -56,7 +56,6 @@ reqwest = { version = "0.12.5", default-features = false, features = [
     "json",
     "charset",
 ] }
-
 eddist-core = { path = "../eddist-core" }
 sha3 = "0.10.8"
 jwt-simple = "0.12.9"
@@ -65,3 +64,9 @@ handlebars = "6.1.0"
 metrics = "0.23.0"
 metrics-exporter-prometheus = "0.15.3"
 axum-prometheus = "0.7.0"
+sha1 = { version = "0.10.6", default-features = false }
+rust-s3 = { version = "0.35.1", default-features = false, features = [
+    "tokio-rustls-tls",
+    "tags",
+    "fail-on-err",
+] }

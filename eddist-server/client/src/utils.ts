@@ -24,7 +24,17 @@ interface PostResponseSuccess {
 
 interface PostResponseFailure {
   success: false;
+  error: PostResponseFailureAuthCode | PostResponseFailureUnknown;
+}
+
+interface PostResponseFailureAuthCode {
+  kind: "auth-code";
   authCode: string;
+}
+
+interface PostResponseFailureUnknown {
+  kind: "unknown";
+  errorHtml: string;
 }
 
 const convertToSjisText = (text: string): string => {
@@ -84,9 +94,18 @@ export const postResponse = async ({
   }
 
   const text = await res.text();
-  if (text.includes("error_code") && text.includes("E-Unauthenticated")) {
-    const authCode = extractAuthCodeWhenUnauthenticated(text);
-    return { success: false, authCode };
+
+  if (text.includes("error_code")) {
+    if (text.includes("E-Unauthenticated")) {
+      const authCode = extractAuthCodeWhenUnauthenticated(text);
+      return { success: false, error: { kind: "auth-code", authCode } };
+    } else {
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      return {
+        success: false,
+        error: { kind: "unknown", errorHtml: doc.body.innerHTML },
+      };
+    }
   }
 
   return { success: true };
@@ -132,9 +151,17 @@ export const postThread = async ({
   }
 
   const text = await res.text();
-  if (text.includes("error_code") && text.includes("E-Unauthenticated")) {
-    const authCode = extractAuthCodeWhenUnauthenticated(text);
-    return { success: false, authCode };
+  if (text.includes("error_code")) {
+    if (text.includes("E-Unauthenticated")) {
+      const authCode = extractAuthCodeWhenUnauthenticated(text);
+      return { success: false, error: { kind: "auth-code", authCode } };
+    } else {
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      return {
+        success: false,
+        error: { kind: "unknown", errorHtml: doc.body.innerHTML },
+      };
+    }
   }
 
   return { success: true };

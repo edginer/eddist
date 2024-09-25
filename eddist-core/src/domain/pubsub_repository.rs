@@ -18,6 +18,7 @@ pub struct CreatingRes {
     pub board_id: Uuid,
     pub client_info: ClientInfo,
     pub res_order: i32,
+    pub is_sage: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

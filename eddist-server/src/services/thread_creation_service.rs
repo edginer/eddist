@@ -40,13 +40,13 @@ impl<T: BbsRepository> TheradCreationService<T> {
 
 #[async_trait::async_trait]
 impl<T: BbsRepository + Clone>
-    BbsCgiService<TheradCreationServiceInput, TheradCreationServiceOutput>
+    BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
     for TheradCreationService<T>
 {
     async fn execute(
         &self,
         input: TheradCreationServiceInput,
-    ) -> Result<TheradCreationServiceOutput, BbsCgiError> {
+    ) -> Result<ThreadCreationServiceOutput, BbsCgiError> {
         let mut redis_conn = self.1.clone();
         let bbs_repo = self.0.clone();
 
@@ -195,7 +195,7 @@ impl<T: BbsRepository + Clone>
         counter!("response_creation", "board_key" => board_key.clone()).increment(1);
         counter!("thread_creation", "board_key" => board_key.clone()).increment(1);
 
-        Ok(TheradCreationServiceOutput { tinker })
+        Ok(ThreadCreationServiceOutput { tinker })
     }
 }
 
@@ -212,7 +212,7 @@ pub struct TheradCreationServiceInput {
     pub asn_num: u32,
 }
 
-pub struct TheradCreationServiceOutput {
+pub struct ThreadCreationServiceOutput {
     pub tinker: Tinker,
 }
 

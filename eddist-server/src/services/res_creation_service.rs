@@ -187,6 +187,7 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             board_id: th.board_id,
             client_info,
             res_order: order as i32,
+            is_sage: res.is_sage(),
         };
         tokio::spawn(async move {
             if let Err(e) = bbs_repo.create_response(cres.clone()).await {

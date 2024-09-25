@@ -207,9 +207,3 @@ pub enum CaptchaLikeResult {
     Success,
     Failure(CaptchaLikeError),
 }
-
-impl CaptchaLikeResult {
-    pub fn is_success(&self) -> bool {
-        matches!(self, Self::Success)
-    }
-}

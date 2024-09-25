@@ -1,9 +1,11 @@
 use auth_with_code_service::AuthWithCodeService;
 use board_info_service::BoardInfoService;
+use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
 use redis::aio::ConnectionManager;
 
 use res_creation_service::ResCreationService;
+use s3::Bucket;
 use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
@@ -15,6 +17,7 @@ use crate::{
 
 pub(crate) mod auth_with_code_service;
 pub(crate) mod board_info_service;
+pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod res_creation_service;
 pub(crate) mod thread_creation_service;
@@ -42,10 +45,11 @@ pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
     thread_creation: TheradCreationService<B>,
     thread_list: ThreadListService<B>,
     thread_retrival: ThreadRetrievalService<B>,
+    kako_thread_retrieval: kako_thread_retrieval_service::KakoThreadRetrievalService,
 }
 
 impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
-    pub fn new(bbs_repo: B, redis_conn: ConnectionManager, pub_repo: P) -> Self {
+    pub fn new(bbs_repo: B, redis_conn: ConnectionManager, pub_repo: P, bucket: Bucket) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
@@ -54,6 +58,7 @@ impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
             thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             thread_retrival: ThreadRetrievalService::new(bbs_repo, redis_conn),
+            kako_thread_retrieval: KakoThreadRetrievalService::new(bucket),
         }
     }
 }
@@ -85,5 +90,9 @@ impl<B: BbsRepository + 'static, P: PubRepository> AppServiceContainer<B, P> {
 
     pub fn list_boards(&self) -> &ListBoardsService<B> {
         &self.list_boards
+    }
+
+    pub fn kako_thread_retrieval(&self) -> &KakoThreadRetrievalService {
+        &self.kako_thread_retrieval
     }
 }

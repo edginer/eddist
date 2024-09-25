@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { twMerge } from "tailwind-merge";
 import { postResponse } from "./utils";
 import AuthCodeModal from "./AuthCodeModal";
+import ErrorModal from "./ErrorModal";
 
 interface Response {
   name: string;
@@ -100,6 +101,8 @@ const ThreadPage = () => {
   const [creatingResponse, setCreatingResponse] = useState(false);
   const [openAuthCodeModal, setOpenAuthCodeModal] = useState(false);
   const [authCode, setAuthCode] = useState("");
+  const [errorModal, serErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   return (
     <div>
@@ -113,7 +116,11 @@ const ThreadPage = () => {
           setOpenAuthCodeModal={setOpenAuthCodeModal}
           authCode={authCode}
         />
-
+        <ErrorModal
+          openErrorModal={errorModal}
+          setOpenErrorModal={serErrorModal}
+          errorMessage={errorMessage}
+        />
         <Modal.Header>
           <h3 className="lg:text-2xl">書き込み</h3>
         </Modal.Header>
@@ -122,15 +129,25 @@ const ThreadPage = () => {
             onSubmit={handleSubmit(async (data) => {
               const result = await postResponse({
                 name: data.name,
-                mail: data.email,
+                mail: data.mail,
                 body: data.body,
                 boardKey: params.boardKey!,
                 threadKey: params.threadKey!,
               });
 
               if (!result.success) {
-                setAuthCode(result.authCode);
-                setOpenAuthCodeModal(true);
+                switch (result.error.kind) {
+                  case "auth-code":
+                    setAuthCode(result.error.authCode);
+                    setOpenAuthCodeModal(true);
+                    break;
+                  case "unknown":
+                    serErrorModal(true);
+                    setErrorMessage(result.error.errorHtml);
+                    return;
+                  default:
+                    break;
+                }
                 return false;
               }
 

@@ -24,11 +24,13 @@ use jsonwebtoken::EncodingKey;
 use jwt_simple::prelude::MACLike;
 use metrics::describe_counter;
 use repositories::{bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl};
+use serde_json::json;
 use services::{
     auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+    kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
     res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
-    thread_creation_service::{TheradCreationServiceInput, TheradCreationServiceOutput},
+    thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
     thread_list_service::BoardKey,
     thread_retrieval_service::ThreadRetrievalServiceInput,
     AppService, AppServiceContainer, BbsCgiService,
@@ -136,9 +138,34 @@ async fn main() -> anyhow::Result<()> {
         "term-of-usage.get",
         include_str!("templates/term-of-usage.get.hbs"),
     )?;
+    template_engine.register_template_string(
+        "auth-code.post.success",
+        include_str!("templates/auth-code.post.success.hbs"),
+    )?;
+
+    let s3_client = s3::bucket::Bucket::new(
+        &env::var("S3_BUCKET_NAME").unwrap(),
+        s3::Region::R2 {
+            account_id: env::var("R2_ACCOUNT_ID").unwrap(),
+        },
+        s3::creds::Credentials::new(
+            Some(&env::var("S3_ACCESS_KEY").unwrap()),
+            Some(&env::var("S3_ACCESS_SECRET_KEY").unwrap()),
+            None,
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
 
     let app_state = AppState {
-        services: AppServiceContainer::new(BbsRepositoryImpl::new(pool), conn_mgr, pub_repo),
+        services: AppServiceContainer::new(
+            BbsRepositoryImpl::new(pool),
+            conn_mgr,
+            pub_repo,
+            *s3_client,
+        ),
         tinker_secret,
         captcha_like_configs,
         template_engine,
@@ -319,16 +346,16 @@ async fn get_kako_dat_txt(
     }
     let thread_number = thread_id_with_dat.replace(".dat", "");
 
-    let svc = state.get_container().thread_retrival();
+    let svc = state.get_container().kako_thread_retrieval();
     let result = svc
-        .execute(ThreadRetrievalServiceInput {
+        .execute(KakoThreadRetrievalServiceInput {
             board_key,
-            thread_number: thread_number.parse::<u64>().unwrap(),
+            thread_number,
         })
         .await
         .unwrap();
 
-    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result.raw()))
+    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
         .content_type(SjisContentType::TextPlain)
         .server_ttl(3600)
         .build()
@@ -455,17 +482,12 @@ async fn post_auth_code(
         .await
         .unwrap();
 
-    Html(r##"<html>
-<head>
-    <title>認証成功 - Successful</title>
-    <meta charset="utf-8">
-</head>
-<body>
-    <p>認証に成功しました</p>
-    <p>再びそのまま書き込みを行うか、メール欄に以下を貼り付けてください（#以降の内容は書き込み時に消えます、いくつかのブラウザでは貼り付けなくても書けます）</p>
-    <input type="text" value="#{token}" onfocus="this.select();" style="width: 50rem;"></input>
-</body>
-</html>"##.replace("{token}", &token))
+    let html = state
+        .template_engine
+        .render_template("auth-code.post.success", &json!({ "token": token }))
+        .unwrap();
+
+    Html(html)
 }
 
 async fn post_bbs_cgi(
@@ -474,8 +496,6 @@ async fn post_bbs_cgi(
     State(state): State<AppState>,
     body: String,
 ) -> Response {
-    info_span!("bbs_cgi", cookie = ?headers.get("Cookie"));
-
     let form = shift_jis_url_encodeded_body_to_vec(&body).unwrap();
     let is_thread = {
         let Some(submit) = form.get("submit") else {
@@ -531,7 +551,7 @@ async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(TheradCreationServiceOutput { tinker }) => tinker,
+            Ok(ThreadCreationServiceOutput { tinker }) => tinker,
             Err(e) => {
                 if matches!(e, BbsCgiError::Other(_)) {
                     error_span!("thread_creation_error", error = ?e);
@@ -580,7 +600,7 @@ async fn post_bbs_cgi(
     <title>書きこみました</title>
 </head>
 <body>書きこみました</body>
-</html>\n"#,
+</html>"#,
     ))
     .content_type(SjisContentType::TextHtml)
     .add_set_cookie(
