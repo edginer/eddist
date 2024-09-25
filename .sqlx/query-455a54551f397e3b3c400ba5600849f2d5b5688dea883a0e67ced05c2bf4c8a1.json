@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT * FROM threads WHERE board_id = ? AND archived = 0",
+  "query": "SELECT * FROM threads WHERE board_id = ? AND archived = 0 ORDER BY sage_last_modified_at DESC",
   "describe": {
     "columns": [
       {
@@ -140,5 +140,5 @@
       false
     ]
   },
-  "hash": "efe21892b3502c3c1dbead4c49ee8f4b16b6805296e21b625bec47114bdec6a6"
+  "hash": "455a54551f397e3b3c400ba5600849f2d5b5688dea883a0e67ced05c2bf4c8a1"
 }

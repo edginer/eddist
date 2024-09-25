@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE threads SET\n                last_modified_at = ?,\n                response_count = response_count + 1,\n                sage_last_modified_at = (\n                    CASE\n                        WHEN ? THEN sage_last_modified_at\n                        ELSE ?\n                    END\n                ),\n                active = (\n                    CASE\n                        WHEN response_count >= 1000 THEN 0\n                        ELSE 1\n                    END\n                )\n            WHERE id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "482f31652ad52d40581a3132333d90e43a9464215f2378e819914dadea47140b"
+}
