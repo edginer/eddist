@@ -45,6 +45,14 @@ const convertToSjisText = (text: string): string => {
   return Encoding.urlEncode(sjis);
 };
 
+const convertToUtf8Text = (text: string): string => {
+  const utf8 = Encoding.convert(Encoding.stringToCode(text), {
+    to: "UTF8",
+    from: "SJIS",
+  });
+  return Encoding.codeToString(utf8);
+};
+
 const extractAuthCodeWhenUnauthenticated = (text: string): string => {
   const extractedAuthCode = text.match(/'(\d{6})'/);
   const authCode = extractedAuthCode?.[1];
@@ -103,7 +111,10 @@ export const postResponse = async ({
       const doc = new DOMParser().parseFromString(text, "text/html");
       return {
         success: false,
-        error: { kind: "unknown", errorHtml: doc.body.innerHTML },
+        error: {
+          kind: "unknown",
+          errorHtml: convertToUtf8Text(doc.body.innerHTML),
+        },
       };
     }
   }
@@ -159,7 +170,10 @@ export const postThread = async ({
       const doc = new DOMParser().parseFromString(text, "text/html");
       return {
         success: false,
-        error: { kind: "unknown", errorHtml: doc.body.innerHTML },
+        error: {
+          kind: "unknown",
+          errorHtml: convertToUtf8Text(doc.body.innerHTML),
+        },
       };
     }
   }

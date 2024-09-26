@@ -484,7 +484,7 @@ async fn post_auth_code(
 
     let html = state
         .template_engine
-        .render_template("auth-code.post.success", &json!({ "token": token }))
+        .render("auth-code.post.success", &json!({ "token": token }))
         .unwrap();
 
     Html(html)
