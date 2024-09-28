@@ -119,6 +119,18 @@ async fn main() -> anyhow::Result<()> {
     let pub_repo = RedisPubRepository::new(conn_mgr.clone());
 
     let pool = MySqlPoolOptions::new()
+        .after_connect(|conn, _| {
+            use sqlx::Executor;
+
+            // Set transaction isolation level to `READ-COMMITTED`
+            Box::pin(async move {
+                conn.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                    .await
+                    .unwrap();
+                log::info!("Set transaction isolation level to `READ-COMMITTED`");
+                Ok(())
+            })
+        })
         .max_connections(8)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&env::var("DATABASE_URL")?)
