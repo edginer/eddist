@@ -5,12 +5,7 @@ use eddist_core::{
     utils::is_prod,
 };
 use futures::StreamExt;
-use hyper::{
-    body::{Body, Bytes},
-    server::conn::http1,
-    service::service_fn,
-    Response,
-};
+use hyper::{server::conn::http1, service::service_fn, Response};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
 use sqlx::{query, Connection, QueryBuilder};

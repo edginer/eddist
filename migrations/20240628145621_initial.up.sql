@@ -8,8 +8,8 @@ CREATE TABLE
         writing_ua TEXT NOT NULL,
         authed_ua TEXT,
         auth_code VARCHAR(12) NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        authed_at TIMESTAMP NULL,
+        created_at DATETIME(3) NOT NULL,
+        authed_at DATETIME(3) NULL,
         validity BOOLEAN NOT NULL,
         INDEX (origin_ip),
         INDEX (auth_code)
@@ -37,8 +37,8 @@ CREATE TABLE
         max_response_body_lines INT NOT NULL DEFAULT 32,
         threads_archive_cron VARCHAR(255),
         threads_archive_trigger_thread_count INT,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL,
+        created_at DATETIME(3) NOT NULL,
+        updated_at DATETIME(3) NOT NULL,
         FOREIGN KEY (id) REFERENCES boards (id)
     );
 
@@ -69,7 +69,7 @@ CREATE TABLE
         author_name TEXT NOT NULL,
         mail TEXT NOT NULL,
         body TEXT NOT NULL,
-        created_at DATETIME (3) NOT NULL,
+        created_at DATETIME(3) NOT NULL,
         author_id TEXT NOT NULL,
         ip_addr TEXT NOT NULL,
         authed_token_id BINARY(16) NOT NULL,
@@ -89,8 +89,8 @@ CREATE TABLE
         name VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL
+        created_at DATETIME(3) NOT NULL,
+        updated_at DATETIME(3) NOT NULL
     );
 
 CREATE TABLE
@@ -107,8 +107,8 @@ CREATE TABLE
         id BINARY(16) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         word VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL
+        created_at DATETIME(3) NOT NULL,
+        updated_at DATETIME(3) NOT NULL
     );
 
 CREATE TABLE

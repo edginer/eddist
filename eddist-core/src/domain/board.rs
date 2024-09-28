@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,6 @@ pub struct BoardInfo {
     pub max_response_body_lines: i32,
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<i32>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }

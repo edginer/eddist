@@ -140,7 +140,7 @@ const ThreadPage = () => {
                   case "auth-code":
                     setAuthCode(result.error.authCode);
                     setOpenAuthCodeModal(true);
-                    break;
+                    return;
                   case "unknown":
                     serErrorModal(true);
                     setErrorMessage(result.error.errorHtml);

@@ -11,6 +11,7 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use axum_prometheus::PrometheusMetricLayer;
 use base64::Engine;
+use chrono::Utc;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
     domain::{board::BoardInfo, sjis_str::SJisStr, tinker::Tinker},
@@ -321,13 +322,46 @@ async fn get_dat_txt(
     let thread_number = thread_id_with_dat.replace(".dat", "");
 
     let svc = state.get_container().thread_retrival();
-    let result = svc
+    let result = match svc
         .execute(ThreadRetrievalServiceInput {
-            board_key,
+            board_key: board_key.clone(),
             thread_number: thread_number.parse::<u64>().unwrap(),
         })
         .await
-        .unwrap();
+    {
+        Ok(raw) => raw,
+        Err(e) => {
+            if e.root_cause()
+                .to_string()
+                .contains("cannot find such thread")
+            {
+                let current_unix_epoch = Utc::now().timestamp();
+                return if thread_number.parse::<i64>().unwrap() > current_unix_epoch {
+                    // Not found response
+                    Response::builder().status(404).body(Body::empty()).unwrap()
+                } else {
+                    // Redirect to kako thread
+                    Response::builder()
+                        .status(302)
+                        .header(
+                            "Location",
+                            format!(
+                                "/{}/kako/{}/{}/{}.dat",
+                                board_key,
+                                &thread_number[0..4],
+                                &thread_number[0..5],
+                                thread_number
+                            ),
+                        )
+                        .body(Body::empty())
+                        .unwrap()
+                };
+            } else {
+                // Not found response
+                return Response::builder().status(404).body(Body::empty()).unwrap();
+            }
+        }
+    };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result.raw()))
         .content_type(SjisContentType::TextPlain)
@@ -530,6 +564,31 @@ async fn post_bbs_cgi(
         return BbsCgiError::from(InsufficientParamType::Body).into_response();
     };
 
+    fn on_error(e: BbsCgiError) -> Response {
+        if matches!(e, BbsCgiError::Other(_)) {
+            error_span!("thread_creation_error", error = ?e);
+        }
+        let is_cookie_reset = matches!(e, BbsCgiError::InvalidAuthedToken);
+        let mut resp = e.into_response();
+        if is_cookie_reset {
+            resp.headers_mut().append(
+                "Set-Cookie",
+                "edge-token = ; Max-Age = 0; Path = /; "
+                    .to_string()
+                    .parse()
+                    .unwrap(),
+            );
+            resp.headers_mut().append(
+                "Set-Cookie",
+                "tinker = ; Max-Age = 0; Path = /; "
+                    .to_string()
+                    .parse()
+                    .unwrap(),
+            );
+        }
+        resp
+    }
+
     let tinker = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
@@ -553,10 +612,7 @@ async fn post_bbs_cgi(
         {
             Ok(ThreadCreationServiceOutput { tinker }) => tinker,
             Err(e) => {
-                if matches!(e, BbsCgiError::Other(_)) {
-                    error_span!("thread_creation_error", error = ?e);
-                }
-                return e.into_response();
+                return on_error(e);
             }
         }
     } else {
@@ -585,10 +641,7 @@ async fn post_bbs_cgi(
         {
             Ok(ResCreationServiceOutput { tinker }) => tinker,
             Err(e) => {
-                if matches!(e, BbsCgiError::Other(_)) {
-                    error_span!("res_creation_error", error = ?e);
-                }
-                return e.into_response();
+                return on_error(e);
             }
         }
     };

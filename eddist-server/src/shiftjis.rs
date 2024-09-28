@@ -135,6 +135,7 @@ impl SJisResponseBuilder {
         let mut cookie = Cookie::new(key, value);
         cookie.set_http_only(true);
         cookie.set_max_age(max_age);
+        cookie.set_path("/");
         let cookies = self.cookies.add(cookie);
         Self { cookies, ..self }
     }

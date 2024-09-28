@@ -285,8 +285,8 @@ impl BbsRepository for BbsRepositoryImpl {
             writing_ua: x.writing_ua,
             authed_ua: x.authed_ua,
             auth_code: x.auth_code,
-            created_at: x.created_at,
-            authed_at: x.authed_at,
+            created_at: x.created_at.and_utc(),
+            authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
         }))
     }
@@ -313,8 +313,8 @@ impl BbsRepository for BbsRepositoryImpl {
             writing_ua: x.writing_ua,
             authed_ua: x.authed_ua,
             auth_code: x.auth_code,
-            created_at: x.created_at,
-            authed_at: x.authed_at,
+            created_at: x.created_at.and_utc(),
+            authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
         }))
     }
@@ -640,8 +640,8 @@ struct SelectionAuthedToken {
     writing_ua: String,
     authed_ua: Option<String>,
     auth_code: String,
-    created_at: DateTime<Utc>,
-    authed_at: Option<DateTime<Utc>>,
+    created_at: NaiveDateTime,
+    authed_at: Option<NaiveDateTime>,
     validity: i8, // TINYINT
 }
 

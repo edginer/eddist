@@ -7,8 +7,8 @@ pub struct Cap {
     pub name: String,
     pub description: String,
     pub password_hash: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
 }
 
 pub fn calculate_cap_hash(password: &str, salt: &str) -> String {

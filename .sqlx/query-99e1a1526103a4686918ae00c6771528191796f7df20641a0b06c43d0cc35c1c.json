@@ -70,18 +70,18 @@
         "ordinal": 7,
         "name": "created_at",
         "type_info": {
-          "type": "Timestamp",
+          "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 19
+          "max_size": 23
         }
       },
       {
         "ordinal": 8,
         "name": "authed_at",
         "type_info": {
-          "type": "Timestamp",
+          "type": "Datetime",
           "flags": "BINARY",
-          "max_size": 19
+          "max_size": 23
         }
       },
       {

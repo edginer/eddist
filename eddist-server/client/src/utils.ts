@@ -45,9 +45,9 @@ const convertToSjisText = (text: string): string => {
   return Encoding.urlEncode(sjis);
 };
 
-const convertToUtf8Text = (text: string): string => {
-  const utf8 = Encoding.convert(Encoding.stringToCode(text), {
-    to: "UTF8",
+const convertToUtf8Text = (text: ArrayBuffer): string => {
+  const utf8 = Encoding.convert(new Uint8Array(text), {
+    to: "UNICODE",
     from: "SJIS",
   });
   return Encoding.codeToString(utf8);
@@ -97,11 +97,23 @@ export const postResponse = async ({
       "&key=" +
       params.key,
   });
+
+  const bytes = await res.arrayBuffer();
+  const text = convertToUtf8Text(bytes);
+
   if (!res.ok) {
+    if (text.includes("error_code")) {
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      return {
+        success: false,
+        error: {
+          kind: "unknown",
+          errorHtml: doc.body.innerHTML,
+        },
+      };
+    }
     throw new Error(`Failed to post a response: ${res.statusText}`);
   }
-
-  const text = await res.text();
 
   if (text.includes("error_code")) {
     if (text.includes("E-Unauthenticated")) {
@@ -113,7 +125,7 @@ export const postResponse = async ({
         success: false,
         error: {
           kind: "unknown",
-          errorHtml: convertToUtf8Text(doc.body.innerHTML),
+          errorHtml: doc.body.innerHTML,
         },
       };
     }
@@ -172,7 +184,7 @@ export const postThread = async ({
         success: false,
         error: {
           kind: "unknown",
-          errorHtml: convertToUtf8Text(doc.body.innerHTML),
+          errorHtml: doc.body.innerHTML,
         },
       };
     }
