@@ -4,9 +4,7 @@ COPY ./target/release/eddist .
 COPY ./eddist-server/client/dist ./dist
 
 ENV RUST_ENV=prod
-# for debugging
-ENV RUST_LOG=debug
-ENV RUST_BACKTRACE=full
+ENV RUST_LOG=info
 EXPOSE 8080
 
 ENTRYPOINT [ "./eddist" ]

@@ -159,11 +159,11 @@ async fn main() -> anyhow::Result<()> {
     let s3_client = s3::bucket::Bucket::new(
         &env::var("S3_BUCKET_NAME").unwrap(),
         s3::Region::R2 {
-            account_id: env::var("R2_ACCOUNT_ID").unwrap(),
+            account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
         },
         s3::creds::Credentials::new(
-            Some(&env::var("S3_ACCESS_KEY").unwrap()),
-            Some(&env::var("S3_ACCESS_SECRET_KEY").unwrap()),
+            Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
+            Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
             None,
             None,
             None,
