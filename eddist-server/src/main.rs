@@ -477,7 +477,10 @@ async fn get_head_txt(
 async fn get_term_of_usage(State(state): State<AppState>) -> impl IntoResponse {
     let html = state
         .template_engine
-        .render("term-of-usage.get", &serde_json::json!({}))
+        .render(
+            "term-of-usage.get",
+            &serde_json::json!({"domain": env::var("DOMAIN").unwrap_or("example.com".to_string())}),
+        )
         .unwrap();
 
     Html(html)

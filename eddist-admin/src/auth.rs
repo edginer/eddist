@@ -1,3 +1,5 @@
+use std::env;
+
 use axum::{
     body::Body,
     extract::{FromRequestParts, State},
@@ -5,7 +7,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use jsonwebtoken::errors::ErrorKind;
 use oauth2::{
     reqwest::async_http_client, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier,
@@ -17,7 +19,7 @@ use tracing::info_span;
 
 use crate::{repository::admin_bbs_repository::AdminBbsRepositoryImpl, AppState};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeycloakAccessToken {
     pub exp: i64,
     pub sub: String,
@@ -26,19 +28,79 @@ pub struct KeycloakAccessToken {
     pub email: String,
 }
 
-pub fn verify_access_token(access_token: &str) -> Result<KeycloakAccessToken, ErrorKind> {
-    let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
-    let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-    validation.set_audience(&["account"]);
-    let token = jsonwebtoken::decode::<KeycloakAccessToken>(
-        access_token,
-        &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
-        &validation,
-    );
+#[derive(Debug, Clone, Deserialize)]
+pub struct Auth0UserInfo {
+    pub sub: String,
+    pub email_verified: bool,
+    pub nickname: String,
+    pub email: String,
+}
 
-    match token {
-        Ok(t) => Ok(t.claims),
-        Err(e) => Err(e.kind().clone()),
+#[derive(Debug, Clone, Deserialize)]
+pub struct Auth0AccessToken {
+    pub exp: i64,
+}
+
+pub async fn verify_access_token(access_token: &str) -> Result<KeycloakAccessToken, ErrorKind> {
+    if let Ok(userinfo_url) = env::var("EDDIST_USER_INFO_URL") {
+        let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&[env::var("EDDIST_AUDIENCE").unwrap().as_str()]);
+        let token = jsonwebtoken::decode::<Auth0AccessToken>(
+            access_token,
+            &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
+            &validation,
+        );
+
+        match token {
+            Ok(t) => {
+                let res = reqwest::Client::new()
+                    .get(&userinfo_url)
+                    .bearer_auth(access_token)
+                    .send()
+                    .await
+                    .unwrap();
+                let text = res.text().await.unwrap();
+                let res = serde_json::from_str::<Auth0UserInfo>(&text);
+
+                let info = match res {
+                    Err(e) => {
+                        log::error!("failed to get userinfo: {e:?}");
+                        return Err(ErrorKind::ExpiredSignature);
+                    }
+                    Ok(info) => info,
+                };
+
+                Ok(KeycloakAccessToken {
+                    exp: t.claims.exp,
+                    sub: info.sub,
+                    email_verified: info.email_verified,
+                    preferred_username: info.nickname,
+                    email: info.email,
+                })
+            }
+            Err(e) => {
+                log::error!("failed to verify access token: {e:?}");
+                Err(e.kind().clone())
+            }
+        }
+    } else {
+        let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&["account"]);
+        let token = jsonwebtoken::decode::<KeycloakAccessToken>(
+            access_token,
+            &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
+            &validation,
+        );
+
+        match token {
+            Ok(t) => Ok(t.claims),
+            Err(e) => {
+                log::error!("failed to verify access token: {e:?}");
+                Err(e.kind().clone())
+            }
+        }
     }
 }
 
@@ -52,14 +114,24 @@ pub async fn auth_simple_header(
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
-    req.headers_mut().remove("X-User-Id");
-    req.headers_mut().remove("X-User-Email");
-    req.headers_mut().remove("X-User-Name");
-
-    if let Some(access_token) = admin_session.access_token {
-        let access_token = verify_access_token(&access_token);
+    if admin_session.next_refresh_at > Utc::now() && admin_session.userinfo.is_some() {
+        log::info!("no need to retrieve userinfo");
+        req.extensions_mut().insert(admin_session.userinfo.unwrap());
+        return next.run(req).await;
+    } else if let Some(access_token) = &admin_session.access_token {
+        let access_token = verify_access_token(access_token).await;
         let access_token = match access_token {
-            Ok(token) => token,
+            Ok(token) => {
+                let new_session = AdminSession {
+                    next_refresh_at: Utc::now()
+                        .checked_add_signed(TimeDelta::minutes(5))
+                        .unwrap(),
+                    userinfo: Some(token.clone()),
+                    ..admin_session
+                };
+                session.insert("data", new_session).await.unwrap();
+                token
+            }
             Err(ErrorKind::ExpiredSignature) => {
                 let Some(refresh_token) = &admin_session.refresh_token else {
                     return Response::builder()
@@ -71,7 +143,7 @@ pub async fn auth_simple_header(
                 let Ok(token) = client
                     .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
                     .add_scopes(
-                        ["openid", "profile", "email"]
+                        ["openid", "profile", "email", "offline_access"]
                             .iter()
                             .map(|s| Scope::new(s.to_string())),
                     )
@@ -85,18 +157,22 @@ pub async fn auth_simple_header(
                         .body(Body::empty())
                         .unwrap();
                 };
+                let access_token = token.access_token().secret();
 
-                let new_session = AdminSession {
-                    access_token: Some(token.access_token().secret().to_string()),
-                    refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
-                    ..admin_session
-                };
-                session.insert("data", new_session).await.unwrap();
-
-                match verify_access_token(token.access_token().secret()) {
-                    Ok(token) => {
-                        info_span!("success to verify access token from refresh token", token = ?token);
-                        token
+                match verify_access_token(access_token).await {
+                    Ok(userinfo) => {
+                        let new_session = AdminSession {
+                            access_token: Some(access_token.to_string()),
+                            refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
+                            next_refresh_at: Utc::now()
+                                .checked_add_signed(TimeDelta::minutes(5))
+                                .unwrap(),
+                            userinfo: Some(userinfo.clone()),
+                            ..admin_session
+                        };
+                        session.insert("data", new_session).await.unwrap();
+                        info_span!("success to verify access token from refresh token", token = ?userinfo);
+                        userinfo
                     }
                     Err(e) => {
                         info_span!("failed to verify access token", error = ?e);
@@ -110,16 +186,7 @@ pub async fn auth_simple_header(
             Err(_) => panic!(),
         };
 
-        let adding_headers = [
-            ("X-User-Id", access_token.sub),
-            ("X-User-Email", access_token.email),
-            ("X-User-Name", access_token.preferred_username),
-        ];
-
-        for (key, value) in adding_headers.into_iter() {
-            req.headers_mut()
-                .insert(key, HeaderValue::from_str(&value).unwrap());
-        }
+        req.extensions_mut().insert(access_token);
 
         // TODO: this only executes after getting access token or refresh token
         // sqlx::query_as::<_, (String, String, String, String, String)>(
@@ -165,6 +232,8 @@ pub struct AdminSession {
     user_id: Option<[u8; 16]>,
     access_token: Option<String>,
     refresh_token: Option<String>,
+    next_refresh_at: chrono::DateTime<Utc>,
+    userinfo: Option<KeycloakAccessToken>,
 }
 
 impl AdminSession {
@@ -177,6 +246,10 @@ impl AdminSession {
             user_id: None,
             access_token: None,
             refresh_token: None,
+            next_refresh_at: Utc::now()
+                .checked_add_signed(TimeDelta::minutes(1))
+                .unwrap(),
+            userinfo: None,
         }
     }
 }
@@ -197,11 +270,19 @@ pub async fn get_login(
     _: AdminSession,
 ) -> impl IntoResponse {
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-    let (authorize_url, csrf_state) = oauth_client
-        .authorize_url(CsrfToken::new_random)
+
+    let authz_req = oauth_client.authorize_url(CsrfToken::new_random);
+    let authz_req = if let Ok(audience) = env::var("EDDIST_AUDIENCE") {
+        authz_req.add_extra_param("audience", audience)
+    } else {
+        authz_req
+    };
+
+    let (authorize_url, csrf_state) = authz_req
         .add_scope(Scope::new("openid".to_string()))
         .add_scope(Scope::new("profile".to_string()))
         .add_scope(Scope::new("email".to_string()))
+        .add_scope(Scope::new("offline_access".to_string()))
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -235,7 +316,7 @@ pub async fn get_login_callback(
     admin_session: AdminSession,
     query: axum::extract::Query<LoginCallbackQuery>,
 ) -> impl IntoResponse {
-    let Some(oauth_session) = session.get::<OAuthSession>("oauth").await.unwrap() else {
+    let Some(oauth_session) = session.remove::<OAuthSession>("oauth").await.unwrap() else {
         info_span!("oauth_session is not found");
 
         return Response::builder()

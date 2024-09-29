@@ -227,9 +227,9 @@ PARTITION BY
 INSERT INTO
     boards (id, name, board_key, default_name)
 VALUES
-    (UUID_TO_BIN ('01815522-2d2b-728f-af94-a234aabb6b20'), 'vエッヂk', 'livedgek', 'ポッドの名無し');
+    (UUID_TO_BIN ('01815522-2d2b-728f-af94-a234aabb6b20'), '試験板', 'experiment', 'ポッドの名無し');
 
 INSERT INTO
     boards_info (id, local_rules, created_at, updated_at)
 VALUES
-    (UUID_TO_BIN ('01815522-2d2b-728f-af94-a234aabb6b20'), 'ローカルルール', NOW (), NOW ());
+    (UUID_TO_BIN ('01815522-2d2b-728f-af94-a234aabb6b20'), '利用規約に従う', NOW (), NOW ());
