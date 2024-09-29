@@ -172,14 +172,6 @@ async fn main() -> anyhow::Result<()> {
     )
     .unwrap();
 
-    println!(
-        "{}/{}/{}/{}",
-        env::var("S3_BUCKET_NAME").unwrap(),
-        env::var("R2_ACCOUNT_ID").unwrap(),
-        env::var("S3_ACCESS_KEY").unwrap(),
-        env::var("S3_ACCESS_SECRET_KEY").unwrap()
-    );
-
     let app_state = AppState {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool),

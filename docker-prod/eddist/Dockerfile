@@ -1,5 +1,7 @@
 FROM debian:bookworm-slim
 
+RUN apt update && apt install -y --no-install-recommends ca-certificates
+
 COPY ./target/release/eddist .
 COPY ./eddist-server/client/dist ./dist
 
