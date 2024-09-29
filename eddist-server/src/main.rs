@@ -329,15 +329,18 @@ async fn get_dat_txt(
     Path((board_key, thread_id_with_dat)): Path<(String, String)>,
 ) -> Response {
     if thread_id_with_dat.len() != 14 {
-        panic!("invalid dat")
+        return Response::builder().status(404).body(Body::empty()).unwrap();
     }
     let thread_number = thread_id_with_dat.replace(".dat", "");
+    let Ok(thread_number_num) = thread_number.parse::<i64>() else {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    };
 
     let svc = state.get_container().thread_retrival();
     let result = match svc
         .execute(ThreadRetrievalServiceInput {
             board_key: board_key.clone(),
-            thread_number: thread_number.parse::<u64>().unwrap(),
+            thread_number: thread_number_num as u64,
         })
         .await
     {
@@ -348,7 +351,7 @@ async fn get_dat_txt(
                 .contains("cannot find such thread")
             {
                 let current_unix_epoch = Utc::now().timestamp();
-                return if thread_number.parse::<i64>().unwrap() > current_unix_epoch {
+                return if thread_number_num > current_unix_epoch {
                     // Not found response
                     Response::builder().status(404).body(Body::empty()).unwrap()
                 } else {
@@ -388,7 +391,7 @@ async fn get_kako_dat_txt(
     Path((board_key, _, _, thread_id_with_dat)): Path<(String, String, String, String)>,
 ) -> Response {
     if thread_id_with_dat.len() != 14 {
-        panic!("invalid dat")
+        return Response::builder().status(404).body(Body::empty()).unwrap();
     }
     let thread_number = thread_id_with_dat.replace(".dat", "");
 
