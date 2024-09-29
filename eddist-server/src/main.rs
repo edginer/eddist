@@ -1,3 +1,4 @@
+use core::str;
 use std::{collections::HashMap, convert::Infallible, env, time::Duration};
 
 use axum::{
@@ -404,7 +405,13 @@ async fn get_kako_dat_txt(
         .await
         .unwrap();
 
-    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
+    let sjis_str = if let Ok(result) = str::from_utf8(&result) {
+        SJisStr::from(result)
+    } else {
+        SJisStr::from_unchecked_vec(result)
+    };
+
+    SJisResponseBuilder::new(sjis_str)
         .content_type(SjisContentType::TextPlain)
         .server_ttl(3600)
         .build()
