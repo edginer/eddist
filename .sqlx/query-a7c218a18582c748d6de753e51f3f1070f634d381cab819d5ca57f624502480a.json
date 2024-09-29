@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            local_rules,\n            base_thread_creation_span_sec,\n            base_response_creation_span_sec,\n            max_thread_name_byte_length,\n            max_author_name_byte_length,\n            max_email_byte_length,\n            max_response_body_byte_length,\n            max_response_body_lines,\n            threads_archive_cron,\n            threads_archive_trigger_thread_count,\n            created_at,\n            updated_at\n        FROM boards_info\n        WHERE id = ?\n        ",
+  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            local_rules,\n            base_thread_creation_span_sec,\n            base_response_creation_span_sec,\n            max_thread_name_byte_length,\n            max_author_name_byte_length,\n            max_email_byte_length,\n            max_response_body_byte_length,\n            max_response_body_lines,\n            threads_archive_cron,\n            threads_archive_trigger_thread_count,\n            created_at,\n            updated_at,\n            read_only AS \"read_only: bool\"\n        FROM boards_info\n        WHERE id = ?\n        ",
   "describe": {
     "columns": [
       {
@@ -119,6 +119,15 @@
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
           "max_size": 23
         }
+      },
+      {
+        "ordinal": 13,
+        "name": "read_only: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
@@ -137,8 +146,9 @@
       true,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "8c06bc617d02aa04b2a18f8147476964ed74de641a588a5a57abbf53cc01371d"
+  "hash": "a7c218a18582c748d6de753e51f3f1070f634d381cab819d5ca57f624502480a"
 }

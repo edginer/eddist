@@ -92,6 +92,15 @@
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "max_size": 1
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "last_wrote_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY",
+          "max_size": 23
+        }
       }
     ],
     "parameters": {
@@ -107,7 +116,8 @@
       false,
       false,
       true,
-      false
+      false,
+      true
     ]
   },
   "hash": "99e1a1526103a4686918ae00c6771528191796f7df20641a0b06c43d0cc35c1c"

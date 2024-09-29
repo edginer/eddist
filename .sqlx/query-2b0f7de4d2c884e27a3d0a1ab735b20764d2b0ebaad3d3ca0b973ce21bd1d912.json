@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE authed_tokens SET last_wrote_at = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2b0f7de4d2c884e27a3d0a1ab735b20764d2b0ebaad3d3ca0b973ce21bd1d912"
+}
