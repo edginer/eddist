@@ -183,7 +183,7 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             id: res_id,
             created_at,
             body: res.body().to_string(),
-            name: res.author_name().to_string(),
+            name: res.pretty_author_name(&board.default_name),
             mail: res.mail().to_string(),
             author_ch5id: res.author_id().to_string(),
             authed_token_id: authed_token.id,
