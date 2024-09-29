@@ -60,6 +60,11 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             .get_board_info_by_key(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
+
+        if board_info.read_only {
+            return Err(BbsCgiError::ReadOnlyBoard);
+        }
+
         let created_at = Utc::now();
 
         let Some(th) = self
@@ -189,6 +194,8 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             res_order: order as i32,
             is_sage: res.is_sage(),
         };
+
+        // let authed_token_id = authed_token.id.clon;
         tokio::spawn(async move {
             if let Err(e) = bbs_repo.create_response(cres.clone()).await {
                 error_span!("failed to create response in database",
@@ -199,6 +206,9 @@ impl<T: BbsRepository + Clone, P: PubRepository>
                     .await
                     .unwrap();
             }
+            let _ = bbs_repo
+                .update_authed_token_last_wrote(authed_token.id, created_at)
+                .await;
         });
 
         let tinker = if let Some(tinker) = input.tinker {

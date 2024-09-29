@@ -56,6 +56,11 @@ impl<T: BbsRepository + Clone>
             .get_board_info_by_key(&input.board_key)
             .await?
             .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
+
+        if board_info.read_only {
+            return Err(BbsCgiError::ReadOnlyBoard);
+        }
+
         let created_at = Utc::now();
         let unix_time = created_at.timestamp();
 
@@ -191,6 +196,10 @@ impl<T: BbsRepository + Clone>
             Tinker::new(authed_token.token, created_at)
         }
         .action_on_create_thread(created_at);
+
+        let _ = bbs_repo
+            .update_authed_token_last_wrote(authed_token.id, created_at)
+            .await;
 
         counter!("response_creation", "board_key" => board_key.clone()).increment(1);
         counter!("thread_creation", "board_key" => board_key.clone()).increment(1);

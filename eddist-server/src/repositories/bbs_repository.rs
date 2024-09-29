@@ -46,6 +46,11 @@ pub trait BbsRepository: Send + Sync + 'static {
         authed_ua: &str,
         authed_time: DateTime<Utc>,
     ) -> anyhow::Result<()>;
+    async fn update_authed_token_last_wrote(
+        &self,
+        token_id: Uuid,
+        last_wrote: DateTime<Utc>,
+    ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
@@ -128,7 +133,8 @@ impl BbsRepository for BbsRepositoryImpl {
             threads_archive_cron,
             threads_archive_trigger_thread_count,
             created_at,
-            updated_at
+            updated_at,
+            read_only AS "read_only: bool"
         FROM boards_info
         WHERE id = ?
         "#,
@@ -288,6 +294,7 @@ impl BbsRepository for BbsRepositoryImpl {
             created_at: x.created_at.and_utc(),
             authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
+            last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
         }))
     }
 
@@ -316,6 +323,7 @@ impl BbsRepository for BbsRepositoryImpl {
             created_at: x.created_at.and_utc(),
             authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
+            last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
         }))
     }
 
@@ -537,6 +545,22 @@ impl BbsRepository for BbsRepositoryImpl {
         Ok(())
     }
 
+    async fn update_authed_token_last_wrote(
+        &self,
+        token_id: Uuid,
+        last_wrote: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let query = query!(
+            "UPDATE authed_tokens SET last_wrote_at = ? WHERE id = ?",
+            last_wrote,
+            token_id.as_bytes().to_vec(),
+        );
+
+        query.execute(&self.pool).await?;
+
+        Ok(())
+    }
+
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()> {
         let query = query!(
             "UPDATE authed_tokens SET validity = ? WHERE token = ?",
@@ -643,6 +667,7 @@ struct SelectionAuthedToken {
     created_at: NaiveDateTime,
     authed_at: Option<NaiveDateTime>,
     validity: i8, // TINYINT
+    last_wrote_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -11,6 +11,7 @@ CREATE TABLE
         created_at DATETIME(3) NOT NULL,
         authed_at DATETIME(3) NULL,
         validity BOOLEAN NOT NULL,
+        last_wrote_at DATETIME(3) NULL,
         INDEX (origin_ip),
         INDEX (auth_code)
     );
@@ -37,6 +38,7 @@ CREATE TABLE
         max_response_body_lines INT NOT NULL DEFAULT 32,
         threads_archive_cron VARCHAR(255),
         threads_archive_trigger_thread_count INT,
+        read_only BOOLEAN NOT NULL DEFAULT FALSE,
         created_at DATETIME(3) NOT NULL,
         updated_at DATETIME(3) NOT NULL,
         FOREIGN KEY (id) REFERENCES boards (id)

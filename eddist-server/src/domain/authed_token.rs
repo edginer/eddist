@@ -16,6 +16,7 @@ pub struct AuthedToken {
     pub created_at: DateTime<Utc>,
     pub authed_at: Option<DateTime<Utc>>,
     pub validity: bool,
+    pub last_wrote_at: Option<DateTime<Utc>>,
 }
 
 impl AuthedToken {
@@ -43,6 +44,7 @@ impl AuthedToken {
             created_at: Utc::now(),
             authed_at: None,
             validity: false,
+            last_wrote_at: None,
         }
     }
 

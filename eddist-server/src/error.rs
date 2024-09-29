@@ -54,6 +54,9 @@ pub enum BbsCgiError {
     #[error("初回書き込み時にはスレッドを立てることができません")]
     TmpCanNotCreateThread,
 
+    #[error("この板は現在読み込み専用です")]
+    ReadOnlyBoard,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -74,6 +77,7 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
+            BbsCgiError::ReadOnlyBoard => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -93,6 +97,7 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
+            BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

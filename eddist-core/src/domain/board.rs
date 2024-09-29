@@ -24,4 +24,5 @@ pub struct BoardInfo {
     pub threads_archive_trigger_thread_count: Option<i32>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub read_only: bool,
 }
