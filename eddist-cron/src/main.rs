@@ -154,12 +154,12 @@ async fn main() {
                             &admin_dat,
                         )
                         .await;
-                    if result.is_err() {
+                    if let Err(e) = result {
                         let result =
                             retry(&s3_client, &board.board_key, thread_number, &admin_dat).await;
                         if !result {
                             eprintln!(
-                                "Failed to upload admin.dat: {}/{}",
+                                "Failed to upload admin.dat: {}/{}, reason: {e}",
                                 board.board_key, thread_number
                             );
                             continue;
@@ -172,12 +172,13 @@ async fn main() {
                             &dat,
                         )
                         .await;
-                    if result.is_err() {
+                    if let Err(e) = result {
                         let result = retry(&s3_client, &board.board_key, thread_number, &dat).await;
                         if !result {
-                            eprintln!(
-                                "Failed to upload dat: {}/{}",
-                                board.board_key, thread_number
+                            log::error!(
+                                "Failed to upload dat: {}/{}, reason: {e}",
+                                board.board_key,
+                                thread_number
                             );
                             continue;
                         }
@@ -200,7 +201,7 @@ async fn main() {
             }
         }
         job => {
-            eprintln!("Unknown job: {job}");
+            log::error!("Unknown job: {job}");
             std::process::exit(1);
         }
     }

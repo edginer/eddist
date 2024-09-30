@@ -1046,6 +1046,7 @@ dependencies = [
  "cron",
  "dotenvy",
  "eddist-core",
+ "log",
  "redis",
  "rust-s3",
  "sqlx",

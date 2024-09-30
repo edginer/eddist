@@ -57,7 +57,7 @@ impl Repository {
                     WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
                     AND archived = 0
                     ORDER BY last_modified_at ASC
-                    LIMIT ?
+                    LIMIT 1000000 OFFSET ?
                 ) AS tmp
             )
             "#,
