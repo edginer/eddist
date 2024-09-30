@@ -9,7 +9,6 @@ use uuid::Uuid;
 use crate::{
     domain::{
         cap::calculate_cap_hash,
-        metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -134,7 +133,7 @@ impl<T: BbsRepository + Clone>
             authed_token_id: authed_token.id,
             ip_addr: input.ip_addr.to_string(),
             board_id: board.id,
-            metadent: MetadentType::None,
+            metadent: res.metadent_type(),
             client_info,
         };
 

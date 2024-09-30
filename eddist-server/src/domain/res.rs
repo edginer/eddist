@@ -72,6 +72,10 @@ impl<T: ResState> Res<T> {
     pub fn is_sage(&self) -> bool {
         self.mail == "sage"
     }
+
+    pub fn metadent_type(&self) -> MetadentType {
+        self.metadent_type
+    }
 }
 
 impl Res<AuthorIdUninitialized> {
