@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE threads SET archived = 1, active = 0 WHERE id IN (\n                SELECT id FROM (\n                    SELECT id\n                    FROM threads\n                    WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)\n                    AND archived = 0\n                    ORDER BY last_modified_at ASC\n                    LIMIT 1000000 OFFSET ?\n                ) AS tmp\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2bd9b86ea6c607e342928e4f39326d3fd1f53161505e0d1b2fee885c63d7fcb8"
+}
