@@ -80,6 +80,25 @@ export const getThreads = ({
   });
 };
 
+const GET_ARCHIVED_THREADS = "/boards/{board_key}/archives/";
+
+export const getArchivedThreads = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_ARCHIVED_THREADS]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_ARCHIVED_THREADS, params.path.board_key],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_ARCHIVED_THREADS, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
 const GET_THREAD = "/boards/{board_key}/threads/{thread_id}/";
 
 export const getThread = ({
@@ -99,6 +118,29 @@ export const getThread = ({
   });
 };
 
+const GET_ARCHIVED_THREAD = "/boards/{board_key}/archives/{thread_id}/";
+
+export const getArchivedThread = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_ARCHIVED_THREAD]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [
+      GET_ARCHIVED_THREAD,
+      params.path.board_key,
+      params.path.thread_id,
+    ],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_ARCHIVED_THREAD, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
 const GET_RESPONSES = "/boards/{board_key}/threads/{thread_id}/responses/";
 
 export const getResponses = ({
@@ -110,6 +152,30 @@ export const getResponses = ({
     queryKey: [GET_RESPONSES, params.path.board_key, params.path.thread_id],
     queryFn: async ({ signal }) => {
       const { data } = await client.GET(GET_RESPONSES, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const GET_ARCHIVED_RESPONSES =
+  "/boards/{board_key}/archives/{thread_id}/responses/";
+
+export const getArchivedResponses = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_ARCHIVED_RESPONSES]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [
+      GET_ARCHIVED_RESPONSES,
+      params.path.board_key,
+      params.path.thread_id,
+    ],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_ARCHIVED_RESPONSES, {
         params,
         signal,
       });

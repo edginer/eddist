@@ -17,9 +17,19 @@ pub trait AdminBbsRepository: Send + Sync {
         board_key: &str,
         thread_numbers: Option<Vec<u64>>,
     ) -> anyhow::Result<Vec<Thread>>;
+    async fn get_archived_threads_by_thread_id(
+        &self,
+        board_key: &str,
+        thread_numbers: Option<Vec<u64>>,
+    ) -> anyhow::Result<Vec<Thread>>;
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board>;
 
     async fn get_reses_by_thread_id(
+        &self,
+        board_key: &str,
+        thread_number: u64,
+    ) -> anyhow::Result<Vec<Res>>;
+    async fn get_archived_reses_by_thread_id(
         &self,
         board_key: &str,
         thread_number: u64,
@@ -333,6 +343,77 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             .collect())
     }
 
+    async fn get_archived_threads_by_thread_id(
+        &self,
+        board_key: &str,
+        thread_numbers: Option<Vec<u64>>,
+    ) -> anyhow::Result<Vec<Thread>> {
+        let pool = &self.0;
+
+        let thread_numbers_where = if let Some(thread_numbers) = &thread_numbers {
+            let mut initial = "AND thread_number IN (".to_string();
+            initial.push_str(
+                &thread_numbers
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            );
+            initial.push(')');
+            initial
+        } else {
+            "".to_string()
+        };
+
+        let query = format!(
+            r#"
+            SELECT
+                *
+            FROM
+                archived_threads
+            WHERE
+                board_id = (
+                    SELECT
+                        id
+                    FROM
+                        boards
+                    WHERE
+                        board_key = ?
+                )
+            {thread_numbers_where}
+            "#
+        );
+
+        let mut query = sqlx::query_as::<_, SelectionThread>(&query);
+
+        query = query.bind(board_key);
+        if let Some(thread_numbers) = &thread_numbers {
+            for thread_number in thread_numbers {
+                query = query.bind(thread_number);
+            }
+        }
+
+        let selected_threads = query.fetch_all(pool).await?;
+
+        Ok(selected_threads
+            .into_iter()
+            .map(|thread| Thread {
+                id: Uuid::from_slice(&thread.id).unwrap(),
+                board_id: Uuid::from_slice(&thread.board_id).unwrap(),
+                thread_number: thread.thread_number as u64,
+                last_modified: thread.last_modified_at,
+                sage_last_modified: thread.sage_last_modified_at,
+                title: thread.title,
+                authed_token_id: Uuid::from_slice(&thread.authed_token_id).unwrap(),
+                metadent: thread.metadent,
+                response_count: thread.response_count as u32,
+                no_pool: thread.no_pool,
+                archived: thread.archived,
+                active: thread.active,
+            })
+            .collect())
+    }
+
     async fn get_reses_by_thread_id(
         &self,
         board_key: &str,
@@ -359,6 +440,79 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 res_order
             FROM
                 responses
+            WHERE
+                thread_id = (
+                    SELECT
+                        id
+                    FROM
+                        threads
+                    WHERE
+                        board_id = (
+                        SELECT
+                            id
+                        FROM
+                            boards
+                        WHERE
+                            board_key = ?
+                        )
+                    AND
+                        thread_number = ?
+                )
+            ORDER BY
+                res_order ASC
+            "#,
+            board_key,
+            thread_number
+        );
+
+        let selected_reses = query.fetch_all(pool).await?;
+
+        Ok(selected_reses
+            .into_iter()
+            .map(|res| Res {
+                id: Uuid::from_slice(&res.id).unwrap(),
+                author_name: Some(res.author_name),
+                mail: Some(res.mail),
+                body: res.body,
+                created_at: Utc.from_utc_datetime(&res.created_at),
+                author_id: res.author_id,
+                ip_addr: res.ip_addr,
+                authed_token_id: Uuid::from_slice(&res.authed_token_id).unwrap(),
+                board_id: Uuid::from_slice(&res.board_id).unwrap(),
+                thread_id: Uuid::from_slice(&res.thread_id).unwrap(),
+                is_abone: res.is_abone != 0,
+                client_info: res.client_info.0.into(),
+                res_order: res.res_order,
+            })
+            .collect())
+    }
+
+    async fn get_archived_reses_by_thread_id(
+        &self,
+        board_key: &str,
+        thread_number: u64,
+    ) -> anyhow::Result<Vec<Res>> {
+        let pool = &self.0;
+
+        let query = query_as!(
+            SelectionRes,
+            r#"
+            SELECT
+                id,
+                author_name,
+                mail,
+                body,
+                created_at,
+                author_id,
+                ip_addr,
+                authed_token_id,
+                board_id,
+                thread_id,
+                is_abone,
+                client_info AS "client_info!: Json<ClientInfo>",
+                res_order
+            FROM
+                archived_responses
             WHERE
                 thread_id = (
                     SELECT

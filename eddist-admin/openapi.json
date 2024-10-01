@@ -127,6 +127,131 @@
         }
       }
     },
+    "/boards/{board_key}/archives/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_archived_threads",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List threads successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Thread"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/archives/{thread_id}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_archived_thread",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get thread successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/archives/{thread_id}/responses/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_archived_responses",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "board_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List responses successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Res"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    },
     "/boards/{board_key}/threads/": {
       "get": {
         "tags": [

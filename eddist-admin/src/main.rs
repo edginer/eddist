@@ -122,6 +122,15 @@ async fn main() {
             "/boards/:boardKey/threads/:threadId/responses",
             get(bbs::get_responses),
         )
+        .route("/boards/:boardKey/archives", get(bbs::get_archived_threads))
+        .route(
+            "/boards/:boardKey/archives/:threadId",
+            get(bbs::get_archived_thread),
+        )
+        .route(
+            "/boards/:boardKey/archives/:threadId/responses",
+            get(bbs::get_archived_responses),
+        )
         .route(
             "/boards/:boardKey/threads/:threadId/responses/:resId",
             patch(bbs::update_response),
@@ -146,6 +155,7 @@ async fn main() {
     };
 
     let app = Router::new()
+        .route("/health-check", get(ok))
         .route("/login", get(get_login))
         .route("/auth/check", get(get_check_auth))
         .route("/auth/logout", get(get_logout))
@@ -431,6 +441,26 @@ mod bbs {
 
     #[utoipa::path(
         get,
+        path = "/boards/{board_key}/archives/",
+        responses(
+            (status = 200, description = "List threads successfully", body = Vec<Thread>),
+        )
+    )]
+    pub async fn get_archived_threads(
+        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        Path(board_key): Path<String>,
+    ) -> Json<Vec<Thread>> {
+        let threads = state
+            .repo
+            .get_archived_threads_by_thread_id(&board_key, None)
+            .await
+            .unwrap();
+
+        threads.into()
+    }
+
+    #[utoipa::path(
+        get,
         path = "/boards/{board_key}/threads/{thread_id}/",
         responses(
             (status = 200, description = "Get thread successfully", body = Thread),
@@ -466,6 +496,41 @@ mod bbs {
 
     #[utoipa::path(
         get,
+        path = "/boards/{board_key}/archives/{thread_id}/",
+        responses(
+            (status = 200, description = "Get thread successfully", body = Thread),
+            (status = 404, description = "Thread not found"),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_id" = u64, Path, description = "Thread ID"),
+        )
+    )]
+    pub async fn get_archived_thread(
+        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        Path((board_key, thread_id)): Path<(String, u64)>,
+    ) -> Response {
+        let thread = state
+            .repo
+            .get_archived_threads_by_thread_id(&board_key, Some(vec![thread_id]))
+            .await
+            .unwrap();
+
+        let Some(thread) = thread.first() else {
+            return Response::builder()
+                .status(404)
+                .body(axum::body::Body::empty())
+                .unwrap();
+        };
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&thread).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        get,
         path = "/boards/{board_key}/threads/{thread_id}/responses/",
         responses(
             (status = 200, description = "List responses successfully", body = Vec<Res>),
@@ -482,6 +547,30 @@ mod bbs {
         let responses = state
             .repo
             .get_reses_by_thread_id(&board_key, thread_id)
+            .await
+            .unwrap();
+
+        responses.into()
+    }
+
+    #[utoipa::path(
+        get,
+        path = "/boards/{board_key}/archives/{thread_id}/responses/",
+        responses(
+            (status = 200, description = "List responses successfully", body = Vec<Res>),
+            (status = 404, description = "Thread not found"),
+        ),
+        params(
+            ("thread_id" = u64, Path, description = "Thread ID"),
+        )
+    )]
+    pub async fn get_archived_responses(
+        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        Path((board_key, thread_id)): Path<(String, u64)>,
+    ) -> Json<Vec<Res>> {
+        let responses = state
+            .repo
+            .get_archived_reses_by_thread_id(&board_key, thread_id)
             .await
             .unwrap();
 
@@ -704,6 +793,9 @@ mod bbs {
         bbs::get_threads,
         bbs::get_thread,
         bbs::get_responses,
+        bbs::get_archived_threads,
+        bbs::get_archived_thread,
+        bbs::get_archived_responses,
         bbs::update_response,
         bbs::delete_authed_token,
         bbs::get_ng_words,
