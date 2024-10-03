@@ -14,7 +14,11 @@ use eddist_core::{
     utils::is_prod,
 };
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
-use repository::admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl};
+use repository::{
+    admin_archive_repository::{AdminArchiveRepository, AdminArchiveRepositoryImpl},
+    admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+};
+use s3::creds::Credentials;
 use serde::{Deserialize, Serialize};
 use time::Duration;
 use tokio::net::TcpListener;
@@ -24,7 +28,7 @@ use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 use utoipa::{IntoParams, OpenApi, ToSchema};
 use uuid::Uuid;
 
-use std::net::SocketAddr;
+use std::{env, net::SocketAddr};
 use tower_http::{
     normalize_path::NormalizePathLayer,
     services::{ServeDir, ServeFile},
@@ -34,6 +38,7 @@ use tracing::info_span;
 
 pub(crate) mod auth;
 pub(crate) mod repository {
+    pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
     pub mod admin_repository;
 }
@@ -56,9 +61,10 @@ async fn ok() -> impl IntoResponse {
 }
 
 #[derive(Clone)]
-struct AppState<T: AdminBbsRepository + Clone> {
+struct AppState<T: AdminBbsRepository + Clone, R: AdminArchiveRepository + Clone> {
     oauth2_client: oauth2::basic::BasicClient,
-    repo: T,
+    admin_bbs_repo: T,
+    admin_archive_repo: R,
     redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -106,6 +112,22 @@ async fn main() {
         .await
         .unwrap();
 
+    let s3_client = s3::bucket::Bucket::new(
+        env::var("S3_BUCKET_NAME").unwrap().trim(),
+        s3::Region::R2 {
+            account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
+        },
+        Credentials::new(
+            Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
+            Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
+            None,
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
@@ -146,12 +168,13 @@ async fn main() {
 
     let state = AppState {
         oauth2_client: client,
-        repo: AdminBbsRepositoryImpl::new(pool),
+        admin_bbs_repo: AdminBbsRepositoryImpl::new(pool),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
             .get_connection_manager()
             .await
             .unwrap(),
+        admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
     };
 
     let app = Router::new()
@@ -347,7 +370,10 @@ mod bbs {
     use uuid::Uuid;
 
     use crate::{
-        repository::admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+        repository::{
+            admin_archive_repository::AdminArchiveRepositoryImpl,
+            admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+        },
         AppState, Board, CreateBoardInput, CreationNgWordInput, DeleteAuthedTokenInput, NgWord,
         Res, Thread, UpdateNgWordInput, UpdateResInput,
     };
@@ -360,9 +386,9 @@ mod bbs {
         )
     )]
     pub async fn get_boards(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
     ) -> Json<Vec<Board>> {
-        let boards = state.repo.get_boards_by_key(None).await.unwrap();
+        let boards = state.admin_bbs_repo.get_boards_by_key(None).await.unwrap();
         boards.into()
     }
 
@@ -378,11 +404,11 @@ mod bbs {
         )
     )]
     pub async fn get_board(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(board_key): Path<String>,
     ) -> Response {
         let board = state
-            .repo
+            .admin_bbs_repo
             .get_boards_by_key(Some(vec![board_key]))
             .await
             .unwrap();
@@ -408,10 +434,10 @@ mod bbs {
         request_body = CreateBoardInput
     )]
     pub async fn create_board(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Json(body): Json<CreateBoardInput>,
     ) -> Response {
-        let board = state.repo.create_board(body).await.unwrap();
+        let board = state.admin_bbs_repo.create_board(body).await.unwrap();
 
         Response::builder()
             .status(200)
@@ -427,11 +453,11 @@ mod bbs {
         )
     )]
     pub async fn get_threads(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(board_key): Path<String>,
     ) -> Json<Vec<Thread>> {
         let threads = state
-            .repo
+            .admin_bbs_repo
             .get_threads_by_thread_id(&board_key, None)
             .await
             .unwrap();
@@ -447,11 +473,11 @@ mod bbs {
         )
     )]
     pub async fn get_archived_threads(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(board_key): Path<String>,
     ) -> Json<Vec<Thread>> {
         let threads = state
-            .repo
+            .admin_bbs_repo
             .get_archived_threads_by_thread_id(&board_key, None)
             .await
             .unwrap();
@@ -472,11 +498,11 @@ mod bbs {
         )
     )]
     pub async fn get_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Response {
         let thread = state
-            .repo
+            .admin_bbs_repo
             .get_threads_by_thread_id(&board_key, Some(vec![thread_id]))
             .await
             .unwrap();
@@ -507,11 +533,11 @@ mod bbs {
         )
     )]
     pub async fn get_archived_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Response {
         let thread = state
-            .repo
+            .admin_bbs_repo
             .get_archived_threads_by_thread_id(&board_key, Some(vec![thread_id]))
             .await
             .unwrap();
@@ -541,11 +567,11 @@ mod bbs {
         )
     )]
     pub async fn get_responses(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Json<Vec<Res>> {
         let responses = state
-            .repo
+            .admin_bbs_repo
             .get_reses_by_thread_id(&board_key, thread_id)
             .await
             .unwrap();
@@ -565,11 +591,11 @@ mod bbs {
         )
     )]
     pub async fn get_archived_responses(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Json<Vec<Res>> {
         let responses = state
-            .repo
+            .admin_bbs_repo
             .get_archived_reses_by_thread_id(&board_key, thread_id)
             .await
             .unwrap();
@@ -591,14 +617,14 @@ mod bbs {
         request_body = UpdateResInput
     )]
     pub async fn update_response(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path((_a, _aa, res_id)): Path<(String, u64, Uuid)>,
         Json(body): Json<UpdateResInput>,
     ) -> Response {
         let (res, default_name, board_key, thread_number, thread_title) =
-            state.repo.get_res(res_id).await.unwrap();
+            state.admin_bbs_repo.get_res(res_id).await.unwrap();
         let updated_res = state
-            .repo
+            .admin_bbs_repo
             .update_res(
                 res_id,
                 body.author_name.clone(),
@@ -666,19 +692,19 @@ mod bbs {
         ),
     )]
     pub async fn delete_authed_token(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(authed_token_id): Path<Uuid>,
         Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
     ) -> Response {
         if using_origin_ip {
             state
-                .repo
+                .admin_bbs_repo
                 .delete_authed_token(authed_token_id)
                 .await
                 .unwrap();
         } else {
             state
-                .repo
+                .admin_bbs_repo
                 .delete_authed_token_by_origin_ip(authed_token_id)
                 .await
                 .unwrap();
@@ -698,9 +724,9 @@ mod bbs {
         )
     )]
     pub async fn get_ng_words(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
     ) -> Json<Vec<NgWord>> {
-        let ng_words = state.repo.get_ng_words().await.unwrap();
+        let ng_words = state.admin_bbs_repo.get_ng_words().await.unwrap();
         ng_words.into()
     }
 
@@ -713,11 +739,11 @@ mod bbs {
         request_body = CreationNgWordInput
     )]
     pub async fn create_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Json(body): Json<CreationNgWordInput>,
     ) -> Response {
         let ng_word = state
-            .repo
+            .admin_bbs_repo
             .create_ng_word(&body.name, &body.word)
             .await
             .unwrap();
@@ -740,12 +766,12 @@ mod bbs {
         request_body = UpdateNgWordInput
     )]
     pub async fn update_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(ng_word_id): Path<Uuid>,
         Json(body): Json<UpdateNgWordInput>,
     ) -> Response {
         let ng_word = state
-            .repo
+            .admin_bbs_repo
             .update_ng_word(
                 ng_word_id,
                 body.name.as_deref(),
@@ -772,10 +798,14 @@ mod bbs {
         ),
     )]
     pub async fn delete_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl>>,
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(ng_word_id): Path<Uuid>,
     ) -> Response {
-        state.repo.delete_ng_word(ng_word_id).await.unwrap();
+        state
+            .admin_bbs_repo
+            .delete_ng_word(ng_word_id)
+            .await
+            .unwrap();
 
         Response::builder()
             .status(200)

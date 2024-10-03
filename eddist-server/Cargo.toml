@@ -14,7 +14,7 @@ base64 = "0.22.1"
 brotli = "6.0.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 dotenvy = "0.15.7"
-encoding_rs = "0.8.34"
+encoding_rs = { version = "0.8.34", features = ["fast-kanji-encode"] }
 env_logger = "0.11.3"
 hyper = "1.4.0"
 hyper-util = "0.1.6"

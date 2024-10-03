@@ -39,3 +39,9 @@ redis = { version = "0.25.4", features = ["tokio-comp", "connection-manager"] }
 eddist-core = { path = "../eddist-core" }
 utoipa = { version = "4.2.3", features = ["uuid", "axum_extras", "chrono"] }
 tower-layer = "0.3.3"
+rust-s3 = { version = "0.35.1", default-features = false, features = [
+    "tokio-rustls-tls",
+    "tags",
+    "fail-on-err",
+] }
+encoding_rs = "0.8.34"
