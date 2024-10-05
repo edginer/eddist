@@ -52,6 +52,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/{board_key}/admin-dat-archives/{thread_number}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_admin_dat_archived_thread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/boards/{board_key}/archives/": {
         parameters: {
             query?: never;
@@ -95,6 +111,54 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_key}/dat-archives/{thread_number}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_dat_archived_thread"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_archived_thread"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_key}/dat-archives/{thread_number}/responses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_archived_res"];
+        trace?: never;
+    };
+    "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_archived_res"];
         options?: never;
         head?: never;
         patch?: never;
@@ -200,6 +264,40 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ArchivedAdminRes: {
+            authed_token_id: string;
+            author_id?: string | null;
+            body: string;
+            date: string;
+            ip_addr: string;
+            mail: string;
+            name: string;
+        };
+        ArchivedAdminThread: {
+            responses: components["schemas"]["ArchivedAdminRes"][];
+            title: string;
+        };
+        ArchivedRes: {
+            author_id?: string | null;
+            body: string;
+            date: string;
+            is_abone: boolean;
+            mail: string;
+            name: string;
+            /** Format: int64 */
+            order: number;
+        };
+        ArchivedResUpdate: {
+            author_name: string;
+            body: string;
+            email: string;
+            /** Format: int64 */
+            res_order: number;
+        };
+        ArchivedThread: {
+            responses: components["schemas"]["ArchivedRes"][];
+            title: string;
+        };
         Board: {
             board_key: string;
             default_name: string;
@@ -420,11 +518,43 @@ export interface operations {
             };
         };
     };
-    get_archived_threads: {
+    get_admin_dat_archived_thread: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description Board ID */
+                board_key: string;
+                /** @description Thread ID */
+                thread_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get archived thread successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedAdminThread"];
+                };
+            };
+        };
+    };
+    get_archived_threads: {
+        parameters: {
+            query?: {
+                keyword?: string | null;
+                start?: number | null;
+                end?: number | null;
+                page?: number | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description Board ID */
                 board_key: string;
             };
             cookie?: never;
@@ -498,6 +628,108 @@ export interface operations {
             };
             /** @description Thread not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_dat_archived_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board ID */
+                board_key: string;
+                /** @description Thread ID */
+                thread_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get archived thread successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedThread"];
+                };
+            };
+        };
+    };
+    delete_archived_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board ID */
+                board_key: string;
+                /** @description Thread ID */
+                thread_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete thread successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_archived_res: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board ID */
+                board_key: string;
+                /** @description Thread ID */
+                thread_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchivedResUpdate"][];
+            };
+        };
+        responses: {
+            /** @description Update archived response successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    delete_archived_res: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board ID */
+                board_key: string;
+                /** @description Thread ID */
+                thread_number: number;
+                /** @description Response order */
+                res_order: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete response successfully */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -127,6 +127,48 @@
         }
       }
     },
+    "/boards/{board_key}/admin-dat-archives/{thread_number}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_admin_dat_archived_thread",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_number",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get archived thread successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivedAdminThread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/boards/{board_key}/archives/": {
       "get": {
         "tags": [
@@ -137,9 +179,63 @@
           {
             "name": "board_key",
             "in": "path",
+            "description": "Board ID",
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true,
+              "minimum": 0
             }
           }
         ],
@@ -248,6 +344,183 @@
           },
           "404": {
             "description": "Thread not found"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/dat-archives/{thread_number}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_dat_archived_thread",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_number",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get archived thread successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivedThread"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_archived_thread",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_number",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete thread successfully"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/dat-archives/{thread_number}/responses/": {
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_archived_res",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_number",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArchivedResUpdate"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update archived response successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null,
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/": {
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_archived_res",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread_number",
+            "in": "path",
+            "description": "Thread ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "res_order",
+            "in": "path",
+            "description": "Response order",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete response successfully"
           }
         }
       }
@@ -558,6 +831,139 @@
   },
   "components": {
     "schemas": {
+      "ArchivedAdminRes": {
+        "type": "object",
+        "required": [
+          "name",
+          "mail",
+          "date",
+          "ip_addr",
+          "authed_token_id",
+          "body"
+        ],
+        "properties": {
+          "authed_token_id": {
+            "type": "string"
+          },
+          "author_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "ip_addr": {
+            "type": "string"
+          },
+          "mail": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ArchivedAdminThread": {
+        "type": "object",
+        "required": [
+          "title",
+          "responses"
+        ],
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivedAdminRes"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ArchivedRes": {
+        "type": "object",
+        "required": [
+          "name",
+          "mail",
+          "date",
+          "body",
+          "is_abone",
+          "order"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "is_abone": {
+            "type": "boolean"
+          },
+          "mail": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "ArchivedResUpdate": {
+        "type": "object",
+        "required": [
+          "res_order",
+          "author_name",
+          "email",
+          "body"
+        ],
+        "properties": {
+          "author_name": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "res_order": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "ArchivedThread": {
+        "type": "object",
+        "required": [
+          "title",
+          "responses"
+        ],
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivedRes"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "Board": {
         "type": "object",
         "required": [

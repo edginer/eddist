@@ -20,7 +20,7 @@ pub trait AdminArchiveRepository: Send + Sync + Clone {
         &self,
         board_key: &str,
         thread_number: u64,
-        update_res_list: &[ResUpdate],
+        update_res_list: &[ArchivedResUpdate],
     ) -> anyhow::Result<()>;
     async fn delete_response(
         &self,
@@ -32,7 +32,7 @@ pub trait AdminArchiveRepository: Send + Sync + Clone {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ResUpdate {
+pub struct ArchivedResUpdate {
     pub res_order: u64,
     pub author_name: String,
     pub email: String,
@@ -133,7 +133,7 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
         &self,
         board_key: &str,
         thread_number: u64,
-        update_res_list: &[ResUpdate],
+        update_res_list: &[ArchivedResUpdate],
     ) -> anyhow::Result<()> {
         let mut a_thread = self.get_thread(board_key, thread_number).await?;
 

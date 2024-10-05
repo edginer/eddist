@@ -16,8 +16,8 @@ use eddist_core::{
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use repository::{
     admin_archive_repository::{
-        AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedAdminThread, ArchivedThread,
-        ResUpdate,
+        AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedAdminRes, ArchivedAdminThread,
+        ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
 };
@@ -161,11 +161,11 @@ async fn main() {
             patch(bbs::update_response),
         )
         .route(
-            "/boards/:boardKey/dat-archives/:threadNumber/",
+            "/boards/:boardKey/dat-archives/:threadNumber",
             get(bbs::get_dat_archived_thread),
         )
         .route(
-            "/boards/:boardKey/admin-dat-archives/:threadNumber/",
+            "/boards/:boardKey/admin-dat-archives/:threadNumber",
             get(bbs::get_admin_dat_archived_thread),
         )
         .route(
@@ -389,13 +389,16 @@ mod bbs {
         response::Response,
         Json,
     };
+    use chrono::{TimeZone, Utc};
     use eddist_core::domain::res::ResView;
+    use serde::{Deserialize, Serialize};
+    use utoipa::IntoParams;
     use uuid::Uuid;
 
     use crate::{
         repository::{
             admin_archive_repository::{
-                AdminArchiveRepository, AdminArchiveRepositoryImpl, ResUpdate as ArchivedResUpdate,
+                AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedResUpdate,
             },
             admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
         },
@@ -490,9 +493,22 @@ mod bbs {
         threads.into()
     }
 
+    #[derive(Debug, Clone, Serialize, Deserialize, IntoParams)]
+    pub struct GetArchivedThreadsQuery {
+        keyword: Option<String>,
+        start: Option<u64>,
+        end: Option<u64>,
+        page: Option<u64>,
+        limit: Option<u64>,
+    }
+
     #[utoipa::path(
         get,
         path = "/boards/{board_key}/archives/",
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            GetArchivedThreadsQuery
+        ),
         responses(
             (status = 200, description = "List threads successfully", body = Vec<Thread>),
         )
@@ -500,10 +516,26 @@ mod bbs {
     pub async fn get_archived_threads(
         State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Path(board_key): Path<String>,
+        Query(GetArchivedThreadsQuery {
+            keyword,
+            start,
+            end,
+            page,
+            limit,
+        }): Query<GetArchivedThreadsQuery>,
     ) -> Json<Vec<Thread>> {
         let threads = state
             .admin_bbs_repo
-            .get_archived_threads_by_thread_id(&board_key, None)
+            .get_archived_threads_by_filter(
+                &board_key,
+                keyword.as_deref(),
+                (
+                    start.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
+                    end.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
+                ),
+                if let Some(page) = page { page } else { 0 },
+                if let Some(limit) = limit { limit } else { 20 },
+            )
             .await
             .unwrap();
 
@@ -803,7 +835,7 @@ mod bbs {
 
     #[utoipa::path(
         delete,
-        path = "/boards/{board_key}/threads/{thread_number}/responses/{res_order}/",
+        path = "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/",
         responses(
             (status = 200, description = "Delete response successfully"),
         ),
@@ -836,7 +868,7 @@ mod bbs {
 
     #[utoipa::path(
         delete,
-        path = "/boards/{board_key}/threads/{thread_number}/",
+        path = "/boards/{board_key}/dat-archives/{thread_number}/",
         responses(
             (status = 200, description = "Delete thread successfully"),
         ),
@@ -1030,7 +1062,9 @@ mod bbs {
         Res,
         ArchivedThread,
         ArchivedAdminThread,
-        ResUpdate,
+        ArchivedRes,
+        ArchivedAdminRes,
+        ArchivedResUpdate,
         ClientInfo,
         Tinker,
         UpdateResInput,

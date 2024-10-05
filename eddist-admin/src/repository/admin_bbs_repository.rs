@@ -7,8 +7,6 @@ use uuid::Uuid;
 
 use crate::{Board, CreateBoardInput, NgWord, Res, Thread};
 
-// use crate::graphql::{Board, Res, Thread};
-
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {
     async fn get_boards_by_key(&self, keys: Option<Vec<String>>) -> anyhow::Result<Vec<Board>>;
@@ -22,6 +20,15 @@ pub trait AdminBbsRepository: Send + Sync {
         board_key: &str,
         thread_numbers: Option<Vec<u64>>,
     ) -> anyhow::Result<Vec<Thread>>;
+    async fn get_archived_threads_by_filter(
+        &self,
+        board_key: &str,
+        keyword: Option<&str>,
+        range: (Option<chrono::DateTime<Utc>>, Option<chrono::DateTime<Utc>>),
+        page: u64,
+        limit: u64, // <= 100
+    ) -> anyhow::Result<Vec<Thread>>;
+
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board>;
 
     async fn get_reses_by_thread_id(
@@ -518,7 +525,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                     SELECT
                         id
                     FROM
-                        threads
+                        archived_threads
                     WHERE
                         board_id = (
                         SELECT
@@ -556,6 +563,77 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 is_abone: res.is_abone != 0,
                 client_info: res.client_info.0.into(),
                 res_order: res.res_order,
+            })
+            .collect())
+    }
+
+    async fn get_archived_threads_by_filter(
+        &self,
+        board_key: &str,
+        keyword: Option<&str>,
+        range: (Option<chrono::DateTime<Utc>>, Option<chrono::DateTime<Utc>>),
+        page: u64,
+        limit: u64, // <= 100
+    ) -> anyhow::Result<Vec<Thread>> {
+        let pool = &self.0;
+
+        let mut query = format!(
+            r#"
+            SELECT
+                *
+            FROM
+                archived_threads
+            WHERE
+                board_id = (
+                    SELECT
+                        id
+                    FROM
+                        boards
+                    WHERE
+                        board_key = ?
+                )
+            "#
+        );
+
+        if keyword.is_some() {
+            query.push_str("AND title LIKE ? ");
+        }
+
+        if matches!(range, (Some(_), Some(_))) {
+            query.push_str("AND last_modified_at BETWEEN ? AND ? ");
+        }
+
+        query.push_str("ORDER BY last_modified_at DESC ");
+        query.push_str("LIMIT ? OFFSET ?");
+
+        let mut query = sqlx::query_as::<_, SelectionThread>(&query);
+
+        query = query.bind(board_key);
+        if let Some(keyword) = keyword {
+            query = query.bind(format!("%{}%", keyword));
+        }
+        if let (Some(start), Some(end)) = range {
+            query = query.bind(start).bind(end);
+        }
+        query = query.bind(limit).bind(page * limit);
+
+        let selected_threads = query.fetch_all(pool).await?;
+
+        Ok(selected_threads
+            .into_iter()
+            .map(|thread| Thread {
+                id: Uuid::from_slice(&thread.id).unwrap(),
+                board_id: Uuid::from_slice(&thread.board_id).unwrap(),
+                thread_number: thread.thread_number as u64,
+                last_modified: thread.last_modified_at,
+                sage_last_modified: thread.sage_last_modified_at,
+                title: thread.title,
+                authed_token_id: Uuid::from_slice(&thread.authed_token_id).unwrap(),
+                metadent: thread.metadent,
+                response_count: thread.response_count as u32,
+                no_pool: thread.no_pool,
+                archived: thread.archived,
+                active: thread.active,
             })
             .collect())
     }
@@ -757,6 +835,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
 
         Ok(())
     }
+
     async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<()> {
         let query = query!(
             r#"

@@ -2,7 +2,7 @@ import ThreadList from "../components/ThreadList";
 import { Link, useParams } from "@remix-run/react";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
-import { getBoard, getThreads } from "../hooks/queries";
+import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
 
 type TabKeys = "threads" | "settings";
 
@@ -21,6 +21,14 @@ const Page = () => {
   });
 
   const { data: threads } = getThreads({
+    params: {
+      path: {
+        board_key: params.boardKey,
+      },
+    },
+  });
+
+  const { data: archivedThreads } = getArchivedThreads({
     params: {
       path: {
         board_key: params.boardKey,
@@ -64,6 +72,31 @@ const Page = () => {
                     boardKey: params.boardKey,
                     boardName: board!.name,
                   }}
+                />
+              </div>
+            ),
+          },
+          {
+            tabKey: "archived-threads",
+            tabLabel: "Archives",
+            id: "archived-threads-tab",
+            children: (
+              <div className="p-2">
+                <ThreadList
+                  threads={
+                    archivedThreads!.map((x) => ({
+                      threadNumber: Number(x.thread_number),
+                      title: x.title,
+                      responseCount: Number(x.response_count),
+                      lastModified: x.last_modified,
+                      boardId: Number(board!.id),
+                    })) ?? []
+                  }
+                  board={{
+                    boardKey: params.boardKey,
+                    boardName: board!.name,
+                  }}
+                  archives
                 />
               </div>
             ),

@@ -184,6 +184,54 @@ export const getArchivedResponses = ({
   });
 };
 
+const GET_DAT_ARCHIVED_THREAD =
+  "/boards/{board_key}/dat-archives/{thread_number}/";
+
+export const getDatArcvhiedThread = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_DAT_ARCHIVED_THREAD]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [
+      GET_DAT_ARCHIVED_THREAD,
+      params.path.board_key,
+      params.path.thread_number,
+    ],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_DAT_ARCHIVED_THREAD, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const GET_DAT_ADMIN_ARCHIVED_THREAD =
+  "/boards/{board_key}/admin-dat-archives/{thread_number}/";
+
+export const getDatAdminArchivedThread = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_DAT_ADMIN_ARCHIVED_THREAD]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [
+      GET_DAT_ADMIN_ARCHIVED_THREAD,
+      params.path.board_key,
+      params.path.thread_number,
+    ],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_DAT_ADMIN_ARCHIVED_THREAD, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
 const DELETE_AUTHED_TOKEN = "/authed_tokens/{authed_token_id}/";
 
 export const deleteAuthedToken = ({
@@ -209,6 +257,50 @@ export const updateResponse = ({
     await client.PATCH(UPDATE_RESPONSE, {
       params,
       body,
+    });
+  };
+  return { mutate };
+};
+
+const UPDATE_DAT_ARCHIVED_RESPONSE =
+  "/boards/{board_key}/dat-archives/{thread_number}/responses/";
+
+export const updateDatArchivedResponse = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_DAT_ARCHIVED_RESPONSE]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_DAT_ARCHIVED_RESPONSE, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_DAT_ARCHIVED_RESPONSE =
+  "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/";
+
+export const deleteDatArchivedResponse = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_DAT_ARCHIVED_RESPONSE]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_DAT_ARCHIVED_RESPONSE, {
+      params,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_DAT_ARCHIVED_THREAD =
+  "/boards/{board_key}/dat-archives/{thread_number}/";
+
+export const deleteDatArchivedThread = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_DAT_ARCHIVED_THREAD]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_DAT_ARCHIVED_THREAD, {
+      params,
     });
   };
   return { mutate };

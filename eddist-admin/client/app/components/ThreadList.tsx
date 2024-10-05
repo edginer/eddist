@@ -16,13 +16,13 @@ interface Thread {
 interface ThreadListProps {
   threads: Thread[];
   board: Board;
-  //   archives?: boolean;
+  archives?: boolean;
 }
 
 const ThreadList: React.FC<ThreadListProps> = ({
   threads,
   board,
-  //   archives: isArchives,
+  archives: isArchives,
 }) => {
   return (
     <div className="rounded border border-black divide-y divide-black">
@@ -31,8 +31,7 @@ const ThreadList: React.FC<ThreadListProps> = ({
           <input type="checkbox" className="mr-2" />
           <Link
             to={`/dashboard/boards/${board.boardKey}/${
-              //   isArchives ? "archives" :
-              "threads"
+              isArchives ? "archives" : "threads"
             }/${thread.threadNumber}`}
             className="text-blue-500 hover:underline cursor-pointer"
           >

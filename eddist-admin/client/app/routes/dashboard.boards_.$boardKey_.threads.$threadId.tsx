@@ -11,6 +11,7 @@ import {
   getThread,
   updateResponse,
 } from "~/hooks/queries";
+import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
 
 export interface ResInput {
   author_name?: string;
@@ -22,7 +23,7 @@ export interface ResInput {
 
 export interface Res {
   id: string;
-  autor_name?: string | null;
+  author_name?: string | null;
   mail?: string | null;
   body: string;
   created_at: string;
@@ -95,28 +96,7 @@ const Page = () => {
     },
     [refetch, params.boardKey, params.threadId]
   );
-  const deleteAuthedCookie = useCallback(
-    async (token: string, deleteAllSameOriginIp: boolean) => {
-      try {
-        const { mutate } = deleteAuthedToken({
-          params: {
-            path: {
-              authed_token_id: token,
-            },
-            query: {
-              using_origin_ip: deleteAllSameOriginIp,
-            },
-          },
-        });
-        await mutate();
-        toast.success(`Successfully deleted authed token`);
-      } catch (error) {
-        toast.error(`Failed to delete authed token`);
-        return error;
-      }
-    },
-    []
-  );
+  const deleteAuthedCookie = useDeleteAuthedToken();
 
   return (
     <>

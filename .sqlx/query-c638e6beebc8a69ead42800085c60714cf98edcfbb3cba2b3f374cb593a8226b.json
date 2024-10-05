@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                archived_responses\n            WHERE\n                thread_id = (\n                    SELECT\n                        id\n                    FROM\n                        threads\n                    WHERE\n                        board_id = (\n                        SELECT\n                            id\n                        FROM\n                            boards\n                        WHERE\n                            board_key = ?\n                        )\n                    AND\n                        thread_number = ?\n                )\n            ORDER BY\n                res_order ASC\n            ",
+  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                archived_responses\n            WHERE\n                thread_id = (\n                    SELECT\n                        id\n                    FROM\n                        archived_threads\n                    WHERE\n                        board_id = (\n                        SELECT\n                            id\n                        FROM\n                            boards\n                        WHERE\n                            board_key = ?\n                        )\n                    AND\n                        thread_number = ?\n                )\n            ORDER BY\n                res_order ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -140,5 +140,5 @@
       false
     ]
   },
-  "hash": "c1ecc463258e6ee512176bddede51bfc53f0b9fb5f88570568446de870dffe40"
+  "hash": "c638e6beebc8a69ead42800085c60714cf98edcfbb3cba2b3f374cb593a8226b"
 }

@@ -1,4 +1,3 @@
-// import { Res } from "@/gql/graphql";
 import { Dropdown } from "flowbite-react";
 import React from "react";
 import {
@@ -8,12 +7,12 @@ import {
 
 interface Props {
   responses: Res[];
-  selectedResponses: ResInput[];
-  setSelectedResponses: React.Dispatch<React.SetStateAction<ResInput[]>>;
-  onClickAbon: (responseId: string) => void;
+  selectedResponses?: ResInput[];
+  setSelectedResponses?: React.Dispatch<React.SetStateAction<ResInput[]>>;
+  onClickAbon?: (responseId: string) => void;
   onClickDeleteAuthedToken: (authedToken: string) => void;
   onClickDeleteAuthedTokensAssociatedWithIp: (authedToken: string) => void;
-  onClickEditResponse: (response: ResInput) => void;
+  onClickEditResponse?: (response: ResInput) => void;
 }
 
 const ResponseList = ({
@@ -28,30 +27,32 @@ const ResponseList = ({
   return responses.map((response, idx) => (
     <div key={response.id} className="bg-gray-200 p-4 rounded-lg mb-4">
       <div className="flex items-center mb-2 border-b">
-        <input
-          type="checkbox"
-          className="mr-2"
-          id={`${response.id}`}
-          onClick={() => {
-            if (selectedResponses.find((r) => r.id === response.id) != null) {
-              setSelectedResponses((s) =>
-                s.filter((res) => res.id !== response.id)
-              );
-            } else {
-              setSelectedResponses((s) => [
-                ...s,
-                {
-                  author_name: response.autor_name ?? undefined,
-                  mail: response.mail ?? undefined,
-                  body: response.body,
-                  id: response.id,
-                },
-              ]);
-            }
-          }}
-        />
+        {selectedResponses && setSelectedResponses && (
+          <input
+            type="checkbox"
+            className="mr-2"
+            id={`${response.id}`}
+            onClick={() => {
+              if (selectedResponses.find((r) => r.id === response.id) != null) {
+                setSelectedResponses((s) =>
+                  s.filter((res) => res.id !== response.id)
+                );
+              } else {
+                setSelectedResponses((s) => [
+                  ...s,
+                  {
+                    author_name: response.author_name ?? undefined,
+                    mail: response.mail ?? undefined,
+                    body: response.body,
+                    id: response.id,
+                  },
+                ]);
+              }
+            }}
+          />
+        )}
         <span className="font-bold mr-2">{idx + 1}</span>
-        <span className="mr-2">{response.autor_name}</span>
+        <span className="mr-2">{response.author_name}</span>
         <span className="text-gray-500 mr-2">{response.mail}</span>
         <span className="text-gray-500 mr-2">{response.created_at}</span>
         <span className="text-gray-500 flex-grow">ID:{response.author_id}</span>
@@ -71,13 +72,15 @@ const ResponseList = ({
             }
             inline
           >
-            <Dropdown.Item
-              onClick={() => {
-                onClickAbon(response.id);
-              }}
-            >
-              Delete Response (Abon)
-            </Dropdown.Item>
+            {onClickAbon && (
+              <Dropdown.Item
+                onClick={() => {
+                  onClickAbon(response.id);
+                }}
+              >
+                Delete Response (Abon)
+              </Dropdown.Item>
+            )}
             <Dropdown.Item
               disabled={response.authed_token_id == null}
               onClick={() => {
@@ -97,18 +100,20 @@ const ResponseList = ({
               Delete authed token associated with writing origin ip of authed
               token
             </Dropdown.Item>
-            <Dropdown.Item
-              onClick={() => {
-                onClickEditResponse({
-                  author_name: response.autor_name ?? undefined,
-                  mail: response.mail ?? undefined,
-                  body: response.body,
-                  id: response.id,
-                });
-              }}
-            >
-              Edit response
-            </Dropdown.Item>
+            {onClickEditResponse && (
+              <Dropdown.Item
+                onClick={() => {
+                  onClickEditResponse({
+                    author_name: response.author_name ?? undefined,
+                    mail: response.mail ?? undefined,
+                    body: response.body,
+                    id: response.id,
+                  });
+                }}
+              >
+                Edit response
+              </Dropdown.Item>
+            )}
           </Dropdown>
         </div>
       </div>
