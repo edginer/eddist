@@ -159,7 +159,7 @@ impl Res<AuthorIdUninitialized> {
             } else if body.contains("!metadent:vvv:") {
                 (
                     Cow::Owned(body.replacen("!metadent:vvv:", "!metadent:vvv - configured", 1)),
-                    MetadentType::VVerbose,
+                    MetadentType::VVVerbose,
                 )
             } else {
                 (body, MetadentType::None)

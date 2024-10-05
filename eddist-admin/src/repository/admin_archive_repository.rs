@@ -3,6 +3,7 @@ use core::str;
 use eddist_core::domain::sjis_str::SJisStr;
 use s3::Bucket;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub trait AdminArchiveRepository: Send + Sync + Clone {
     async fn get_thread(
@@ -30,7 +31,7 @@ pub trait AdminArchiveRepository: Send + Sync + Clone {
     async fn delete_thread(&self, board_key: &str, thread_number: u64) -> anyhow::Result<()>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ResUpdate {
     pub res_order: u64,
     pub author_name: String,
@@ -47,7 +48,7 @@ impl AdminArchiveRepositoryImpl {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ArchivedRes {
     pub name: String,
     pub mail: String,
@@ -58,7 +59,7 @@ pub struct ArchivedRes {
     pub order: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ArchivedAdminRes {
     pub name: String,
     pub mail: String,
@@ -69,13 +70,13 @@ pub struct ArchivedAdminRes {
     pub body: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ArchivedThread {
     pub title: String,
     pub responses: Vec<ArchivedRes>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ArchivedAdminThread {
     pub title: String,
     pub responses: Vec<ArchivedAdminRes>,
@@ -245,7 +246,7 @@ fn convert_admin_dat_file_to_res(dat_file: &str) -> ArchivedAdminThread {
 
     let responses = dat_file
         .lines()
-        .filter_map(|(line)| {
+        .filter_map(|line| {
             let split = line.split("<>").collect::<Vec<_>>();
             if split.len() < 6 {
                 return None;

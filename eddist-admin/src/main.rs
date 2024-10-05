@@ -15,7 +15,10 @@ use eddist_core::{
 };
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 use repository::{
-    admin_archive_repository::{AdminArchiveRepository, AdminArchiveRepositoryImpl},
+    admin_archive_repository::{
+        AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedAdminThread, ArchivedThread,
+        ResUpdate,
+    },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
 };
 use s3::creds::Credentials;
@@ -156,6 +159,26 @@ async fn main() {
         .route(
             "/boards/:boardKey/threads/:threadId/responses/:resId",
             patch(bbs::update_response),
+        )
+        .route(
+            "/boards/:boardKey/dat-archives/:threadNumber/",
+            get(bbs::get_dat_archived_thread),
+        )
+        .route(
+            "/boards/:boardKey/admin-dat-archives/:threadNumber/",
+            get(bbs::get_admin_dat_archived_thread),
+        )
+        .route(
+            "/boards/:boardKey/dat-archives/:threadNumber/responses",
+            patch(bbs::update_archived_res),
+        )
+        .route(
+            "/boards/:boardKey/dat-archives/:threadNumber/responses/:resOrder",
+            delete(bbs::delete_archived_res),
+        )
+        .route(
+            "/boards/:boardKey/dat-archives/:threadNumber",
+            delete(bbs::delete_archived_thread),
         )
         .route(
             "/authed_tokens/:authedTokenId",
@@ -371,7 +394,9 @@ mod bbs {
 
     use crate::{
         repository::{
-            admin_archive_repository::AdminArchiveRepositoryImpl,
+            admin_archive_repository::{
+                AdminArchiveRepository, AdminArchiveRepositoryImpl, ResUpdate as ArchivedResUpdate,
+            },
             admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
         },
         AppState, Board, CreateBoardInput, CreationNgWordInput, DeleteAuthedTokenInput, NgWord,
@@ -604,6 +629,68 @@ mod bbs {
     }
 
     #[utoipa::path(
+        get,
+        path = "/boards/{board_key}/dat-archives/{thread_number}/",
+        responses(
+            (status = 200, description = "Get archived thread successfully", body = ArchivedThread),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_number" = u64, Path, description = "Thread ID"),
+        )
+    )]
+    pub async fn get_dat_archived_thread(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path((board_key, thread_number)): Path<(String, u64)>,
+    ) -> Response {
+        match state
+            .admin_archive_repo
+            .get_thread(&board_key, thread_number)
+            .await
+        {
+            Ok(thread) => Response::builder()
+                .status(200)
+                .body(serde_json::to_string(&thread).unwrap().into())
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(500)
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        }
+    }
+
+    #[utoipa::path(
+        get,
+        path = "/boards/{board_key}/admin-dat-archives/{thread_number}/",
+        responses(
+            (status = 200, description = "Get archived thread successfully", body = ArchivedAdminThread),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_number" = u64, Path, description = "Thread ID"),
+        )
+    )]
+    pub async fn get_admin_dat_archived_thread(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path((board_key, thread_number)): Path<(String, u64)>,
+    ) -> Response {
+        match state
+            .admin_archive_repo
+            .get_archived_admin_thread(&board_key, thread_number)
+            .await
+        {
+            Ok(thread) => Response::builder()
+                .status(200)
+                .body(serde_json::to_string(&thread).unwrap().into())
+                .unwrap(),
+            Err(_) => Response::builder()
+                .status(500)
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        }
+    }
+
+    #[utoipa::path(
         patch,
         path = "/boards/{board_key}/threads/{thread_id}/responses/{res_id}/",
         responses(
@@ -678,6 +765,105 @@ mod bbs {
             .status(200)
             .body(serde_json::to_string(&updated_res).unwrap().into())
             .unwrap()
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/boards/{board_key}/dat-archives/{thread_number}/responses/",
+        responses(
+            (status = 200, description = "Update archived response successfully", body = ()),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_number" = u64, Path, description = "Thread ID"),
+        ),
+        request_body = Vec<ArchivedResUpdate>,
+    )]
+    pub async fn update_archived_res(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path((board_key, thread_number)): Path<(String, u64)>,
+        Json(body): Json<Vec<ArchivedResUpdate>>,
+    ) -> Response {
+        if let Err(e) = state
+            .admin_archive_repo
+            .update_response(&board_key, thread_number, &body)
+            .await
+        {
+            Response::builder()
+                .status(500)
+                .body(e.to_string().into())
+                .unwrap()
+        } else {
+            Response::builder()
+                .status(200)
+                .body(axum::body::Body::empty())
+                .unwrap()
+        }
+    }
+
+    #[utoipa::path(
+        delete,
+        path = "/boards/{board_key}/threads/{thread_number}/responses/{res_order}/",
+        responses(
+            (status = 200, description = "Delete response successfully"),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_number" = u64, Path, description = "Thread ID"),
+            ("res_order" = u64, Path, description = "Response order"),
+        ),
+    )]
+    pub async fn delete_archived_res(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path((board_key, thread_number, res_order)): Path<(String, u64, u64)>,
+    ) -> Response {
+        if let Err(e) = state
+            .admin_archive_repo
+            .delete_response(&board_key, thread_number, res_order)
+            .await
+        {
+            Response::builder()
+                .status(500)
+                .body(e.to_string().into())
+                .unwrap()
+        } else {
+            Response::builder()
+                .status(200)
+                .body(axum::body::Body::empty())
+                .unwrap()
+        }
+    }
+
+    #[utoipa::path(
+        delete,
+        path = "/boards/{board_key}/threads/{thread_number}/",
+        responses(
+            (status = 200, description = "Delete thread successfully"),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+            ("thread_number" = u64, Path, description = "Thread ID"),
+        ),
+    )]
+    pub async fn delete_archived_thread(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path((board_key, thread_number)): Path<(String, u64)>,
+    ) -> Response {
+        if let Err(e) = state
+            .admin_archive_repo
+            .delete_thread(&board_key, thread_number)
+            .await
+        {
+            Response::builder()
+                .status(500)
+                .body(e.to_string().into())
+                .unwrap()
+        } else {
+            Response::builder()
+                .status(200)
+                .body(axum::body::Body::empty())
+                .unwrap()
+        }
     }
 
     #[utoipa::path(
@@ -826,7 +1012,12 @@ mod bbs {
         bbs::get_archived_threads,
         bbs::get_archived_thread,
         bbs::get_archived_responses,
+        bbs::get_dat_archived_thread,
+        bbs::get_admin_dat_archived_thread,
         bbs::update_response,
+        bbs::update_archived_res,
+        bbs::delete_archived_res,
+        bbs::delete_archived_thread,
         bbs::delete_authed_token,
         bbs::get_ng_words,
         bbs::create_ng_word,
@@ -837,6 +1028,9 @@ mod bbs {
         Board,
         Thread,
         Res,
+        ArchivedThread,
+        ArchivedAdminThread,
+        ResUpdate,
         ClientInfo,
         Tinker,
         UpdateResInput,
