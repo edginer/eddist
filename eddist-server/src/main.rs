@@ -572,7 +572,7 @@ async fn post_bbs_cgi(
     let ua = get_ua(&headers);
     let asn_num = get_asn_num(&headers);
     let tinker = jar
-        .get("tinker")
+        .get("tinker-token")
         .and_then(|x| get_tinker(x.value(), state.tinker_secret()));
     let edge_token = jar.get("edge-token").map(|x| x.value().to_string());
 
@@ -682,7 +682,7 @@ async fn post_bbs_cgi(
     ))
     .content_type(SjisContentType::TextHtml)
     .add_set_cookie(
-        "tinker".to_string(),
+        "tinker-token".to_string(),
         jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
             &tinker,
