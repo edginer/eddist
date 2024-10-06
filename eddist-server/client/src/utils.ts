@@ -98,40 +98,7 @@ export const postResponse = async ({
       params.key,
   });
 
-  const bytes = await res.arrayBuffer();
-  const text = convertToUtf8Text(bytes);
-
-  if (!res.ok) {
-    if (text.includes("error_code")) {
-      const doc = new DOMParser().parseFromString(text, "text/html");
-      return {
-        success: false,
-        error: {
-          kind: "unknown",
-          errorHtml: doc.body.innerHTML,
-        },
-      };
-    }
-    throw new Error(`Failed to post a response: ${res.statusText}`);
-  }
-
-  if (text.includes("error_code")) {
-    if (text.includes("E-Unauthenticated")) {
-      const authCode = extractAuthCodeWhenUnauthenticated(text);
-      return { success: false, error: { kind: "auth-code", authCode } };
-    } else {
-      const doc = new DOMParser().parseFromString(text, "text/html");
-      return {
-        success: false,
-        error: {
-          kind: "unknown",
-          errorHtml: doc.body.innerHTML,
-        },
-      };
-    }
-  }
-
-  return { success: true };
+  return await afterPost(res);
 };
 
 export const postThread = async ({
@@ -169,11 +136,28 @@ export const postThread = async ({
       "&subject=" +
       params.subject,
   });
+
+  return await afterPost(res);
+};
+
+const afterPost = async (res: Response): Promise<PostResponseResult> => {
+  const bytes = await res.arrayBuffer();
+  const text = convertToUtf8Text(bytes);
+
   if (!res.ok) {
+    if (text.includes("error_code")) {
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      return {
+        success: false,
+        error: {
+          kind: "unknown",
+          errorHtml: doc.body.innerHTML,
+        },
+      };
+    }
     throw new Error(`Failed to post a response: ${res.statusText}`);
   }
 
-  const text = await res.text();
   if (text.includes("error_code")) {
     if (text.includes("E-Unauthenticated")) {
       const authCode = extractAuthCodeWhenUnauthenticated(text);
