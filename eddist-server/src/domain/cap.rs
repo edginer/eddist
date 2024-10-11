@@ -12,6 +12,7 @@ pub struct Cap {
 }
 
 pub fn calculate_cap_hash(password: &str, salt: &str) -> String {
+    let salt = salt.trim();
     let stretch_count = 3;
     let mut hash = format!("{password}{salt}");
     for i in 0..stretch_count {
@@ -23,5 +24,5 @@ pub fn calculate_cap_hash(password: &str, salt: &str) -> String {
             _ => unreachable!(),
         };
     }
-    hash
+    format!("{:x}", sha3::Sha3_512::digest(hash.as_bytes()))
 }
