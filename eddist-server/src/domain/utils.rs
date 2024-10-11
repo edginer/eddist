@@ -22,7 +22,6 @@ impl Debug for SimpleSecret {
 
 pub fn sanitize_base(input: &str, is_body: bool) -> String {
     input
-        .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
