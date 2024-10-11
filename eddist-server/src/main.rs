@@ -559,17 +559,55 @@ async fn post_auth_code(
                         .unwrap(),
                 );
             } else {
-                log::error!("Failed to issue authed token: {e:?}");
+                let reason = e.to_string();
+                match &reason as &str {
+                    "failed to find authed token" => {
+                        return Html(
+                            state
+                                .template_engine
+                                .render(
+                                    "auth-code.post.failed",
+                                    &json!({ "reason": "書き込み時のIPアドレスと異なるか、入力した6桁の数字が誤りです" }),
+                                )
+                                .unwrap(),
+                        );
+                    }
+                    "authed token is already valid" => {
+                        return Html(
+                            state
+                                .template_engine
+                                .render(
+                                    "auth-code.post.failed",
+                                    &json!({ "reason": "既に認証済みです" }),
+                                )
+                                .unwrap(),
+                        );
+                    }
+                    "activation code is expired" => {
+                        return Html(
+                            state
+                                .template_engine
+                                .render(
+                                    "auth-code.post.failed",
+                                    &json!({ "reason": "認証コードの有効期限が切れています。再度認証してください" }),
+                                )
+                                .unwrap(),
+                        );
+                    }
+                    _ => {
+                        log::error!("Failed to issue authed token: {e:?}");
 
-                return Html(
-                    state
-                        .template_engine
-                        .render(
-                            "auth-code.post.failed",
-                            &json!({ "reason": "不明な理由です" }),
-                        )
-                        .unwrap(),
-                );
+                        return Html(
+                            state
+                                .template_engine
+                                .render(
+                                    "auth-code.post.failed",
+                                    &json!({ "reason": "不明な理由です（認証に失敗した可能性があります）" }),
+                                )
+                                .unwrap(),
+                        );
+                    }
+                }
             }
         }
     };
