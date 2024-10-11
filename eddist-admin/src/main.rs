@@ -47,8 +47,20 @@ pub(crate) mod repository {
 }
 pub(crate) mod role;
 
-async fn add_cors_header(req: Request<Body>, next: Next) -> Response {
+async fn add_some_header(req: Request<Body>, next: Next) -> Response {
     let mut res = next.run(req).await;
+
+    // Cache-Control: private
+    res.headers_mut()
+        .insert("Cache-Control", HeaderValue::from_static("private"));
+
+    // if local env
+    if matches!(
+        std::env::var("RUST_ENV").as_deref(),
+        Ok("prod" | "production")
+    ) {
+        return res;
+    }
     res.headers_mut()
         .insert("Access-Control-Allow-Origin", HeaderValue::from_static("*"));
     res.headers_mut().insert(
@@ -180,6 +192,7 @@ async fn main() {
             "/boards/:boardKey/dat-archives/:threadNumber",
             delete(bbs::delete_archived_thread),
         )
+        .route("/authed_tokens/:authedTokenId", get(bbs::get_authed_token))
         .route(
             "/authed_tokens/:authedTokenId",
             delete(bbs::delete_authed_token),
@@ -232,7 +245,7 @@ async fn main() {
                 )
             }),
         )
-        .layer(axum::middleware::from_fn(add_cors_header))
+        .layer(axum::middleware::from_fn(add_some_header))
         .layer(session_layer)
         .with_state(state.clone());
 
@@ -242,6 +255,20 @@ async fn main() {
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .await
         .unwrap();
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct AuthedToken {
+    id: Uuid,
+    token: String,
+    origin_ip: String,
+    reduced_origin_ip: String,
+    writing_ua: String,
+    authed_ua: Option<String>,
+    created_at: chrono::NaiveDateTime,
+    authed_at: Option<chrono::NaiveDateTime>,
+    validity: bool,
+    last_wrote_at: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -899,6 +926,32 @@ mod bbs {
     }
 
     #[utoipa::path(
+        get,
+        path = "/authed_tokens/{authed_token_id}/",
+        responses(
+            (status = 200, description = "Get authed token successfully", body = AuthedToken),
+        ),
+        params(
+            ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
+        ),
+    )]
+    pub async fn get_authed_token(
+        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        Path(authed_token_id): Path<Uuid>,
+    ) -> Response {
+        let authed_token = state
+            .admin_bbs_repo
+            .get_authed_token(authed_token_id)
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&authed_token).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
         delete,
         path = "/authed_tokens/{authed_token_id}/",
         responses(
@@ -1050,6 +1103,7 @@ mod bbs {
         bbs::update_archived_res,
         bbs::delete_archived_res,
         bbs::delete_archived_thread,
+        bbs::get_authed_token,
         bbs::delete_authed_token,
         bbs::get_ng_words,
         bbs::create_ng_word,
@@ -1068,6 +1122,7 @@ mod bbs {
         ClientInfo,
         Tinker,
         UpdateResInput,
+        AuthedToken,
         NgWord,
         CreationNgWordInput,
         UpdateNgWordInput,

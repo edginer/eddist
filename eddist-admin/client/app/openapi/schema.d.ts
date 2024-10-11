@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_authed_token"];
         put?: never;
         post?: never;
         delete: operations["delete_authed_token"];
@@ -298,6 +298,22 @@ export interface components {
             responses: components["schemas"]["ArchivedRes"][];
             title: string;
         };
+        AuthedToken: {
+            /** Format: date-time */
+            authed_at?: string | null;
+            authed_ua?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            last_wrote_at?: string | null;
+            origin_ip: string;
+            reduced_origin_ip: string;
+            token: string;
+            validity: boolean;
+            writing_ua: string;
+        };
         Board: {
             board_key: string;
             default_name: string;
@@ -421,6 +437,29 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_authed_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Authed token ID */
+                authed_token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get authed token successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthedToken"];
+                };
+            };
+        };
+    };
     delete_authed_token: {
         parameters: {
             query: {

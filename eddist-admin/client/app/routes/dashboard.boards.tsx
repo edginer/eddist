@@ -2,7 +2,6 @@ import { FaPlus } from "react-icons/fa";
 import BoardItem from "../components/BoardItem";
 import { getBoards } from "~/hooks/queries";
 import { useState } from "react";
-import { Button, Label, Modal, TextInput } from "flowbite-react";
 import CreateBoardModal from "~/components/CreateBoardModal";
 
 function Page() {

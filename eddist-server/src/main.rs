@@ -520,7 +520,11 @@ async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
         .render("auth-code.get", &serde_json::json!(site_keys))
         .unwrap();
 
-    Html(html)
+    let mut resp = Html(html).into_response();
+    let headers = resp.headers_mut();
+    headers.insert("Cache-Control", "private".parse().unwrap());
+
+    resp
 }
 
 async fn post_auth_code(

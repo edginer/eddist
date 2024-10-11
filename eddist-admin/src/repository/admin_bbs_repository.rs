@@ -5,7 +5,7 @@ use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{query, query_as, types::Json, Executor, FromRow, MySqlPool};
 use uuid::Uuid;
 
-use crate::{Board, CreateBoardInput, NgWord, Res, Thread};
+use crate::{AuthedToken, Board, CreateBoardInput, NgWord, Res, Thread};
 
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {
@@ -55,6 +55,7 @@ pub trait AdminBbsRepository: Send + Sync {
         is_abone: Option<bool>,
     ) -> anyhow::Result<Res>;
 
+    async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken>;
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()>;
     async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<()>;
 
@@ -816,6 +817,34 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             client_info: res.client_info.0.into(),
             res_order: res.res_order,
         })
+    }
+
+    async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken> {
+        let query = query_as!(
+            AuthedToken,
+            r#"
+            SELECT
+                id AS "id!: Uuid",
+                token,
+                origin_ip,
+                reduced_origin_ip,
+                writing_ua,
+                authed_ua,
+                created_at,
+                authed_at,
+                validity AS "validity!: bool",
+                last_wrote_at
+            FROM
+                authed_tokens
+            WHERE
+                id = ?
+            "#,
+            id.as_bytes().to_vec(),
+        );
+
+        let authed_token = query.fetch_one(&self.0).await?;
+
+        Ok(authed_token)
     }
 
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()> {

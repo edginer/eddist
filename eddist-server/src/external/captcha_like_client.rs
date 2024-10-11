@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use eddist_core::domain::ip_addr::ReducedIpAddr;
+use eddist_core::{domain::ip_addr::ReducedIpAddr, utils::is_prod};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
@@ -183,7 +183,7 @@ impl CaptchaClient for MonocleClient {
         Ok(if matches!(resp.anon, Some(true)) {
             log::info!("Monocle response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess)
-        } else if !verify_ip(resp.ip.as_deref(), resp.ipv6.as_deref()) {
+        } else if !verify_ip(resp.ip.as_deref(), resp.ipv6.as_deref()) && is_prod() {
             log::info!("Monocle response: {resp:?}");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)
         } else {

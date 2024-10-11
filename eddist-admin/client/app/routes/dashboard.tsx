@@ -2,9 +2,11 @@ import React, { Suspense, useState } from "react";
 import { IoMdMenu } from "react-icons/io";
 import { twMerge } from "tailwind-merge";
 import { Spinner } from "flowbite-react";
-import { Link, Outlet } from "@remix-run/react";
+import { Link, Outlet, useLocation } from "@remix-run/react";
 
 const Layout: React.FC = () => {
+  const location = useLocation();
+
   const [isNavbarOpen, setIsNavbarOpen] = useState(false);
   return (
     <div className="flex h-screen flex-col sm:flex-row">
@@ -14,7 +16,7 @@ const Layout: React.FC = () => {
             to="/dashboard"
             className="text-white text-2xl mx-2 font-semibold"
           >
-            Dashboard
+            Eddist Dashboard
           </Link>
         </div>
         <nav className="mt-10">
@@ -94,6 +96,25 @@ const Layout: React.FC = () => {
             </svg>
             <span className="mx-4 font-medium">Global</span>
           </Link>
+          <Link
+            to="/dashboard/authed-token"
+            className="flex items-center py-2 px-8 text-gray-400 hover:bg-gray-700"
+          >
+            <svg
+              className="h-6 w-6 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+            <span className="mx-4 font-medium">Authed Token</span>
+          </Link>
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -149,6 +170,14 @@ const Layout: React.FC = () => {
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Global
+                </Link>
+              </li>
+              <li className="pl-2 border-slate-400">
+                <Link
+                  to="/dashboard/authed-token"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
+                  Authed Token
                 </Link>
               </li>
             </ul>

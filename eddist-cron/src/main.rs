@@ -148,15 +148,24 @@ async fn main() {
                         admin_dat.append(&mut admin_res.get_inner());
                     }
 
+                    // TODO: sjis to utf-8 workarounds for now
+                    let admin_dat = encoding_rs::SHIFT_JIS.decode(&admin_dat).0.into_owned();
+                    let dat = encoding_rs::SHIFT_JIS.decode(&dat).0.into_owned();
+
                     let result = s3_client
                         .put_object(
                             format!("{}/admin/{}.dat", board.board_key, thread_number),
-                            &admin_dat,
+                            admin_dat.as_bytes(),
                         )
                         .await;
                     if let Err(e) = result {
-                        let result =
-                            retry(&s3_client, &board.board_key, thread_number, &admin_dat).await;
+                        let result = retry(
+                            &s3_client,
+                            &board.board_key,
+                            thread_number,
+                            admin_dat.as_bytes(),
+                        )
+                        .await;
                         if !result {
                             eprintln!(
                                 "Failed to upload admin.dat: {}/{}, reason: {e}",
@@ -169,11 +178,13 @@ async fn main() {
                     let result = s3_client
                         .put_object(
                             format!("{}/dat/{}.dat", board.board_key, thread_number),
-                            &dat,
+                            dat.as_bytes(),
                         )
                         .await;
                     if let Err(e) = result {
-                        let result = retry(&s3_client, &board.board_key, thread_number, &dat).await;
+                        let result =
+                            retry(&s3_client, &board.board_key, thread_number, dat.as_bytes())
+                                .await;
                         if !result {
                             log::error!(
                                 "Failed to upload dat: {}/{}, reason: {e}",

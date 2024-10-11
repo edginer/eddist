@@ -272,7 +272,7 @@ fn convert_admin_dat_file_to_res(dat_file: &str) -> ArchivedAdminThread {
 }
 
 fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec<u8> {
-    reses
+    let sjis_array = reses
         .into_iter()
         .enumerate()
         .map(|(idx, res)| {
@@ -304,5 +304,11 @@ fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec
         .fold(Vec::new(), |mut cur, next| {
             cur.append(&mut next.get_inner());
             cur
-        })
+        });
+
+    encoding_rs::SHIFT_JIS
+        .decode(&sjis_array)
+        .0
+        .into_owned()
+        .into_bytes()
 }

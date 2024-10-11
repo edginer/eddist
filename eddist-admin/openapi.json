@@ -10,6 +10,36 @@
   },
   "paths": {
     "/authed_tokens/{authed_token_id}/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_authed_token",
+        "parameters": [
+          {
+            "name": "authed_token_id",
+            "in": "path",
+            "description": "Authed token ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get authed token successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthedToken"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "bbs"
@@ -960,6 +990,57 @@
             }
           },
           "title": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthedToken": {
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "origin_ip",
+          "reduced_origin_ip",
+          "writing_ua",
+          "created_at",
+          "validity"
+        ],
+        "properties": {
+          "authed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "authed_ua": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_wrote_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "origin_ip": {
+            "type": "string"
+          },
+          "reduced_origin_ip": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "validity": {
+            "type": "boolean"
+          },
+          "writing_ua": {
             "type": "string"
           }
         }
