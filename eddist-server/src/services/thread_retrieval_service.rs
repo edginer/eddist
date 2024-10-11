@@ -86,7 +86,7 @@ pub struct ThreadRetrievalServiceInput {
 
 #[derive(Debug, Clone)]
 pub struct ThreadResListRaw {
-    raw: Vec<u8>,
+    pub raw: Vec<u8>,
 }
 
 impl ThreadResListRaw {

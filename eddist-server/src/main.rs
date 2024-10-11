@@ -35,7 +35,7 @@ use services::{
     res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
     thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
     thread_list_service::BoardKey,
-    thread_retrieval_service::ThreadRetrievalServiceInput,
+    thread_retrieval_service::{ThreadResListRaw, ThreadRetrievalServiceInput},
     AppService, AppServiceContainer, BbsCgiService,
 };
 use shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType};
@@ -332,6 +332,7 @@ async fn get_subject_txt(
 
 async fn get_dat_txt(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path((board_key, thread_id_with_dat)): Path<(String, String)>,
 ) -> Response {
     if thread_id_with_dat.len() != 14 {
@@ -350,7 +351,29 @@ async fn get_dat_txt(
         })
         .await
     {
-        Ok(raw) => raw,
+        Ok(raw) => {
+            let range = headers.get("Range");
+            let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
+
+            match (range, ua) {
+                (Some(range), Some(ua)) if !ua.contains("Xeno") => {
+                    let range = range.to_str().unwrap();
+                    if let Some(range) = range.split('=').nth(1) {
+                        let range = range.split('-').collect::<Vec<_>>();
+                        let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok())
+                        else {
+                            return Response::builder().status(400).body(Body::empty()).unwrap();
+                        };
+
+                        let raw = raw.raw().into_iter().skip(start).collect::<Vec<_>>();
+                        ThreadResListRaw { raw }
+                    } else {
+                        raw
+                    }
+                }
+                _ => raw,
+            }
+        }
         Err(e) => {
             if e.root_cause()
                 .to_string()
