@@ -19,6 +19,7 @@ use eddist_core::{
     utils::is_prod,
 };
 use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
+use external::captcha_like_client::CaptchaLikeError;
 use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -155,6 +156,10 @@ async fn main() -> anyhow::Result<()> {
     template_engine.register_template_string(
         "auth-code.post.success",
         include_str!("templates/auth-code.post.success.hbs"),
+    )?;
+    template_engine.register_template_string(
+        "auth-code.post.failed",
+        include_str!("templates/auth-code.post.failed.hbs"),
     )?;
 
     let s3_client = s3::bucket::Bucket::new(
@@ -532,7 +537,7 @@ async fn post_auth_code(
     State(state): State<AppState>,
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let AuthWithCodeServiceOutput { token } = state
+    let token = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -543,7 +548,31 @@ async fn post_auth_code(
             responses: form,
         })
         .await
-        .unwrap();
+    {
+        Ok(AuthWithCodeServiceOutput { token }) => token,
+        Err(e) => {
+            if let Some(r) = e.downcast_ref::<CaptchaLikeError>() {
+                return Html(
+                    state
+                        .template_engine
+                        .render("auth-code.post.failed", &json!({ "reason": r.to_string() }))
+                        .unwrap(),
+                );
+            } else {
+                log::error!("Failed to issue authed token: {e:?}");
+
+                return Html(
+                    state
+                        .template_engine
+                        .render(
+                            "auth-code.post.failed",
+                            &json!({ "reason": "不明な理由です" }),
+                        )
+                        .unwrap(),
+                );
+            }
+        }
+    };
 
     let html = state
         .template_engine
