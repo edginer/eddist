@@ -35,7 +35,7 @@ use services::{
     res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
     thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
     thread_list_service::BoardKey,
-    thread_retrieval_service::{ThreadResListRaw, ThreadRetrievalServiceInput},
+    thread_retrieval_service::ThreadRetrievalServiceInput,
     AppService, AppServiceContainer, BbsCgiService,
 };
 use shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType};
@@ -352,27 +352,28 @@ async fn get_dat_txt(
         .await
     {
         Ok(raw) => {
-            let range = headers.get("Range");
-            let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
+            raw
+            // let range = headers.get("Range");
+            // let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
 
-            match (range, ua) {
-                (Some(range), Some(ua)) if !ua.contains("Xeno") => {
-                    let range = range.to_str().unwrap();
-                    if let Some(range) = range.split('=').nth(1) {
-                        let range = range.split('-').collect::<Vec<_>>();
-                        let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok())
-                        else {
-                            return Response::builder().status(400).body(Body::empty()).unwrap();
-                        };
+            // match (range, ua) {
+            //     (Some(range), Some(ua)) if !ua.contains("Xeno") => {
+            //         let range = range.to_str().unwrap();
+            //         if let Some(range) = range.split('=').nth(1) {
+            //             let range = range.split('-').collect::<Vec<_>>();
+            //             let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok())
+            //             else {
+            //                 return Response::builder().status(400).body(Body::empty()).unwrap();
+            //             };
 
-                        let raw = raw.raw().into_iter().skip(start).collect::<Vec<_>>();
-                        ThreadResListRaw { raw }
-                    } else {
-                        raw
-                    }
-                }
-                _ => raw,
-            }
+            //             let raw = raw.raw().into_iter().skip(start).collect::<Vec<_>>();
+            //             ThreadResListRaw { raw }
+            //         } else {
+            //             raw
+            //         }
+            //     }
+            //     _ => raw,
+            // }
         }
         Err(e) => {
             if e.root_cause()
@@ -407,10 +408,36 @@ async fn get_dat_txt(
         }
     };
 
-    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result.raw()))
+    let range = headers.get("Range");
+    let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
+
+    let (result, is_partial) = match (range, ua) {
+        (Some(range), Some(ua)) if !ua.contains("Xeno") => {
+            let range = range.to_str().unwrap();
+            if let Some(range) = range.split('=').nth(1) {
+                let range = range.split('-').collect::<Vec<_>>();
+                let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok()) else {
+                    return Response::builder().status(400).body(Body::empty()).unwrap();
+                };
+
+                let raw = result.raw().into_iter().skip(start).collect::<Vec<_>>();
+                (raw, true)
+            } else {
+                (result.raw(), false)
+            }
+        }
+        _ => (result.raw(), false),
+    };
+
+    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
         .content_type(SjisContentType::TextPlain)
         .client_ttl(5)
         .server_ttl(1)
+        .status_code(if is_partial {
+            StatusCode::PARTIAL_CONTENT
+        } else {
+            StatusCode::OK
+        })
         .build()
         .into_response()
 }
