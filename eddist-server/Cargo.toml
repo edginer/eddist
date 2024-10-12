@@ -70,3 +70,4 @@ rust-s3 = { version = "0.35.1", default-features = false, features = [
     "tags",
     "fail-on-err",
 ] }
+http = "1.1.0"

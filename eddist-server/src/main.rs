@@ -224,13 +224,6 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state)
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(
-            CompressionLayer::new().gzip(true).br(false).compress_when(
-                SizeAbove::new(1024)
-                    .and(NotForContentType::GRPC)
-                    .and(NotForContentType::IMAGES),
-            ),
-        )
-        .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
                     // Log the matched route's path (with placeholders not filled in).
