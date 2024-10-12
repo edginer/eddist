@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt update && apt install -y --no-install-recommends ca-certificates
+RUN apt update && apt install -y --no-install-recommends ca-certificates libc6
 
 COPY ./target/release/eddist-admin .
 COPY ./eddist-admin/client/build/client ./dist

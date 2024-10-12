@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt update && apt install -y --no-install-recommends ca-certificates
+RUN apt update && apt install -y --no-install-recommends ca-certificates libc6
 COPY ./target/release/eddist-cron .
 
 ENV RUST_ENV=prod
