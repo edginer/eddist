@@ -118,9 +118,11 @@ async fn main() {
                     .get_threads_with_archive_converted(&board.board_key, false)
                     .await
                     .unwrap();
-                let mut admin_dat = Vec::new();
-                let mut dat = Vec::new();
+
                 for (title, thread_number, id) in threads {
+                    let mut admin_dat = Vec::new();
+                    let mut dat = Vec::new();
+
                     let responses = repo.get_thread_responses(id).await.unwrap();
                     for (idx, (res, client_info, authed_token_id)) in responses.iter().enumerate() {
                         let admin_res = if idx == 0 {

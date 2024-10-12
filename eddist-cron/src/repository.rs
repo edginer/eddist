@@ -56,7 +56,7 @@ impl Repository {
                     FROM threads
                     WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
                     AND archived = 0
-                    ORDER BY last_modified_at ASC
+                    ORDER BY last_modified_at DESC
                     LIMIT 1000000 OFFSET ?
                 ) AS tmp
             )
