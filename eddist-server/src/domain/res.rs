@@ -183,12 +183,16 @@ impl Res<AuthorIdUninitialized> {
         authed_token: &AuthedToken,
         retrieved_cap_name: Option<String>,
     ) -> Res<AuthorIdInitialized> {
-        let author_id = get_author_id(
-            &self.board_key,
-            self.created_at,
-            authed_token.reduced_ip.clone(),
-        )[..9]
-            .to_string();
+        let author_id = if retrieved_cap_name.is_none() {
+            get_author_id(
+                &self.board_key,
+                self.created_at,
+                authed_token.reduced_ip.clone(),
+            )[..9]
+                .to_string()
+        } else {
+            "????".to_string()
+        };
 
         Res {
             author_name: self.author_name,
