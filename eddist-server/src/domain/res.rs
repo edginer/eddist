@@ -222,7 +222,7 @@ impl Res<AuthorIdInitialized> {
     }
 
     pub fn pretty_author_name(&self, default_name: &str) -> String {
-        let author_name = if self.author_name.is_empty() {
+        let author_name = if self.author_name.is_empty() && self.cap.is_none() {
             default_name
         } else {
             &self.author_name
