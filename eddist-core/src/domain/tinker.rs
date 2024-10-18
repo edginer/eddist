@@ -29,12 +29,13 @@ impl Tinker {
         let wrote_count = self.wrote_count + 1;
         let timestamp = datetime.timestamp() as u64;
         let level_up = self.last_level_up_at + 23 * 60 * 60 < timestamp;
+        let level = if level_up { self.level + 1 } else { self.level };
 
         Self {
             authed_token: self.authed_token,
             wrote_count,
             created_thread_count: self.created_thread_count,
-            level: if level_up { self.level + 1 } else { self.level },
+            level: if level > 20 { 20 } else { level },
             last_level_up_at: if level_up {
                 timestamp
             } else {
@@ -50,12 +51,13 @@ impl Tinker {
             (self.wrote_count + 1, self.created_thread_count + 1);
         let timestamp = datetime.timestamp() as u64;
         let level_up = self.last_level_up_at + 23 * 60 * 60 < timestamp;
+        let level = if level_up { self.level + 1 } else { self.level };
 
         Self {
             authed_token: self.authed_token,
             wrote_count,
             created_thread_count,
-            level: if level_up { self.level + 1 } else { self.level },
+            level: if level > 20 { 20 } else { level },
             last_level_up_at: if level_up {
                 timestamp
             } else {

@@ -190,7 +190,11 @@ impl<T: BbsRepository + Clone>
             .map_err(|e| BbsCgiError::Other(e.into()))?;
 
         let tinker = if let Some(tinker) = input.tinker {
-            tinker
+            if tinker.authed_token() != authed_token.token {
+                Tinker::new(authed_token.token, created_at)
+            } else {
+                tinker
+            }
         } else {
             Tinker::new(authed_token.token, created_at)
         }
