@@ -34,6 +34,8 @@ async fn main() {
         .unwrap();
     let repo = repository::Repository::new(pool);
 
+    log::info!("Application started with args: {args:?}");
+
     // TODO: logging
     match args[1].as_str() {
         "inactivate" => {
