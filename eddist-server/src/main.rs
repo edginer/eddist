@@ -18,8 +18,7 @@ use eddist_core::{
     domain::{board::BoardInfo, sjis_str::SJisStr, tinker::Tinker},
     utils::is_prod,
 };
-use error::{BbsCgiError, InsufficientParamType, InvalidParamType};
-use external::captcha_like_client::CaptchaLikeError;
+use error::{BbsCgiError, BbsPostAuthWithCodeError, InsufficientParamType, InvalidParamType};
 use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -43,10 +42,6 @@ use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{
     classify::ServerErrorsFailureClass,
-    compression::{
-        predicate::{NotForContentType, SizeAbove},
-        CompressionLayer, Predicate,
-    },
     services::{ServeDir, ServeFile},
     timeout::TimeoutLayer,
     trace::TraceLayer,
@@ -344,30 +339,7 @@ async fn get_dat_txt(
         })
         .await
     {
-        Ok(raw) => {
-            raw
-            // let range = headers.get("Range");
-            // let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
-
-            // match (range, ua) {
-            //     (Some(range), Some(ua)) if !ua.contains("Xeno") => {
-            //         let range = range.to_str().unwrap();
-            //         if let Some(range) = range.split('=').nth(1) {
-            //             let range = range.split('-').collect::<Vec<_>>();
-            //             let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok())
-            //             else {
-            //                 return Response::builder().status(400).body(Body::empty()).unwrap();
-            //             };
-
-            //             let raw = raw.raw().into_iter().skip(start).collect::<Vec<_>>();
-            //             ThreadResListRaw { raw }
-            //         } else {
-            //             raw
-            //         }
-            //     }
-            //     _ => raw,
-            // }
-        }
+        Ok(raw) => raw,
         Err(e) => {
             if e.root_cause()
                 .to_string()
@@ -594,63 +566,25 @@ async fn post_auth_code(
     {
         Ok(AuthWithCodeServiceOutput { token }) => token,
         Err(e) => {
-            if let Some(r) = e.downcast_ref::<CaptchaLikeError>() {
-                return Html(
+            return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
+                Html(
                     state
                         .template_engine
-                        .render("auth-code.post.failed", &json!({ "reason": r.to_string() }))
+                        .render("auth-code.post.failed", &json!({ "reason": e.to_string() }))
                         .unwrap(),
-                );
+                )
             } else {
-                let reason = e.to_string();
-                match &reason as &str {
-                    "failed to find authed token" => {
-                        return Html(
-                            state
-                                .template_engine
-                                .render(
-                                    "auth-code.post.failed",
-                                    &json!({ "reason": "書き込み時のIPアドレスと異なるか、入力した6桁の数字が誤りです" }),
-                                )
-                                .unwrap(),
-                        );
-                    }
-                    "authed token is already valid" => {
-                        return Html(
-                            state
-                                .template_engine
-                                .render(
-                                    "auth-code.post.failed",
-                                    &json!({ "reason": "既に認証済みです" }),
-                                )
-                                .unwrap(),
-                        );
-                    }
-                    "activation code is expired" => {
-                        return Html(
-                            state
-                                .template_engine
-                                .render(
-                                    "auth-code.post.failed",
-                                    &json!({ "reason": "認証コードの有効期限が切れています。再度認証してください" }),
-                                )
-                                .unwrap(),
-                        );
-                    }
-                    _ => {
-                        log::error!("Failed to issue authed token: {e:?}");
+                log::error!("Failed to issue authed token: {e:?}");
 
-                        return Html(
-                            state
-                                .template_engine
-                                .render(
-                                    "auth-code.post.failed",
-                                    &json!({ "reason": "不明な理由です（認証に失敗した可能性があります）" }),
-                                )
-                                .unwrap(),
-                        );
-                    }
-                }
+                Html(
+                    state
+                        .template_engine
+                        .render(
+                            "auth-code.post.failed",
+                            &json!({ "reason": "不明な理由です（認証に失敗した可能性があります）" }),
+                        )
+                        .unwrap(),
+                )
             }
         }
     };

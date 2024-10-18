@@ -8,6 +8,7 @@ use tracing::{error_span, info_span};
 
 use crate::{
     domain::captcha_like::CaptchaLikeConfig,
+    error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
         CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
     },
@@ -82,19 +83,19 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             counter!("issue_authed_token", "state" => "failed", "reason" => "ip_check")
                 .increment(1);
             info_span!("failed to find authed token", reduced_ip = %reduced.to_string(), origin_ip = %ip_addr, code = %input.code);
-            return Err(anyhow::anyhow!("failed to find authed token"));
+            return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
         };
 
         if token.validity {
             counter!("issue_authed_token" , "state" => "failed", "reason" => "already_valid")
                 .increment(1);
-            return Err(anyhow::anyhow!("authed token is already valid"));
+            return Err(BbsPostAuthWithCodeError::AlreadyValid.into());
         }
 
         let now = Utc::now();
         if token.is_activation_expired(now) {
             counter!("issue_authed_token", "state" => "failed", "reason" => "expired").increment(1);
-            return Err(anyhow::anyhow!("activation code is expired"));
+            return Err(BbsPostAuthWithCodeError::ExpiredActivationCode.into());
         }
 
         let handles = clients_responses
@@ -107,7 +108,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                 Ok(CaptchaLikeResult::Failure(e)) => {
                     counter!("issue_authed_token", "state" => "failed", "reason" => "captcha")
                         .increment(1);
-                    return Err(e.into());
+                    return Err(BbsPostAuthWithCodeError::CaptchaError(e).into());
                 }
                 Err(e) => return Err(e.into()),
                 _ => {}
@@ -117,7 +118,6 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         self.0
             .activate_authed_status(&token.token, &input.user_agent, now)
             .await?;
-
         counter!("issue_authed_token", "state" => "success").increment(1);
 
         Ok(AuthWithCodeServiceOutput { token: token.token })

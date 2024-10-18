@@ -5,7 +5,9 @@ use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
 use time::Duration;
 
-use crate::{SJisResponseBuilder, SjisContentType};
+use crate::{
+    external::captcha_like_client::CaptchaLikeError, SJisResponseBuilder, SjisContentType,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum BbsCgiError {
@@ -253,4 +255,16 @@ impl Display for ContentLengthExceededParamType {
             }
         )
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum BbsPostAuthWithCodeError {
+    #[error("書き込み時のIPアドレスと異なるか、入力した6桁の数字が誤りです")]
+    FailedToFindAuthedToken,
+    #[error("既に認証済みです")]
+    AlreadyValid,
+    #[error("認証コードの有効期限が切れています。再度認証してください")]
+    ExpiredActivationCode,
+    #[error(transparent)]
+    CaptchaError(#[from] CaptchaLikeError),
 }
