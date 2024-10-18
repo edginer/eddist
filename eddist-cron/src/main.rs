@@ -154,47 +154,29 @@ async fn main() {
                     let admin_dat = encoding_rs::SHIFT_JIS.decode(&admin_dat).0.into_owned();
                     let dat = encoding_rs::SHIFT_JIS.decode(&dat).0.into_owned();
 
-                    let result = s3_client
-                        .put_object(
-                            format!("{}/admin/{}.dat", board.board_key, thread_number),
-                            admin_dat.as_bytes(),
-                        )
-                        .await;
-                    if let Err(e) = result {
-                        let result = retry(
-                            &s3_client,
-                            &board.board_key,
-                            thread_number,
-                            admin_dat.as_bytes(),
-                        )
-                        .await;
-                        if !result {
-                            eprintln!(
-                                "Failed to upload admin.dat: {}/{}, reason: {e}",
-                                board.board_key, thread_number
-                            );
-                            continue;
-                        }
+                    if retry(
+                        &s3_client,
+                        &board.board_key,
+                        thread_number,
+                        admin_dat.as_bytes(),
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "Failed to upload admin.dat: {}/{}",
+                            board.board_key,
+                            thread_number
+                        );
+                        continue;
                     }
 
-                    let result = s3_client
-                        .put_object(
-                            format!("{}/dat/{}.dat", board.board_key, thread_number),
-                            dat.as_bytes(),
-                        )
-                        .await;
-                    if let Err(e) = result {
-                        let result =
-                            retry(&s3_client, &board.board_key, thread_number, dat.as_bytes())
-                                .await;
-                        if !result {
-                            log::error!(
-                                "Failed to upload dat: {}/{}, reason: {e}",
-                                board.board_key,
-                                thread_number
-                            );
-                            continue;
-                        }
+                    if retry(&s3_client, &board.board_key, thread_number, dat.as_bytes()).await {
+                        log::error!(
+                            "Failed to upload dat: {}/{}",
+                            board.board_key,
+                            thread_number
+                        );
+                        continue;
                     }
 
                     let client = redis::Client::open(env::var("REDIS_URL").unwrap()).unwrap();
@@ -221,12 +203,14 @@ async fn main() {
 }
 
 async fn retry(s3_client: &Bucket, board_key: &str, thread_number: u64, content: &[u8]) -> bool {
-    let mut retry_count = 0;
+    let mut retry_count = -1;
     let mut retry_delay = 2;
     let mut is_err = true;
 
     while is_err && retry_count < 3 {
-        tokio::time::sleep(Duration::from_secs(retry_delay)).await;
+        if retry_count >= 0 {
+            tokio::time::sleep(Duration::from_secs(retry_delay)).await;
+        }
         let result = s3_client
             .put_object(
                 format!("{}/admin/{}.dat", board_key, thread_number),
@@ -237,9 +221,25 @@ async fn retry(s3_client: &Bucket, board_key: &str, thread_number: u64, content:
         retry_delay *= 2;
         if let Ok(result) = result {
             if result.status_code() == 200 {
-                is_err = false;
+                if let Ok((_, code)) = s3_client
+                    .head_object(format!("{}/admin/{}.dat", board_key, thread_number))
+                    .await
+                {
+                    if code != 404 {
+                        is_err = false;
+                    }
+                }
             }
         }
+    }
+
+    if !is_err {
+        log::info!(
+            "Successfully uploaded admin.dat: {}/{}, retry count: {}",
+            board_key,
+            thread_number,
+            retry_count
+        );
     }
 
     !is_err
