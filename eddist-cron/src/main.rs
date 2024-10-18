@@ -161,6 +161,7 @@ async fn main() {
                         admin_dat.as_bytes(),
                     )
                     .await
+                    .is_err()
                     {
                         log::error!(
                             "Failed to upload admin.dat: {}/{}",
@@ -170,7 +171,10 @@ async fn main() {
                         continue;
                     }
 
-                    if retry(&s3_client, &board.board_key, thread_number, dat.as_bytes()).await {
+                    if retry(&s3_client, &board.board_key, thread_number, dat.as_bytes())
+                        .await
+                        .is_err()
+                    {
                         log::error!(
                             "Failed to upload dat: {}/{}",
                             board.board_key,
@@ -202,7 +206,12 @@ async fn main() {
     }
 }
 
-async fn retry(s3_client: &Bucket, board_key: &str, thread_number: u64, content: &[u8]) -> bool {
+async fn retry(
+    s3_client: &Bucket,
+    board_key: &str,
+    thread_number: u64,
+    content: &[u8],
+) -> Result<(), ()> {
     let mut retry_count = -1;
     let mut retry_delay = 2;
     let mut is_err = true;
@@ -242,7 +251,11 @@ async fn retry(s3_client: &Bucket, board_key: &str, thread_number: u64, content:
         );
     }
 
-    !is_err
+    if is_err {
+        Err(())
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
