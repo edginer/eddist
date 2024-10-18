@@ -44,7 +44,7 @@ function TopPage() {
         <h2 className="text-2xl lg:text-4xl">利用規約</h2>
         <p className="text-left py-2 lg:text-lg">
           <a href="/terms" className="text-blue-500">
-            利用規約はこちら
+            利用規約・問い合わせ先はこちら
           </a>
         </p>
       </section>

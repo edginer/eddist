@@ -509,7 +509,10 @@ async fn get_term_of_usage(State(state): State<AppState>) -> impl IntoResponse {
         .template_engine
         .render(
             "term-of-usage.get",
-            &serde_json::json!({"domain": env::var("DOMAIN").unwrap_or("example.com".to_string())}),
+            &serde_json::json!({
+                "domain": env::var("DOMAIN").unwrap_or("example.com".to_string()), 
+                "contact_point": env::var("CONTACT_POINT").unwrap_or("abuse@example.com".to_string())
+            }),
         )
         .unwrap();
 
