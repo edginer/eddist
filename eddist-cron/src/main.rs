@@ -5,6 +5,7 @@ use cron::Schedule;
 use eddist_core::utils::is_prod;
 use s3::{creds::Credentials, Bucket};
 use sqlx::mysql::MySqlPoolOptions;
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod repository;
 
@@ -13,6 +14,12 @@ async fn main() {
     if !is_prod() {
         dotenvy::dotenv().unwrap();
     }
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::CLOSE)
+        .with_ansi(false)
+        .init();
 
     // Jobs:
     // - inactivate and archive (not to show thread list),

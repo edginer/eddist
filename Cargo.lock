@@ -1055,6 +1055,7 @@ dependencies = [
  "rust-s3",
  "sqlx",
  "tokio",
+ "tracing-subscriber",
  "uuid",
 ]
 
