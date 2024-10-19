@@ -110,6 +110,44 @@ impl Repository {
             .collect())
     }
 
+    pub async fn get_archived_threads(
+        &self,
+        board_key: &str,
+        start: u64,
+        end: u64,
+    ) -> anyhow::Result<Vec<(String, u64, Uuid)>> {
+        struct Thread {
+            title: String,
+            thread_number: i64,
+            id: Uuid,
+        }
+
+        let threads = sqlx::query_as!(
+            Thread,
+            r#"
+            SELECT
+                title,
+                thread_number,
+                id AS "id: Uuid"
+            FROM
+                archived_threads
+            WHERE
+                board_id = (SELECT id FROM boards WHERE board_key = ?)
+            AND
+                thread_number BETWEEN ? AND ?
+            "#,
+            board_key,
+            start as i64,
+            end as i64,
+        )
+        .fetch_all(&self.0)
+        .await?;
+        Ok(threads
+            .into_iter()
+            .map(|t| (t.title, t.thread_number as u64, t.id))
+            .collect())
+    }
+
     pub async fn update_archive_converted(&self, thread_id: Uuid) -> anyhow::Result<()> {
         sqlx::query!(
             r#"
@@ -128,17 +166,6 @@ impl Repository {
     ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
         let thread_id = Vec::<u8>::from(thread_id);
 
-        struct Res {
-            author_name: String,
-            mail: String,
-            body: String,
-            created_at: chrono::NaiveDateTime,
-            author_id: String,
-            is_abone: i8,
-            authed_token_id: Uuid,
-            client_info: Json<ClientInfo>,
-        }
-
         let responses = sqlx::query_as!(
             Res,
             r#"
@@ -153,6 +180,54 @@ impl Repository {
                 client_info AS "client_info: Json<ClientInfo>"
             FROM
                 responses
+            WHERE
+                thread_id = ?
+            ORDER BY res_order, id
+            "#,
+            thread_id,
+        )
+        .fetch_all(&self.0)
+        .await?;
+
+        Ok(responses
+            .into_iter()
+            .map(|r| {
+                (
+                    ResView {
+                        author_name: r.author_name,
+                        mail: r.mail,
+                        body: r.body,
+                        created_at: Utc.from_utc_datetime(&r.created_at),
+                        author_id: r.author_id,
+                        is_abone: r.is_abone == 1,
+                    },
+                    r.client_info.0,
+                    r.authed_token_id,
+                )
+            })
+            .collect::<Vec<_>>())
+    }
+
+    pub async fn get_archived_thread_responses(
+        &self,
+        thread_id: Uuid,
+    ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
+        let thread_id = Vec::<u8>::from(thread_id);
+
+        let responses = sqlx::query_as!(
+            Res,
+            r#"
+            SELECT
+                author_name,
+                mail,
+                body,
+                created_at,
+                author_id,
+                is_abone,
+                authed_token_id AS "authed_token_id: Uuid",
+                client_info AS "client_info: Json<ClientInfo>"
+            FROM
+                archived_responses
             WHERE
                 thread_id = ?
             ORDER BY res_order, id
@@ -278,6 +353,17 @@ impl Repository {
 
         Ok(())
     }
+}
+
+struct Res {
+    author_name: String,
+    mail: String,
+    body: String,
+    created_at: chrono::NaiveDateTime,
+    author_id: String,
+    is_abone: i8,
+    authed_token_id: Uuid,
+    client_info: Json<ClientInfo>,
 }
 
 #[derive(Debug, Clone)]

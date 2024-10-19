@@ -215,6 +215,168 @@ async fn main() {
                 }
             }
         }
+        "backfill-convert" => {
+            let start = args[2].parse::<u64>().unwrap();
+            let end = args[3].parse::<u64>().unwrap();
+
+            // backfill-convert
+            // - convert (to dat text file compressed by gzip and delete responses, and publish to S3 compatible storage)
+            //   with only threads that are not converted yet because of the previous error
+            let boards = repo.get_all_boards_info().await.unwrap();
+            let s3_client = s3::bucket::Bucket::new(
+                env::var("S3_BUCKET_NAME").unwrap().trim(),
+                s3::Region::R2 {
+                    account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
+                },
+                Credentials::new(
+                    Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
+                    Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+            for board in boards {
+                let threads = repo
+                    .get_archived_threads(&board.board_key, start, end)
+                    .await
+                    .unwrap();
+
+                for (title, thread_number, id) in threads {
+                    let mut admin_dat = Vec::new();
+                    let mut dat = Vec::new();
+
+                    let responses = repo.get_archived_thread_responses(id).await.unwrap();
+                    for (idx, (res, client_info, authed_token_id)) in responses.iter().enumerate() {
+                        let admin_res = if idx == 0 {
+                            res.get_sjis_admin_bytes(
+                                &board.default_name,
+                                Some(title.as_str()),
+                                client_info,
+                                *authed_token_id,
+                            )
+                        } else {
+                            res.get_sjis_admin_bytes(
+                                &board.default_name,
+                                None,
+                                client_info,
+                                *authed_token_id,
+                            )
+                        };
+                        let res = if idx == 0 {
+                            res.get_sjis_bytes(&board.default_name, Some(title.as_str()))
+                        } else {
+                            res.get_sjis_bytes(&board.default_name, None)
+                        };
+
+                        dat.append(&mut res.get_inner());
+                        admin_dat.append(&mut admin_res.get_inner());
+                    }
+
+                    // TODO: sjis to utf-8 workarounds for now
+                    let admin_dat = encoding_rs::SHIFT_JIS.decode(&admin_dat).0.into_owned();
+                    let dat = encoding_rs::SHIFT_JIS.decode(&dat).0.into_owned();
+
+                    let admin_needs = if let Ok((_, code)) = s3_client
+                        .head_object(format!(
+                            "{}/{}/{}.dat",
+                            board.board_key, "admin", thread_number
+                        ))
+                        .await
+                    {
+                        if code == 404 {
+                            true
+                        } else {
+                            log::info!(
+                                "admin.dat already exists: {}/{}",
+                                board.board_key,
+                                thread_number
+                            );
+                            false
+                        }
+                    } else {
+                        true
+                    };
+
+                    if admin_needs {
+                        log::info!(
+                            "admin.dat needs to be uploaded: {}/{}",
+                            board.board_key,
+                            thread_number
+                        );
+
+                        if retry(
+                            &s3_client,
+                            &board.board_key,
+                            thread_number,
+                            admin_dat.as_bytes(),
+                            true,
+                        )
+                        .await
+                        .is_err()
+                        {
+                            log::error!(
+                                "Failed to upload admin.dat: {}/{}",
+                                board.board_key,
+                                thread_number
+                            );
+                            continue;
+                        }
+                    }
+
+                    let dat_needs = if let Ok((_, code)) = s3_client
+                        .head_object(format!(
+                            "{}/{}/{}.dat",
+                            board.board_key, "dat", thread_number
+                        ))
+                        .await
+                    {
+                        if code == 404 {
+                            true
+                        } else {
+                            log::info!(
+                                "normal.dat already exists: {}/{}",
+                                board.board_key,
+                                thread_number
+                            );
+                            false
+                        }
+                    } else {
+                        true
+                    };
+
+                    if dat_needs {
+                        log::info!(
+                            "normal.dat needs to be uploaded: {}/{}",
+                            board.board_key,
+                            thread_number
+                        );
+
+                        if retry(
+                            &s3_client,
+                            &board.board_key,
+                            thread_number,
+                            dat.as_bytes(),
+                            false,
+                        )
+                        .await
+                        .is_err()
+                        {
+                            log::error!(
+                                "Failed to upload normal dat: {}/{}",
+                                board.board_key,
+                                thread_number
+                            );
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
         job => {
             log::error!("Unknown job: {job}");
             std::process::exit(1);
@@ -271,7 +433,8 @@ async fn retry(
 
     if !is_err {
         log::info!(
-            "Successfully uploaded admin.dat: {}/{}, retry count: {}",
+            "Successfully uploaded {}.dat: {}/{}, retry count: {}",
+            if is_admin { "admin" } else { "normal" },
             board_key,
             thread_number,
             retry_count
