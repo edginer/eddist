@@ -35,7 +35,7 @@ async fn main() {
     let executed_time = Utc::now();
     let pool = MySqlPoolOptions::new()
         .max_connections(4)
-        .acquire_timeout(Duration::from_secs(5))
+        .acquire_timeout(Duration::from_secs(25))
         .connect(&env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();
@@ -245,6 +245,13 @@ async fn main() {
                     .await
                     .unwrap();
 
+                log::info!(
+                    "target thread count for backfill-convert: {}",
+                    threads.len()
+                );
+                let mut backfill_dat_count = 0;
+                let mut backfill_admin_dat_count = 0;
+
                 for (title, thread_number, id) in threads {
                     let mut admin_dat = Vec::new();
                     let mut dat = Vec::new();
@@ -302,6 +309,7 @@ async fn main() {
                     };
 
                     if admin_needs {
+                        backfill_admin_dat_count += 1;
                         log::info!(
                             "admin.dat needs to be uploaded: {}/{}",
                             board.board_key,
@@ -349,6 +357,7 @@ async fn main() {
                     };
 
                     if dat_needs {
+                        backfill_dat_count += 1;
                         log::info!(
                             "normal.dat needs to be uploaded: {}/{}",
                             board.board_key,
@@ -374,6 +383,13 @@ async fn main() {
                         }
                     }
                 }
+
+                log::info!(
+                    "backfill-convert: admin: {}/dat: {} for board: {}",
+                    backfill_admin_dat_count,
+                    backfill_dat_count,
+                    board.board_key
+                );
             }
         }
 
