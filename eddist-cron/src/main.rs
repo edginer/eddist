@@ -168,6 +168,7 @@ async fn main() {
                         &board.board_key,
                         thread_number,
                         admin_dat.as_bytes(),
+                        true,
                     )
                     .await
                     .is_err()
@@ -180,12 +181,18 @@ async fn main() {
                         continue;
                     }
 
-                    if retry(&s3_client, &board.board_key, thread_number, dat.as_bytes())
-                        .await
-                        .is_err()
+                    if retry(
+                        &s3_client,
+                        &board.board_key,
+                        thread_number,
+                        dat.as_bytes(),
+                        false,
+                    )
+                    .await
+                    .is_err()
                     {
                         log::error!(
-                            "Failed to upload dat: {}/{}",
+                            "Failed to upload normal dat: {}/{}",
                             board.board_key,
                             thread_number
                         );
@@ -220,6 +227,7 @@ async fn retry(
     board_key: &str,
     thread_number: u64,
     content: &[u8],
+    is_admin: bool,
 ) -> Result<(), ()> {
     let mut retry_count = -1;
     let mut retry_delay = 2;
@@ -231,7 +239,12 @@ async fn retry(
         }
         let result = s3_client
             .put_object(
-                format!("{}/admin/{}.dat", board_key, thread_number),
+                format!(
+                    "{}/{}/{}.dat",
+                    board_key,
+                    if is_admin { "admin" } else { "dat" },
+                    thread_number
+                ),
                 content,
             )
             .await;
@@ -240,7 +253,12 @@ async fn retry(
         if let Ok(result) = result {
             if result.status_code() == 200 {
                 if let Ok((_, code)) = s3_client
-                    .head_object(format!("{}/admin/{}.dat", board_key, thread_number))
+                    .head_object(format!(
+                        "{}/{}/{}.dat",
+                        board_key,
+                        if is_admin { "admin" } else { "dat" },
+                        thread_number
+                    ))
                     .await
                 {
                     if code != 404 {
