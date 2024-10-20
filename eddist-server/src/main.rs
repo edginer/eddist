@@ -417,13 +417,23 @@ async fn get_kako_dat_txt(
     let thread_number = thread_id_with_dat.replace(".dat", "");
 
     let svc = state.get_container().kako_thread_retrieval();
-    let result = svc
+
+    let result = match svc
         .execute(KakoThreadRetrievalServiceInput {
             board_key,
             thread_number,
         })
         .await
-        .unwrap();
+    {
+        Ok(result) => result,
+        Err(err) => {
+            return if err.to_string().contains("Thread not found") {
+                Response::builder().status(404).body(Body::empty()).unwrap()
+            } else {
+                Response::builder().status(500).body(Body::empty()).unwrap()
+            };
+        }
+    };
 
     let sjis_str = if let Ok(result) = str::from_utf8(&result) {
         SJisStr::from(result)
