@@ -3,11 +3,11 @@ use std::{collections::HashMap, convert::Infallible, env, time::Duration};
 
 use axum::{
     body::{Body, Bytes},
-    extract::{MatchedPath, Path, State},
+    extract::{MatchedPath, Path, Request as AxumRequest, State},
     http::{HeaderMap, Request, StatusCode},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Form, Json, Router,
+    Form, Json, Router, ServiceExt as AxumServiceExt,
 };
 use axum_extra::extract::CookieJar;
 use axum_prometheus::PrometheusMetricLayer;
@@ -40,8 +40,10 @@ use services::{
 use shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
+use tower::{util::ServiceExt as ServiceExtTower, Layer};
 use tower_http::{
     classify::ServerErrorsFailureClass,
+    normalize_path::NormalizePathLayer,
     services::{ServeDir, ServeFile},
     timeout::TimeoutLayer,
     trace::TraceLayer,
@@ -191,7 +193,7 @@ async fn main() -> anyhow::Result<()> {
         "eddist-server/client/dist"
     };
     let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
-    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file);
+    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file.clone());
 
     log::info!("Start application server with 0.0.0.0:8080");
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
@@ -201,6 +203,9 @@ async fn main() -> anyhow::Result<()> {
     );
     describe_counter!("response_creation", "response creation count if success");
     describe_counter!("thread_creation", "thread creation count if success");
+
+    let serve_dir_inner = serve_dir.clone();
+    let serve_file_inner = serve_file.clone();
 
     let app = Router::new()
         .route("/health-check", get(health_check))
@@ -214,6 +219,47 @@ async fn main() -> anyhow::Result<()> {
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
         .route("/metrics", get(|| async move { metric_handle.render() }))
+        .route_service(
+            "/:boardKey/:threadId",
+            get(
+                |Path((board_key, thread_id)): Path<(String, String)>| async move {
+                    if board_key == "assets" {
+                        // Serve assets
+                        serve_dir_inner
+                            .clone()
+                            .oneshot(
+                                Request::builder()
+                                    .uri(format!("/assets/{}", thread_id))
+                                    .body(Body::empty())
+                                    .unwrap(),
+                            )
+                            .await
+                    } else {
+                        // Return index.html
+                        serve_file_inner
+                            .clone()
+                            .oneshot(Request::new(Body::empty()))
+                            .await
+                    }
+                },
+            ),
+        )
+        .route(
+            "/test/read.cgi/:boardKey/:threadId",
+            get(
+                |Path((board_key, thread_id)): Path<(String, String)>| async move {
+                    Redirect::permanent(&format!("/{}/{}", board_key, thread_id))
+                },
+            ),
+        )
+        .route(
+            "/test/read.cgi/:boardKey/:threadId/*pos",
+            get(
+                |Path((board_key, thread_id)): Path<(String, String)>| async move {
+                    Redirect::permanent(&format!("/{}/{}", board_key, thread_id))
+                },
+            ),
+        )
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
         .with_state(app_state)
@@ -268,6 +314,9 @@ async fn main() -> anyhow::Result<()> {
     ))
     .await
     .unwrap();
+
+    let app = NormalizePathLayer::trim_trailing_slash().layer(app);
+    let app = AxumServiceExt::<AxumRequest>::into_make_service(app);
     axum::serve(listener, app)
         .with_graceful_shutdown(graceful_shutdown_http())
         .await
@@ -308,7 +357,17 @@ async fn get_subject_txt(
     Path(board_key): Path<String>,
 ) -> impl IntoResponse {
     let svc = state.get_container().thread_list();
-    let threads = svc.execute(BoardKey(board_key)).await.unwrap();
+    let threads = match svc.execute(BoardKey(board_key)).await {
+        Ok(threads) => threads,
+        Err(e) => {
+            return if e.to_string().contains("failed to find board info") {
+                Response::builder().status(404).body(Body::empty()).unwrap()
+            } else {
+                log::error!("Failed to get thread list: {e:?}");
+                Response::builder().status(500).body(Body::empty()).unwrap()
+            }
+        }
+    };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
         .content_type(SjisContentType::TextPlain)

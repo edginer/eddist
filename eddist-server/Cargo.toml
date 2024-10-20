@@ -46,6 +46,7 @@ tower-http = { version = "0.5.2", features = [
     "trace",
     "timeout",
     "fs",
+    "normalize-path",
 ] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
@@ -71,3 +72,4 @@ rust-s3 = { version = "0.35.1", default-features = false, features = [
     "fail-on-err",
 ] }
 http = "1.1.0"
+tower = "0.5.1"

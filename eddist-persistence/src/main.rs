@@ -238,6 +238,8 @@ impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         self.pubsub_conn.subscribe("bbs:pubsubitem").await?;
 
+        log::info!("Application starts subscribing to pubsub channel");
+
         loop {
             let mut on_message = self.pubsub_conn.on_message();
             let msg = select! {
