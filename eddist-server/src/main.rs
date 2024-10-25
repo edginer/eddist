@@ -15,7 +15,11 @@ use base64::Engine;
 use chrono::Utc;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::{board::BoardInfo, sjis_str::SJisStr, tinker::Tinker},
+    domain::{
+        board::{validate_board_key, BoardInfo},
+        sjis_str::SJisStr,
+        tinker::Tinker,
+    },
     utils::is_prod,
 };
 use error::{BbsCgiError, BbsPostAuthWithCodeError, InsufficientParamType, InvalidParamType};
@@ -48,7 +52,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{error_span, info_span, warn_span, Span};
+use tracing::{info_span, warn_span, Span};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
@@ -356,6 +360,10 @@ async fn get_subject_txt(
     State(state): State<AppState>,
     Path(board_key): Path<String>,
 ) -> impl IntoResponse {
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
+
     let svc = state.get_container().thread_list();
     let threads = match svc.execute(BoardKey(board_key)).await {
         Ok(threads) => threads,
@@ -389,6 +397,9 @@ async fn get_dat_txt(
     let Ok(thread_number_num) = thread_number.parse::<i64>() else {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     };
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
 
     let svc = state.get_container().thread_retrival();
     let result = match svc
@@ -473,6 +484,9 @@ async fn get_kako_dat_txt(
     if thread_id_with_dat.len() != 14 {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
     let thread_number = thread_id_with_dat.replace(".dat", "");
 
     let svc = state.get_container().kako_thread_retrieval();
@@ -511,6 +525,10 @@ async fn get_setting_txt(
     Path(board_key): Path<String>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
+
     let BoardInfoServiceOutput {
         board_key,
         name,
@@ -555,6 +573,10 @@ async fn get_head_txt(
     Path(board_key): Path<String>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
+
     let BoardInfoServiceOutput {
         board_info: BoardInfo { local_rules, .. },
         ..
@@ -708,10 +730,17 @@ async fn post_bbs_cgi(
     let Some(body) = form.get("MESSAGE").map(|x| x.to_string()) else {
         return BbsCgiError::from(InsufficientParamType::Body).into_response();
     };
+    if validate_board_key(&board_key).is_err() {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
 
-    fn on_error(e: BbsCgiError) -> Response {
+    fn on_error(e: BbsCgiError, is_thread: bool) -> Response {
         if matches!(e, BbsCgiError::Other(_)) {
-            error_span!("thread_creation_error", error = ?e);
+            if is_thread {
+                log::error!("thread_creation_error, error = {e:?}");
+            } else {
+                log::error!("res_creation_error, error = {e:?}");
+            }
         }
         let is_cookie_reset = matches!(e, BbsCgiError::InvalidAuthedToken);
         let mut resp = e.into_response();
@@ -757,7 +786,7 @@ async fn post_bbs_cgi(
         {
             Ok(ThreadCreationServiceOutput { tinker }) => tinker,
             Err(e) => {
-                return on_error(e);
+                return on_error(e, true);
             }
         }
     } else {
@@ -786,7 +815,7 @@ async fn post_bbs_cgi(
         {
             Ok(ResCreationServiceOutput { tinker }) => tinker,
             Err(e) => {
-                return on_error(e);
+                return on_error(e, false);
             }
         }
     };

@@ -417,7 +417,7 @@ mod bbs {
         Json,
     };
     use chrono::{TimeZone, Utc};
-    use eddist_core::domain::res::ResView;
+    use eddist_core::domain::{board::validate_board_key, res::ResView};
     use serde::{Deserialize, Serialize};
     use utoipa::IntoParams;
     use uuid::Uuid;
@@ -492,6 +492,13 @@ mod bbs {
         State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
         Json(body): Json<CreateBoardInput>,
     ) -> Response {
+        if validate_board_key(&body.board_key).is_err() {
+            return Response::builder()
+                .status(400)
+                .body("board_key must be ascii lower alphabetic or numeric".into())
+                .unwrap();
+        }
+
         let board = state.admin_bbs_repo.create_board(body).await.unwrap();
 
         Response::builder()

@@ -26,3 +26,42 @@ pub struct BoardInfo {
     pub updated_at: NaiveDateTime,
     pub read_only: bool,
 }
+
+pub fn validate_board_key(board_key: &str) -> Result<(), ()> {
+    (board_key
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && board_key.len() < 64)
+        .then(|| ())
+        .ok_or(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_board_key() {
+        let cases = [
+            ("a", Ok(())),
+            ("1", Ok(())),
+            ("a1", Ok(())),
+            ("a1b2c3d4e5f6g7h8i9j0", Ok(())),
+            ("A", Err(())),
+            ("あ", Err(())),
+            ("A/A", Err(())),
+            (
+                "123456789012345678901234567890123456789012345678901234567890123",
+                Ok(()),
+            ),
+            (
+                "1234567890123456789012345678901234567890123456789012345678901234",
+                Err(()),
+            ),
+        ];
+
+        for (input, expected) in cases.iter() {
+            assert_eq!(validate_board_key(input), *expected);
+        }
+    }
+}
