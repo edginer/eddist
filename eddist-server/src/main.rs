@@ -1,5 +1,5 @@
 use core::str;
-use std::{collections::HashMap, convert::Infallible, env, time::Duration};
+use std::{convert::Infallible, env, time::Duration};
 
 use axum::{
     body::{Body, Bytes},
@@ -7,41 +7,33 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Form, Json, Router, ServiceExt as AxumServiceExt,
+    Json, Router, ServiceExt as AxumServiceExt,
 };
-use axum_extra::extract::CookieJar;
 use axum_prometheus::PrometheusMetricLayer;
-use base64::Engine;
-use chrono::Utc;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
     domain::{
         board::{validate_board_key, BoardInfo},
         sjis_str::SJisStr,
-        tinker::Tinker,
     },
     utils::is_prod,
 };
-use error::{BbsCgiError, BbsPostAuthWithCodeError, InsufficientParamType, InvalidParamType};
 use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
-use jsonwebtoken::EncodingKey;
-use jwt_simple::prelude::MACLike;
 use metrics::describe_counter;
 use repositories::{bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl};
-use serde_json::json;
-use services::{
-    auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
-    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
-    kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
-    res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
-    thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
-    thread_list_service::BoardKey,
-    thread_retrieval_service::ThreadRetrievalServiceInput,
-    AppService, AppServiceContainer, BbsCgiService,
+use routes::{
+    auth_code::{get_auth_code, post_auth_code},
+    bbs_cgi::post_bbs_cgi,
+    dat_routing::{get_dat_txt, get_kako_dat_txt},
 };
-use shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType};
+use services::{
+    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+    thread_list_service::BoardKey,
+    AppService, AppServiceContainer,
+};
+use shiftjis::{SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
 use tower::{util::ServiceExt as ServiceExtTower, Layer};
@@ -52,7 +44,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, warn_span, Span};
+use tracing::{info_span, Span};
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
@@ -85,6 +77,13 @@ mod error;
 mod services;
 pub(crate) mod external {
     pub mod captcha_like_client;
+}
+mod utils;
+mod routes {
+    pub mod auth_code;
+    pub mod bbs_cgi;
+    pub mod dat_routing;
+    pub mod statics;
 }
 
 #[derive(Clone)]
@@ -385,142 +384,6 @@ async fn get_subject_txt(
         .into_response()
 }
 
-async fn get_dat_txt(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Path((board_key, thread_id_with_dat)): Path<(String, String)>,
-) -> Response {
-    if thread_id_with_dat.len() != 14 {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-    let thread_number = thread_id_with_dat.replace(".dat", "");
-    let Ok(thread_number_num) = thread_number.parse::<i64>() else {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    };
-    if validate_board_key(&board_key).is_err() {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-
-    let svc = state.get_container().thread_retrival();
-    let result = match svc
-        .execute(ThreadRetrievalServiceInput {
-            board_key: board_key.clone(),
-            thread_number: thread_number_num as u64,
-        })
-        .await
-    {
-        Ok(raw) => raw,
-        Err(e) => {
-            if e.root_cause()
-                .to_string()
-                .contains("cannot find such thread")
-            {
-                let current_unix_epoch = Utc::now().timestamp();
-                return if thread_number_num > current_unix_epoch {
-                    // Not found response
-                    Response::builder().status(404).body(Body::empty()).unwrap()
-                } else {
-                    // Redirect to kako thread
-                    Response::builder()
-                        .status(302)
-                        .header(
-                            "Location",
-                            format!(
-                                "/{}/kako/{}/{}/{}.dat",
-                                board_key,
-                                &thread_number[0..4],
-                                &thread_number[0..5],
-                                thread_number
-                            ),
-                        )
-                        .body(Body::empty())
-                        .unwrap()
-                };
-            } else {
-                // Not found response
-                return Response::builder().status(404).body(Body::empty()).unwrap();
-            }
-        }
-    };
-
-    let range = headers.get("Range");
-    let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
-
-    let (result, is_partial) = match (range, ua) {
-        (Some(range), Some(ua)) if !ua.contains("Xeno") => {
-            let range = range.to_str().unwrap();
-            if let Some(range) = range.split('=').nth(1) {
-                let range = range.split('-').collect::<Vec<_>>();
-                let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok()) else {
-                    return Response::builder().status(400).body(Body::empty()).unwrap();
-                };
-
-                let raw = result.raw().into_iter().skip(start).collect::<Vec<_>>();
-                (raw, true)
-            } else {
-                (result.raw(), false)
-            }
-        }
-        _ => (result.raw(), false),
-    };
-
-    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
-        .content_type(SjisContentType::TextPlain)
-        .client_ttl(5)
-        .server_ttl(1)
-        .status_code(if is_partial {
-            StatusCode::PARTIAL_CONTENT
-        } else {
-            StatusCode::OK
-        })
-        .build()
-        .into_response()
-}
-
-async fn get_kako_dat_txt(
-    State(state): State<AppState>,
-    Path((board_key, _, _, thread_id_with_dat)): Path<(String, String, String, String)>,
-) -> Response {
-    if thread_id_with_dat.len() != 14 {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-    if validate_board_key(&board_key).is_err() {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-    let thread_number = thread_id_with_dat.replace(".dat", "");
-
-    let svc = state.get_container().kako_thread_retrieval();
-
-    let result = match svc
-        .execute(KakoThreadRetrievalServiceInput {
-            board_key,
-            thread_number,
-        })
-        .await
-    {
-        Ok(result) => result,
-        Err(err) => {
-            return if err.to_string().contains("Thread not found") {
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            } else {
-                Response::builder().status(500).body(Body::empty()).unwrap()
-            };
-        }
-    };
-
-    let sjis_str = if let Ok(result) = str::from_utf8(&result) {
-        SJisStr::from(result)
-    } else {
-        SJisStr::from_unchecked_vec(result)
-    };
-
-    SJisResponseBuilder::new(sjis_str)
-        .content_type(SjisContentType::TextPlain)
-        .server_ttl(3600)
-        .build()
-        .into_response()
-}
-
 async fn get_setting_txt(
     Path(board_key): Path<String>,
     State(state): State<AppState>,
@@ -610,292 +473,9 @@ async fn get_term_of_usage(State(state): State<AppState>) -> impl IntoResponse {
     Html(html)
 }
 
-// NOTE: this system will be changed in the future
-async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let site_keys = state
-        .captcha_like_configs
-        .iter()
-        .filter_map(|config| match config {
-            CaptchaLikeConfig::Turnstile { site_key, .. } => Some(("cf_site_key", site_key)),
-            CaptchaLikeConfig::Hcaptcha { site_key, .. } => Some(("hcaptcha_site_key", site_key)),
-            CaptchaLikeConfig::Monocle { site_key, .. } => Some(("monocle_site_key", site_key)),
-            _ => {
-                warn_span!(
-                    "not implemented yet such captcha like config, ignored",
-                    ?config
-                );
-                None
-            }
-        })
-        .collect::<HashMap<_, _>>();
-
-    let html = state
-        .template_engine
-        .render("auth-code.get", &serde_json::json!(site_keys))
-        .unwrap();
-
-    let mut resp = Html(html).into_response();
-    let headers = resp.headers_mut();
-    headers.insert("Cache-Control", "private".parse().unwrap());
-
-    resp
-}
-
-async fn post_auth_code(
-    headers: HeaderMap,
-    State(state): State<AppState>,
-    Form(form): Form<HashMap<String, String>>,
-) -> impl IntoResponse {
-    let token = match state
-        .services
-        .auth_with_code()
-        .execute(AuthWithCodeServiceInput {
-            code: form["auth-code"].to_string(),
-            origin_ip: get_origin_ip(&headers).to_string(),
-            user_agent: get_ua(&headers).to_string(),
-            captcha_like_configs: state.captcha_like_configs.clone(),
-            responses: form,
-        })
-        .await
-    {
-        Ok(AuthWithCodeServiceOutput { token }) => token,
-        Err(e) => {
-            return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
-                Html(
-                    state
-                        .template_engine
-                        .render("auth-code.post.failed", &json!({ "reason": e.to_string() }))
-                        .unwrap(),
-                )
-            } else {
-                log::error!("Failed to issue authed token: {e:?}");
-
-                Html(
-                    state
-                        .template_engine
-                        .render(
-                            "auth-code.post.failed",
-                            &json!({ "reason": "不明な理由です（認証に失敗した可能性があります）" }),
-                        )
-                        .unwrap(),
-                )
-            }
-        }
-    };
-
-    let html = state
-        .template_engine
-        .render("auth-code.post.success", &json!({ "token": token }))
-        .unwrap();
-
-    Html(html)
-}
-
-async fn post_bbs_cgi(
-    headers: HeaderMap,
-    jar: CookieJar,
-    State(state): State<AppState>,
-    body: String,
-) -> Response {
-    let form = shift_jis_url_encodeded_body_to_vec(&body).unwrap();
-    let is_thread = {
-        let Some(submit) = form.get("submit") else {
-            return BbsCgiError::from(InsufficientParamType::Submit).into_response();
-        };
-
-        match submit as &str {
-            "書き込む" => false,
-            "新規スレッド作成" => true,
-            _ => return BbsCgiError::from(InvalidParamType::Submit).into_response(),
-        }
-    };
-
-    let origin_ip = get_origin_ip(&headers);
-    let ua = get_ua(&headers);
-    let asn_num = get_asn_num(&headers);
-    let tinker = jar
-        .get("tinker-token")
-        .and_then(|x| get_tinker(x.value(), state.tinker_secret()));
-    let edge_token = jar.get("edge-token").map(|x| x.value().to_string());
-
-    let Some(board_key) = form.get("bbs").map(|x| x.to_string()) else {
-        return BbsCgiError::from(InsufficientParamType::Bbs).into_response();
-    };
-    let Some(name) = form.get("FROM").map(|x| x.to_string()) else {
-        return BbsCgiError::from(InsufficientParamType::From).into_response();
-    };
-    let Some(mail) = form.get("mail").map(|x| x.to_string()) else {
-        return BbsCgiError::from(InsufficientParamType::Mail).into_response();
-    };
-    let Some(body) = form.get("MESSAGE").map(|x| x.to_string()) else {
-        return BbsCgiError::from(InsufficientParamType::Body).into_response();
-    };
-    if validate_board_key(&board_key).is_err() {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-
-    fn on_error(e: BbsCgiError, is_thread: bool) -> Response {
-        if matches!(e, BbsCgiError::Other(_)) {
-            if is_thread {
-                log::error!("thread_creation_error, error = {e:?}");
-            } else {
-                log::error!("res_creation_error, error = {e:?}");
-            }
-        }
-        let is_cookie_reset = matches!(e, BbsCgiError::InvalidAuthedToken);
-        let mut resp = e.into_response();
-        if is_cookie_reset {
-            resp.headers_mut().append(
-                "Set-Cookie",
-                "edge-token = ; Max-Age = 0; Path = /; "
-                    .to_string()
-                    .parse()
-                    .unwrap(),
-            );
-            resp.headers_mut().append(
-                "Set-Cookie",
-                "tinker = ; Max-Age = 0; Path = /; "
-                    .to_string()
-                    .parse()
-                    .unwrap(),
-            );
-        }
-        resp
-    }
-
-    let tinker = if is_thread {
-        let Some(title) = form.get("subject").map(|x| x.to_string()) else {
-            return BbsCgiError::from(InsufficientParamType::Subject).into_response();
-        };
-
-        let svc = state.services.thread_creation();
-        match svc
-            .execute(TheradCreationServiceInput {
-                board_key,
-                title,
-                authed_token: edge_token,
-                name,
-                mail,
-                body,
-                tinker,
-                ip_addr: origin_ip.to_string(),
-                user_agent: ua.to_string(),
-                asn_num,
-            })
-            .await
-        {
-            Ok(ThreadCreationServiceOutput { tinker }) => tinker,
-            Err(e) => {
-                return on_error(e, true);
-            }
-        }
-    } else {
-        let Some(thread_number) = form.get("key").map(|x| x.to_string()) else {
-            return BbsCgiError::from(InsufficientParamType::Key).into_response();
-        };
-        let Ok(thread_number) = thread_number.parse::<u64>() else {
-            return BbsCgiError::from(InvalidParamType::Key).into_response();
-        };
-
-        let svc = state.services.res_creation();
-        match svc
-            .execute(ResCreationServiceInput {
-                board_key,
-                thread_number,
-                authed_token_cookie: edge_token,
-                name,
-                mail,
-                body,
-                tinker,
-                ip_addr: origin_ip.to_string(),
-                user_agent: ua.to_string(),
-                asn_num,
-            })
-            .await
-        {
-            Ok(ResCreationServiceOutput { tinker }) => tinker,
-            Err(e) => {
-                return on_error(e, false);
-            }
-        }
-    };
-
-    SJisResponseBuilder::new(SJisStr::from(
-        r#"<html><!-- 2ch_X:true -->
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=x-sjis">
-    <title>書きこみました</title>
-</head>
-<body>書きこみました</body>
-</html>"#,
-    ))
-    .content_type(SjisContentType::TextHtml)
-    .add_set_cookie(
-        "tinker-token".to_string(),
-        jsonwebtoken::encode(
-            &jsonwebtoken::Header::default(),
-            &tinker,
-            &EncodingKey::from_base64_secret(state.tinker_secret()).unwrap(),
-        )
-        .unwrap(),
-        time::Duration::days(365),
-    )
-    .add_set_cookie(
-        "edge-token".to_string(),
-        tinker.authed_token().to_string(),
-        time::Duration::days(365),
-    )
-    .build()
-    .into_response()
-}
-
 async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     let svc = state.get_container().list_boards();
     let boards = svc.execute(()).await.unwrap();
 
     Json(boards)
-}
-
-fn get_origin_ip(headers: &HeaderMap) -> &str {
-    let origin_ip = headers
-        .get("Cf-Connecting-IP")
-        .or_else(|| headers.get("X-Forwarded-For"))
-        .map(|x| x.to_str());
-
-    if is_prod() {
-        origin_ip.unwrap().unwrap()
-    } else {
-        origin_ip.unwrap_or(Ok("localhost")).unwrap()
-    }
-}
-
-fn get_ua(headers: &HeaderMap) -> &str {
-    headers
-        .get("User-Agent")
-        .map(|x| x.to_str())
-        .unwrap_or(Ok("unknown"))
-        .unwrap()
-}
-
-fn get_asn_num(headers: &HeaderMap) -> u32 {
-    let header_name = env::var("ASN_NUMBER_HEADER_NAME").unwrap_or("X-ASN-Num".to_string());
-
-    let header = headers.get(header_name).map(|x| x.to_str());
-
-    if is_prod() {
-        header.unwrap().unwrap().parse::<u32>().unwrap()
-    } else {
-        header.unwrap_or(Ok("0")).unwrap().parse::<u32>().unwrap()
-    }
-}
-
-fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
-    let key = jwt_simple::prelude::HS256Key::from_bytes(
-        &base64::engine::general_purpose::STANDARD
-            .decode(secret.trim())
-            .unwrap(),
-    );
-    let tinker = key.verify_token::<Tinker>(tinker, None).ok()?;
-
-    Some(tinker.custom)
 }
