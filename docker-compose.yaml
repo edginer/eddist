@@ -1,0 +1,68 @@
+# Docker compose file for running the application
+services:
+  eddist:
+    image: ghcr.io/edginer/eddist:latest
+    container_name: eddist_container
+    ports:
+      - "8080:8080"
+    env_file:
+      - .docker-compose.env
+    volumes:
+      - ./captcha-config.json:/captcha-config.json:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  # optional (but strongly recommended)
+  eddist_admin:
+    image: ghcr.io/edginer/eddist-admin:latest
+    container_name: eddist_admin_container
+    ports:
+      - "8081:8081"
+    env_file:
+      - .docker-compose.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  # optional (use only if database is down)
+  eddist_persistence:
+    image: ghcr.io/edginer/eddist-persistence:latest
+    container_name: eddist_persistence_container
+    env_file:
+      - .docker-compose.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  # This project needs to run cron jobs (e.g., for thread archiving), but docker-compose does not support cron jobs.
+  # If you want to run `eddist-cron` for this project, you need to do something without docker-compose. (We does not mention it here.)
+
+  redis:
+    image: valkey/valkey:8.0
+    container_name: redis_container
+    ports:
+      - "6379:6379"
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_container
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: eddist
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mysql_data:
