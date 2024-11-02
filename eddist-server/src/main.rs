@@ -209,6 +209,7 @@ async fn main() -> anyhow::Result<()> {
 
     let serve_dir_inner = serve_dir.clone();
     let serve_file_inner = serve_file.clone();
+    let serve_file_inner2 = serve_file.clone();
 
     let app = Router::new()
         .route("/health-check", get(health_check))
@@ -222,6 +223,15 @@ async fn main() -> anyhow::Result<()> {
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
         .route("/metrics", get(|| async move { metric_handle.render() }))
+        .route_service(
+            "/:boardKey",
+            get(|Path(_): Path<String>| async move {
+                serve_file_inner
+                    .clone()
+                    .oneshot(Request::new(Body::empty()))
+                    .await
+            }),
+        )
         .route_service(
             "/:boardKey/:threadId",
             get(
@@ -239,7 +249,7 @@ async fn main() -> anyhow::Result<()> {
                             .await
                     } else {
                         // Return index.html
-                        serve_file_inner
+                        serve_file_inner2
                             .clone()
                             .oneshot(Request::new(Body::empty()))
                             .await
