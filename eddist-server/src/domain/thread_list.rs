@@ -16,7 +16,7 @@ impl ThreadList {
             .iter()
             .map(|x| {
                 format!(
-                    "{}.dat<> {} ({})\n",
+                    "{}.dat<>{} ({})\n",
                     x.thread_number, x.title, x.response_count
                 )
             })
