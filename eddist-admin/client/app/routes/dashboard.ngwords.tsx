@@ -93,6 +93,7 @@ const NgWords = () => {
                 });
                 await mutate();
                 setOpenEditNgModal(false);
+                reset();
                 toast.success("Successfully updated NG word");
                 await refetch();
               } catch (e) {
