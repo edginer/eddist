@@ -7,10 +7,10 @@ import {
   Table,
   TextInput,
 } from "flowbite-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import {
   deleteNgWord,
   getBoards,
@@ -19,12 +19,18 @@ import {
 } from "~/hooks/queries";
 import CreateNgWordModal from "~/components/CreateNgWordModal";
 import { toast } from "react-toastify";
+import Select from "react-select";
 
 interface NgWord {
   id: string;
   name: string;
   word: string;
   boardIds: string[];
+}
+
+interface BoardSelectOption {
+  label: string;
+  value: string;
 }
 
 const NgWords = () => {
@@ -34,12 +40,18 @@ const NgWords = () => {
   const [selectedNgWord, setSelectedNgWord] = useState<NgWord | undefined>(
     undefined
   );
-  const { register, handleSubmit, control, getValues } = useForm();
-  const { fields } = useFieldArray({
-    control,
-    name: "boardIds",
-  });
+  const { register, handleSubmit, control, reset } = useForm();
+
   const { data: boards } = getBoards({});
+  const boardSelectOptions = useMemo(() => {
+    if (boards) {
+      return boards.map((board) => ({
+        label: board.board_key,
+        value: board.board_key,
+      }));
+    }
+    return [];
+  }, [boards]);
 
   return (
     <>
@@ -48,21 +60,25 @@ const NgWords = () => {
         setOpen={setOpenCreateNgModal}
         refetch={refetch}
       />
-      <Modal show={openEditNgModal} onClose={() => setOpenEditNgModal(false)}>
+      <Modal
+        show={openEditNgModal}
+        onClose={() => {
+          reset();
+          setOpenEditNgModal(false);
+        }}
+      >
         <Modal.Header>Edit NG Word</Modal.Header>
         <Modal.Body>
           <form
             onSubmit={handleSubmit(async (data) => {
               try {
-                const boardIds = Object.entries(data.boardIds)
-                  .map((val: [string, unknown]) => {
-                    const boardKey = val[0];
-                    const boardId = boards!.find(
-                      (board) => board.board_key === boardKey
-                    )?.id;
-                    return boardId;
-                  })
-                  .filter((x) => x != null);
+                console.log(data);
+                const boardIds = data.boardKeys.map(
+                  (val: BoardSelectOption) =>
+                    boards!.find((board) => board.board_key === val.value)?.id
+                );
+                console.log(boardIds);
+
                 const { mutate } = updateNgWord({
                   params: {
                     path: {
@@ -115,29 +131,41 @@ const NgWords = () => {
             </div>
             <div>
               Boards
-              <div>
-                {boards!.map((board, index) => (
-                  <div key={`board-key:${board.board_key}`}>
-                    <Checkbox
-                      id={`board-key-checkbox-${index}`}
-                      key={`board-key:${board.board_key}`}
-                      {...register(`boardIds.${board.board_key}`)}
-                      defaultChecked={selectedNgWord?.boardIds.includes(
-                        board.board_key
-                      )}
-                    />
-                    <Label
-                      htmlFor={`board-key-checkbox-${board.board_key}`}
-                      className="ml-2"
-                    >
-                      {board.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              <Controller
+                name="boardKeys"
+                control={control}
+                defaultValue={selectedNgWord?.boardIds.map((boardId) => {
+                  const board = boards!.find((b) => b.id === boardId);
+                  return {
+                    label: board!.board_key,
+                    value: board!.board_key,
+                  };
+                })}
+                render={({ field }) => (
+                  <Select
+                    options={boardSelectOptions}
+                    value={boardSelectOptions
+                      .map((board) => {
+                        if (
+                          field.value?.find(
+                            (v: BoardSelectOption) => v.value === board.value
+                          )
+                        ) {
+                          return board;
+                        }
+                        return null;
+                      })
+                      .filter((board) => board != null)}
+                    onChange={(value) => {
+                      field.onChange(value);
+                    }}
+                    isMulti
+                  />
+                )}
+              />
             </div>
             <Button type="submit" className="mt-4">
-              Create
+              Edit
             </Button>
           </form>
         </Modal.Body>

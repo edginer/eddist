@@ -10,6 +10,7 @@ import "./tailwind.css";
 import { ErrorBoundary } from "react-error-boundary";
 import { Suspense, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const reactQueryClient = new QueryClient({});

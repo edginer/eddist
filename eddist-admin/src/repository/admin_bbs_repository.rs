@@ -1086,7 +1086,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 word AS "word!: String",
                 created_at AS "created_at!: chrono::DateTime<Utc>",
                 updated_at AS "updated_at!: chrono::DateTime<Utc>",
-                board_id AS "board_id!: Uuid"
+                board_id AS "board_id: Uuid"
             FROM
                 ng_words AS ng
                 LEFT OUTER JOIN boards_ng_words AS bng
@@ -1097,7 +1097,12 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             id,
         );
 
-        let selection = query.fetch_one(&self.0).await?;
+        let selections = query.fetch_all(&self.0).await?;
+        let board_ids = selections
+            .iter()
+            .filter_map(|selection| selection.board_id)
+            .collect::<Vec<_>>();
+        let selection = selections.into_iter().next().unwrap();
 
         Ok(NgWord {
             id: selection.id,
@@ -1105,11 +1110,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             word: selection.word,
             created_at: selection.created_at,
             updated_at: selection.updated_at,
-            board_ids: if let Some(board_id) = selection.board_id {
-                vec![board_id]
-            } else {
-                Vec::new()
-            },
+            board_ids,
         })
     }
 }
