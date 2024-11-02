@@ -104,6 +104,62 @@ impl AppState {
     }
 }
 
+fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
+    let mut template_engine = Handlebars::new();
+    template_engine
+        .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "term-of-usage.get",
+            include_str!("templates/term-of-usage.get.hbs"),
+        )
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "auth-code.post.success",
+            include_str!("templates/auth-code.post.success.hbs"),
+        )
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "auth-code.post.failed",
+            include_str!("templates/auth-code.post.failed.hbs"),
+        )
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "setting-txt.get",
+            include_str!("templates/setting-txt.get.hbs"),
+        )
+        .unwrap();
+
+    let index_html = std::fs::read_to_string(index_html_path).unwrap();
+    template_engine
+        .register_template_string("dist-index_html", &index_html)
+        .unwrap();
+
+    template_engine
+}
+
+fn render_index_html(template_engine: &Handlebars<'static>) -> impl IntoResponse {
+    let mut resp = Html(
+        template_engine
+            .render(
+                "dist-index_html",
+                &serde_json::json!({
+                    "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string())
+                }),
+            )
+            .unwrap(),
+    )
+    .into_response();
+
+    resp.headers_mut()
+        .insert("Cache-Control", "s-maxage=300".parse().unwrap());
+    resp
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if !is_prod() {
@@ -146,21 +202,16 @@ async fn main() -> anyhow::Result<()> {
     let captcha_like_configs =
         serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
 
-    let mut template_engine = Handlebars::new();
-    template_engine
-        .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))?;
-    template_engine.register_template_string(
-        "term-of-usage.get",
-        include_str!("templates/term-of-usage.get.hbs"),
-    )?;
-    template_engine.register_template_string(
-        "auth-code.post.success",
-        include_str!("templates/auth-code.post.success.hbs"),
-    )?;
-    template_engine.register_template_string(
-        "auth-code.post.failed",
-        include_str!("templates/auth-code.post.failed.hbs"),
-    )?;
+    let serve_dir = if is_prod() {
+        "dist"
+    } else {
+        "eddist-server/client/dist"
+    };
+
+    let template_engine = load_template_engine(&format!("{serve_dir}/index.html"));
+
+    let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
+    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file.clone());
 
     let s3_client = s3::bucket::Bucket::new(
         env::var("S3_BUCKET_NAME").unwrap().trim(),
@@ -190,14 +241,6 @@ async fn main() -> anyhow::Result<()> {
         template_engine,
     };
 
-    let serve_dir = if is_prod() {
-        "dist"
-    } else {
-        "eddist-server/client/dist"
-    };
-    let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
-    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file.clone());
-
     log::info!("Start application server with 0.0.0.0:8080");
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
     describe_counter!(
@@ -208,8 +251,6 @@ async fn main() -> anyhow::Result<()> {
     describe_counter!("thread_creation", "thread creation count if success");
 
     let serve_dir_inner = serve_dir.clone();
-    let serve_file_inner = serve_file.clone();
-    let serve_file_inner2 = serve_file.clone();
 
     let app = Router::new()
         .route("/health-check", get(health_check))
@@ -223,39 +264,37 @@ async fn main() -> anyhow::Result<()> {
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
         .route("/metrics", get(|| async move { metric_handle.render() }))
-        .route_service(
+        .route(
             "/:boardKey",
-            get(|Path(_): Path<String>| async move {
-                serve_file_inner
-                    .clone()
-                    .oneshot(Request::new(Body::empty()))
-                    .await
+            get(|State(state): State<AppState>| async move {
+                render_index_html(&state.template_engine)
+            }),
+        )
+        .route(
+            "/",
+            get(|State(state): State<AppState>| async move {
+                render_index_html(&state.template_engine)
             }),
         )
         .route_service(
+            "/assets/:item",
+            get(|Path(item): Path<String>| async move {
+                serve_dir_inner
+                    .clone()
+                    .oneshot(
+                        Request::builder()
+                            .uri(format!("/assets/{}", item))
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                    .await
+            }),
+        )
+        .route(
             "/:boardKey/:threadId",
-            get(
-                |Path((board_key, thread_id)): Path<(String, String)>| async move {
-                    if board_key == "assets" {
-                        // Serve assets
-                        serve_dir_inner
-                            .clone()
-                            .oneshot(
-                                Request::builder()
-                                    .uri(format!("/assets/{}", thread_id))
-                                    .body(Body::empty())
-                                    .unwrap(),
-                            )
-                            .await
-                    } else {
-                        // Return index.html
-                        serve_file_inner2
-                            .clone()
-                            .oneshot(Request::new(Body::empty()))
-                            .await
-                    }
-                },
-            ),
+            get(|State(app_state): State<AppState>| async move {
+                render_index_html(&app_state.template_engine)
+            }),
         )
         .route(
             "/test/read.cgi/:boardKey/:threadId",
@@ -422,17 +461,23 @@ async fn get_setting_txt(
         .await
         .unwrap();
     let max_response_body_lines = max_response_body_lines / 2;
-    let setting_txt = format!(
-        "{board_key}@{board_key}
-BBS_TITLE={name}
-BBS_TITLE_ORIG={name}
-BBS_LINE_NUMBER={max_response_body_lines}
-BBS_NONAME_NAME={default_name}
-BBS_SUBJECT_COUNT={max_thread_name_byte_length}
-BBS_NAME_COUNT={max_author_name_byte_length}
-BBS_MAIL_COUNT={max_email_byte_length}
-BBS_MESSAGE_COUNT={max_response_body_byte_length}"
-    );
+
+    let setting_txt = state
+        .template_engine
+        .render(
+            "setting-txt.get",
+            &serde_json::json!({
+                "board_key": board_key,
+                "name": name,
+                "default_name": default_name,
+                "max_thread_name_byte_length": max_thread_name_byte_length,
+                "max_author_name_byte_length": max_author_name_byte_length,
+                "max_email_byte_length": max_email_byte_length,
+                "max_response_body_byte_length": max_response_body_byte_length,
+                "max_response_body_lines": max_response_body_lines,
+            }),
+        )
+        .unwrap();
 
     SJisResponseBuilder::new((&setting_txt as &str).into())
         .client_ttl(120)
@@ -480,12 +525,18 @@ async fn get_term_of_usage(State(state): State<AppState>) -> impl IntoResponse {
         )
         .unwrap();
 
-    Html(html)
+    let mut resp = Html(html).into_response();
+    resp.headers_mut()
+        .insert("Cache-Control", "s-maxage=300".parse().unwrap());
+    resp
 }
 
 async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     let svc = state.get_container().list_boards();
     let boards = svc.execute(()).await.unwrap();
 
-    Json(boards)
+    let mut resp = Json(boards).into_response();
+    resp.headers_mut()
+        .insert("Cache-Control", "s-maxage=300".parse().unwrap());
+    resp
 }
