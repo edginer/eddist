@@ -1,13 +1,13 @@
 import { useQuery as useSuspenseQuery } from "@tanstack/react-query";
-import { Button, Label, Modal, Textarea, TextInput } from "flowbite-react";
+import { Button, HR, Label, Modal, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { twMerge } from "tailwind-merge";
-import { postResponse } from "./utils";
-import AuthCodeModal from "./AuthCodeModal";
-import ErrorModal from "./ErrorModal";
+import { postResponse } from "../utils";
+import AuthCodeModal from "../AuthCodeModal";
+import ErrorModal from "../ErrorModal";
 
 interface Response {
   name: string;
@@ -219,11 +219,12 @@ const ThreadPage = () => {
           書き込み
         </Button>
       </header>
-      <div className=" mx-auto bg-white border border-gray-300 rounded-lg shadow-md mt-4">
+      <HR className="my-4" />
+      <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md mt-4">
         <div className="p-4 bg-gray-100 border-b border-gray-300">
           <div className="text-lg">{posts?.threadName}</div>
         </div>
-        <div>
+        <div className="overflow-y-auto h-[calc(100vh-11rem)] lg:h-[calc(100vh-14rem)]">
           {posts?.responses.map((post) => (
             <div key={post.id} className="border-b border-gray-300 p-4">
               <div className="text-sm text-gray-500">

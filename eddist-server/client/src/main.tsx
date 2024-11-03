@@ -7,9 +7,9 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const TopPage = React.lazy(() => import("./TopPage.tsx"));
-const ThreadListPage = React.lazy(() => import("./ThreadListPage.tsx"));
-const ThreadPage = React.lazy(() => import("./ThreadPage.tsx"));
+const TopPage = React.lazy(() => import("./pages/TopPage.tsx"));
+const ThreadListPage = React.lazy(() => import("./pages/ThreadListPage.tsx"));
+const ThreadPage = React.lazy(() => import("./pages/ThreadPage.tsx"));
 
 // React-router-dom v6
 // Pages
@@ -31,10 +31,6 @@ const router = createBrowserRouter([
   {
     path: "/:boardKey/:threadKey",
     element: <ThreadPage></ThreadPage>,
-  },
-  {
-    path: "/terms",
-    element: <></>,
   },
 ]);
 

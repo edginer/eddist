@@ -1,13 +1,13 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Button, Label, Modal, Textarea, TextInput } from "flowbite-react";
+import { Button, HR, Label, Modal, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { FaArrowLeft } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
-import { postThread } from "./utils";
-import AuthCodeModal from "./AuthCodeModal";
-import ErrorModal from "./ErrorModal";
+import { postThread } from "../utils";
+import AuthCodeModal from "../AuthCodeModal";
+import ErrorModal from "../ErrorModal";
 
 interface Thread {
   title: string;
@@ -223,7 +223,8 @@ const ThreadListPage = () => {
           スレッド作成
         </Button>
       </header>
-      <div className="flex flex-col lg:flex-grow pt-8">
+      <HR className="my-4" />
+      <div className="flex flex-col lg:flex-grow">
         {data.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (
@@ -238,7 +239,11 @@ const ThreadListPage = () => {
               }}
             >
               <div>
-                <span>{thread.title}</span>
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: thread.title,
+                  }}
+                />
                 <span> ({thread.responseCount})</span>
               </div>
               <div>
