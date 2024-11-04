@@ -142,13 +142,17 @@ fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
     template_engine
 }
 
-fn render_index_html(template_engine: &Handlebars<'static>) -> impl IntoResponse {
+fn render_index_html(
+    template_engine: &Handlebars<'static>,
+    canonical: Option<String>,
+) -> impl IntoResponse {
     let mut resp = Html(
         template_engine
             .render(
                 "dist-index_html",
                 &serde_json::json!({
-                    "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string())
+                    "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string()),
+                    "canonical": canonical,
                 }),
             )
             .unwrap(),
@@ -266,14 +270,23 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
             "/:boardKey",
-            get(|State(state): State<AppState>| async move {
-                render_index_html(&state.template_engine)
-            }),
+            get(
+                |State(state): State<AppState>, Path(board_key): Path<String>| async move {
+                    render_index_html(
+                        &state.template_engine,
+                        if let Some(base_url) = env::var("BASE_URL").ok() {
+                            Some(format!("{base_url}/{board_key}"))
+                        } else {
+                            None
+                        },
+                    )
+                },
+            ),
         )
         .route(
             "/",
             get(|State(state): State<AppState>| async move {
-                render_index_html(&state.template_engine)
+                render_index_html(&state.template_engine, env::var("BASE_URL").ok())
             }),
         )
         .route_service(
@@ -292,9 +305,19 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/:boardKey/:threadId",
-            get(|State(app_state): State<AppState>| async move {
-                render_index_html(&app_state.template_engine)
-            }),
+            get(
+                |State(app_state): State<AppState>,
+                 Path((board_key, thread_id)): Path<(String, String)>| async move {
+                    render_index_html(
+                        &app_state.template_engine,
+                        if let Some(base_url) = env::var("BASE_URL").ok() {
+                            Some(format!("{base_url}/{board_key}/{thread_id}"))
+                        } else {
+                            None
+                        },
+                    )
+                },
+            ),
         )
         .route(
             "/test/read.cgi/:boardKey/:threadId",

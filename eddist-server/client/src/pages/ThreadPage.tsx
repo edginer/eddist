@@ -224,7 +224,7 @@ const ThreadPage = () => {
         <div className="p-4 bg-gray-100 border-b border-gray-300">
           <div className="text-lg">{posts?.threadName}</div>
         </div>
-        <div className="overflow-y-auto h-[calc(100vh-11rem)] lg:h-[calc(100vh-14rem)]">
+        <div className="overflow-y-auto max-h-[calc(100vh-11rem)] lg:max-h-[calc(100vh-14rem)]">
           {posts?.responses.map((post) => (
             <div key={post.id} className="border-b border-gray-300 p-4">
               <div className="text-sm text-gray-500">

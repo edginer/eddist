@@ -240,6 +240,7 @@ const ThreadListPage = () => {
             >
               <div>
                 <span
+                  className="break-all"
                   dangerouslySetInnerHTML={{
                     __html: thread.title,
                   }}
