@@ -34,7 +34,7 @@ pub fn get_sjis_bytes(
     if res_view.is_abone {
         SJisStr::from(
             format!(
-                "あぼーん<>あぼーん<><> あぼーん<> {}\n",
+                "あぼーん<>あぼーん<><> あぼーん <>{}\n",
                 thread_title.unwrap_or_default()
             )
             .as_str(),
@@ -42,7 +42,7 @@ pub fn get_sjis_bytes(
     } else {
         SJisStr::from(
             format!(
-                "{}<>{}<>{} ID:{}<> {}<> {}\n",
+                "{}<>{}<>{} ID:{}<> {} <>{}\n",
                 if res_view.author_name.is_empty() {
                     default_name
                 } else {
@@ -84,7 +84,7 @@ impl ResView {
     ) -> SJisStr {
         SJisStr::from(
             format!(
-                "{}<>{}<>{} ID:{}<>{}<>{}<> {}<> {}\n",
+                "{}<>{}<>{} ID:{}<>{}<>{}<> {} <>{}\n",
                 if self.author_name.is_empty() {
                     default_name
                 } else {
