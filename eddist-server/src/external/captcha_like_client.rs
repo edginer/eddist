@@ -58,8 +58,10 @@ impl CaptchaClient for TurnstileClient {
         let resp = match res.json::<TurnstileResponse>().await {
             Ok(resp) => resp,
             Err(e) => {
-                log::error!("Failed to parse Turnstile response");
-                return Err(e);
+                log::error!("Failed to parse Turnstile response, {e}");
+                return Ok(CaptchaLikeResult::Failure(
+                    CaptchaLikeError::FailedToVerifyCaptcha,
+                ));
             }
         };
 
