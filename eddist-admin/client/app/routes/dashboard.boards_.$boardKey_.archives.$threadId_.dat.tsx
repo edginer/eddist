@@ -215,9 +215,11 @@ const Page = () => {
           adminResponses={adminArchivedThread.data?.responses!!}
           selectedResponsesOrder={selectedResponsesOrder}
           setSelectedResponsesOrder={setSelectedResponsesOrder}
-          onClickDeleteAuthedToken={(token) => deleteAuthedToken(token, false)}
-          onClickDeleteAuthedTokensAssociatedWithIp={(token) =>
-            deleteAuthedToken(token, true)
+          onClickDeleteAuthedToken={async (token) =>
+            await deleteAuthedToken(token, false)
+          }
+          onClickDeleteAuthedTokensAssociatedWithIp={async (token) =>
+            await deleteAuthedToken(token, true)
           }
           onClickEditResponse={(idx) => {
             setOnEditResponseOrder(idx);
@@ -228,8 +230,9 @@ const Page = () => {
               res_order: idx,
             });
           }}
-          onClieckAbon={(idx) => {
-            deleteResponse(idx);
+          onClieckAbon={async (idx) => {
+            const { mutate } = deleteResponse(idx);
+            await mutate();
           }}
         />
       </div>

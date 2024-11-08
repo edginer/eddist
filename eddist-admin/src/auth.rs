@@ -216,13 +216,6 @@ pub async fn auth_simple_header(
         return next.run(req).await;
     }
 
-    // if !matches!(
-    //     std::env::var("RUST_ENV").as_deref(),
-    //     Ok("prod" | "production")
-    // ) {
-    //     return next.run(req).await;
-    // }
-
     Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .body(Body::empty())
