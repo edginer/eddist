@@ -258,6 +258,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health-check", get(health_check))
+        .route("/robots.txt", get(get_robots_txt))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
         .route("/:boardKey/subject.txt", get(get_subject_txt))
@@ -562,4 +563,14 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     resp.headers_mut()
         .insert("Cache-Control", "s-maxage=300".parse().unwrap());
     resp
+}
+
+async fn get_robots_txt() -> impl IntoResponse {
+    let robot_txt = "User-agent: *\nAllow: /\nDisallow: /auth-code\n";
+    SJisResponseBuilder::new((&robot_txt as &str).into())
+        .client_ttl(60 * 60 * 24)
+        .server_ttl(60 * 60 * 24)
+        .content_type(SjisContentType::TextPlain)
+        .build()
+        .into_response()
 }
