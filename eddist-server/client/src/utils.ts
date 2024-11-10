@@ -38,11 +38,40 @@ interface PostResponseFailureUnknown {
 }
 
 const convertToSjisText = (text: string): string => {
-  const sjis = Encoding.convert(Encoding.stringToCode(text), {
-    to: "SJIS",
-    from: "UNICODE",
-  });
-  return Encoding.urlEncode(sjis);
+  const resultArray = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const codePoint = text.codePointAt(i);
+    if (codePoint == null) {
+      throw new Error("Invalid code point");
+    }
+
+    // Move to the next index if the code point is a surrogate pair
+    if (codePoint > 0xffff) i++;
+
+    const char = String.fromCodePoint(codePoint);
+
+    const encodedChar = Encoding.convert(char, {
+      to: "SJIS",
+      from: "UNICODE",
+      type: "array",
+    });
+
+    // Check if encoding succeeded (non-Shift-JIS characters are usually replaced by '?')
+    if (encodedChar.length === 1 && encodedChar[0] === 63) {
+      const numericRef = `&#${codePoint};`;
+      const encodedRef = Encoding.convert(numericRef, {
+        to: "SJIS",
+        from: "UNICODE",
+        type: "array",
+      });
+      resultArray.push(...encodedRef);
+    } else {
+      resultArray.push(...encodedChar);
+    }
+  }
+
+  return Encoding.urlEncode(new Uint8Array(resultArray));
 };
 
 const convertToUtf8Text = (text: ArrayBuffer): string => {

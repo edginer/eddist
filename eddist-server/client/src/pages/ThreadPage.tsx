@@ -222,7 +222,10 @@ const ThreadPage = () => {
       <HR className="my-4" />
       <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md mt-4">
         <div className="p-4 bg-gray-100 border-b border-gray-300">
-          <div className="text-lg">{posts?.threadName}</div>
+          <div
+            className="text-lg"
+            dangerouslySetInnerHTML={{ __html: posts?.threadName ?? "" }}
+          ></div>
         </div>
         <div className="overflow-y-auto max-h-[calc(100vh-11rem)] lg:max-h-[calc(100vh-14rem)]">
           {posts?.responses.map((post) => (
