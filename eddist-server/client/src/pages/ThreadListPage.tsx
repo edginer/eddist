@@ -1,13 +1,10 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Button, HR, Label, Modal, Textarea, TextInput } from "flowbite-react";
+import { Button, HR } from "flowbite-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { FaArrowLeft } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
-import { postThread } from "../utils";
-import AuthCodeModal from "../AuthCodeModal";
-import ErrorModal from "../ErrorModal";
+import PostThreadModal from "../PostThreadModal";
 
 interface Thread {
   title: string;
@@ -73,7 +70,6 @@ const convertLinuxTimeToDateString = (linuxTime: number): string => {
 const ThreadListPage = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const { register, handleSubmit } = useForm();
 
   const { data: boards } = useSuspenseQuery({
     queryKey: ["boards"],
@@ -98,112 +94,15 @@ const ThreadListPage = () => {
   });
 
   const [creatingThread, setCreatingThread] = useState(false);
-  const [openAuthCodeModal, setOpenAuthCodeModal] = useState(false);
-  const [authCode, setAuthCode] = useState("");
-  const [errorModal, serErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
   return (
     <div>
-      <Modal
-        show={creatingThread}
-        size="5xl"
-        onClose={() => setCreatingThread(false)}
-      >
-        <ErrorModal
-          openErrorModal={errorModal}
-          setOpenErrorModal={serErrorModal}
-          errorMessage={errorMessage}
-        />
-        <AuthCodeModal
-          openAuthCodeModal={openAuthCodeModal}
-          setOpenAuthCodeModal={setOpenAuthCodeModal}
-          authCode={authCode}
-        />
-        <Modal.Header>
-          <h3 className="lg:text-2xl">スレッド作成</h3>
-        </Modal.Header>
-        <Modal.Body>
-          <form
-            onSubmit={handleSubmit(async (data) => {
-              const result = await postThread({
-                title: data.title,
-                name: data.name,
-                mail: data.mail,
-                body: data.body,
-                boardKey: params.boardKey!,
-              });
-              if (!result.success) {
-                switch (result.error.kind) {
-                  case "auth-code":
-                    setAuthCode(result.error.authCode);
-                    setOpenAuthCodeModal(true);
-                    return;
-                  case "unknown":
-                    serErrorModal(true);
-                    setErrorMessage(result.error.errorHtml);
-                    return;
-                  default:
-                    break;
-                }
-              }
-              setCreatingThread(false);
-              await refetch();
-            })}
-          >
-            <div className="space-y-6">
-              <div>
-                <div className="mb-2 block">
-                  <Label htmlFor="modal-thread-name" value="スレッド名" />
-                </div>
-                <TextInput
-                  id="modal-thread-name"
-                  placeholder="スレッド名..."
-                  required
-                  {...register("title", { required: true })}
-                />
-              </div>
-              <div className="flex justify-between">
-                <div className="flex-grow mr-2">
-                  <div className="mb-2 block">
-                    <Label htmlFor="modal-name" value="名前" />
-                  </div>
-                  <TextInput
-                    id="modal-name"
-                    placeholder="名前..."
-                    {...register("name")}
-                  />
-                </div>
-                <div className="flex-grow ml-2">
-                  <div className="mb-2 block">
-                    <Label htmlFor="modal-email" value="メール" />
-                  </div>
-                  <TextInput
-                    id="modal-email"
-                    placeholder="メール..."
-                    {...register("mail")}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="mb-2 block">
-                  <Label value="本文" />
-                </div>
-                <Textarea
-                  placeholder="本文..."
-                  required
-                  rows={8}
-                  {...register("body", { required: true })}
-                />
-              </div>
-
-              <div className="w-full">
-                <Button type="submit">書き込む</Button>
-              </div>
-            </div>
-          </form>
-        </Modal.Body>
-      </Modal>
+      <PostThreadModal
+        boardKey={params.boardKey!}
+        open={creatingThread}
+        setOpen={setCreatingThread}
+        refetchThreadList={refetch}
+      />
       <header className="flex justify-between items-center">
         <Link to="/">
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
