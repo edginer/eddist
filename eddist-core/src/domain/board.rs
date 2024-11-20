@@ -27,13 +27,13 @@ pub struct BoardInfo {
     pub read_only: bool,
 }
 
-pub fn validate_board_key(board_key: &str) -> Result<(), ()> {
+pub fn validate_board_key(board_key: &str) -> anyhow::Result<()> {
     (board_key
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
         && board_key.len() < 64)
-        .then(|| ())
-        .ok_or(())
+        .then_some(())
+        .ok_or(anyhow::anyhow!("invalid board key"))
 }
 
 #[cfg(test)]
@@ -61,7 +61,8 @@ mod tests {
         ];
 
         for (input, expected) in cases.iter() {
-            assert_eq!(validate_board_key(input), *expected);
+            let result = validate_board_key(input);
+            assert_eq!(expected.is_ok(), result.is_ok());
         }
     }
 }

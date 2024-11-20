@@ -275,11 +275,9 @@ async fn main() -> anyhow::Result<()> {
                 |State(state): State<AppState>, Path(board_key): Path<String>| async move {
                     render_index_html(
                         &state.template_engine,
-                        if let Some(base_url) = env::var("BASE_URL").ok() {
-                            Some(format!("{base_url}/{board_key}"))
-                        } else {
-                            None
-                        },
+                        env::var("BASE_URL")
+                            .ok()
+                            .map(|base_url| format!("{base_url}/{board_key}")),
                     )
                 },
             ),
@@ -311,11 +309,9 @@ async fn main() -> anyhow::Result<()> {
                  Path((board_key, thread_id)): Path<(String, String)>| async move {
                     render_index_html(
                         &app_state.template_engine,
-                        if let Some(base_url) = env::var("BASE_URL").ok() {
-                            Some(format!("{base_url}/{board_key}/{thread_id}"))
-                        } else {
-                            None
-                        },
+                        env::var("BASE_URL")
+                            .ok()
+                            .map(|base_url| format!("{base_url}/{board_key}/{thread_id}")),
                     )
                 },
             ),
@@ -567,7 +563,7 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn get_robots_txt() -> impl IntoResponse {
     let robot_txt = "User-agent: *\nAllow: /\nDisallow: /auth-code\n";
-    SJisResponseBuilder::new((&robot_txt as &str).into())
+    SJisResponseBuilder::new((robot_txt as &str).into())
         .client_ttl(60 * 60 * 24)
         .server_ttl(60 * 60 * 24)
         .content_type(SjisContentType::TextPlain)

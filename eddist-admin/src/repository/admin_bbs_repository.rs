@@ -578,8 +578,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
     ) -> anyhow::Result<Vec<Thread>> {
         let pool = &self.0;
 
-        let mut query = format!(
-            r#"
+        let mut query = r#"
             SELECT
                 *
             FROM
@@ -594,7 +593,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                         board_key = ?
                 )
             "#
-        );
+        .to_string();
 
         if keyword.is_some() {
             query.push_str("AND title LIKE ? ");

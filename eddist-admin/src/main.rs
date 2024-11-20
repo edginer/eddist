@@ -567,8 +567,8 @@ mod bbs {
                     start.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
                     end.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
                 ),
-                if let Some(page) = page { page } else { 0 },
-                if let Some(limit) = limit { limit } else { 20 },
+                page.unwrap_or(0),
+                limit.unwrap_or(20),
             )
             .await
             .unwrap();
