@@ -134,6 +134,7 @@ pub async fn auth_simple_header(
             }
             Err(ErrorKind::ExpiredSignature) => {
                 let Some(refresh_token) = &admin_session.refresh_token else {
+                    session.delete().await.unwrap();
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .body(Body::empty())
