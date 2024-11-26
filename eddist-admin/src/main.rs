@@ -20,6 +20,7 @@ use repository::{
         ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+    ngword_repository::{NgWordRepository, NgWordRepositoryImpl},
 };
 use s3::creds::Credentials;
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,7 @@ pub(crate) mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
     pub mod admin_repository;
+    pub mod ngword_repository;
 }
 pub(crate) mod role;
 
@@ -76,12 +78,20 @@ async fn ok() -> impl IntoResponse {
 }
 
 #[derive(Clone)]
-struct AppState<T: AdminBbsRepository + Clone, R: AdminArchiveRepository + Clone> {
+struct AppState<
+    T: AdminBbsRepository + Clone,
+    R: AdminArchiveRepository + Clone,
+    N: NgWordRepository + Clone,
+> {
     oauth2_client: oauth2::basic::BasicClient,
     admin_bbs_repo: T,
+    ng_word_repo: N,
     admin_archive_repo: R,
     redis_conn: redis::aio::ConnectionManager,
 }
+
+type DefaultAppState =
+    AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl, NgWordRepositoryImpl>;
 
 #[tokio::main]
 async fn main() {
@@ -204,7 +214,8 @@ async fn main() {
 
     let state = AppState {
         oauth2_client: client,
-        admin_bbs_repo: AdminBbsRepositoryImpl::new(pool),
+        admin_bbs_repo: AdminBbsRepositoryImpl::new(pool.clone()),
+        ng_word_repo: NgWordRepositoryImpl::new(pool),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
             .get_connection_manager()
@@ -424,13 +435,12 @@ mod bbs {
 
     use crate::{
         repository::{
-            admin_archive_repository::{
-                AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedResUpdate,
-            },
-            admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+            admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
+            admin_bbs_repository::AdminBbsRepository,
+            ngword_repository::NgWordRepository,
         },
-        AppState, Board, CreateBoardInput, CreationNgWordInput, DeleteAuthedTokenInput, NgWord,
-        Res, Thread, UpdateNgWordInput, UpdateResInput,
+        Board, CreateBoardInput, CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput,
+        NgWord, Res, Thread, UpdateNgWordInput, UpdateResInput,
     };
 
     #[utoipa::path(
@@ -440,9 +450,7 @@ mod bbs {
             (status = 200, description = "List boards successfully", body = Vec<Board>),
         )
     )]
-    pub async fn get_boards(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
-    ) -> Json<Vec<Board>> {
+    pub async fn get_boards(State(state): State<DefaultAppState>) -> Json<Vec<Board>> {
         let boards = state.admin_bbs_repo.get_boards_by_key(None).await.unwrap();
         boards.into()
     }
@@ -459,7 +467,7 @@ mod bbs {
         )
     )]
     pub async fn get_board(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(board_key): Path<String>,
     ) -> Response {
         let board = state
@@ -489,7 +497,7 @@ mod bbs {
         request_body = CreateBoardInput
     )]
     pub async fn create_board(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Json(body): Json<CreateBoardInput>,
     ) -> Response {
         if validate_board_key(&body.board_key).is_err() {
@@ -515,7 +523,7 @@ mod bbs {
         )
     )]
     pub async fn get_threads(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(board_key): Path<String>,
     ) -> Json<Vec<Thread>> {
         let threads = state
@@ -548,7 +556,7 @@ mod bbs {
         )
     )]
     pub async fn get_archived_threads(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(board_key): Path<String>,
         Query(GetArchivedThreadsQuery {
             keyword,
@@ -589,7 +597,7 @@ mod bbs {
         )
     )]
     pub async fn get_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Response {
         let thread = state
@@ -624,7 +632,7 @@ mod bbs {
         )
     )]
     pub async fn get_archived_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Response {
         let thread = state
@@ -658,7 +666,7 @@ mod bbs {
         )
     )]
     pub async fn get_responses(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Json<Vec<Res>> {
         let responses = state
@@ -682,7 +690,7 @@ mod bbs {
         )
     )]
     pub async fn get_archived_responses(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_id)): Path<(String, u64)>,
     ) -> Json<Vec<Res>> {
         let responses = state
@@ -706,7 +714,7 @@ mod bbs {
         )
     )]
     pub async fn get_dat_archived_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_number)): Path<(String, u64)>,
     ) -> Response {
         match state
@@ -737,7 +745,7 @@ mod bbs {
         )
     )]
     pub async fn get_admin_dat_archived_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_number)): Path<(String, u64)>,
     ) -> Response {
         match state
@@ -770,7 +778,7 @@ mod bbs {
         request_body = UpdateResInput
     )]
     pub async fn update_response(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((_a, _aa, res_id)): Path<(String, u64, Uuid)>,
         Json(body): Json<UpdateResInput>,
     ) -> Response {
@@ -846,7 +854,7 @@ mod bbs {
         request_body = Vec<ArchivedResUpdate>,
     )]
     pub async fn update_archived_res(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_number)): Path<(String, u64)>,
         Json(body): Json<Vec<ArchivedResUpdate>>,
     ) -> Response {
@@ -880,7 +888,7 @@ mod bbs {
         ),
     )]
     pub async fn delete_archived_res(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_number, res_order)): Path<(String, u64, u64)>,
     ) -> Response {
         if let Err(e) = state
@@ -912,7 +920,7 @@ mod bbs {
         ),
     )]
     pub async fn delete_archived_thread(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path((board_key, thread_number)): Path<(String, u64)>,
     ) -> Response {
         if let Err(e) = state
@@ -943,7 +951,7 @@ mod bbs {
         ),
     )]
     pub async fn get_authed_token(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(authed_token_id): Path<Uuid>,
     ) -> Response {
         let authed_token = state
@@ -970,7 +978,7 @@ mod bbs {
         ),
     )]
     pub async fn delete_authed_token(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(authed_token_id): Path<Uuid>,
         Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
     ) -> Response {
@@ -1001,10 +1009,8 @@ mod bbs {
             (status = 200, description = "List ng words successfully", body = Vec<NgWord>),
         )
     )]
-    pub async fn get_ng_words(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
-    ) -> Json<Vec<NgWord>> {
-        let ng_words = state.admin_bbs_repo.get_ng_words().await.unwrap();
+    pub async fn get_ng_words(State(state): State<DefaultAppState>) -> Json<Vec<NgWord>> {
+        let ng_words = state.ng_word_repo.get_ng_words().await.unwrap();
         ng_words.into()
     }
 
@@ -1017,11 +1023,11 @@ mod bbs {
         request_body = CreationNgWordInput
     )]
     pub async fn create_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Json(body): Json<CreationNgWordInput>,
     ) -> Response {
         let ng_word = state
-            .admin_bbs_repo
+            .ng_word_repo
             .create_ng_word(&body.name, &body.word)
             .await
             .unwrap();
@@ -1044,12 +1050,12 @@ mod bbs {
         request_body = UpdateNgWordInput
     )]
     pub async fn update_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(ng_word_id): Path<Uuid>,
         Json(body): Json<UpdateNgWordInput>,
     ) -> Response {
         let ng_word = state
-            .admin_bbs_repo
+            .ng_word_repo
             .update_ng_word(
                 ng_word_id,
                 body.name.as_deref(),
@@ -1076,14 +1082,10 @@ mod bbs {
         ),
     )]
     pub async fn delete_ng_word(
-        State(state): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+        State(state): State<DefaultAppState>,
         Path(ng_word_id): Path<Uuid>,
     ) -> Response {
-        state
-            .admin_bbs_repo
-            .delete_ng_word(ng_word_id)
-            .await
-            .unwrap();
+        state.ng_word_repo.delete_ng_word(ng_word_id).await.unwrap();
 
         Response::builder()
             .status(200)

@@ -17,13 +17,7 @@ use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use tracing::info_span;
 
-use crate::{
-    repository::{
-        admin_archive_repository::AdminArchiveRepositoryImpl,
-        admin_bbs_repository::AdminBbsRepositoryImpl,
-    },
-    AppState,
-};
+use crate::{AppState, DefaultAppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeycloakAccessToken {
@@ -115,7 +109,7 @@ pub async fn auth_simple_header(
     State(AppState {
         oauth2_client: client,
         ..
-    }): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+    }): State<DefaultAppState>,
     admin_session: AdminSession,
     mut req: Request<Body>,
     next: Next,
@@ -264,7 +258,7 @@ pub async fn get_login(
     State(AppState {
         oauth2_client: oauth_client,
         ..
-    }): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+    }): State<DefaultAppState>,
     session: Session,
     _: AdminSession,
 ) -> impl IntoResponse {
@@ -310,7 +304,7 @@ pub async fn get_login_callback(
     State(AppState {
         oauth2_client: oauth_client,
         ..
-    }): State<AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl>>,
+    }): State<DefaultAppState>,
     session: Session,
     admin_session: AdminSession,
     query: axum::extract::Query<LoginCallbackQuery>,
