@@ -28,6 +28,7 @@ pub fn sanitize_base(input: &str, is_body: bool) -> String {
         .replace('\'', "&#39;")
         .replace('\r', "")
         .replace('\n', if is_body { "<br>" } else { "" })
+        .replace("&NewLine;", "")
 }
 
 pub fn sanitize_num_refs(input: &str) -> String {

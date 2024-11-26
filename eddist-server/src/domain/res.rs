@@ -326,6 +326,8 @@ fn sanitize_author_name(author_name: &str) -> String {
     sanitize_base(author_name, false)
         .replace("★", "☆")
         .replace("◆", "◇")
+        .replace("&starf;", "☆")
+        .replace("&bigstar;", "☆")
 }
 
 fn sanitize_email(email: &str) -> String {
