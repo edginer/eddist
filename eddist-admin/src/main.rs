@@ -20,6 +20,7 @@ use repository::{
         ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+    authed_token_repository::{AuthedTokenRepository, AuthedTokenRepositoryImpl},
     ngword_repository::{NgWordRepository, NgWordRepositoryImpl},
 };
 use s3::creds::Credentials;
@@ -45,6 +46,7 @@ pub(crate) mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
     pub mod admin_repository;
+    pub mod authed_token_repository;
     pub mod ngword_repository;
 }
 pub(crate) mod role;
@@ -82,16 +84,22 @@ struct AppState<
     T: AdminBbsRepository + Clone,
     R: AdminArchiveRepository + Clone,
     N: NgWordRepository + Clone,
+    A: AuthedTokenRepository + Clone,
 > {
     oauth2_client: oauth2::basic::BasicClient,
     admin_bbs_repo: T,
     ng_word_repo: N,
     admin_archive_repo: R,
+    authed_token_repo: A,
     redis_conn: redis::aio::ConnectionManager,
 }
 
-type DefaultAppState =
-    AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl, NgWordRepositoryImpl>;
+type DefaultAppState = AppState<
+    AdminBbsRepositoryImpl,
+    AdminArchiveRepositoryImpl,
+    NgWordRepositoryImpl,
+    AuthedTokenRepositoryImpl,
+>;
 
 #[tokio::main]
 async fn main() {
@@ -215,13 +223,14 @@ async fn main() {
     let state = AppState {
         oauth2_client: client,
         admin_bbs_repo: AdminBbsRepositoryImpl::new(pool.clone()),
-        ng_word_repo: NgWordRepositoryImpl::new(pool),
+        ng_word_repo: NgWordRepositoryImpl::new(pool.clone()),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
             .get_connection_manager()
             .await
             .unwrap(),
         admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
+        authed_token_repo: AuthedTokenRepositoryImpl::new(pool),
     };
 
     let app = Router::new()
@@ -437,6 +446,7 @@ mod bbs {
         repository::{
             admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
             admin_bbs_repository::AdminBbsRepository,
+            authed_token_repository::AuthedTokenRepository,
             ngword_repository::NgWordRepository,
         },
         Board, CreateBoardInput, CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput,
@@ -955,7 +965,7 @@ mod bbs {
         Path(authed_token_id): Path<Uuid>,
     ) -> Response {
         let authed_token = state
-            .admin_bbs_repo
+            .authed_token_repo
             .get_authed_token(authed_token_id)
             .await
             .unwrap();
@@ -984,13 +994,13 @@ mod bbs {
     ) -> Response {
         if using_origin_ip {
             state
-                .admin_bbs_repo
+                .authed_token_repo
                 .delete_authed_token(authed_token_id)
                 .await
                 .unwrap();
         } else {
             state
-                .admin_bbs_repo
+                .authed_token_repo
                 .delete_authed_token_by_origin_ip(authed_token_id)
                 .await
                 .unwrap();
