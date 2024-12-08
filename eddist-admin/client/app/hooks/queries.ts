@@ -376,3 +376,74 @@ export const updateNgWord = ({
   };
   return { mutate };
 };
+
+const GET_CAPS = "/caps/";
+
+export const getCaps = ({
+  params,
+}: UseQueryOptions<paths[typeof GET_CAPS]["get"]>) => {
+  return useSuspenseQuery({
+    queryKey: [GET_CAPS],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_CAPS, {
+        params,
+        signal,
+      });
+
+      if (data) {
+        data.sort((a, b) => {
+          if (a.id < b.id) {
+            return -1;
+          }
+          if (a.id > b.id) {
+            return 1;
+          }
+          return 0;
+        });
+      }
+
+      return data;
+    },
+  });
+};
+
+const CREATE_CAP = "/caps/";
+
+export const createCap = ({
+  body,
+}: UseQueryOptions<paths[typeof CREATE_CAP]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(CREATE_CAP, {
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_CAP = "/caps/{cap_id}/";
+
+export const deleteCap = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_CAP]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_CAP, {
+      params,
+    });
+  };
+  return { mutate };
+};
+
+const UPDATE_CAP = "/caps/{cap_id}/";
+
+export const updateCap = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_CAP]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_CAP, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};

@@ -1,14 +1,13 @@
 use std::{borrow::Cow, env};
 
 use chrono::Utc;
-use eddist_core::domain::{client_info::ClientInfo, tinker::Tinker};
+use eddist_core::domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker};
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
 use uuid::Uuid;
 
 use crate::{
     domain::{
-        cap::calculate_cap_hash,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,

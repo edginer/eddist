@@ -20,6 +20,8 @@ use repository::{
         ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+    authed_token_repository::{AuthedTokenRepository, AuthedTokenRepositoryImpl},
+    cap_repository::{CapRepository, CapRepositoryImpl},
     ngword_repository::{NgWordRepository, NgWordRepositoryImpl},
 };
 use s3::creds::Credentials;
@@ -45,6 +47,8 @@ pub(crate) mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
     pub mod admin_repository;
+    pub mod authed_token_repository;
+    pub mod cap_repository;
     pub mod ngword_repository;
 }
 pub(crate) mod role;
@@ -82,16 +86,25 @@ struct AppState<
     T: AdminBbsRepository + Clone,
     R: AdminArchiveRepository + Clone,
     N: NgWordRepository + Clone,
+    A: AuthedTokenRepository + Clone,
+    C: CapRepository + Clone,
 > {
     oauth2_client: oauth2::basic::BasicClient,
     admin_bbs_repo: T,
     ng_word_repo: N,
     admin_archive_repo: R,
+    authed_token_repo: A,
+    cap_repo: C,
     redis_conn: redis::aio::ConnectionManager,
 }
 
-type DefaultAppState =
-    AppState<AdminBbsRepositoryImpl, AdminArchiveRepositoryImpl, NgWordRepositoryImpl>;
+type DefaultAppState = AppState<
+    AdminBbsRepositoryImpl,
+    AdminArchiveRepositoryImpl,
+    NgWordRepositoryImpl,
+    AuthedTokenRepositoryImpl,
+    CapRepositoryImpl,
+>;
 
 #[tokio::main]
 async fn main() {
@@ -210,18 +223,24 @@ async fn main() {
         .route("/ng_words", get(bbs::get_ng_words))
         .route("/ng_words", post(bbs::create_ng_word))
         .route("/ng_words/:ngWordId", delete(bbs::delete_ng_word))
-        .route("/ng_words/:ngWordId", patch(bbs::update_ng_word));
+        .route("/ng_words/:ngWordId", patch(bbs::update_ng_word))
+        .route("/caps", get(bbs::get_caps))
+        .route("/caps", post(bbs::create_cap))
+        .route("/caps/:capId", delete(bbs::delete_cap))
+        .route("/caps/:capId", patch(bbs::update_cap));
 
     let state = AppState {
         oauth2_client: client,
         admin_bbs_repo: AdminBbsRepositoryImpl::new(pool.clone()),
-        ng_word_repo: NgWordRepositoryImpl::new(pool),
+        ng_word_repo: NgWordRepositoryImpl::new(pool.clone()),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
             .get_connection_manager()
             .await
             .unwrap(),
         admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
+        authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
+        cap_repo: CapRepositoryImpl::new(pool),
     };
 
     let app = Router::new()
@@ -409,6 +428,16 @@ struct NgWord {
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct Cap {
+    id: Uuid,
+    name: String,
+    description: String,
+    created_at: chrono::DateTime<Utc>,
+    updated_at: chrono::DateTime<Utc>,
+    board_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
 struct CreationNgWordInput {
     name: String,
     word: String,
@@ -418,6 +447,21 @@ struct CreationNgWordInput {
 struct UpdateNgWordInput {
     name: Option<String>,
     word: Option<String>,
+    board_ids: Option<Vec<Uuid>>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct CreationCapInput {
+    name: String,
+    description: String,
+    password: String,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct UpdateCapInput {
+    name: Option<String>,
+    description: Option<String>,
+    password: Option<String>,
     board_ids: Option<Vec<Uuid>>,
 }
 
@@ -437,10 +481,13 @@ mod bbs {
         repository::{
             admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
             admin_bbs_repository::AdminBbsRepository,
+            authed_token_repository::AuthedTokenRepository,
+            cap_repository::CapRepository,
             ngword_repository::NgWordRepository,
         },
-        Board, CreateBoardInput, CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput,
-        NgWord, Res, Thread, UpdateNgWordInput, UpdateResInput,
+        Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
+        DeleteAuthedTokenInput, NgWord, Res, Thread, UpdateCapInput, UpdateNgWordInput,
+        UpdateResInput,
     };
 
     #[utoipa::path(
@@ -955,7 +1002,7 @@ mod bbs {
         Path(authed_token_id): Path<Uuid>,
     ) -> Response {
         let authed_token = state
-            .admin_bbs_repo
+            .authed_token_repo
             .get_authed_token(authed_token_id)
             .await
             .unwrap();
@@ -984,13 +1031,13 @@ mod bbs {
     ) -> Response {
         if using_origin_ip {
             state
-                .admin_bbs_repo
+                .authed_token_repo
                 .delete_authed_token(authed_token_id)
                 .await
                 .unwrap();
         } else {
             state
-                .admin_bbs_repo
+                .authed_token_repo
                 .delete_authed_token_by_origin_ip(authed_token_id)
                 .await
                 .unwrap();
@@ -1092,6 +1139,112 @@ mod bbs {
             .body(axum::body::Body::empty())
             .unwrap()
     }
+
+    #[utoipa::path(
+        get,
+        path = "/caps/",
+        responses(
+            (status = 200, description = "List cap words successfully", body = Vec<Cap>),
+        )
+    )]
+    pub async fn get_caps(State(state): State<DefaultAppState>) -> Json<Vec<Cap>> {
+        let caps = state.cap_repo.get_caps().await.unwrap();
+        caps.into()
+    }
+
+    #[utoipa::path(
+        post,
+        path = "/caps/",
+        responses(
+            (status = 200, description = "Create cap successfully", body = Cap),
+        ),
+        request_body = CreationCapInput
+    )]
+    pub async fn create_cap(
+        State(state): State<DefaultAppState>,
+        Json(body): Json<CreationCapInput>,
+    ) -> Response {
+        let cap = state
+            .cap_repo
+            .create_cap(
+                &body.name,
+                &body.description,
+                &eddist_core::domain::cap::calculate_cap_hash(
+                    &body.password,
+                    &std::env::var("TINKER_SECRET").unwrap(),
+                ),
+            )
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&cap).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/caps/{cap_id}/",
+        responses(
+            (status = 200, description = "Update cap word successfully", body = Cap),
+        ),
+        params(
+            ("cap_id" = Uuid, Path, description = "Cap ID"),
+        ),
+        request_body = UpdateCapInput
+    )]
+    pub async fn update_cap(
+        State(state): State<DefaultAppState>,
+        Path(cap_id): Path<Uuid>,
+        Json(body): Json<UpdateCapInput>,
+    ) -> Response {
+        let cap = state
+            .cap_repo
+            .update_cap(
+                cap_id,
+                body.name.as_deref(),
+                body.description.as_deref(),
+                body.password
+                    .map(|x| {
+                        eddist_core::domain::cap::calculate_cap_hash(
+                            &x,
+                            &std::env::var("TINKER_SECRET").unwrap(),
+                        )
+                    })
+                    .as_deref(),
+                body.board_ids,
+            )
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&cap).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        delete,
+        path = "/caps/{cap_id}/",
+        responses(
+            (status = 200, description = "Delete Cap successfully"),
+        ),
+        params(
+            ("cap_id" = Uuid, Path, description = "Cap ID"),
+        ),
+    )]
+    pub async fn delete_cap(
+        State(state): State<DefaultAppState>,
+        Path(cap_id): Path<Uuid>,
+    ) -> Response {
+        state.cap_repo.delete_cap(cap_id).await.unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(axum::body::Body::empty())
+            .unwrap()
+    }
 }
 
 #[derive(OpenApi)]
@@ -1118,6 +1271,10 @@ mod bbs {
         bbs::create_ng_word,
         bbs::update_ng_word,
         bbs::delete_ng_word,
+        bbs::get_caps,
+        bbs::create_cap,
+        bbs::update_cap,
+        bbs::delete_cap,
     ),
     components(schemas(
         Board,
@@ -1136,6 +1293,9 @@ mod bbs {
         CreationNgWordInput,
         UpdateNgWordInput,
         CreateBoardInput,
+        Cap,
+        CreationCapInput,
+        UpdateCapInput,
     ))
 )]
 struct ApiDoc;

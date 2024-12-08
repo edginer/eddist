@@ -1,6 +1,5 @@
 import {
   Button,
-  Checkbox,
   Dropdown,
   Label,
   Modal,
@@ -166,7 +165,7 @@ const NgWords = () => {
               />
             </div>
             <Button type="submit" className="mt-4">
-              Edit
+              Submit
             </Button>
           </form>
         </Modal.Body>

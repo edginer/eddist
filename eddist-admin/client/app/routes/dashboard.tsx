@@ -4,8 +4,73 @@ import { twMerge } from "tailwind-merge";
 import { Spinner } from "flowbite-react";
 import { Link, Outlet, useLocation } from "@remix-run/react";
 
+type NavBarSectionKind =
+  | "boards"
+  | "caps"
+  | "ngwords"
+  | "global"
+  | "authed-token";
+
+const Hamburger = () => (
+  <svg
+    className="h-6 w-6 text-gray-300"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 6h16M4 12h16M4 18h16"
+    />
+  </svg>
+);
+
+const NavBarSection = ({
+  selected,
+  kind,
+}: {
+  selected: boolean;
+  kind: NavBarSectionKind;
+}) => {
+  let displayText = "";
+  switch (kind) {
+    case "boards":
+      displayText = "Boards";
+      break;
+    case "caps":
+      displayText = "Caps";
+      break;
+    case "ngwords":
+      displayText = "Ng Words";
+      break;
+    case "global":
+      displayText = "Global";
+      break;
+    case "authed-token":
+      displayText = "Authed Token";
+      break;
+  }
+
+  return (
+    <Link
+      to={`/dashboard/${kind}`}
+      className={twMerge(
+        "flex items-center py-2 px-8 hover:bg-gray-700",
+        selected ? "bg-gray-900 text-gray-400" : "text-gray-400"
+      )}
+    >
+      <Hamburger />
+      <span className="mx-4 font-medium">{displayText}</span>
+    </Link>
+  );
+};
+
 const Layout: React.FC = () => {
   const location = useLocation();
+
+  const navBarSection = location.pathname.split("/")[2] as NavBarSectionKind;
 
   const [isNavbarOpen, setIsNavbarOpen] = useState(false);
   return (
@@ -20,101 +85,17 @@ const Layout: React.FC = () => {
           </Link>
         </div>
         <nav className="mt-10">
-          <Link
-            to="/dashboard/boards"
-            className="flex items-center py-2 px-8 bg-gray-900 text-gray-400 hover:bg-gray-700"
-          >
-            <svg
-              className="h-6 w-6 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="mx-4 font-medium">Boards</span>
-          </Link>
-          <Link
-            to="/dashboard/caps"
-            className="flex items-center py-2 px-8 text-gray-400 hover:bg-gray-700"
-          >
-            <svg
-              className="h-6 w-6 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="mx-4 font-medium">Caps</span>
-          </Link>
-          <Link
-            to="/dashboard/ngwords"
-            className="flex items-center py-2 px-8 text-gray-400 hover:bg-gray-700"
-          >
-            <svg
-              className="h-6 w-6 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="mx-4 font-medium">Ng Words</span>
-          </Link>
-          <Link
-            to="/dashboard/global"
-            className="flex items-center py-2 px-8 text-gray-400 hover:bg-gray-700"
-          >
-            <svg
-              className="h-6 w-6 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="mx-4 font-medium">Global</span>
-          </Link>
-          <Link
-            to="/dashboard/authed-token"
-            className="flex items-center py-2 px-8 text-gray-400 hover:bg-gray-700"
-          >
-            <svg
-              className="h-6 w-6 text-gray-300"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <span className="mx-4 font-medium">Authed Token</span>
-          </Link>
+          <NavBarSection selected={navBarSection === "boards"} kind="boards" />
+          <NavBarSection selected={navBarSection === "caps"} kind="caps" />
+          <NavBarSection
+            selected={navBarSection === "ngwords"}
+            kind="ngwords"
+          />
+          <NavBarSection selected={navBarSection === "global"} kind="global" />
+          <NavBarSection
+            selected={navBarSection === "authed-token"}
+            kind="authed-token"
+          />
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -164,7 +145,7 @@ const Layout: React.FC = () => {
                   Ng Words
                 </Link>
               </li>
-              <li className="pl-2 border-slate-400">
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
                 <Link
                   to="/dashboard/global"
                   onClick={() => setIsNavbarOpen((x) => !x)}

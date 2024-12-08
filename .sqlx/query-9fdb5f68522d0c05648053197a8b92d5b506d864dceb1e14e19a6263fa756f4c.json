@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                    INSERT INTO boards_caps (id, board_id, cap_id)\n                    VALUES (?, ?, ?)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "9fdb5f68522d0c05648053197a8b92d5b506d864dceb1e14e19a6263fa756f4c"
+}

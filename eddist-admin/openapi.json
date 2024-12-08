@@ -742,6 +742,122 @@
         }
       }
     },
+    "/caps/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_caps",
+        "responses": {
+          "200": {
+            "description": "List cap words successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Cap"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "create_cap",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreationCapInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create cap successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/caps/{cap_id}/": {
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_cap",
+        "parameters": [
+          {
+            "name": "cap_id",
+            "in": "path",
+            "description": "Cap ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete Cap successfully"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_cap",
+        "parameters": [
+          {
+            "name": "cap_id",
+            "in": "path",
+            "description": "Cap ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCapInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update cap word successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ng_words/": {
       "get": {
         "tags": [
@@ -1074,6 +1190,44 @@
           }
         }
       },
+      "Cap": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "created_at",
+          "updated_at",
+          "board_ids"
+        ],
+        "properties": {
+          "board_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ClientInfo": {
         "type": "object",
         "required": [
@@ -1167,6 +1321,25 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0
+          }
+        }
+      },
+      "CreationCapInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "password"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
           }
         }
       },
@@ -1396,6 +1569,31 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "UpdateCapInput": {
+        "type": "object",
+        "properties": {
+          "board_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

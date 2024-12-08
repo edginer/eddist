@@ -228,6 +228,38 @@ export interface paths {
         patch: operations["update_response"];
         trace?: never;
     };
+    "/caps/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_caps"];
+        put?: never;
+        post: operations["create_cap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caps/{cap_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_cap"];
+        options?: never;
+        head?: never;
+        patch: operations["update_cap"];
+        trace?: never;
+    };
     "/ng_words/": {
         parameters: {
             query?: never;
@@ -323,6 +355,17 @@ export interface components {
             /** Format: int64 */
             thread_count: number;
         };
+        Cap: {
+            board_ids: string[];
+            /** Format: date-time */
+            created_at: string;
+            description: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         ClientInfo: {
             /** Format: int32 */
             asn_num: number;
@@ -344,6 +387,11 @@ export interface components {
             name: string;
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
+        };
+        CreationCapInput: {
+            description: string;
+            name: string;
+            password: string;
         };
         CreationNgWordInput: {
             name: string;
@@ -416,6 +464,12 @@ export interface components {
             level: number;
             /** Format: int32 */
             wrote_count: number;
+        };
+        UpdateCapInput: {
+            board_ids?: string[] | null;
+            description?: string | null;
+            name?: string | null;
+            password?: string | null;
         };
         UpdateNgWordInput: {
             board_ids?: string[] | null;
@@ -888,6 +942,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Res"];
+                };
+            };
+        };
+    };
+    get_caps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List cap words successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cap"][];
+                };
+            };
+        };
+    };
+    create_cap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreationCapInput"];
+            };
+        };
+        responses: {
+            /** @description Create cap successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cap"];
+                };
+            };
+        };
+    };
+    delete_cap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cap ID */
+                cap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete Cap successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_cap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cap ID */
+                cap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCapInput"];
+            };
+        };
+        responses: {
+            /** @description Update cap word successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cap"];
                 };
             };
         };
