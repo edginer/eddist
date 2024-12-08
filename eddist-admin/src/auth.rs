@@ -208,7 +208,13 @@ pub async fn auth_simple_header(
         // .await
         // .unwrap();
 
-        return next.run(req).await;
+        let mut res = next.run(req).await;
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+
+        return res;
     }
 
     Response::builder()

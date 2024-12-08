@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO caps (id, name, description, password_hash, created_at, updated_at)\n            VALUES (?, ?, ?, ?, NOW(), NOW())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "77f9ad1d0b3bf6894a0315a1c782e92e084f3a1f26bdd41661ad8aed669f1d24"
+}

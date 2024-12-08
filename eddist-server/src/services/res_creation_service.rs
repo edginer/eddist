@@ -3,6 +3,7 @@ use std::{borrow::Cow, env};
 use anyhow::anyhow;
 use chrono::Utc;
 use eddist_core::domain::{
+    cap::calculate_cap_hash,
     client_info::ClientInfo,
     pubsub_repository::{CreatingRes, PubSubItem},
     tinker::Tinker,
@@ -14,7 +15,6 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        cap::calculate_cap_hash,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,

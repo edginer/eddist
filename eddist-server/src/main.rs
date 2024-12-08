@@ -61,7 +61,6 @@ mod domain {
     }
 
     pub(crate) mod authed_token;
-    pub(crate) mod cap;
     pub(crate) mod captcha_like;
     pub(crate) mod metadent;
     pub(crate) mod ng_word;

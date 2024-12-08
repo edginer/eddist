@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                DELETE FROM boards_caps WHERE cap_id = ?\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8006f5f6b610577b15ea4bddc6ff6ecd1d956eb385b97a731361ca599b95ffeb"
+}
