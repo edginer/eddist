@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                cap.id AS \"id!: Uuid\",\n                name AS \"name!: String\",\n                description AS \"description!: String\",\n                password_hash AS \"password_hash!: String\",\n                created_at AS \"created_at!: chrono::DateTime<Utc>\",\n                updated_at AS \"updated_at!: chrono::DateTime<Utc>\",\n                board_id AS \"board_id: Uuid\"\n            FROM\n                caps AS cap\n                LEFT OUTER JOIN boards_caps AS bcap\n                ON cap.id = bcap.cap_id\n            ",
+  "query": "\n            SELECT\n                cap.id AS \"id!: Uuid\",\n                name AS \"name!: String\",\n                description AS \"description!: String\",\n                created_at AS \"created_at!: chrono::DateTime<Utc>\",\n                updated_at AS \"updated_at!: chrono::DateTime<Utc>\",\n                board_id AS \"board_id: Uuid\"\n            FROM\n                caps AS cap\n                LEFT OUTER JOIN boards_caps AS bcap\n                ON cap.id = bcap.cap_id\n            ",
   "describe": {
     "columns": [
       {
@@ -32,15 +32,6 @@
       },
       {
         "ordinal": 3,
-        "name": "password_hash!: String",
-        "type_info": {
-          "type": "VarString",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
-          "max_size": 1020
-        }
-      },
-      {
-        "ordinal": 4,
         "name": "created_at!: chrono::DateTime<Utc>",
         "type_info": {
           "type": "Datetime",
@@ -49,7 +40,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "updated_at!: chrono::DateTime<Utc>",
         "type_info": {
           "type": "Datetime",
@@ -58,7 +49,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "board_id: Uuid",
         "type_info": {
           "type": "String",
@@ -76,9 +67,8 @@
       false,
       false,
       false,
-      false,
       true
     ]
   },
-  "hash": "564ea1f0c445efb9e85d4cce6138c9990396f819d365139f3dea3b53a3bab8a9"
+  "hash": "4a6820ba3473b1e9b95323ae5b2fdf6fd0b96d567c0c4805740f6b4cde012171"
 }
