@@ -373,8 +373,13 @@ async fn main() -> anyhow::Result<()> {
                         // ...
                     },
                 ),
-        )
-        .layer(prometheus_layer);
+        );
+
+    let app = if env::var("AXUM_METRICS") == Ok("true".to_string()) {
+        app.layer(prometheus_layer)
+    } else {
+        app
+    };
     let listener = TcpListener::bind((
         "0.0.0.0",
         env::var("PORT")
