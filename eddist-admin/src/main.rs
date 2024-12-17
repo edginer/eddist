@@ -176,6 +176,7 @@ async fn main() {
         .route("/boards", get(bbs::get_boards))
         .route("/boards", post(bbs::create_board))
         .route("/boards/:boardKey", get(bbs::get_board))
+        .route("/boards/:boardId", patch(bbs::edit_board))
         .route("/boards/:boardKey/threads", get(bbs::get_threads))
         .route("/boards/:boardKey/threads/:threadId", get(bbs::get_thread))
         .route(
@@ -316,6 +317,22 @@ struct CreateBoardInput {
     pub board_key: String,
     pub default_name: String,
     pub local_rule: String,
+    pub base_thread_creation_span_sec: Option<usize>,
+    pub base_response_creation_span_sec: Option<usize>,
+    pub max_thread_name_byte_length: Option<usize>,
+    pub max_author_name_byte_length: Option<usize>,
+    pub max_email_byte_length: Option<usize>,
+    pub max_response_body_byte_length: Option<usize>,
+    pub max_response_body_lines: Option<usize>,
+    pub threads_archive_cron: Option<String>,
+    pub threads_archive_trigger_thread_count: Option<usize>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct EditBoardInput {
+    pub name: Option<String>,
+    pub default_name: Option<String>,
+    pub local_rule: Option<String>,
     pub base_thread_creation_span_sec: Option<usize>,
     pub base_response_creation_span_sec: Option<usize>,
     pub max_thread_name_byte_length: Option<usize>,
@@ -486,8 +503,8 @@ mod bbs {
             ngword_repository::NgWordRepository,
         },
         Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
-        DeleteAuthedTokenInput, NgWord, Res, Thread, UpdateCapInput, UpdateNgWordInput,
-        UpdateResInput,
+        DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, UpdateCapInput,
+        UpdateNgWordInput, UpdateResInput,
     };
 
     #[utoipa::path(
@@ -555,6 +572,34 @@ mod bbs {
         }
 
         let board = state.admin_bbs_repo.create_board(body).await.unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&board).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/boards/{board_id}/",
+        responses(
+            (status = 200, description = "Edit board successfully", body = Board),
+        ),
+        params(
+            ("board_id" = Uuid, Path, description = "Board ID"),
+        ),
+        request_body = EditBoardInput
+    )]
+    pub async fn edit_board(
+        State(state): State<DefaultAppState>,
+        Path(board_id): Path<Uuid>,
+        Json(body): Json<EditBoardInput>,
+    ) -> Response {
+        let board = state
+            .admin_bbs_repo
+            .edit_board(board_id, body)
+            .await
+            .unwrap();
 
         Response::builder()
             .status(200)
@@ -1253,6 +1298,7 @@ mod bbs {
         bbs::get_boards,
         bbs::get_board,
         bbs::create_board,
+        bbs::edit_board,
         bbs::get_threads,
         bbs::get_thread,
         bbs::get_responses,
@@ -1278,6 +1324,8 @@ mod bbs {
     ),
     components(schemas(
         Board,
+        CreateBoardInput,
+        EditBoardInput,
         Thread,
         Res,
         ArchivedThread,
@@ -1292,7 +1340,6 @@ mod bbs {
         NgWord,
         CreationNgWordInput,
         UpdateNgWordInput,
-        CreateBoardInput,
         Cap,
         CreationCapInput,
         UpdateCapInput,
