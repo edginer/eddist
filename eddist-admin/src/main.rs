@@ -176,7 +176,7 @@ async fn main() {
         .route("/boards", get(bbs::get_boards))
         .route("/boards", post(bbs::create_board))
         .route("/boards/:boardKey", get(bbs::get_board))
-        .route("/boards/:boardId", patch(bbs::edit_board))
+        .route("/boards/:boardKey", patch(bbs::edit_board))
         .route("/boards/:boardKey/threads", get(bbs::get_threads))
         .route("/boards/:boardKey/threads/:threadId", get(bbs::get_thread))
         .route(
@@ -581,23 +581,23 @@ mod bbs {
 
     #[utoipa::path(
         patch,
-        path = "/boards/{board_id}/",
+        path = "/boards/{board_key}/",
         responses(
             (status = 200, description = "Edit board successfully", body = Board),
         ),
         params(
-            ("board_id" = Uuid, Path, description = "Board ID"),
+            ("board_key" = Uuid, Path, description = "Board Key"),
         ),
         request_body = EditBoardInput
     )]
     pub async fn edit_board(
         State(state): State<DefaultAppState>,
-        Path(board_id): Path<Uuid>,
+        Path(board_key): Path<String>,
         Json(body): Json<EditBoardInput>,
     ) -> Response {
         let board = state
             .admin_bbs_repo
-            .edit_board(board_id, body)
+            .edit_board(&board_key, body)
             .await
             .unwrap();
 

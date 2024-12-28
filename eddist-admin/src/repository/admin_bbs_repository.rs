@@ -31,7 +31,7 @@ pub trait AdminBbsRepository: Send + Sync {
     ) -> anyhow::Result<Vec<Thread>>;
 
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board>;
-    async fn edit_board(&self, id: Uuid, board: EditBoardInput) -> anyhow::Result<Board>;
+    async fn edit_board(&self, board_key: &str, board: EditBoardInput) -> anyhow::Result<Board>;
 
     async fn get_reses_by_thread_id(
         &self,
@@ -295,7 +295,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             .ok_or_else(|| anyhow::anyhow!("Failed to create board"))
     }
 
-    async fn edit_board(&self, id: Uuid, board: EditBoardInput) -> anyhow::Result<Board> {
+    async fn edit_board(&self, board_key: &str, board: EditBoardInput) -> anyhow::Result<Board> {
         let pool = &self.0;
 
         let mut sets = Vec::new();
@@ -358,7 +358,14 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             SET
                 {}
             WHERE
-                id = ?
+                board_id = (
+                    SELECT
+                        id
+                    FROM
+                        boards
+                    WHERE
+                        board_key = ?
+                )
             "#,
             sets.join(", ")
         );
@@ -373,13 +380,17 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
         if let Some(threads_archive_cron) = &board.threads_archive_cron {
             query = query.bind(threads_archive_cron);
         }
-        let query = query.bind(id);
+        let query = query.bind(board_key);
 
         query.execute(&mut *tx).await?;
 
         tx.commit().await?;
 
-        self.get_board(id).await
+        self.get_boards_by_key(Some(vec![board_key.to_string()]))
+            .await?
+            .first()
+            .cloned()
+            .ok_or(anyhow::anyhow!("Failed to edit board"))
     }
 
     async fn get_threads_by_thread_id(

@@ -2,8 +2,8 @@ name: Check eddist-main
 
 on:
   push:
-    branches:
-      - "*"
+    branches-ignore:
+      - main
 
 jobs:
   check-rust:
@@ -50,5 +50,9 @@ jobs:
         run: pnpm install
       - name: Build eddist-client
         run: pnpm -F eddist-client build
+      - name: Check eddist-client
+        run: pnpm -F eddist-client lint && pnpm -F eddist-client typecheck
       - name: Build eddist-admin-client
         run: pnpm -F eddist-admin-client build
+      - name: Check eddist-admin-client
+        run: pnpm -F eddist-admin-client typecheck
