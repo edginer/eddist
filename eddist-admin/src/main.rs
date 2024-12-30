@@ -176,6 +176,8 @@ async fn main() {
         .route("/boards", get(bbs::get_boards))
         .route("/boards", post(bbs::create_board))
         .route("/boards/:boardKey", get(bbs::get_board))
+        .route("/boards/:boardKey/info", get(bbs::get_board_info))
+        .route("/boards/:boardKey", patch(bbs::edit_board))
         .route("/boards/:boardKey/threads", get(bbs::get_threads))
         .route("/boards/:boardKey/threads/:threadId", get(bbs::get_thread))
         .route(
@@ -311,6 +313,21 @@ struct Board {
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct BoardInfo {
+    pub local_rules: String,
+    pub base_thread_creation_span_sec: usize,
+    pub base_response_creation_span_sec: usize,
+    pub max_thread_name_byte_length: usize,
+    pub max_author_name_byte_length: usize,
+    pub max_email_byte_length: usize,
+    pub max_response_body_byte_length: usize,
+    pub max_response_body_lines: usize,
+    pub threads_archive_cron: Option<String>,
+    pub threads_archive_trigger_thread_count: Option<usize>,
+    pub read_only: bool,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
 struct CreateBoardInput {
     pub name: String,
     pub board_key: String,
@@ -325,6 +342,23 @@ struct CreateBoardInput {
     pub max_response_body_lines: Option<usize>,
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<usize>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+struct EditBoardInput {
+    pub name: Option<String>,
+    pub default_name: Option<String>,
+    pub local_rule: Option<String>,
+    pub base_thread_creation_span_sec: Option<usize>,
+    pub base_response_creation_span_sec: Option<usize>,
+    pub max_thread_name_byte_length: Option<usize>,
+    pub max_author_name_byte_length: Option<usize>,
+    pub max_email_byte_length: Option<usize>,
+    pub max_response_body_byte_length: Option<usize>,
+    pub max_response_body_lines: Option<usize>,
+    pub threads_archive_cron: Option<String>,
+    pub threads_archive_trigger_thread_count: Option<usize>,
+    pub read_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -486,8 +520,8 @@ mod bbs {
             ngword_repository::NgWordRepository,
         },
         Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
-        DeleteAuthedTokenInput, NgWord, Res, Thread, UpdateCapInput, UpdateNgWordInput,
-        UpdateResInput,
+        DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, UpdateCapInput,
+        UpdateNgWordInput, UpdateResInput,
     };
 
     #[utoipa::path(
@@ -536,6 +570,41 @@ mod bbs {
     }
 
     #[utoipa::path(
+        get,
+        path = "/boards/{board_key}/info/",
+        responses(
+            (status = 200, description = "Get board info successfully", body = BoardInfo),
+            (status = 404, description = "Board not found"),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board ID"),
+        ))
+    ]
+    pub async fn get_board_info(
+        State(state): State<DefaultAppState>,
+        Path(board_key): Path<String>,
+    ) -> Response {
+        let board = state
+            .admin_bbs_repo
+            .get_boards_by_key(Some(vec![board_key]))
+            .await
+            .unwrap();
+        let Some(board) = board.first() else {
+            return Response::builder()
+                .status(404)
+                .body(axum::body::Body::empty())
+                .unwrap();
+        };
+
+        let board_info = state.admin_bbs_repo.get_board_info(board.id).await.unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&board_info).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
         post,
         path = "/boards/",
         responses(
@@ -555,6 +624,34 @@ mod bbs {
         }
 
         let board = state.admin_bbs_repo.create_board(body).await.unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(serde_json::to_string(&board).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/boards/{board_key}/",
+        responses(
+            (status = 200, description = "Edit board successfully", body = Board),
+        ),
+        params(
+            ("board_key" = Uuid, Path, description = "Board Key"),
+        ),
+        request_body = EditBoardInput
+    )]
+    pub async fn edit_board(
+        State(state): State<DefaultAppState>,
+        Path(board_key): Path<String>,
+        Json(body): Json<EditBoardInput>,
+    ) -> Response {
+        let board = state
+            .admin_bbs_repo
+            .edit_board(&board_key, body)
+            .await
+            .unwrap();
 
         Response::builder()
             .status(200)
@@ -1252,7 +1349,9 @@ mod bbs {
     paths(
         bbs::get_boards,
         bbs::get_board,
+        bbs::get_board_info,
         bbs::create_board,
+        bbs::edit_board,
         bbs::get_threads,
         bbs::get_thread,
         bbs::get_responses,
@@ -1278,6 +1377,9 @@ mod bbs {
     ),
     components(schemas(
         Board,
+        BoardInfo,
+        CreateBoardInput,
+        EditBoardInput,
         Thread,
         Res,
         ArchivedThread,
@@ -1292,7 +1394,6 @@ mod bbs {
         NgWord,
         CreationNgWordInput,
         UpdateNgWordInput,
-        CreateBoardInput,
         Cap,
         CreationCapInput,
         UpdateCapInput,

@@ -49,7 +49,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["edit_board"];
         trace?: never;
     };
     "/boards/{board_key}/admin-dat-archives/{thread_number}/": {
@@ -159,6 +159,22 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["delete_archived_res"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_key}/info/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_board_info"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -355,6 +371,19 @@ export interface components {
             /** Format: int64 */
             thread_count: number;
         };
+        BoardInfo: {
+            base_response_creation_span_sec: number;
+            base_thread_creation_span_sec: number;
+            local_rules: string;
+            max_author_name_byte_length: number;
+            max_email_byte_length: number;
+            max_response_body_byte_length: number;
+            max_response_body_lines: number;
+            max_thread_name_byte_length: number;
+            read_only: boolean;
+            threads_archive_cron?: string | null;
+            threads_archive_trigger_thread_count?: number | null;
+        };
         Cap: {
             board_ids: string[];
             /** Format: date-time */
@@ -396,6 +425,21 @@ export interface components {
         CreationNgWordInput: {
             name: string;
             word: string;
+        };
+        EditBoardInput: {
+            base_response_creation_span_sec?: number | null;
+            base_thread_creation_span_sec?: number | null;
+            default_name?: string | null;
+            local_rule?: string | null;
+            max_author_name_byte_length?: number | null;
+            max_email_byte_length?: number | null;
+            max_response_body_byte_length?: number | null;
+            max_response_body_lines?: number | null;
+            max_thread_name_byte_length?: number | null;
+            name?: string | null;
+            read_only?: boolean | null;
+            threads_archive_cron?: string | null;
+            threads_archive_trigger_thread_count?: number | null;
         };
         NgWord: {
             board_ids: string[];
@@ -611,6 +655,33 @@ export interface operations {
             };
         };
     };
+    edit_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board Key */
+                board_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditBoardInput"];
+            };
+        };
+        responses: {
+            /** @description Edit board successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Board"];
+                };
+            };
+        };
+    };
     get_admin_dat_archived_thread: {
         parameters: {
             query?: never;
@@ -823,6 +894,36 @@ export interface operations {
         responses: {
             /** @description Delete response successfully */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_board_info: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board ID */
+                board_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get board info successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardInfo"];
+                };
+            };
+            /** @description Board not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

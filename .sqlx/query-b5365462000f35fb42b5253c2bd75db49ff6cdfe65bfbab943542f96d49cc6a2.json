@@ -1,0 +1,124 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT\n                local_rules,\n                base_thread_creation_span_sec,\n                base_response_creation_span_sec,\n                max_thread_name_byte_length,\n                max_author_name_byte_length,\n                max_email_byte_length,\n                max_response_body_byte_length,\n                max_response_body_lines,\n                threads_archive_trigger_thread_count,\n                threads_archive_cron,\n                read_only AS \"read_only!: bool\"\n            FROM\n                boards_info\n            WHERE\n                id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "local_rules",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "base_thread_creation_span_sec",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "base_response_creation_span_sec",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "max_thread_name_byte_length",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "max_author_name_byte_length",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "max_email_byte_length",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "max_response_body_byte_length",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "max_response_body_lines",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "threads_archive_trigger_thread_count",
+        "type_info": {
+          "type": "Long",
+          "flags": "",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "threads_archive_cron",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "read_only!: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "b5365462000f35fb42b5253c2bd75db49ff6cdfe65bfbab943542f96d49cc6a2"
+}

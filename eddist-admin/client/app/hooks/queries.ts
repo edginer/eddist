@@ -48,6 +48,40 @@ export const getBoard = ({
   });
 };
 
+const GET_BOARD_INFO = "/boards/{board_key}/info/";
+
+export const getBoardInfo = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_BOARD_INFO]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_BOARD_INFO, params.path.board_key],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_BOARD_INFO, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const UPDATE_BOARD = "/boards/{board_key}/";
+
+export const updateBoard = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_BOARD]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_BOARD, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
 const CREATE_BOARD = "/boards/";
 
 export const createBoard = ({
