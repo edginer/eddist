@@ -155,6 +155,45 @@
             "description": "Board not found"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "edit_board",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditBoardInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Edit board successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/boards/{board_key}/admin-dat-archives/{thread_number}/": {
@@ -551,6 +590,40 @@
         "responses": {
           "200": {
             "description": "Delete response successfully"
+          }
+        }
+      }
+    },
+    "/boards/{board_key}/info/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_board_info",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get board info successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found"
           }
         }
       }
@@ -1190,6 +1263,65 @@
           }
         }
       },
+      "BoardInfo": {
+        "type": "object",
+        "required": [
+          "local_rules",
+          "base_thread_creation_span_sec",
+          "base_response_creation_span_sec",
+          "max_thread_name_byte_length",
+          "max_author_name_byte_length",
+          "max_email_byte_length",
+          "max_response_body_byte_length",
+          "max_response_body_lines",
+          "read_only"
+        ],
+        "properties": {
+          "base_response_creation_span_sec": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "base_thread_creation_span_sec": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "local_rules": {
+            "type": "string"
+          },
+          "max_author_name_byte_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_email_byte_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_response_body_byte_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_response_body_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_thread_name_byte_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "threads_archive_cron": {
+            "type": "string",
+            "nullable": true
+          },
+          "threads_archive_trigger_thread_count": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
+      },
       "Cap": {
         "type": "object",
         "required": [
@@ -1355,6 +1487,71 @@
           },
           "word": {
             "type": "string"
+          }
+        }
+      },
+      "EditBoardInput": {
+        "type": "object",
+        "properties": {
+          "base_response_creation_span_sec": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "base_thread_creation_span_sec": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "default_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "local_rule": {
+            "type": "string",
+            "nullable": true
+          },
+          "max_author_name_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_email_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_response_body_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_response_body_lines": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "max_thread_name_byte_length": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "read_only": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "threads_archive_cron": {
+            "type": "string",
+            "nullable": true
+          },
+          "threads_archive_trigger_thread_count": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
           }
         }
       },

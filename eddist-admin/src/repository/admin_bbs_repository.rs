@@ -5,12 +5,13 @@ use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{query, query_as, types::Json, FromRow, MySqlPool};
 use uuid::Uuid;
 
-use crate::{Board, CreateBoardInput, EditBoardInput, Res, Thread};
+use crate::{Board, BoardInfo, CreateBoardInput, EditBoardInput, Res, Thread};
 
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {
-    async fn get_board(&self, id: Uuid) -> anyhow::Result<Board>;
     async fn get_boards_by_key(&self, keys: Option<Vec<String>>) -> anyhow::Result<Vec<Board>>;
+    async fn get_board_info(&self, id: Uuid) -> anyhow::Result<BoardInfo>;
+
     async fn get_threads_by_thread_id(
         &self,
         board_key: &str,
@@ -77,6 +78,21 @@ pub struct SelectionBoardWithThreadCount {
 }
 
 #[derive(Debug, FromRow)]
+pub struct SelectionBoardInfo {
+    pub local_rules: String,
+    pub base_thread_creation_span_sec: i32,
+    pub base_response_creation_span_sec: i32,
+    pub max_thread_name_byte_length: i32,
+    pub max_author_name_byte_length: i32,
+    pub max_email_byte_length: i32,
+    pub max_response_body_byte_length: i32,
+    pub max_response_body_lines: i32,
+    pub threads_archive_trigger_thread_count: Option<i32>,
+    pub threads_archive_cron: Option<String>,
+    pub read_only: bool,
+}
+
+#[derive(Debug, FromRow)]
 pub struct SelectionThread {
     pub id: Vec<u8>,
     pub board_id: Vec<u8>,
@@ -111,44 +127,6 @@ pub struct SelectionRes {
 
 #[async_trait::async_trait]
 impl AdminBbsRepository for AdminBbsRepositoryImpl {
-    async fn get_board(&self, id: Uuid) -> anyhow::Result<Board> {
-        let pool = &self.0;
-
-        let board = query_as!(
-            SelectionBoardWithThreadCount,
-            r#"
-            SELECT
-                id AS "id!: Uuid",
-                name AS "name!: String",
-                board_key AS "board_key!: String",
-                default_name AS "default_name!: String",
-                (
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        threads
-                    WHERE
-                        board_id = boards.id
-                ) AS "thread_count!: i64"
-            FROM
-                boards
-            WHERE
-                id = ?
-            "#,
-            id.as_bytes().to_vec()
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(Board {
-            id: Uuid::from_slice(&board.id).unwrap(),
-            name: board.name,
-            board_key: board.board_key,
-            default_name: board.default_name,
-            thread_count: board.thread_count,
-        })
-    }
-
     async fn get_boards_by_key(&self, keys: Option<Vec<String>>) -> anyhow::Result<Vec<Board>> {
         let pool = &self.0;
         let key_lists = if let Some(keys) = &keys {
@@ -201,6 +179,51 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                 thread_count: board.thread_count,
             })
             .collect())
+    }
+
+    async fn get_board_info(&self, id: Uuid) -> anyhow::Result<BoardInfo> {
+        let pool = &self.0;
+
+        let board = query_as!(
+            SelectionBoardInfo,
+            r#"
+            SELECT
+                local_rules,
+                base_thread_creation_span_sec,
+                base_response_creation_span_sec,
+                max_thread_name_byte_length,
+                max_author_name_byte_length,
+                max_email_byte_length,
+                max_response_body_byte_length,
+                max_response_body_lines,
+                threads_archive_trigger_thread_count,
+                threads_archive_cron,
+                read_only AS "read_only!: bool"
+            FROM
+                boards_info
+            WHERE
+                id = ?
+            "#,
+            id.as_bytes().to_vec()
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(BoardInfo {
+            local_rules: board.local_rules,
+            base_thread_creation_span_sec: board.base_thread_creation_span_sec as usize,
+            base_response_creation_span_sec: board.base_response_creation_span_sec as usize,
+            max_thread_name_byte_length: board.max_thread_name_byte_length as usize,
+            max_author_name_byte_length: board.max_author_name_byte_length as usize,
+            max_email_byte_length: board.max_email_byte_length as usize,
+            max_response_body_byte_length: board.max_response_body_byte_length as usize,
+            max_response_body_lines: board.max_response_body_lines as usize,
+            threads_archive_trigger_thread_count: board
+                .threads_archive_trigger_thread_count
+                .map(|v| v as usize),
+            threads_archive_cron: board.threads_archive_cron,
+            read_only: board.read_only,
+        })
     }
 
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board> {
@@ -302,13 +325,27 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
         let mut values = Vec::new();
         let mut values_str = Vec::new();
 
+        let mut board_sets = Vec::new();
+        let mut board_values = Vec::new();
+
+        // for boards
         if let Some(name) = &board.name {
-            sets.push("name = ?");
-            values_str.push(name);
+            board_sets.push("name = ?");
+            board_values.push(name);
         }
         if let Some(default_name) = &board.default_name {
-            sets.push("default_name = ?");
-            values_str.push(default_name);
+            board_sets.push("default_name = ?");
+            board_values.push(default_name);
+        }
+
+        // str first for board_info
+        if let Some(local_rule) = &board.local_rule {
+            sets.push("local_rules = ?");
+            values_str.push(local_rule);
+        }
+        if let Some(threads_archive_cron) = &board.threads_archive_cron {
+            sets.push("threads_archive_cron = ?");
+            values_str.push(threads_archive_cron);
         }
 
         if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
@@ -345,20 +382,21 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             sets.push("threads_archive_trigger_thread_count = ?");
             values.push(threads_archive_trigger_thread_count);
         }
-        if board.threads_archive_cron.is_some() {
-            sets.push("threads_archive_cron = ?");
+        if board.read_only.is_some() {
+            sets.push("read_only = ?");
         }
 
         let mut tx = pool.begin().await?;
 
-        let query = format!(
-            r#"
+        if !sets.is_empty() {
+            let query = format!(
+                r#"
             UPDATE
                 boards_info
             SET
                 {}
             WHERE
-                board_id = (
+                id = (
                     SELECT
                         id
                     FROM
@@ -367,22 +405,45 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
                         board_key = ?
                 )
             "#,
-            sets.join(", ")
-        );
-        let mut query = sqlx::query(&query);
+                sets.join(", ")
+            );
+            let mut query = sqlx::query(&query);
 
-        for v in values_str {
-            query = query.bind(v);
-        }
-        for v in values {
-            query = query.bind(v as i32);
-        }
-        if let Some(threads_archive_cron) = &board.threads_archive_cron {
-            query = query.bind(threads_archive_cron);
-        }
-        let query = query.bind(board_key);
+            for v in values_str {
+                query = query.bind(v);
+            }
+            for v in values {
+                query = query.bind(v as i32);
+            }
+            if let Some(read_only) = board.read_only {
+                query = query.bind(read_only);
+            }
+            let query = query.bind(board_key);
 
-        query.execute(&mut *tx).await?;
+            query.execute(&mut *tx).await?;
+        }
+
+        if !board_sets.is_empty() {
+            let query = format!(
+                r#"
+            UPDATE
+                boards
+            SET
+                {}
+            WHERE
+                board_key = ?
+            "#,
+                board_sets.join(", ")
+            );
+            let mut query = sqlx::query(&query);
+
+            for v in board_values {
+                query = query.bind(v);
+            }
+            let query = query.bind(board_key);
+
+            query.execute(&mut *tx).await?;
+        }
 
         tx.commit().await?;
 

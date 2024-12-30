@@ -3,6 +3,7 @@ import { Link, useParams } from "@remix-run/react";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
 import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
+import BoardSetting from "~/components/BoardSetting";
 
 type TabKeys = "threads" | "settings";
 
@@ -12,7 +13,7 @@ const Page = () => {
     throw new Error("Page not found");
   }
 
-  const { data: board } = getBoard({
+  const { data: board, refetch } = getBoard({
     params: {
       path: {
         board_key: params.boardKey,
@@ -105,7 +106,7 @@ const Page = () => {
             tabKey: "settings",
             tabLabel: "Settings",
             id: "settings-tab",
-            children: <div className="p-2">Settings</div>,
+            children: <BoardSetting board={board!} refetchBoard={refetch} />,
           },
         ]}
       />
