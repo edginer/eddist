@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT * FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
+  "query": "SELECT\n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at \n            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
   "describe": {
     "columns": [
       {
@@ -120,5 +120,5 @@
       true
     ]
   },
-  "hash": "e4f68fc2bd1d71c905be31cb91d8d47670359d7ce84ffe9a9535448d29260660"
+  "hash": "1b1bfa62e1b3263a23cf70ad4684721be40193e855fd8b62e32a70af004359e1"
 }

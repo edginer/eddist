@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT * FROM authed_tokens WHERE token = ?",
+  "query": "SELECT \n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at \n            FROM authed_tokens WHERE token = ?",
   "describe": {
     "columns": [
       {
@@ -120,5 +120,5 @@
       true
     ]
   },
-  "hash": "99e1a1526103a4686918ae00c6771528191796f7df20641a0b06c43d0cc35c1c"
+  "hash": "f7e79ad7d091e305f864c5308a933aec17f1430dc3bc979a11f84284705da1f0"
 }
