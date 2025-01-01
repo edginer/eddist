@@ -278,7 +278,19 @@ impl BbsRepository for BbsRepositoryImpl {
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT * FROM authed_tokens WHERE token = ?",
+            "SELECT 
+                id, 
+                token, 
+                origin_ip, 
+                reduced_origin_ip, 
+                writing_ua, 
+                authed_ua, 
+                auth_code, 
+                created_at, 
+                authed_at, 
+                validity, 
+                last_wrote_at 
+            FROM authed_tokens WHERE token = ?",
             token
         );
 
@@ -306,7 +318,19 @@ impl BbsRepository for BbsRepositoryImpl {
     ) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT * FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
+            "SELECT
+                id, 
+                token, 
+                origin_ip, 
+                reduced_origin_ip, 
+                writing_ua, 
+                authed_ua, 
+                auth_code, 
+                created_at, 
+                authed_at, 
+                validity, 
+                last_wrote_at 
+            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
             reduced_ip,
             auth_code
         );
