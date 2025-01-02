@@ -8,7 +8,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-22.04
-
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,6 +54,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set docker version tag
+        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')" >> $GITHUB_ENV
 
       - name: Build and push Docker image (eddist)
         uses: docker/build-push-action@v6
@@ -60,7 +64,7 @@ jobs:
           file: docker-prod/eddist/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist:${{ github.ref_name }}
+            ghcr.io/edginer/eddist:${{ env.VERSION }}
       - name: Build and push Docker image (eddist-admin)
         uses: docker/build-push-action@v6
         with:
@@ -68,7 +72,7 @@ jobs:
           file: docker-prod/eddist-admin/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-admin:${{ github.ref_name }}
+            ghcr.io/edginer/eddist-admin:${{ env.VERSION }}
       - name: Build and push Docker image (eddist-cron)
         uses: docker/build-push-action@v6
         with:
@@ -76,7 +80,7 @@ jobs:
           file: docker-prod/eddist-cron/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-cron:${{ github.ref_name }}
+            ghcr.io/edginer/eddist-cron:${{ env.VERSION }}
       - name: Build and push Docker image (eddist-persistence)
         uses: docker/build-push-action@v6
         with:
@@ -84,7 +88,7 @@ jobs:
           file: docker-prod/eddist-persistence/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-persistence:${{ github.ref_name }}
+            ghcr.io/edginer/eddist-persistence:${{ env.VERSION }}
       - name: Create GitHub release
         run: gh release create ${{ github.ref_name }} --generate-notes
         env:
