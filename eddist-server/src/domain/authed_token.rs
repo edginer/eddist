@@ -17,6 +17,7 @@ pub struct AuthedToken {
     pub authed_at: Option<DateTime<Utc>>,
     pub validity: bool,
     pub last_wrote_at: Option<DateTime<Utc>>,
+    pub author_id_seed: Vec<u8>,
 }
 
 impl AuthedToken {
@@ -29,7 +30,7 @@ impl AuthedToken {
             .finalize();
         let token = format!("{token:x}");
         let ip_addr = IpAddr::new(origin_ip);
-        let reduced_ip = ip_addr.clone().into();
+        let reduced_ip = ReducedIpAddr::from(ip_addr.clone());
         let auth_code = rand::thread_rng().gen_range(0..1000000);
         let auth_code = format!("{auth_code:06}");
 
@@ -37,7 +38,7 @@ impl AuthedToken {
             id,
             token,
             origin_ip: ip_addr,
-            reduced_ip,
+            reduced_ip: reduced_ip.clone(),
             writing_ua,
             authed_ua: None,
             auth_code,
@@ -45,6 +46,7 @@ impl AuthedToken {
             authed_at: None,
             validity: false,
             last_wrote_at: None,
+            author_id_seed: sha2::Sha512::digest(reduced_ip.to_string().as_bytes()).to_vec(),
         }
     }
 

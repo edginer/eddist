@@ -289,7 +289,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 created_at, 
                 authed_at, 
                 validity, 
-                last_wrote_at 
+                last_wrote_at,
+                author_id_seed
             FROM authed_tokens WHERE token = ?",
             token
         );
@@ -308,6 +309,7 @@ impl BbsRepository for BbsRepositoryImpl {
             authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
+            author_id_seed: x.author_id_seed,
         }))
     }
 
@@ -329,7 +331,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 created_at, 
                 authed_at, 
                 validity, 
-                last_wrote_at 
+                last_wrote_at,
+                author_id_seed
             FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
             reduced_ip,
             auth_code
@@ -349,6 +352,7 @@ impl BbsRepository for BbsRepositoryImpl {
             authed_at: x.authed_at.map(|x| x.and_utc()),
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
+            author_id_seed: x.author_id_seed,
         }))
     }
 
@@ -533,9 +537,10 @@ impl BbsRepository for BbsRepositoryImpl {
                     writing_ua, 
                     auth_code, 
                     created_at, 
-                    validity
+                    validity,
+                    author_id_seed
                 ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             authed_token.id.as_bytes().to_vec(),
             authed_token.token,
             ip_addr,
@@ -543,7 +548,8 @@ impl BbsRepository for BbsRepositoryImpl {
             authed_token.writing_ua,
             authed_token.auth_code,
             authed_token.created_at,
-            false
+            false,
+            authed_token.author_id_seed,
         );
 
         query.execute(&self.pool).await?;
@@ -693,6 +699,7 @@ struct SelectionAuthedToken {
     authed_at: Option<NaiveDateTime>,
     validity: i8, // TINYINT
     last_wrote_at: Option<NaiveDateTime>,
+    author_id_seed: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -733,4 +740,5 @@ pub struct CreatingAuthedToken {
     pub writing_ua: String,
     pub auth_code: String,
     pub created_at: DateTime<Utc>,
+    pub author_id_seed: Vec<u8>,
 }

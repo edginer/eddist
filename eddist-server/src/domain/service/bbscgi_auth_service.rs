@@ -31,6 +31,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                     writing_ua: authed_token.writing_ua,
                     origin_ip: authed_token.origin_ip,
                     created_at,
+                    author_id_seed: authed_token.author_id_seed,
                     auth_code: authed_token.auth_code.clone(),
                     id: authed_token.id,
                 })
@@ -61,6 +62,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                         writing_ua: authed_token.writing_ua,
                         origin_ip: authed_token.origin_ip,
                         created_at,
+                        author_id_seed: authed_token.author_id_seed,
                         auth_code: authed_token.auth_code.clone(),
                         id: authed_token.id,
                     })

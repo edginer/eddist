@@ -4,7 +4,6 @@ use base64::Engine;
 use chrono::{DateTime, Datelike, Utc};
 use eddist_core::domain::{
     client_info::ClientInfo,
-    ip_addr::ReducedIpAddr,
     res::{ResView, ResViewRef},
     sjis_str::SJisStr,
 };
@@ -184,10 +183,10 @@ impl Res<AuthorIdUninitialized> {
         retrieved_cap_name: Option<String>,
     ) -> Res<AuthorIdInitialized> {
         let author_id = if retrieved_cap_name.is_none() {
-            get_author_id(
+            get_author_id_by_seed(
                 &self.board_key,
                 self.created_at,
-                authed_token.reduced_ip.clone(),
+                &authed_token.author_id_seed,
             )[..9]
                 .to_string()
         } else {
@@ -284,10 +283,10 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
-pub fn get_author_id(board_key: &str, datetime: DateTime<Utc>, ip_addr: ReducedIpAddr) -> String {
+pub fn get_author_id_by_seed(board_key: &str, datetime: DateTime<Utc>, seed: &[u8]) -> String {
     let datetime = datetime.add(chrono::Duration::hours(9)); // JST
     let (year, month, day) = (datetime.year(), datetime.month(), datetime.day());
-    calculate_trip(&format!("{year}-{month}-{day}:{board_key}:{ip_addr}"))
+    calculate_trip(&format!("{year}-{month}-{day}:{board_key}:{seed:?}"))
 }
 
 // &str is utf-8 bytes
