@@ -90,6 +90,4 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-persistence:${{ env.VERSION }}
       - name: Create GitHub release
-        run: gh release create ${{ github.ref_name }} --generate-notes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
