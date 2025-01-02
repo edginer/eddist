@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT \n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at \n            FROM authed_tokens WHERE token = ?",
+  "query": "SELECT\n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at,\n                author_id_seed\n            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
   "describe": {
     "columns": [
       {
@@ -101,10 +101,19 @@
           "flags": "BINARY",
           "max_size": 23
         }
+      },
+      {
+        "ordinal": 11,
+        "name": "author_id_seed",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 64
+        }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -117,8 +126,9 @@
       false,
       true,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "f7e79ad7d091e305f864c5308a933aec17f1430dc3bc979a11f84284705da1f0"
+  "hash": "f304c8fb1fdff86cef5da4eb079f4fd745ab026ef4ba7a48c5a5519c6cf2360e"
 }
