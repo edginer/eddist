@@ -99,7 +99,7 @@ impl Metadent {
 //   z is 4 if v4, 6 if v6 (this segment does not use date_seed)
 //   A is generated from type of Browser
 //   BB is generated from UA
-fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> String {
+pub fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> String {
     let alpha_char_62_to_ascii = |x: u8| match x {
         0..=9 => x + b'0',
         10..=35 => (x - 10) + b'A',
@@ -151,10 +151,16 @@ fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> String {
         3
     } else if ua.contains("Xeno") {
         4
-    } else if ua.contains("ThreadMaster") {
+    } else if ua == "Monazilla/1.00" {
         5
-    } else {
+    } else if ua.contains("Live5ch") {
         6
+    } else if ua.contains("BathyScaphe") {
+        7
+    } else if ua.contains("Chrome") {
+        8
+    } else {
+        9
     } + seed;
 
     let a = (a % 62) as u8;
@@ -174,7 +180,7 @@ fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> String {
     format!("{xx}{yy}-{z}{a}{bb}")
 }
 
-fn generate_date_seed(time: DateTime<Utc>) -> u32 {
+pub fn generate_date_seed(time: DateTime<Utc>) -> u32 {
     let n = time.timestamp() as u64;
     let seed = (n / (60 * 60 * 24) / 7) % i32::MAX as u64;
     rand::rngs::StdRng::seed_from_u64(seed).gen()

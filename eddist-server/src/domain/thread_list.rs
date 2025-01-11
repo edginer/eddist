@@ -28,3 +28,29 @@ impl ThreadList {
         SHIFT_JIS.encode(&text).0.to_vec()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ThreadListWithMetadent {
+    pub board: Board,
+    pub thread_list: Vec<(Thread, String)>,
+}
+
+impl ThreadListWithMetadent {
+    pub fn get_sjis_thread_list(&self) -> Vec<u8> {
+        let text = self
+            .thread_list
+            .iter()
+            .map(|(x, metadent)| {
+                format!(
+                    "{}.dat<>{} [{}★] ({})\n",
+                    x.thread_number, x.title, metadent, x.response_count
+                )
+            })
+            .fold(String::new(), |mut cur, next| {
+                cur.push_str(&next);
+                cur
+            });
+
+        SHIFT_JIS.encode(&text).0.to_vec()
+    }
+}

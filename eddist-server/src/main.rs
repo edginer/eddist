@@ -12,10 +12,7 @@ use axum::{
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::{
-        board::{validate_board_key, BoardInfo},
-        sjis_str::SJisStr,
-    },
+    domain::board::{validate_board_key, BoardInfo},
     utils::is_prod,
 };
 use handlebars::Handlebars;
@@ -27,10 +24,10 @@ use routes::{
     auth_code::{get_auth_code, post_auth_code},
     bbs_cgi::post_bbs_cgi,
     dat_routing::{get_dat_txt, get_kako_dat_txt},
+    subject_list::{get_subject_txt, get_subject_txt_with_metadent},
 };
 use services::{
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
-    thread_list_service::BoardKey,
     AppService, AppServiceContainer,
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
@@ -83,6 +80,7 @@ mod routes {
     pub mod bbs_cgi;
     pub mod dat_routing;
     pub mod statics;
+    pub mod subject_list;
 }
 
 #[derive(Clone)]
@@ -261,6 +259,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
         .route("/:boardKey/subject.txt", get(get_subject_txt))
+        .route(
+            "/:boardKey/subject-metadent.txt",
+            get(get_subject_txt_with_metadent),
+        )
         .route("/:boardKey/head.txt", get(get_head_txt))
         .route("/:boardKey/SETTING.TXT", get(get_setting_txt))
         .route("/:boardKey/dat/:threadId", get(get_dat_txt))
@@ -426,35 +428,6 @@ async fn graceful_shutdown_http() {
 
 async fn health_check() -> StatusCode {
     StatusCode::OK
-}
-
-async fn get_subject_txt(
-    State(state): State<AppState>,
-    Path(board_key): Path<String>,
-) -> impl IntoResponse {
-    if validate_board_key(&board_key).is_err() {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
-    }
-
-    let svc = state.get_container().thread_list();
-    let threads = match svc.execute(BoardKey(board_key)).await {
-        Ok(threads) => threads,
-        Err(e) => {
-            return if e.to_string().contains("failed to find board info") {
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            } else {
-                log::error!("Failed to get thread list: {e:?}");
-                Response::builder().status(500).body(Body::empty()).unwrap()
-            }
-        }
-    };
-
-    SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
-        .content_type(SjisContentType::TextPlain)
-        .client_ttl(5)
-        .server_ttl(1)
-        .build()
-        .into_response()
 }
 
 async fn get_setting_txt(
