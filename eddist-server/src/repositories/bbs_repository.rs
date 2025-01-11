@@ -8,7 +8,7 @@ use eddist_core::domain::{
     res::ResView,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{query, query_as, types::Json, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
@@ -26,6 +26,10 @@ pub trait BbsRepository: Send + Sync + 'static {
         board_id: Uuid,
         status: ThreadStatus,
     ) -> anyhow::Result<Vec<Thread>>;
+    async fn get_threads_with_metadent(
+        &self,
+        board_id: Uuid,
+    ) -> anyhow::Result<Vec<(Thread, ClientInfo)>>;
     async fn get_thread_by_board_key_and_thread_number(
         &self,
         board_key: &str,
@@ -206,6 +210,90 @@ impl BbsRepository for BbsRepositoryImpl {
                 no_pool: x.no_pool != 0,
                 active: x.active != 0,
                 archived: x.archived != 0,
+            })
+            .collect())
+    }
+
+    async fn get_threads_with_metadent(
+        &self,
+        board_id: Uuid,
+    ) -> anyhow::Result<Vec<(Thread, ClientInfo)>> {
+        let threads = query_as!(
+            SelectionThreadWithMetadent,
+            r#" 
+            WITH MinCreatedAt AS (
+                SELECT 
+                    thread_id, 
+                    MIN(created_at) AS min_created_at
+                FROM 
+                    responses
+                GROUP BY 
+                    thread_id
+            ),
+            FirstResponses AS (
+                SELECT 
+                    r.thread_id,
+                    r.client_info
+                FROM 
+                    responses r
+                INNER JOIN 
+                    MinCreatedAt m 
+                ON 
+                    r.thread_id = m.thread_id 
+                    AND r.created_at = m.min_created_at
+            )
+            SELECT 
+                t.id AS "id: Uuid",
+                t.board_id AS "board_id: Uuid",
+                t.thread_number AS thread_number,
+                t.last_modified_at AS last_modified_at,
+                t.sage_last_modified_at AS sage_last_modified_at,
+                t.title AS title,
+                t.authed_token_id AS "authed_token_id: Uuid",
+                t.metadent AS metadent,
+                t.response_count AS response_count,
+                t.no_pool AS "no_pool: bool",
+                t.active AS "active: bool",
+                t.archived AS "archived: bool",
+                t.archive_converted AS "archive_converted: bool",
+                r.client_info AS "client_info! : Json<ClientInfo>"
+            FROM 
+                threads AS t
+            LEFT JOIN 
+                FirstResponses r 
+            ON 
+                r.thread_id = t.id
+            WHERE 
+                t.board_id = ? AND
+                t.archived = 0
+            ORDER BY 
+                t.sage_last_modified_at DESC;
+"#,
+            board_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(threads
+            .into_iter()
+            .map(|x| {
+                (
+                    Thread {
+                        id: x.id,
+                        board_id: x.board_id,
+                        thread_number: x.thread_number,
+                        last_modified_at: Utc.from_utc_datetime(&x.last_modified_at),
+                        sage_last_modified_at: Utc.from_utc_datetime(&x.sage_last_modified_at),
+                        title: x.title,
+                        authed_token_id: x.authed_token_id,
+                        metadent: x.metadent,
+                        response_count: x.response_count as u32,
+                        no_pool: x.no_pool,
+                        active: x.active,
+                        archived: x.archived,
+                    },
+                    x.client_info.0,
+                )
             })
             .collect())
     }
@@ -674,6 +762,24 @@ struct SelectionThread {
     active: i8,            // TINYINT
     archived: i8,          // TINYINT
     archive_converted: i8, // TINYINT
+}
+
+#[derive(Debug)]
+struct SelectionThreadWithMetadent {
+    id: Uuid,
+    board_id: Uuid,
+    thread_number: i64,
+    last_modified_at: NaiveDateTime,
+    sage_last_modified_at: NaiveDateTime,
+    title: String,
+    authed_token_id: Uuid,
+    metadent: String,
+    response_count: i32,
+    no_pool: bool,           // TINYINT
+    active: bool,            // TINYINT
+    archived: bool,          // TINYINT
+    archive_converted: bool, // TINYINT
+    client_info: Json<ClientInfo>,
 }
 
 #[derive(Debug)]

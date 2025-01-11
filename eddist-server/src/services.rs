@@ -2,6 +2,7 @@ use auth_with_code_service::AuthWithCodeService;
 use board_info_service::BoardInfoService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
+use metadent_thread_list_service::MetadentThreadListService;
 use redis::aio::ConnectionManager;
 
 use res_creation_service::ResCreationService;
@@ -19,6 +20,7 @@ pub(crate) mod auth_with_code_service;
 pub(crate) mod board_info_service;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
+pub(crate) mod metadent_thread_list_service;
 pub(crate) mod res_creation_service;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
@@ -44,6 +46,7 @@ pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
     res_creation: ResCreationService<B, P>,
     thread_creation: TheradCreationService<B>,
     thread_list: ThreadListService<B>,
+    metadent_thread_list: MetadentThreadListService<B>,
     thread_retrival: ThreadRetrievalService<B>,
     kako_thread_retrieval: kako_thread_retrieval_service::KakoThreadRetrievalService,
 }
@@ -57,6 +60,7 @@ impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
             res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone(), pub_repo),
             thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
             thread_list: ThreadListService::new(bbs_repo.clone()),
+            metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
             thread_retrival: ThreadRetrievalService::new(bbs_repo, redis_conn),
             kako_thread_retrieval: KakoThreadRetrievalService::new(bucket),
         }
@@ -82,6 +86,10 @@ impl<B: BbsRepository + 'static, P: PubRepository> AppServiceContainer<B, P> {
 
     pub fn thread_list(&self) -> &ThreadListService<B> {
         &self.thread_list
+    }
+
+    pub fn metadent_thread_list(&self) -> &MetadentThreadListService<B> {
+        &self.metadent_thread_list
     }
 
     pub fn thread_retrival(&self) -> &ThreadRetrievalService<B> {
