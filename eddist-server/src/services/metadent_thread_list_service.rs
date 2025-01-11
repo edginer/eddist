@@ -1,4 +1,5 @@
 use base64::Engine;
+use chrono::TimeZone;
 use md5::Digest;
 
 use crate::{
@@ -35,6 +36,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
         let threads = threads
             .into_iter()
             .map(|(thread, client_info)| {
+                let thread_number = thread.thread_number;
                 (thread, {
                     let metadent = generate_meta_ident(
                         client_info.asn_num,
@@ -44,7 +46,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                             .unwrap_or(0)
                             .to_string(),
                         &client_info.user_agent,
-                        generate_date_seed(chrono::Utc::now()),
+                        generate_date_seed(chrono::Utc.timestamp_opt(thread_number, 0).unwrap()),
                     );
                     let mut hasher = md5::Md5::new();
                     hasher.update(metadent.as_bytes());

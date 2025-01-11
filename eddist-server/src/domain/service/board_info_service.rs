@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::res_core::ResCore,
-    error::{BbsCgiError, ContentLengthExceededParamType},
+    error::{BbsCgiError, ContentEmptyParamType, ContentLengthExceededParamType},
     repositories::bbs_repository::BbsRepository,
 };
 
@@ -138,6 +138,10 @@ impl BoardInfoResRestrictable for (&ResCore<'_>, &str) {
         let (res, thread_name) = self;
 
         res.validate_content_length(board_info)?;
+
+        if thread_name.is_empty() {
+            return Err(BbsCgiError::ContentEmpty(ContentEmptyParamType::ThreadName));
+        }
 
         if thread_name.len() > board_info.max_thread_name_byte_length as usize {
             return Err(BbsCgiError::ContentLengthExceeded(
