@@ -47,6 +47,9 @@ pub enum BbsCgiError {
     #[error("{0}が長すぎます")]
     ContentLengthExceeded(ContentLengthExceededParamType),
 
+    #[error("{0}が空です")]
+    ContentEmpty(ContentEmptyParamType),
+
     #[error("短期間に書き込みすぎです ({0}秒以内に1回書き込むことができます)")]
     TooManyCreatingRes(i32),
 
@@ -76,6 +79,7 @@ impl BbsCgiError {
             BbsCgiError::RevokedAuthedToken => StatusCode::FORBIDDEN,
             BbsCgiError::NgWordDetected => StatusCode::OK,
             BbsCgiError::ContentLengthExceeded(_) => StatusCode::OK,
+            BbsCgiError::ContentEmpty(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
@@ -96,6 +100,7 @@ impl BbsCgiError {
             BbsCgiError::RevokedAuthedToken => "RevokedAuthedToken",
             BbsCgiError::NgWordDetected => "NgWordDetected",
             BbsCgiError::ContentLengthExceeded(_) => "ContentLengthExceeded",
+            BbsCgiError::ContentEmpty(_) => "ContentEmpty",
             BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
@@ -252,6 +257,23 @@ impl Display for ContentLengthExceededParamType {
                 ContentLengthExceededParamType::Body => "本文",
                 ContentLengthExceededParamType::ThreadName => "スレッド名",
                 ContentLengthExceededParamType::BodyLines => "本文の行数",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ContentEmptyParamType {
+    ThreadName,
+}
+
+impl Display for ContentEmptyParamType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ContentEmptyParamType::ThreadName => "スレッド名",
             }
         )
     }
