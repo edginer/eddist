@@ -4,6 +4,7 @@ use base64::Engine;
 use chrono::{DateTime, Datelike, Utc};
 use eddist_core::domain::{
     client_info::ClientInfo,
+    metadent::MetadentType,
     res::{ResView, ResViewRef},
     sjis_str::SJisStr,
 };
@@ -14,7 +15,6 @@ use crate::domain::metadent::Metadent;
 
 use super::{
     authed_token::AuthedToken,
-    metadent::MetadentType,
     res_core::ResCore,
     utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
 };

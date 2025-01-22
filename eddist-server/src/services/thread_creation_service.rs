@@ -1,7 +1,10 @@
 use std::{borrow::Cow, env};
 
 use chrono::Utc;
-use eddist_core::domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker};
+use eddist_core::domain::{
+    cap::calculate_cap_hash, client_info::ClientInfo, pubsub_repository::PubSubItem,
+    repository::CreatingThread, tinker::Tinker,
+};
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
 use uuid::Uuid;
@@ -22,24 +25,24 @@ use crate::{
         utils::{sanitize_base, sanitize_num_refs},
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::bbs_repository::{BbsRepository, CreatingThread},
+    repositories::{bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository},
 };
 
 use super::BbsCgiService;
 
 #[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository>(T, ConnectionManager);
+pub struct TheradCreationService<T: BbsRepository, P: PubRepository>(T, ConnectionManager, P);
 
-impl<T: BbsRepository> TheradCreationService<T> {
-    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
-        Self(repo, redis_conn)
+impl<T: BbsRepository, P: PubRepository> TheradCreationService<T, P> {
+    pub fn new(repo: T, redis_conn: ConnectionManager, pub_repo: P) -> Self {
+        Self(repo, redis_conn, pub_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone>
+impl<T: BbsRepository + Clone, P: PubRepository + Clone>
     BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
-    for TheradCreationService<T>
+    for TheradCreationService<T, P>
 {
     async fn execute(
         &self,
@@ -47,6 +50,7 @@ impl<T: BbsRepository + Clone>
     ) -> Result<ThreadCreationServiceOutput, BbsCgiError> {
         let mut redis_conn = self.1.clone();
         let bbs_repo = self.0.clone();
+        let pub_repo = self.2.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
         let board_info_svc = BoardInfoService::new(self.0.clone());
@@ -156,7 +160,7 @@ impl<T: BbsRepository + Clone>
         }
 
         let authed_token_clone = authed_token.token.clone();
-        let db_result = bbs_repo.create_thread(creating_th).await;
+        let db_result = bbs_repo.create_thread(creating_th.clone()).await;
         db_result.map_err(|e| {
             if e.to_string() == "Given thread number is already exists" {
                 BbsCgiError::SameTimeThreadCration
@@ -175,6 +179,13 @@ impl<T: BbsRepository + Clone>
             res_span_svc
                 .update_last_res_creation_time(&authed_token_clone, unix_time as u64)
                 .await;
+
+            if env::var("PUB_POST_THREAD") == Ok("true".to_string()) {
+                let _ = pub_repo
+                    .publish(PubSubItem::CreatingThread(Box::new(creating_th.clone())))
+                    .await;
+            }
+
             redis_conn
                 .send_packed_command(&Cmd::expire(
                     format!("thread:{}:{unix_time}", input.board_key),

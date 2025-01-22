@@ -3,10 +3,8 @@ use std::{borrow::Cow, env};
 use anyhow::anyhow;
 use chrono::Utc;
 use eddist_core::domain::{
-    cap::calculate_cap_hash,
-    client_info::ClientInfo,
-    pubsub_repository::{CreatingRes, PubSubItem},
-    tinker::Tinker,
+    cap::calculate_cap_hash, client_info::ClientInfo, pubsub_repository::PubSubItem,
+    repository::CreatingRes, tinker::Tinker,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
@@ -202,10 +200,18 @@ impl<T: BbsRepository + Clone, P: PubRepository>
                     error = %e
                 );
                 pub_repo
-                    .publish(PubSubItem::CreatingRes(Box::new(cres)))
+                    .publish(PubSubItem::CreatingResWhenFailed(Box::new(cres.clone())))
                     .await
                     .unwrap();
             }
+
+            if env::var("PUB_POST_RES") == Ok("true".to_string()) {
+                pub_repo
+                    .publish(PubSubItem::CreatingRes(Box::new(cres.clone())))
+                    .await
+                    .unwrap();
+            }
+
             let _ = bbs_repo
                 .update_authed_token_last_wrote(authed_token.id, created_at)
                 .await;

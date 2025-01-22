@@ -1,7 +1,7 @@
 use std::{convert::Infallible, env};
 
 use eddist_core::{
-    domain::pubsub_repository::{CreatingRes, PubSubItem},
+    domain::{pubsub_repository::PubSubItem, repository::CreatingRes},
     utils::is_prod,
 };
 use futures::StreamExt;
@@ -261,15 +261,16 @@ impl SubRepository for RedisSubRepository {
             let payload = msg.get_payload::<String>()?;
             let item = serde_json::from_str::<PubSubItem>(&payload)?;
             match item {
-                PubSubItem::CreatingRes(res) => {
+                PubSubItem::CreatingResWhenFailed(res) => {
                     let mut conn = self.conn.clone();
                     let res = serde_json::to_string(&res)?;
                     conn.rpush::<'_, _, _, ()>("bbs:db_failed_cache:res", res)
                         .await?;
                 }
-                PubSubItem::Shutdown => {
+                PubSubItem::PersistenceShutdown => {
                     break;
                 }
+                _ => {}
             }
         }
 

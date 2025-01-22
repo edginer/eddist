@@ -21,10 +21,22 @@ pub trait PubRepository: Clone + 'static + Send + Sync {
 impl PubRepository for RedisPubRepository {
     async fn publish(&self, item: PubSubItem) -> Result<(), anyhow::Error> {
         let mut redis_conn = self.redis_conn.clone();
-        let item = serde_json::to_string(&item)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:pubsubitem", item.clone())
-            .await?;
+
+        match &item {
+            PubSubItem::CreatingResWhenFailed(_) | PubSubItem::PersistenceShutdown => {
+                let item = serde_json::to_string(&item)?;
+                redis_conn
+                    .publish::<'_, _, _, ()>("bbs:pubsubitem", item.clone())
+                    .await?;
+            }
+            PubSubItem::CreatingRes(_) | PubSubItem::CreatingThread(_) => {
+                let item = serde_json::to_string(&item)?;
+                redis_conn
+                    .publish::<'_, _, _, ()>("bbs:pubsub-post", item.clone())
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 }

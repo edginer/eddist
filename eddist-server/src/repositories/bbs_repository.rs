@@ -4,16 +4,13 @@ use eddist_core::domain::{
     cap::Cap,
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
-    pubsub_repository::CreatingRes,
+    repository::{CreatingRes, CreatingThread},
     res::ResView,
 };
-use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, types::Json, MySqlPool};
 use uuid::Uuid;
 
-use crate::domain::{
-    authed_token::AuthedToken, metadent::MetadentType, ng_word::NgWord, thread::Thread,
-};
+use crate::domain::{authed_token::AuthedToken, ng_word::NgWord, thread::Thread};
 
 #[mockall::automock]
 #[async_trait::async_trait]
@@ -818,24 +815,6 @@ pub enum ThreadStatus {
     Inactive,
     // Show in the thread list, and it contains the thread that is inactive but not archived
     Unarchived,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreatingThread {
-    pub thread_id: Uuid,
-    pub response_id: Uuid,
-    pub title: String,
-    pub unix_time: u64,
-    pub body: String,
-    pub name: String,
-    pub mail: String,
-    pub created_at: DateTime<Utc>,
-    pub author_ch5id: String,
-    pub authed_token_id: Uuid,
-    pub ip_addr: String,
-    pub board_id: Uuid,
-    pub metadent: MetadentType,
-    pub client_info: ClientInfo,
 }
 
 #[derive(Debug, Clone)]

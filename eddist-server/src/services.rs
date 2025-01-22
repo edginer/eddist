@@ -44,7 +44,7 @@ pub struct AppServiceContainer<B: BbsRepository + 'static, P: PubRepository> {
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B, P>,
-    thread_creation: TheradCreationService<B>,
+    thread_creation: TheradCreationService<B, P>,
     thread_list: ThreadListService<B>,
     metadent_thread_list: MetadentThreadListService<B>,
     thread_retrival: ThreadRetrievalService<B>,
@@ -57,8 +57,16 @@ impl<B: BbsRepository + Clone, P: PubRepository> AppServiceContainer<B, P> {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
-            res_creation: ResCreationService::new(bbs_repo.clone(), redis_conn.clone(), pub_repo),
-            thread_creation: TheradCreationService::new(bbs_repo.clone(), redis_conn.clone()),
+            res_creation: ResCreationService::new(
+                bbs_repo.clone(),
+                redis_conn.clone(),
+                pub_repo.clone(),
+            ),
+            thread_creation: TheradCreationService::new(
+                bbs_repo.clone(),
+                redis_conn.clone(),
+                pub_repo,
+            ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
             thread_retrival: ThreadRetrievalService::new(bbs_repo, redis_conn),
@@ -80,7 +88,7 @@ impl<B: BbsRepository + 'static, P: PubRepository> AppServiceContainer<B, P> {
         &self.res_creation
     }
 
-    pub fn thread_creation(&self) -> &TheradCreationService<B> {
+    pub fn thread_creation(&self) -> &TheradCreationService<B, P> {
         &self.thread_creation
     }
 
