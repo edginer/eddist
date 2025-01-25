@@ -2,6 +2,7 @@ use std::{convert::Infallible, env};
 
 use eddist_core::{
     domain::pubsub_repository::{CreatingRes, PubSubItem},
+    tracing::init_tracing,
     utils::is_prod,
 };
 use futures::StreamExt;
@@ -12,7 +13,6 @@ use sqlx::{query, Connection, QueryBuilder};
 use tokio::net::TcpListener;
 use tokio::{join, select, time::sleep};
 use tracing::{error_span, info_span};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,11 +20,7 @@ async fn main() -> anyhow::Result<()> {
         dotenvy::dotenv().ok();
     }
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .with_ansi(false)
-        .init();
+    init_tracing();
 
     let (ctrl_c_tx, _) = tokio::sync::broadcast::channel::<()>(1);
     let ctrl_c_sub_persitence = ctrl_c_tx.subscribe();

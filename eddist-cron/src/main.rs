@@ -2,10 +2,9 @@ use std::{env, str::FromStr, time::Duration};
 
 use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
-use eddist_core::utils::is_prod;
+use eddist_core::{tracing::init_tracing, utils::is_prod};
 use s3::{creds::Credentials, Bucket};
 use sqlx::mysql::MySqlPoolOptions;
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod repository;
 
@@ -15,11 +14,7 @@ async fn main() {
         dotenvy::dotenv().unwrap();
     }
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .with_ansi(false)
-        .init();
+    init_tracing();
 
     // Jobs:
     // - inactivate and archive (not to show thread list),

@@ -993,7 +993,6 @@ dependencies = [
  "tower 0.5.1",
  "tower-http",
  "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -1024,7 +1023,6 @@ dependencies = [
  "tower-layer",
  "tower-sessions",
  "tracing",
- "tracing-subscriber",
  "utoipa",
  "uuid",
 ]
@@ -1036,10 +1034,13 @@ dependencies = [
  "anyhow",
  "chrono",
  "encoding_rs",
+ "metrics",
  "redis",
  "serde",
  "serde_json",
  "sha3",
+ "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 
@@ -1058,7 +1059,6 @@ dependencies = [
  "rust-s3",
  "sqlx",
  "tokio",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -1080,7 +1080,6 @@ dependencies = [
  "sqlx",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
