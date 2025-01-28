@@ -10,4 +10,5 @@ pub mod domain {
 }
 
 pub mod cache_aside;
+pub mod tracing;
 pub mod utils;

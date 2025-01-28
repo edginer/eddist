@@ -13,6 +13,7 @@ use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
     domain::board::{validate_board_key, BoardInfo},
+    tracing::init_tracing,
     utils::is_prod,
 };
 use handlebars::Handlebars;
@@ -42,7 +43,6 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{info_span, Span};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 mod shiftjis;
 mod repositories {
@@ -167,11 +167,7 @@ async fn main() -> anyhow::Result<()> {
         dotenvy::dotenv()?;
     }
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .with_ansi(false)
-        .init();
+    init_tracing();
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let conn_mgr = client.get_connection_manager().await?;

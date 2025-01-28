@@ -11,6 +11,7 @@ use axum::{
 use chrono::Utc;
 use eddist_core::{
     domain::{client_info::ClientInfo as CoreClientInfo, tinker::Tinker as CoreTinker},
+    tracing::init_tracing,
     utils::is_prod,
 };
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
@@ -30,7 +31,6 @@ use time::Duration;
 use tokio::net::TcpListener;
 use tower_layer::Layer;
 use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, SessionManagerLayer};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 use utoipa::{IntoParams, OpenApi, ToSchema};
 use uuid::Uuid;
 
@@ -132,11 +132,7 @@ async fn main() {
         RedirectUrl::new(std::env::var("EDDIST_ADMIN_LOGIN_CALLBACK_URL").unwrap()).unwrap(),
     );
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .with_ansi(false)
-        .init();
+    init_tracing();
 
     let serve_dir = if is_prod() {
         "dist"
