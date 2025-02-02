@@ -1,0 +1,164 @@
+# Abstract
+This document details the design of the user registration system for Eddist. 
+Registered users authenticate via third-party IdPs (OAuth 2.0/OpenID Connect) without local passwords. 
+A secure registration flow is triggered by a message command, leveraging cryptographically generated temporary URLs and state parameters. 
+The system binds authed tokens to user accounts and manages user sessions for message posting, ensuring robust user identity management.
+
+# Background
+Currently, the user need to auth to post a message. But auth system which only depends on the token is not enough, because below reasons:
+- The user is hard to remember the token, so the user need to memorize the token or save the token in some place to use the token another device.
+- We want to revoke the token which is used for abuse, so user registration system is beneficial to distinguish the user is abuser or not.
+
+# Specification
+## Abstract
+- User registration system is not required to post a message currently
+- We will provide some features only for registered user
+- User registration system use only third-party IdP to authenticate the user
+  - OAuth 2.0 / OpenID Connect compatible IdP is supported
+  - We does not store the user's password because of this choice
+  - We support multiple IdP to authenticate the user
+    - User can login one of the IdP which is supported by Eddist and registered by the user
+- User auth first, then the user can register using user registration process
+  - User registration process can begin from writing a message including the some specific command
+- We will add flag whether enable this feature or not for while
+  - We will create beta env in the future, and test it, then we will enable it in the production env
+
+## Sequence Diagram of User Registration / Management
+
+### Registration Flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant Eddist
+    participant Redis
+    participant DB
+    participant IdP
+
+    Note right of User: User already authed
+    User->>Eddist: Write a message w/ user registration command
+    Eddist->>DB: Check authed token is valid
+    alt Invalid
+        Eddist->>User: Show error message
+        Note right of User: End of the flow
+        DB->>Eddist: Return the authed token status
+    else Valid
+        Eddist->>DB: Check whether the authed token is bound to the user (registered user)
+        alt Registered
+            DB->>Eddist: Return the user's information
+            Eddist->>Eddist: Create a temporary URL to show the user's page
+            Eddist->>Redis: Store the temporary URL <br> (expiration: 3 minutes, only one time, prefix: userreg:tempurl:exist)
+            Eddist->>User: Show temporary URL to show the user's page
+            Note right of User: End of the flow
+        else Not registered
+            Eddist->>Eddist: Create a temporary URL to register the user
+            Eddist->>Redis: Store the temporary URL <br> (expiration: 3 minutes, only one time, prefix: userreg:tempurl:register)
+            Eddist->>User: Show temporary URL to register the user
+        end
+    end
+    
+    User->>Eddist: Access the temporary URL
+    Eddist->>Redis: Retrieve the authed token using the temporary URL and expire the temporary URL <br> (expire userreg:tempurl:register)
+    Redis->>Eddist: Return the authed token
+    Eddist->>Redis: Generate a state / session ID containing the authed token and some information, then store it <br> (expiration: 1hour, prefix: userreg:oauth2:state)
+    Eddist->>User: Show the confirmation page (w/ optional user name input form) to register the user and redirect to IdP
+    User->>Eddist: Confirm the registration and redirect to IdP
+    Eddist->>Eddist: Generate authorization request parameters (state, nonce, PKCE)
+    Eddist->>Redis: Store the authorization request parameters <br> (expiration: 1hour, key: state, prefix: userreg:oauth2:authreq)
+    Eddist->>IdP: Redirect to IdP (authorization endpoint)
+    IdP<<->>User: Authenticate & Authorize in IdP
+    IdP->>Eddist: Redirect to Eddist (callback URL w/ authorization code, state)
+    Eddist->>IdP: Get access token
+    Eddist->>Redis: Retrieve the authorization request parameters, authed token using the state and expire the state <br> (expire userreg:oauth2:state and userreg:oauth2:authreq)
+    Redis->>Eddist: Return the authorization request parameters, authed token, (optional) user name, and some information
+    Eddist->>DB: Save the user's information and bind the user to the authed token
+    Eddist->>Eddist: Create user session
+    Eddist->>Redis: Store the user session <br> (expiration: 365 days, prefix: user:session)
+    Eddist->>User: Show the user page w/ success message and user session
+```
+
+### Post flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant Eddist
+    participant Redis
+    participant DB
+
+    Note right of User: User already authed
+    User->>Eddist: Write a message
+    Eddist->>DB: Check authed token is valid
+    alt Invalid
+        Eddist->>User: Show error message
+        Note right of User: End of the flow
+        DB->>Eddist: Return the authed token status
+    else Valid
+        alt User has user session
+            Eddist->>Redis: Retrieve the user session using user session
+            Redis->>Eddist: Return the user session
+            Eddist->>DB: Check the user session (user status) is valid
+            alt Invalid (not found)
+                Eddist->>User: Remove the user session cookie
+                Note right of User: Continue with normal post flow
+            else Invalid (abuser)
+                Eddist->>Redis: Expire the user session
+                Eddist->>DB: Revoke the authed token
+                Eddist->>User: Show the error message
+            else Valid
+                Eddist->>DB: Get all of authed tokens which are bound to the user
+                DB->>Eddist: Return the authed tokens
+                alt Current authed token is included in the authed tokens
+                    Note right of User: Continue with normal post flow
+                else Current authed token is not included in the authed tokens
+                    Eddist->>DB: Check the authed token is bound to the another user
+                    alt is bound to the another user
+                        Eddist->>DB: Revoke the authed token
+                        Eddist->>User: Show the error message
+                    else is not bound to the another user
+                        Eddist->>DB: Bind the authed token to the user
+                        Note right of User: Continue with normal post flow
+                    end
+                end
+            end
+        else User does not have user session
+            Note right of User: This is not user flow (normal post flow)
+        end
+    end
+```
+
+## ER Diagram associated with User Registration / Management
+```mermaid
+erDiagram
+    %% authed_tokens is already defined, so we does not write the definition here
+    authed_tokens
+    users {
+        string user_id
+        string user_name
+        string created_at
+        string updated_at
+    }
+    user_authed_tokens {
+        string user_id
+        string authed_token
+        string created_at
+        string updated_at
+    }
+    user_idp_bindings {
+        string user_id
+        string idp_id
+        string created_at
+        string updated_at
+    }
+    idps {
+        string idp_id
+        string idp_name
+        string oidc_config_url
+        string client_id
+        %% client_secret is encrypted using AES-256 (key: tinker-token)
+        string client_secret
+    }
+
+    users ||--o{ user_authed_tokens: user_id
+    users ||--o{ user_idp_bindings: user_id    
+    authed_tokens ||--o{ user_authed_tokens: authed_token
+    idps ||--o{ user_idp_bindings: idp_id
+```
