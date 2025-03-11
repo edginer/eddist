@@ -378,7 +378,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 authed_at, 
                 validity, 
                 last_wrote_at,
-                author_id_seed
+                author_id_seed,
+                registered_user_id
             FROM authed_tokens WHERE token = ?",
             token
         );
@@ -398,6 +399,7 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
 
@@ -408,7 +410,7 @@ impl BbsRepository for BbsRepositoryImpl {
     ) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT
+            r#"SELECT
                 id, 
                 token, 
                 origin_ip, 
@@ -420,8 +422,9 @@ impl BbsRepository for BbsRepositoryImpl {
                 authed_at, 
                 validity, 
                 last_wrote_at,
-                author_id_seed
-            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
+                author_id_seed,
+                registered_user_id
+            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
             reduced_ip,
             auth_code
         );
@@ -441,6 +444,7 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
 
@@ -806,6 +810,7 @@ struct SelectionAuthedToken {
     validity: i8, // TINYINT
     last_wrote_at: Option<NaiveDateTime>,
     author_id_seed: Vec<u8>,
+    registered_user_id: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Copy)]

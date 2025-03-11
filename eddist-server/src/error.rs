@@ -62,6 +62,12 @@ pub enum BbsCgiError {
     #[error("この板は現在読み込み専用です")]
     ReadOnlyBoard,
 
+    #[error("以下のURLを利用してユーザー登録を行ってください \n {url}")]
+    UserRegTempUrl { url: String },
+
+    #[error("ユーザー登録の試行回数が多すぎます")]
+    TooManyUserCreationAttempt,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -84,6 +90,8 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
+            BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
+            BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -105,6 +113,8 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
+            BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
+            BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

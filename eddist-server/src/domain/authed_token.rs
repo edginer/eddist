@@ -18,6 +18,7 @@ pub struct AuthedToken {
     pub validity: bool,
     pub last_wrote_at: Option<DateTime<Utc>>,
     pub author_id_seed: Vec<u8>,
+    pub registered_user_id: Option<Uuid>,
 }
 
 impl AuthedToken {
@@ -47,6 +48,7 @@ impl AuthedToken {
             validity: false,
             last_wrote_at: None,
             author_id_seed: sha2::Sha512::digest(reduced_ip.to_string().as_bytes()).to_vec(),
+            registered_user_id: None,
         }
     }
 

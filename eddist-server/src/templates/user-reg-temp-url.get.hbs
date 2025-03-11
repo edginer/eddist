@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Registration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .idp-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .idp-button {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s, transform 0.2s;
+        }
+        .idp-button:hover {
+            background: #e9e9e9;
+            transform: scale(1.05);
+        }
+        .idp-button img {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>登録に利用するサービスを選択してください</h1>
+    <div class="idp-container">
+        {{#each available_idps}}
+            <button class="idp-button" onclick="redirectToIdP('{{idp_name}}')">
+                <img src="data:image/svg+xml;base64,{{idp_logo_svg}}" alt="{{idp_display_name}} Logo" width="24" height="24">
+                {{idp_display_name}} でログイン
+            </button>
+        {{/each}}
+    </div>
+    
+    <script>
+        function redirectToIdP(idpName) {
+            window.location.href = `/user/register/authz/idp/${idpName}`;
+        }
+    </script>
+</body>
+</html>

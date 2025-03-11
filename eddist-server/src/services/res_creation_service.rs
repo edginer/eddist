@@ -2,14 +2,18 @@ use std::{borrow::Cow, env};
 
 use anyhow::anyhow;
 use chrono::Utc;
-use eddist_core::domain::{
-    cap::calculate_cap_hash,
-    client_info::ClientInfo,
-    pubsub_repository::{CreatingRes, PubSubItem},
-    tinker::Tinker,
+use eddist_core::{
+    domain::{
+        cap::calculate_cap_hash,
+        client_info::ClientInfo,
+        pubsub_repository::{CreatingRes, PubSubItem},
+        tinker::Tinker,
+    },
+    simple_rate_limiter::RateLimiter,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
+use tokio::sync::Mutex;
 use tracing::error_span;
 use uuid::Uuid;
 
@@ -20,6 +24,7 @@ use crate::{
         res_core::ResCore,
         service::{
             bbscgi_auth_service::BbsCgiAuthService,
+            bbscgi_user_reg_temp_url_service::UserRegTempUrlService,
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
@@ -28,31 +33,40 @@ use crate::{
         },
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::{bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository},
+    repositories::{
+        bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
+        user_repository::UserRepository,
+    },
 };
 
-use super::BbsCgiService;
+use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
 
 #[derive(Clone)]
-pub struct ResCreationService<T: BbsRepository, P: PubRepository>(T, ConnectionManager, P);
+pub struct ResCreationService<T: BbsRepository, U: UserRepository, P: PubRepository>(
+    T,
+    U,
+    ConnectionManager,
+    P,
+);
 
-impl<T: BbsRepository, P: PubRepository> ResCreationService<T, P> {
-    pub fn new(repo: T, redis_conn: ConnectionManager, pub_repo: P) -> Self {
-        Self(repo, redis_conn, pub_repo)
+impl<T: BbsRepository, U: UserRepository, P: PubRepository> ResCreationService<T, U, P> {
+    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, pub_repo: P) -> Self {
+        Self(repo, user_repo, redis_conn, pub_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, P: PubRepository>
-    BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput> for ResCreationService<T, P>
+impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
+    BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
+    for ResCreationService<T, U, P>
 {
     async fn execute(
         &self,
         input: ResCreationServiceInput,
     ) -> Result<ResCreationServiceOutput, BbsCgiError> {
-        let mut redis_conn = self.1.clone();
+        let mut redis_conn = self.2.clone();
         let bbs_repo = self.0.clone();
-        let pub_repo = self.2.clone();
+        let pub_repo = self.3.clone();
 
         let res_id = Uuid::now_v7();
         let board_info_svc = BoardInfoService::new(self.0.clone());
@@ -114,6 +128,28 @@ impl<T: BbsRepository + Clone, P: PubRepository>
                 created_at,
             )
             .await?;
+
+        if input.body.starts_with("!userreg") {
+            let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
+                Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
+            });
+            {
+                let mut rate_limiter = rate_limiter.lock().await;
+                if !rate_limiter.check_and_add(&authed_token.token) {
+                    return Err(BbsCgiError::TooManyUserCreationAttempt);
+                }
+            }
+
+            let user_reg_url_svc = UserRegTempUrlService::new(redis_conn.clone());
+            let user_reg_url = user_reg_url_svc
+                .create_userreg_temp_url(&authed_token)
+                .await?;
+
+            // TODO: when user is registered, we should return to link to user's page. (using tmp_url_path)
+
+            return Err(BbsCgiError::UserRegTempUrl { url: user_reg_url });
+        }
+
         let cap_name = if let Some(cap) = res.cap() {
             let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
             self.0
@@ -195,7 +231,6 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             is_sage: res.is_sage(),
         };
 
-        // let authed_token_id = authed_token.id.clon;
         tokio::spawn(async move {
             if let Err(e) = bbs_repo.create_response(cres.clone()).await {
                 error_span!("failed to create response in database",

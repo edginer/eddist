@@ -1,0 +1,22 @@
+use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    pub user_name: String,
+    pub idps: Vec<UserIdp>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserIdp {
+    pub idp_id: Uuid,
+    pub idp_name: String,
+    pub idp_display_name: String,
+    pub idp_sub: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}

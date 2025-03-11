@@ -59,17 +59,18 @@ sequenceDiagram
     User->>Eddist: Access the temporary URL
     Eddist->>Redis: Retrieve the authed token using the temporary URL and expire the temporary URL <br> (expire userreg:tempurl:register)
     Redis->>Eddist: Return the authed token
-    Eddist->>Redis: Generate a state / session ID containing the authed token and some information, then store it <br> (expiration: 1hour, prefix: userreg:oauth2:state)
-    Eddist->>User: Show the confirmation page (w/ optional user name input form) to register the user and redirect to IdP
+    Eddist->>Redis: Generate a state / session ID containing the authed token and some information, then store it <br> (expiration: 3min, prefix: userreg:oauth2:state)
+    Eddist->>User: Show the confirmation page to register the user and redirect to IdP
     User->>Eddist: Confirm the registration and redirect to IdP
-    Eddist->>Eddist: Generate authorization request parameters (state, nonce, PKCE)
-    Eddist->>Redis: Store the authorization request parameters <br> (expiration: 1hour, key: state, prefix: userreg:oauth2:authreq)
-    Eddist->>IdP: Redirect to IdP (authorization endpoint)
+    Eddist->>Eddist: Generate authorization request parameters (state, nonce, PKCE)    
+    Eddist->>Redis: Store the authorization request parameters <br> (expiration: 15min, key: state, prefix: userreg:oauth2:authreq, expire userreg:oauth2:state)
+    Eddist->>User: Redirect to IdP (authorization endpoint)
+    User->>IdP: Access the authorization endpoint
     IdP<<->>User: Authenticate & Authorize in IdP
     IdP->>Eddist: Redirect to Eddist (callback URL w/ authorization code, state)
+    Eddist->>Redis: Retrieve the authorization request parameters, authed token using the state and expire the state <br> (expire userreg:oauth2:authreq)
     Eddist->>IdP: Get access token
-    Eddist->>Redis: Retrieve the authorization request parameters, authed token using the state and expire the state <br> (expire userreg:oauth2:state and userreg:oauth2:authreq)
-    Redis->>Eddist: Return the authorization request parameters, authed token, (optional) user name, and some information
+    Redis->>Eddist: Return the authorization request parameters, authed token and some information
     Eddist->>DB: Save the user's information and bind the user to the authed token
     Eddist->>Eddist: Create user session
     Eddist->>Redis: Store the user session <br> (expiration: 365 days, prefix: user:session)
@@ -129,32 +130,41 @@ sequenceDiagram
 ```mermaid
 erDiagram
     %% authed_tokens is already defined, so we does not write the definition here
-    authed_tokens
+    authed_tokens {
+        %% ony added fields
+        boolean require_user_registration
+        string registered_user_id
+    }
     users {
-        string user_id
+        string id
+        %% user_name is optional, user can set the user name after registration
         string user_name
         string created_at
         string updated_at
     }
     user_authed_tokens {
+        string id
         string user_id
-        string authed_token
+        string authed_token_id
         string created_at
         string updated_at
     }
     user_idp_bindings {
+        string id
         string user_id
         string idp_id
+        string idp_sub
         string created_at
         string updated_at
     }
     idps {
-        string idp_id
+        string id
         string idp_name
         string oidc_config_url
         string client_id
         %% client_secret is encrypted using AES-256 (key: tinker-token)
         string client_secret
+        boolean enabled
     }
 
     users ||--o{ user_authed_tokens: user_id
@@ -162,3 +172,10 @@ erDiagram
     authed_tokens ||--o{ user_authed_tokens: authed_token
     idps ||--o{ user_idp_bindings: idp_id
 ```
+
+## URL / API Endpoints
+- `/user/register/{tempurl}`: Show the user registration page
+- `/user/register/authz/idp/{idp_name}`: Generate the authorization request parameters and redirect to IdP
+- `/user/exist/{tempurl}`: Temporary URL to show the user page
+- `/user/auth/callback`: Callback URL for IdP
+- `/user/`: User page
