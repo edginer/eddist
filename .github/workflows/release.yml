@@ -55,7 +55,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set docker version tag
-        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')" >> $GITHUB_ENV
+        run: echo "VERSION=$(echo ${{ github.ref_name }})" >> $GITHUB_ENV
 
       - name: Build and push Docker image (eddist)
         uses: docker/build-push-action@v6
