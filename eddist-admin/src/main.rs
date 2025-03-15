@@ -213,6 +213,10 @@ async fn main() {
             "/boards/:boardKey/dat-archives/:threadNumber",
             delete(bbs::delete_archived_thread),
         )
+        .route(
+            "/boards/:boardKey/threads-compaction/",
+            post(bbs::threads_compaction),
+        )
         .route("/authed_tokens/:authedTokenId", get(bbs::get_authed_token))
         .route(
             "/authed_tokens/:authedTokenId",
@@ -495,6 +499,11 @@ struct UpdateCapInput {
     board_ids: Option<Vec<Uuid>>,
 }
 
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct ThreadCompactionInput {
+    target_count: u32,
+}
+
 mod bbs {
     use axum::{
         extract::{Path, Query, State},
@@ -516,8 +525,8 @@ mod bbs {
             ngword_repository::NgWordRepository,
         },
         Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
-        DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, UpdateCapInput,
-        UpdateNgWordInput, UpdateResInput,
+        DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput,
+        UpdateCapInput, UpdateNgWordInput, UpdateResInput,
     };
 
     #[utoipa::path(
@@ -1332,6 +1341,34 @@ mod bbs {
         Path(cap_id): Path<Uuid>,
     ) -> Response {
         state.cap_repo.delete_cap(cap_id).await.unwrap();
+
+        Response::builder()
+            .status(200)
+            .body(axum::body::Body::empty())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        post,
+        path = "/boards/{board_key}/threads-compaction/",
+        responses(
+            (status = 200, description = "Compaction thread successfully"),
+        ),
+        params(
+            ("board_key" = String, Path, description = "Board Key"),
+        ),
+        request_body = ThreadCompactionInput
+    )]
+    pub async fn threads_compaction(
+        State(state): State<DefaultAppState>,
+        Path(board_key): Path<String>,
+        Json(body): Json<ThreadCompactionInput>,
+    ) -> Response {
+        state
+            .admin_bbs_repo
+            .compact_threads(&board_key, body.target_count)
+            .await
+            .unwrap();
 
         Response::builder()
             .status(200)

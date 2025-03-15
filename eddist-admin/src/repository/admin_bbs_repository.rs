@@ -57,6 +57,8 @@ pub trait AdminBbsRepository: Send + Sync {
         body: Option<String>,
         is_abone: Option<bool>,
     ) -> anyhow::Result<Res>;
+
+    async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]
@@ -990,5 +992,28 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             client_info: res.client_info.0.into(),
             res_order: res.res_order,
         })
+    }
+
+    async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()> {
+        sqlx::query!(
+            r#"
+            UPDATE threads SET archived = 1, active = 0 WHERE id IN (
+                SELECT id FROM (
+                    SELECT id
+                    FROM threads
+                    WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
+                    AND archived = 0
+                    ORDER BY last_modified_at DESC
+                    LIMIT 1000000 OFFSET ?
+                ) AS tmp
+            )
+            "#,
+            board_key,
+            target_count,
+        )
+        .execute(&self.0)
+        .await?;
+
+        Ok(())
     }
 }
