@@ -257,5 +257,5 @@ pub struct ThreadCreationServiceOutput {
 }
 
 pub fn sanitize_thread_name(name: &str) -> String {
-    sanitize_num_refs(&sanitize_base(name, true))
+    sanitize_num_refs(&sanitize_base(name, false))
 }
