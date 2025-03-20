@@ -10,6 +10,7 @@ use s3::Bucket;
 use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
+use user_page_service::UserPageService;
 use user_reg_authz_idp_callback_service::UserRegAuthzIdpCallbackService;
 use user_reg_idp_redirection_service::UserRegIdpRedirectionService;
 use user_reg_temp_url_service::UserRegTempUrlService;
@@ -31,6 +32,7 @@ pub(crate) mod res_creation_service;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;
+pub(crate) mod user_page_service;
 pub(crate) mod user_reg_authz_idp_callback_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
@@ -67,6 +69,7 @@ pub struct AppServiceContainer<
     user_reg_temp_url: UserRegTempUrlService<I>,
     user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
     user_reg_authz_idp_callback: UserRegAuthzIdpCallbackService<I, U>,
+    user_page: UserPageService<U>,
 }
 
 impl<
@@ -110,8 +113,11 @@ impl<
                 redis_conn.clone(),
             ),
             user_reg_authz_idp_callback: UserRegAuthzIdpCallbackService::new(
-                idp_repo, user_repo, redis_conn,
+                idp_repo,
+                user_repo.clone(),
+                redis_conn.clone(),
             ),
+            user_page: UserPageService::new(user_repo, redis_conn),
         }
     }
 }
@@ -169,5 +175,9 @@ impl<
 
     pub fn user_reg_authz_idp_callback(&self) -> &UserRegAuthzIdpCallbackService<I, U> {
         &self.user_reg_authz_idp_callback
+    }
+
+    pub fn user_page(&self) -> &UserPageService<U> {
+        &self.user_page
     }
 }

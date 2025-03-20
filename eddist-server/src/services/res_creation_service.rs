@@ -24,7 +24,7 @@ use crate::{
         res_core::ResCore,
         service::{
             bbscgi_auth_service::BbsCgiAuthService,
-            bbscgi_user_reg_temp_url_service::UserRegTempUrlService,
+            bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
@@ -141,13 +141,15 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             }
 
             let user_reg_url_svc = UserRegTempUrlService::new(redis_conn.clone());
-            let user_reg_url = user_reg_url_svc
+            return match user_reg_url_svc
                 .create_userreg_temp_url(&authed_token)
-                .await?;
-
-            // TODO: when user is registered, we should return to link to user's page. (using tmp_url_path)
-
-            return Err(BbsCgiError::UserRegTempUrl { url: user_reg_url });
+                .await?
+            {
+                UserRegUrlKind::Registered => Err(BbsCgiError::UserAlreadyRegistered),
+                UserRegUrlKind::NotRegistered(user_reg_url) => {
+                    Err(BbsCgiError::UserRegTempUrl { url: user_reg_url })
+                }
+            };
         }
 
         let cap_name = if let Some(cap) = res.cap() {

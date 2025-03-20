@@ -34,6 +34,7 @@ use routes::{
 use serde::Deserialize;
 use services::{
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+    user_page_service::{UserPageServiceInput, UserPageServiceOutput},
     user_reg_authz_idp_callback_service::{
         UserRegAuthzIdpCallbackServiceInput, UserRegAuthzIdpCallbackServiceOutput,
     },
@@ -165,14 +166,20 @@ fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
         .unwrap();
     template_engine
         .register_template_string(
-            "user-reg-temp-url.get.hbs",
+            "user-reg-temp-url.get",
             include_str!("templates/user-reg-temp-url.get.hbs"),
         )
         .unwrap();
     template_engine
         .register_template_string(
-            "user-page-simple.get.hbs",
+            "user-page-simple.get",
             include_str!("templates/user-page-simple.get.hbs"),
+        )
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "error-page.get",
+            include_str!("templates/error-page.get.hbs"),
         )
         .unwrap();
 
@@ -320,19 +327,7 @@ async fn main() -> anyhow::Result<()> {
             "/user/register/authz/idp/:idpName",
             get(get_user_reg_redirect_to_idp_authz),
         )
-        .route(
-            "/user",
-            // TODO: check user is whether registered and session is valid or not
-            get(|State(state): State<AppState>| async move {
-                let html = state
-                    .template_engine
-                    .render("user-page-simple.get.hbs", &serde_json::json!({}))
-                    .unwrap();
-
-                Html(html).into_response()
-            }),
-        )
-        .route("/user/exist/:tempUrlPath", get(|| async move { todo!() }))
+        .route("/user", get(get_user_page))
         .route("/user/auth/callback", get(get_user_authz_idp_callback))
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
@@ -645,7 +640,7 @@ async fn get_user_register_temp_url(
             let html = state
                 .template_engine
                 .render(
-                    "user-reg-temp-url.get.hbs",
+                    "user-reg-temp-url.get",
                     &serde_json::json!(
                         {
                             "available_idps": available_idps,
@@ -784,6 +779,41 @@ async fn get_user_authz_idp_callback(
         .header("Location", format!("/user/"))
         .body(Body::empty())
         .unwrap()
+}
+
+async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
+    let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
+    let Some(user_sid) = user_sid else {
+        // TODO: more user-friendly error page
+        return Response::builder()
+            .status(400)
+            .body(Body::from("User is not registered"))
+            .unwrap();
+    };
+
+    let Ok(UserPageServiceOutput { user }) = state
+        .services
+        .user_page()
+        .execute(UserPageServiceInput { user_sid })
+        .await
+    else {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("User not found"))
+            .unwrap();
+    };
+
+    let html = state
+        .template_engine
+        .render(
+            "user-page-simple.get",
+            &serde_json::json!({
+                "user_name": user.user_name,
+            }),
+        )
+        .unwrap();
+
+    Html(html).into_response()
 }
 
 #[derive(Debug, Clone, Deserialize)]

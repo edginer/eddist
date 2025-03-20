@@ -65,6 +65,9 @@ pub enum BbsCgiError {
     #[error("以下のURLを利用してユーザー登録を行ってください \n {url}")]
     UserRegTempUrl { url: String },
 
+    #[error("この端末は既にユーザー登録されています")]
+    UserAlreadyRegistered,
+
     #[error("ユーザー登録の試行回数が多すぎます")]
     TooManyUserCreationAttempt,
 
@@ -91,6 +94,7 @@ impl BbsCgiError {
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
+            BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -114,6 +118,7 @@ impl BbsCgiError {
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
+            BbsCgiError::UserAlreadyRegistered => "UserAlreadyRegistered",
             BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
             BbsCgiError::Other(_) => "InternalError",
         }

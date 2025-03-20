@@ -50,6 +50,7 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
             }
         }
 
+        // TODO: non-existance url
         let authed_token = redis_conn
             .get_del::<_, String>(format!("userreg:tempurl:register:{}", input.temp_url_path))
             .await?;

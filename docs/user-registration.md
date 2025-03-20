@@ -24,7 +24,7 @@ Currently, the user need to auth to post a message. But auth system which only d
   - We will create beta env in the future, and test it, then we will enable it in the production env
 
 ## Sequence Diagram of User Registration / Management
-
+TODO: Login flow
 ### Registration Flow
 ```mermaid
 sequenceDiagram
@@ -45,9 +45,7 @@ sequenceDiagram
         Eddist->>DB: Check whether the authed token is bound to the user (registered user)
         alt Registered
             DB->>Eddist: Return the user's information
-            Eddist->>Eddist: Create a temporary URL to show the user's page
-            Eddist->>Redis: Store the temporary URL <br> (expiration: 3 minutes, only one time, prefix: userreg:tempurl:exist)
-            Eddist->>User: Show temporary URL to show the user's page
+            Eddist->>User: Show the error message (already registered)
             Note right of User: End of the flow
         else Not registered
             Eddist->>Eddist: Create a temporary URL to register the user
@@ -75,6 +73,37 @@ sequenceDiagram
     Eddist->>Eddist: Create user session
     Eddist->>Redis: Store the user session <br> (expiration: 365 days, prefix: user:session)
     Eddist->>User: Show the user page w/ success message and user session
+```
+
+### Login flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant Eddist
+    participant Redis
+    participant DB
+    participant IdP
+
+    User->>Eddist: Access the login page
+    Eddist->>User: Show the login page
+    User->>Eddist: Click the IdP button
+    Eddist->>Eddist: Generate a state / session ID containing some information, then store it <br> (expiration: 15min, prefix: userlogin:oauth2:authreq)
+    Eddist->>User: Redirect to IdP (authorization endpoint)
+    User->>IdP: Access the authorization endpoint
+    IdP<<->>User: Authenticate & Authorize in IdP
+    IdP->>Eddist: Redirect to Eddist (callback URL w/ authorization code, state)
+    Eddist->>Redis: Retrieve the authorization request parameters using the state and expire the authreq <br> (expire userlogin:oauth2:authreq)
+    Eddist->>IdP: Get access token
+    Redis->>Eddist: Return the authorization request parameters and some information
+    Eddist->>DB: Check the user is registered or not
+    alt Registered
+        DB->>Eddist: Return the user's information
+        Eddist->>Eddist: Create user session
+        Eddist->>Redis: Store the user session <br> (expiration: 365 days, prefix: user:session)
+        Eddist->>User: Show the user page w/ success message and user session
+    else Not registered
+        Eddist->>User: Show the error message (not registered)
+    end
 ```
 
 ### Post flow
@@ -162,7 +191,7 @@ erDiagram
         string idp_name
         string oidc_config_url
         string client_id
-        %% client_secret is encrypted using AES-256 (key: tinker-token)
+        %% client_secret is encrypted using ChaCha20-Poly1305
         string client_secret
         boolean enabled
     }
@@ -176,6 +205,8 @@ erDiagram
 ## URL / API Endpoints
 - `/user/register/{tempurl}`: Show the user registration page
 - `/user/register/authz/idp/{idp_name}`: Generate the authorization request parameters and redirect to IdP
-- `/user/exist/{tempurl}`: Temporary URL to show the user page
 - `/user/auth/callback`: Callback URL for IdP
 - `/user/`: User page
+- `/user/login`: Login page
+- `/user/login/authz/idp/{idp_name}`: Generate the authorization request parameters and redirect to IdP
+- `/user/logout`: Logout page (if possible)

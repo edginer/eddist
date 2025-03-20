@@ -18,11 +18,11 @@ impl UserRegTempUrlService {
     pub async fn create_userreg_temp_url(
         &self,
         authed_token: &AuthedToken,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<UserRegUrlKind> {
         let mut redis_conn = self.redis_conn.clone();
 
         if authed_token.registered_user_id.is_some() {
-            return Err(anyhow::anyhow!("Already registered user"));
+            return Ok(UserRegUrlKind::Registered);
         }
 
         let temp_url_query = generate_random_string(USER_REG_TEMP_URL_LEN);
@@ -52,11 +52,17 @@ impl UserRegTempUrlService {
             )
             .await?;
 
-        Ok(format!(
+        Ok(UserRegUrlKind::NotRegistered(format!(
             "{}/user/register/{temp_url_path}",
             std::env::var("BASE_URL").unwrap(),
-        ))
+        )))
     }
+}
+
+#[derive(Debug)]
+pub enum UserRegUrlKind {
+    Registered,
+    NotRegistered(String),
 }
 
 fn generate_random_string(len: usize) -> String {

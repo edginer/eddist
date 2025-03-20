@@ -98,8 +98,8 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
         redis_conn
             .set_ex::<_, _, ()>(
-                format!("user:session:{}", user_sid),
-                serde_json::to_string(&id_token_claims)?,
+                format!("user:session:{user_sid}"),
+                user_id.to_string(),
                 60 * 60 * 24 * 365,
             )
             .await?;
