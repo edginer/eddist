@@ -24,7 +24,6 @@ Currently, the user need to auth to post a message. But auth system which only d
   - We will create beta env in the future, and test it, then we will enable it in the production env
 
 ## Sequence Diagram of User Registration / Management
-TODO: Login flow
 ### Registration Flow
 ```mermaid
 sequenceDiagram
@@ -55,6 +54,12 @@ sequenceDiagram
     end
     
     User->>Eddist: Access the temporary URL
+    Eddist->>Redis: Check user-sid if available
+    opt User has user-sid and user-sid is bound to the valid user
+        Eddist->>Redis: Delete the temporary URL <br> (expire userreg:tempurl:register)
+        Eddist->>User: Redirect to User page
+        Note right of User: End of the flow
+    end 
     Eddist->>Redis: Retrieve the authed token using the temporary URL and expire the temporary URL <br> (expire userreg:tempurl:register)
     Redis->>Eddist: Return the authed token
     Eddist->>Redis: Generate a state / session ID containing the authed token and some information, then store it <br> (expiration: 3min, prefix: userreg:oauth2:state)
@@ -104,6 +109,11 @@ sequenceDiagram
     else Not registered
         Eddist->>User: Show the error message (not registered)
     end
+```
+
+### Authentication w/ Login flow
+TODO
+```mermaid
 ```
 
 ### Post flow

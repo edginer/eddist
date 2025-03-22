@@ -9,7 +9,6 @@ use axum::{
     routing::{get, post},
     Json, Router, ServiceExt as AxumServiceExt,
 };
-use axum_extra::extract::CookieJar;
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
@@ -30,16 +29,10 @@ use routes::{
     bbs_cgi::post_bbs_cgi,
     dat_routing::{get_dat_txt, get_kako_dat_txt},
     subject_list::{get_subject_txt, get_subject_txt_with_metadent},
+    user::user_routes,
 };
-use serde::Deserialize;
 use services::{
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
-    user_page_service::{UserPageServiceInput, UserPageServiceOutput},
-    user_reg_authz_idp_callback_service::{
-        UserRegAuthzIdpCallbackServiceInput, UserRegAuthzIdpCallbackServiceOutput,
-    },
-    user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
-    user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
     AppService, AppServiceContainer,
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
@@ -75,6 +68,7 @@ mod domain {
     pub(crate) mod user {
         pub mod idp;
         pub mod user;
+        pub mod user_login_state;
         pub mod user_reg_state;
     }
 
@@ -103,6 +97,7 @@ mod routes {
     pub mod dat_routing;
     pub mod statics;
     pub mod subject_list;
+    pub mod user;
 }
 
 #[derive(Clone)]
@@ -174,6 +169,12 @@ fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
         .register_template_string(
             "user-page-simple.get",
             include_str!("templates/user-page-simple.get.hbs"),
+        )
+        .unwrap();
+    template_engine
+        .register_template_string(
+            "login-idp-selection.get",
+            include_str!("templates/login-idp-selection.get.hbs"),
         )
         .unwrap();
     template_engine
@@ -319,16 +320,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
-        .route(
-            "/user/register/:tempUrlPath",
-            get(get_user_register_temp_url),
-        )
-        .route(
-            "/user/register/authz/idp/:idpName",
-            get(get_user_reg_redirect_to_idp_authz),
-        )
-        .route("/user", get(get_user_page))
-        .route("/user/auth/callback", get(get_user_authz_idp_callback))
+        .nest("/user", user_routes())
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
             "/:boardKey",
@@ -596,230 +588,6 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     resp.headers_mut()
         .insert("Cache-Control", "s-maxage=300".parse().unwrap());
     resp
-}
-
-async fn get_user_register_temp_url(
-    State(state): State<AppState>,
-    Path(temp_url_path): Path<String>,
-    jar: CookieJar,
-) -> impl IntoResponse {
-    let user_cookie = jar.get("user-sid").map(|cookie| cookie.value().to_string());
-
-    let svc = state.get_container().user_reg_temp_url();
-    let Ok(output) = svc
-        .execute(UserRegTempUrlServiceInput {
-            temp_url_path,
-            user_cookie,
-        })
-        .await
-    else {
-        return Response::builder()
-            .status(200)
-            .body(Body::from("User registration is not available"))
-            .unwrap();
-    };
-
-    match output {
-        UserRegTempUrlServiceOutput::NotFound => {
-            return Response::builder()
-                .status(404)
-                .body(Body::from("Not found"))
-                .unwrap();
-        }
-        UserRegTempUrlServiceOutput::Registered => {
-            return Response::builder()
-                .status(302)
-                .header("Location", "/user/")
-                .body(Body::empty())
-                .unwrap();
-        }
-        UserRegTempUrlServiceOutput::NotRegistered {
-            available_idps,
-            state_cookie,
-        } => {
-            let html = state
-                .template_engine
-                .render(
-                    "user-reg-temp-url.get",
-                    &serde_json::json!(
-                        {
-                            "available_idps": available_idps,
-                        }
-                    ),
-                )
-                .unwrap();
-
-            let mut res_builder = Response::builder();
-            {
-                let headers = res_builder.headers_mut().unwrap();
-                headers.append(
-                    "Set-Cookie",
-                    format!("userreg-state-id={state_cookie}; Path=/; HttpOnly; Secure")
-                        .parse()
-                        .unwrap(),
-                );
-                headers.append(
-                    "Set-Cookie",
-                    "user-sid=; Path=/; HttpOnly; Secure; Max-Age=0"
-                        .parse()
-                        .unwrap(),
-                );
-            }
-
-            res_builder.status(200).body(Body::from(html)).unwrap()
-        }
-    }
-}
-
-async fn get_user_reg_redirect_to_idp_authz(
-    State(state): State<AppState>,
-    Path(idp_name): Path<String>,
-    jar: CookieJar,
-) -> Response {
-    if jar.get("user-sid").is_some() {
-        return Response::builder()
-            .status(400)
-            .body(Body::from("User is already registered"))
-            .unwrap();
-    }
-
-    let Some(user_reg_state_id) = jar
-        .get("userreg-state-id")
-        .map(|cookie| cookie.value().to_string())
-    else {
-        return Response::builder()
-            .status(400)
-            .body(Body::from("User registration state session is not found"))
-            .unwrap();
-    };
-
-    let svc = state.get_container().user_reg_idp_redirection();
-
-    let output = match svc
-        .execute(UserRegIdpRedirectionServiceInput {
-            idp_name,
-            user_reg_state_id,
-        })
-        .await
-    {
-        Ok(o) => o,
-        Err(e) if e.to_string().contains("user_reg_state_id not found") => {
-            let mut builder = Response::builder();
-            let headers = builder.headers_mut().unwrap();
-
-            // NOTE: このへんのCookie処理いい感じにうまくしたい
-            headers.append(
-                "Set-Cookie",
-                "userreg-state-id=; Path=/; HttpOnly; Secure"
-                    .parse()
-                    .unwrap(),
-            );
-
-            return builder
-                .status(400)
-                .body(Body::from("User registration state session is not found"))
-                .unwrap();
-        }
-        Err(_) => {
-            return Response::builder()
-                .status(400)
-                .body(Body::from("Failed to redirect to IDP"))
-                .unwrap()
-        }
-    };
-
-    Response::builder()
-        .status(302)
-        .header("Location", output.authz_url)
-        .body(Body::empty())
-        .unwrap()
-}
-
-async fn get_user_authz_idp_callback(
-    State(state): State<AppState>,
-    jar: CookieJar,
-    query: axum::extract::Query<AuthzIdpCallbackQuery>,
-) -> Response {
-    let state_cookie = jar.get("userreg-state-id").unwrap().value().to_string();
-    if state_cookie != query.state {
-        return Response::builder()
-            .status(400)
-            .body(Body::from("Invalid state"))
-            .unwrap();
-    }
-
-    let UserRegAuthzIdpCallbackServiceOutput { user_sid } = state
-        .services
-        .user_reg_authz_idp_callback()
-        .execute(UserRegAuthzIdpCallbackServiceInput {
-            code: query.code.clone(),
-            state: query.state.clone(),
-            user_reg_state_id: state_cookie,
-        })
-        .await
-        .unwrap();
-
-    let mut builder = Response::builder();
-    let headers = builder.headers_mut().unwrap();
-    headers.append(
-        "Set-Cookie",
-        format!("user-sid={user_sid}; Path=/; HttpOnly; Secure")
-            .parse()
-            .unwrap(),
-    );
-    headers.append(
-        "Set-Cookie",
-        "userreg-state-id=; Path=/; HttpOnly; Secure"
-            .parse()
-            .unwrap(),
-    );
-
-    builder
-        .status(302)
-        .header("Location", format!("/user/"))
-        .body(Body::empty())
-        .unwrap()
-}
-
-async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
-    let Some(user_sid) = user_sid else {
-        // TODO: more user-friendly error page
-        return Response::builder()
-            .status(400)
-            .body(Body::from("User is not registered"))
-            .unwrap();
-    };
-
-    let Ok(UserPageServiceOutput { user }) = state
-        .services
-        .user_page()
-        .execute(UserPageServiceInput { user_sid })
-        .await
-    else {
-        return Response::builder()
-            .status(400)
-            .body(Body::from("User not found"))
-            .unwrap();
-    };
-
-    let html = state
-        .template_engine
-        .render(
-            "user-page-simple.get",
-            &serde_json::json!({
-                "user_name": user.user_name,
-            }),
-        )
-        .unwrap();
-
-    Html(html).into_response()
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct AuthzIdpCallbackQuery {
-    code: String,
-    state: String,
 }
 
 async fn get_robots_txt() -> impl IntoResponse {

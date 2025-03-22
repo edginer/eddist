@@ -46,6 +46,9 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
                 .exists::<_, bool>(format!("user:session:{user_cookie}"))
                 .await?
             {
+                redis_conn
+                    .del::<_, ()>(format!("userreg:tempurl:register:{}", input.temp_url_path))
+                    .await?;
                 return Ok(UserRegTempUrlServiceOutput::Registered);
             }
         }

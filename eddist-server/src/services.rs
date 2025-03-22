@@ -10,8 +10,11 @@ use s3::Bucket;
 use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
+use user_authz_idp_callback_service::UserAuthzIdpCallbackService;
+use user_login_idp_redirection_service::UserLoginIdpRedirectionService;
+use user_login_page_service::UserLoginPageService;
+use user_logout_service::UserLogoutService;
 use user_page_service::UserPageService;
-use user_reg_authz_idp_callback_service::UserRegAuthzIdpCallbackService;
 use user_reg_idp_redirection_service::UserRegIdpRedirectionService;
 use user_reg_temp_url_service::UserRegTempUrlService;
 
@@ -32,8 +35,11 @@ pub(crate) mod res_creation_service;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;
+pub(crate) mod user_authz_idp_callback_service;
+pub(crate) mod user_login_idp_redirection_service;
+pub(crate) mod user_login_page_service;
+pub(crate) mod user_logout_service;
 pub(crate) mod user_page_service;
-pub(crate) mod user_reg_authz_idp_callback_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
 
@@ -68,8 +74,11 @@ pub struct AppServiceContainer<
 
     user_reg_temp_url: UserRegTempUrlService<I>,
     user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
-    user_reg_authz_idp_callback: UserRegAuthzIdpCallbackService<I, U>,
+    user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
     user_page: UserPageService<U>,
+    user_login_page: UserLoginPageService<U, I>,
+    user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
+    user_logout: UserLogoutService,
 }
 
 impl<
@@ -112,12 +121,22 @@ impl<
                 idp_repo.clone(),
                 redis_conn.clone(),
             ),
-            user_reg_authz_idp_callback: UserRegAuthzIdpCallbackService::new(
-                idp_repo,
+            user_authz_idp_callback: UserAuthzIdpCallbackService::new(
+                idp_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
             ),
-            user_page: UserPageService::new(user_repo, redis_conn),
+            user_page: UserPageService::new(user_repo.clone(), redis_conn.clone()),
+            user_login_page: UserLoginPageService::new(
+                user_repo,
+                idp_repo.clone(),
+                redis_conn.clone(),
+            ),
+            user_login_idp_redirection: UserLoginIdpRedirectionService::new(
+                idp_repo,
+                redis_conn.clone(),
+            ),
+            user_logout: UserLogoutService::new(redis_conn),
         }
     }
 }
@@ -173,11 +192,23 @@ impl<
         &self.user_reg_idp_redirection
     }
 
-    pub fn user_reg_authz_idp_callback(&self) -> &UserRegAuthzIdpCallbackService<I, U> {
-        &self.user_reg_authz_idp_callback
+    pub fn user_authz_idp_callback(&self) -> &UserAuthzIdpCallbackService<I, U> {
+        &self.user_authz_idp_callback
     }
 
     pub fn user_page(&self) -> &UserPageService<U> {
         &self.user_page
+    }
+
+    pub fn user_login_page(&self) -> &UserLoginPageService<U, I> {
+        &self.user_login_page
+    }
+
+    pub fn user_logout(&self) -> &UserLogoutService {
+        &self.user_logout
+    }
+
+    pub fn user_login_idp_redirection(&self) -> &UserLoginIdpRedirectionService<I> {
+        &self.user_login_idp_redirection
     }
 }

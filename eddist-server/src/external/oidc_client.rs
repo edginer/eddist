@@ -57,7 +57,7 @@ impl OidcClient {
             .authorize_url(
                 AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
                 || CsrfToken::new(state),
-                || Nonce::new_random(),
+                Nonce::new_random,
             )
             .set_pkce_challenge(pkce_challenge);
 

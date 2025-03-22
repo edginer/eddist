@@ -75,7 +75,7 @@ fn generate_random_string(len: usize) -> String {
 
     (0..len)
         .map(|_| {
-            let idx = rng.sample(&index_dist);
+            let idx = rng.sample(index_dist);
             charset[idx] as char
         })
         .collect()

@@ -6,7 +6,10 @@ use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
-    domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
+    domain::{
+        service::oidc_client_service::OidcClientService,
+        user::{user_login_state::UserLoginState, user_reg_state::UserRegState},
+    },
     repositories::{
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
@@ -17,13 +20,13 @@ use crate::{
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserRegAuthzIdpCallbackService<I: IdpRepository, U: UserRepository> {
+pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository> {
     idp_repo: I,
     user_repo: U,
     redis_conn: ConnectionManager,
 }
 
-impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserRegAuthzIdpCallbackService<I, U> {
+impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserAuthzIdpCallbackService<I, U> {
     pub fn new(idp_repo: I, user_repo: U, redis_conn: ConnectionManager) -> Self {
         Self {
             idp_repo,
@@ -35,22 +38,48 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserRegAuthzIdpCallbac
 
 #[async_trait::async_trait]
 impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> + Clone>
-    AppService<UserRegAuthzIdpCallbackServiceInput, UserRegAuthzIdpCallbackServiceOutput>
-    for UserRegAuthzIdpCallbackService<I, U>
+    AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
+    for UserAuthzIdpCallbackService<I, U>
 {
     async fn execute(
         &self,
-        input: UserRegAuthzIdpCallbackServiceInput,
-    ) -> anyhow::Result<UserRegAuthzIdpCallbackServiceOutput> {
+        input: UserAuthzIdpCallbackServiceInput,
+    ) -> anyhow::Result<UserAuthzIdpCallbackServiceOutput> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let user_reg_state = redis_conn
-            .get_del::<_, String>(format!(
-                "userreg:oauth2:authreq:{}",
-                input.user_reg_state_id
-            ))
+        let redis_authreq_key = match input.callback_kind {
+            CallbackKind::Register => format!("userreg:oauth2:authreq:{}", input.state_id),
+            CallbackKind::Login => format!("userlogin:oauth2:authreq:{}", input.state_id),
+        };
+
+        let user_state = redis_conn
+            .get_del::<_, String>(format!("userreg:oauth2:authreq:{redis_authreq_key}"))
             .await?;
-        let user_reg_state = serde_json::from_str::<UserRegState>(&user_reg_state)?;
+
+        let user_sid = match input.callback_kind {
+            CallbackKind::Register => {
+                let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
+                self.register_user_with_idp(reg_state, input.code).await?
+            }
+            CallbackKind::Login => {
+                let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
+                self.login_user_with_idp(login_state, input.code).await?
+            }
+        };
+
+        Ok(UserAuthzIdpCallbackServiceOutput { user_sid })
+    }
+}
+
+impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> + Clone>
+    UserAuthzIdpCallbackService<I, U>
+{
+    async fn register_user_with_idp(
+        &self,
+        user_reg_state: UserRegState,
+        code: String,
+    ) -> anyhow::Result<String> {
+        let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
             OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
@@ -64,7 +93,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
         let id_token_claims = idp_client
             .exchange_code(
-                AuthorizationCode::new(input.code),
+                AuthorizationCode::new(code),
                 PkceCodeVerifier::new(user_reg_state.code_verifier.unwrap()),
                 Nonce::new(user_reg_state.nonce.unwrap()),
             )
@@ -104,17 +133,72 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             )
             .await?;
 
-        Ok(UserRegAuthzIdpCallbackServiceOutput { user_sid })
+        Ok(user_sid)
+    }
+
+    async fn login_user_with_idp(
+        &self,
+        user_login_state: UserLoginState,
+        code: String,
+    ) -> anyhow::Result<String> {
+        let mut redis_conn = self.redis_conn.clone();
+
+        let idp_clients_svc =
+            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+        let idp_clients = idp_clients_svc.get_idp_clients().await?;
+
+        let (idp, idp_client) = idp_clients
+            .get(&user_login_state.idp_name.clone())
+            .ok_or_else(|| {
+                anyhow::anyhow!("idp client not found: {}", user_login_state.idp_name)
+            })?;
+
+        let id_token_claims = idp_client
+            .exchange_code(
+                AuthorizationCode::new(code),
+                PkceCodeVerifier::new(user_login_state.code_verifier),
+                Nonce::new(user_login_state.nonce),
+            )
+            .await;
+
+        let user = self
+            .user_repo
+            .get_user_by_idp_sub(&idp.idp_name, &id_token_claims.subject().to_string())
+            .await?;
+
+        match user {
+            Some(user) => {
+                let mut hasher = sha3::Sha3_512::new();
+                hasher.update(Uuid::now_v7().to_string());
+                let user_sid = format!("{:x}", hasher.finalize());
+
+                redis_conn
+                    .set_ex::<_, _, ()>(
+                        format!("user:session:{user_sid}"),
+                        user.id.to_string(),
+                        60 * 60 * 24 * 365,
+                    )
+                    .await?;
+
+                Ok(user_sid)
+            }
+            None => Err(anyhow::anyhow!("user not found")),
+        }
     }
 }
 
-pub struct UserRegAuthzIdpCallbackServiceInput {
+pub struct UserAuthzIdpCallbackServiceInput {
     pub code: String,
-    pub state: String,
-    pub user_reg_state_id: String,
+    pub state_id: String,
+    pub callback_kind: CallbackKind,
 }
 
-pub struct UserRegAuthzIdpCallbackServiceOutput {
+pub enum CallbackKind {
+    Register,
+    Login,
+}
+
+pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
 }
 
