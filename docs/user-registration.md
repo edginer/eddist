@@ -112,11 +112,33 @@ sequenceDiagram
 ```
 
 ### Authentication w/ Login flow
-TODO
 ```mermaid
+sequenceDiagram
+    participant User
+    participant Eddist
+    participant Redis
+    participant DB
+    participant IdP
+
+    Note right of User: User is not authed
+    User->>Eddist: Attempt to write a message
+    Eddist->>User: Show the error message w/ temporary auth code
+    User->>Eddist: Access the login page
+    Note right of User: After successful of login flow
+    Eddist->>User: Show the user page
+    User->>Eddist: Input the temporary auth code
+    Eddist->>DB: Check the temporary auth code is valid
+    alt Invalid
+        Eddist->>User: Show the error message
+        Note right of User: End of the flow
+    else Valid
+        Eddist->>DB: Activate the authed token and bind the authed token to the user
+        Eddist->>User: Show the user page w/ success message
+    end
 ```
 
 ### Post flow
+TODO: need to further discussion
 ```mermaid
 sequenceDiagram
     participant User

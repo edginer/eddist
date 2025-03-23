@@ -37,6 +37,7 @@ use services::{
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
+use template::load_template_engine;
 use tokio::net::TcpListener;
 use tower::{util::ServiceExt as ServiceExtTower, Layer};
 use tower_http::{
@@ -86,6 +87,7 @@ mod domain {
 }
 mod error;
 mod services;
+mod template;
 pub(crate) mod external {
     pub mod captcha_like_client;
     pub mod oidc_client;
@@ -128,68 +130,6 @@ impl AppState {
     pub fn tinker_secret(&self) -> &str {
         &self.tinker_secret
     }
-}
-
-fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
-    let mut template_engine = Handlebars::new();
-    template_engine
-        .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "term-of-usage.get",
-            include_str!("templates/term-of-usage.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "auth-code.post.success",
-            include_str!("templates/auth-code.post.success.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "auth-code.post.failed",
-            include_str!("templates/auth-code.post.failed.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "setting-txt.get",
-            include_str!("templates/setting-txt.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "user-reg-temp-url.get",
-            include_str!("templates/user-reg-temp-url.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "user-page-simple.get",
-            include_str!("templates/user-page-simple.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "login-idp-selection.get",
-            include_str!("templates/login-idp-selection.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "error-page.get",
-            include_str!("templates/error-page.get.hbs"),
-        )
-        .unwrap();
-
-    let index_html = std::fs::read_to_string(index_html_path).unwrap();
-    template_engine
-        .register_template_string("dist-index_html", &index_html)
-        .unwrap();
-
-    template_engine
 }
 
 fn render_index_html(
