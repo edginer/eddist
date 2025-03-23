@@ -2,14 +2,17 @@ use axum::{
     body::Body,
     extract::{Path, State},
     response::{Html, IntoResponse, Response},
-    routing::get,
-    Router,
+    routing::{get, post},
+    Extension, Json, Router,
 };
 use axum_extra::extract::CookieJar;
+use http::HeaderMap;
 use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
     services::{
+        auth_with_code_user_page_service::AuthWithCodeUserPageServiceInput,
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
         },
@@ -21,6 +24,7 @@ use crate::{
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
         AppService,
     },
+    utils::{get_ua, CsrfState},
     AppState,
 };
 
@@ -39,9 +43,14 @@ pub fn user_routes() -> Router<AppState> {
         )
         .route("/logout", get(get_user_logout))
         .route("/auth/callback", get(get_user_authz_idp_callback))
+        .route("/api/auth-code", post(post_auth_code_at_user_page))
 }
 
-async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
+async fn get_user_page(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    csrf: Extension<CsrfState>,
+) -> impl IntoResponse {
     let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
     let Some(user_sid) = user_sid else {
         // TODO: more user-friendly error page
@@ -63,12 +72,18 @@ async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl In
             .unwrap();
     };
 
+    let csrf_token = csrf
+        .generate_new_csrf_token("user-page", 60 * 60)
+        .await
+        .unwrap();
+
     let html = state
         .template_engine
         .render(
             "user-page-simple.get",
             &serde_json::json!({
                 "user_name": user.user_name,
+                "csrf_token": csrf_token,
             }),
         )
         .unwrap();
@@ -397,5 +412,84 @@ async fn get_user_authz_idp_callback(
         .status(302)
         .header("Location", "/user/")
         .body(Body::empty())
+        .unwrap()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PostAuthCodeAtUserPage {
+    auth_code: String,
+}
+
+async fn post_auth_code_at_user_page(
+    headers: HeaderMap,
+    State(state): State<AppState>,
+    jar: CookieJar,
+    csrf: Extension<CsrfState>,
+    Json(PostAuthCodeAtUserPage { auth_code }): Json<PostAuthCodeAtUserPage>,
+) -> impl IntoResponse {
+    let csrf_token = headers.get("X-CSRF-Token").map(|x| x.to_str().unwrap());
+
+    let Some(csrf_token) = csrf_token else {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("\"CSRF token is missing\""))
+            .unwrap();
+    };
+
+    if !csrf.verify_csrf_token(csrf_token).await.unwrap_or(false) {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("\"Invalid CSRF token\""))
+            .unwrap();
+    }
+
+    if auth_code.len() != 6 || auth_code.chars().any(|c| !c.is_ascii_digit()) {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("\"Invalid auth code\""))
+            .unwrap();
+    }
+
+    let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
+    let Some(user_sid) = user_sid else {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("\"Invalid user session\""))
+            .unwrap();
+    };
+
+    let ua = get_ua(&headers);
+
+    let svc = state.get_container().auth_with_code_user_page();
+    let Ok(result) = svc
+        .execute(AuthWithCodeUserPageServiceInput {
+            auth_code,
+            user_sid,
+            user_agent: ua.to_string(),
+        })
+        .await
+    else {
+        return Response::builder()
+            .status(400)
+            .body(Body::from("\"Failed to validate authed token\""))
+            .unwrap();
+    };
+
+    Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .header(
+            "Set-Cookie",
+            format!(
+                "edge-token={}; Path=/; HttpOnly; Secure; Max-Age=31536000",
+                result.token
+            ),
+        )
+        .body(Body::from(
+            json!({
+                "token": result.token,
+            })
+            .to_string(),
+        ))
         .unwrap()
 }

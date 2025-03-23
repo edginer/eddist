@@ -1,4 +1,5 @@
 use auth_with_code_service::AuthWithCodeService;
+use auth_with_code_user_page_service::AuthWithCodeUserPageService;
 use board_info_service::BoardInfoService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
@@ -27,6 +28,7 @@ use crate::{
 };
 
 pub(crate) mod auth_with_code_service;
+pub(crate) mod auth_with_code_user_page_service;
 pub(crate) mod board_info_service;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
@@ -77,6 +79,7 @@ pub struct AppServiceContainer<
     user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
     user_page: UserPageService<U>,
     user_login_page: UserLoginPageService<U, I>,
+    auth_with_code_user_page: AuthWithCodeUserPageService<U, B>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
     user_logout: UserLogoutService,
 }
@@ -113,7 +116,7 @@ impl<
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
-            thread_retrival: ThreadRetrievalService::new(bbs_repo, redis_conn.clone()),
+            thread_retrival: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
             kako_thread_retrieval: KakoThreadRetrievalService::new(bucket),
 
             user_reg_temp_url: UserRegTempUrlService::new(idp_repo.clone(), redis_conn.clone()),
@@ -128,8 +131,13 @@ impl<
             ),
             user_page: UserPageService::new(user_repo.clone(), redis_conn.clone()),
             user_login_page: UserLoginPageService::new(
-                user_repo,
+                user_repo.clone(),
                 idp_repo.clone(),
+                redis_conn.clone(),
+            ),
+            auth_with_code_user_page: AuthWithCodeUserPageService::new(
+                user_repo,
+                bbs_repo,
                 redis_conn.clone(),
             ),
             user_login_idp_redirection: UserLoginIdpRedirectionService::new(
@@ -202,6 +210,10 @@ impl<
 
     pub fn user_login_page(&self) -> &UserLoginPageService<U, I> {
         &self.user_login_page
+    }
+
+    pub fn auth_with_code_user_page(&self) -> &AuthWithCodeUserPageService<U, B> {
+        &self.auth_with_code_user_page
     }
 
     pub fn user_logout(&self) -> &UserLogoutService {

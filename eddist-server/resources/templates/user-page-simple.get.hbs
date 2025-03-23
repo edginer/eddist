@@ -37,10 +37,11 @@
             errorMessage.style.display = 'none';
 
             try {
-                const response = await fetch('/api/authenticate', {
+                const response = await fetch('/user/api/auth-code', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token }}',
                     },
                     body: JSON.stringify({ auth_code: authCode }),
                 });

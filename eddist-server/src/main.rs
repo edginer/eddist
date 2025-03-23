@@ -7,7 +7,7 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Json, Router, ServiceExt as AxumServiceExt,
+    Extension, Json, Router, ServiceExt as AxumServiceExt,
 };
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
@@ -48,6 +48,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{info_span, Span};
+use utils::CsrfState;
 
 mod shiftjis;
 mod repositories {
@@ -224,7 +225,7 @@ async fn main() -> anyhow::Result<()> {
             BbsRepositoryImpl::new(pool.clone()),
             UserRepositoryImpl::new(pool.clone()),
             IdpRepositoryImpl::new(pool),
-            conn_mgr,
+            conn_mgr.clone(),
             pub_repo,
             *s3_client,
         ),
@@ -367,7 +368,8 @@ async fn main() -> anyhow::Result<()> {
                         // ...
                     },
                 ),
-        );
+        )
+        .layer(Extension(CsrfState::new(conn_mgr)));
 
     let app = if env::var("AXUM_METRICS") == Ok("true".to_string()) {
         app.layer(prometheus_layer)

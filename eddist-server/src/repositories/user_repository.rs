@@ -249,6 +249,7 @@ impl UserRepository for UserRepositoryImpl {
             authed_token_id
         );
 
+        // TODO: It is not good idea that update authed_tokens outside of BbsRepository
         sqlx::query!(
             r#"
             UPDATE authed_tokens
