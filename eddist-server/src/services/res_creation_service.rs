@@ -137,7 +137,11 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             board_info.base_response_creation_span_sec as u64,
         );
         if res_span_svc
-            .is_within_creation_span(&authed_token.token, created_at.timestamp() as u64)
+            .is_within_creation_span(
+                &authed_token.token,
+                &input.ip_addr,
+                created_at.timestamp() as u64,
+            )
             .await
         {
             return Err(BbsCgiError::TooManyCreatingRes(
@@ -176,7 +180,11 @@ impl<T: BbsRepository + Clone, P: PubRepository>
         };
 
         res_span_svc
-            .update_last_res_creation_time(&authed_token.token, created_at.timestamp() as u64)
+            .update_last_res_creation_time(
+                &authed_token.token,
+                &input.ip_addr,
+                created_at.timestamp() as u64,
+            )
             .await;
 
         let cres = CreatingRes {

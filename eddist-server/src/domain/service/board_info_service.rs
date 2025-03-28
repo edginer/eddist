@@ -149,6 +149,13 @@ impl BoardInfoResRestrictable for (&ResCore<'_>, &str) {
             ));
         }
 
+        // Restrict length of character (not byte) only for thread name, using max_thread_name_byte_length / 2
+        if thread_name.chars().count() > board_info.max_thread_name_byte_length as usize / 2 {
+            return Err(BbsCgiError::ContentLengthExceeded(
+                ContentLengthExceededParamType::ThreadName,
+            ));
+        }
+
         Ok(())
     }
 }

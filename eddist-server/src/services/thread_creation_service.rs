@@ -141,7 +141,7 @@ impl<T: BbsRepository + Clone>
             board_info.base_response_creation_span_sec as u64,
         );
         if res_span_svc
-            .is_within_creation_span(&authed_token.token, unix_time as u64)
+            .is_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
             .await
         {
             return Err(BbsCgiError::TooManyCreatingRes(
@@ -173,7 +173,11 @@ impl<T: BbsRepository + Clone>
                 ))
                 .await?;
             res_span_svc
-                .update_last_res_creation_time(&authed_token_clone, unix_time as u64)
+                .update_last_res_creation_time(
+                    &authed_token_clone,
+                    &input.ip_addr,
+                    unix_time as u64,
+                )
                 .await;
             redis_conn
                 .send_packed_command(&Cmd::expire(
