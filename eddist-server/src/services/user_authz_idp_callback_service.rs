@@ -52,9 +52,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             CallbackKind::Login => format!("userlogin:oauth2:authreq:{}", input.state_id),
         };
 
-        let user_state = redis_conn
-            .get_del::<_, String>(format!("userreg:oauth2:authreq:{redis_authreq_key}"))
-            .await?;
+        let user_state = redis_conn.get_del::<_, String>(redis_authreq_key).await?;
 
         let user_sid = match input.callback_kind {
             CallbackKind::Register => {
@@ -316,43 +314,43 @@ fn user_name_generator() -> String {
         "zen",
     ];
 
-    // List of japanese prime minister's family names after WWII (1945/9/2)
+    // List of home appliance
     let right = [
-        ("shidehara", "kijuro"),
-        ("yoshida", "shigeru"),
-        ("katayama", "tetsu"),
-        ("ashida", "hitoshi"),
-        ("hatoyama", "ichiro"),
-        ("ishibashi", "tanzan"),
-        ("kishi", "nobusuke"),
-        ("ikeda", "hayato"),
-        ("sato", "eisaku"),
-        ("tanaka", "kakuei"),
-        ("miki", "takeo"),
-        ("fukuda", "takeo"),
-        ("ohira", "masayoshi"),
-        ("suzuki", "zenko"),
-        ("nakasone", "yasuhiro"),
-        ("takeshita", "noboru"),
-        ("uno", "sosuke"),
-        ("kaifu", "toshiki"),
-        ("miyazawa", "kiichi"),
-        ("hosokawa", "morihiro"),
-        ("hata", "tsutomu"),
-        ("murayama", "tomiichi"),
-        ("hashimoto", "ryutaro"),
-        ("obuchi", "keizo"),
-        ("mori", "yoshiro"),
-        ("koizumi", "junichiro"),
-        ("abe", "shinzo"),
-        ("fukuda", "yasuo"),
-        ("aso", "taro"),
-        ("hatoyama", "yukio"),
-        ("kan", "naoto"),
-        ("noda", "yoshihiko"),
-        ("suga", "yoshihide"),
-        ("kishida", "fumio"),
-        ("ishiba", "shigeru"),
+        ("air", "conditioner"),
+        ("washing", "machine"),
+        ("microwave", "oven"),
+        ("vacuum", "cleaner"),
+        ("toaster", "oven"),
+        ("coffee", "maker"),
+        ("rice", "cooker"),
+        ("bread", "maker"),
+        ("water", "heater"),
+        ("electric", "kettle"),
+        ("food", "processor"),
+        ("slow", "cooker"),
+        ("pressure", "cooker"),
+        ("electric", "stove"),
+        ("induction", "cooker"),
+        ("gas", "oven"),
+        ("desk", "fan"),
+        ("space", "heater"),
+        ("window", "fan"),
+        ("food", "steamer"),
+        ("ice", "maker"),
+        ("hair", "dryer"),
+        ("water", "dispenser"),
+        ("clothes", "dryer"),
+        ("clothes", "washer"),
+        ("garment", "steamer"),
+        ("electric", "grill"),
+        ("electric", "skillet"),
+        ("deep", "fryer"),
+        ("convection", "oven"),
+        ("wine", "cooler"),
+        ("air", "purifier"),
+        ("espresso", "machine"),
+        ("induction", "range"),
+        ("mixer", "grinder"),
     ];
 
     let mut rng = rand::thread_rng();

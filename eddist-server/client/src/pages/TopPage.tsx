@@ -31,7 +31,7 @@ function TopPage() {
             ))}
           </ul>
         </section>
-        <section>
+        <section className="py-4 pt-8">
           <h2 className="text-2xl lg:text-4xl">認証ページ</h2>
           <p className="text-left py-2 lg:text-lg">
             認証ページへのリンクはこちら
@@ -42,6 +42,18 @@ function TopPage() {
           >
             認証ページ
           </a>
+        </section>
+        <section>
+          <h2 className="text-2xl lg:text-4xl">ユーザーページ・ログイン</h2>
+          <a
+            href="/user"
+            className="text-blue-500 text-left py-2 pt-4 lg:text-lg"
+          >
+            ユーザーページ
+          </a>
+          <p className="text-left py-2 lg:text-lg">
+            ユーザー登録を行うには書き込みを行う必要があります
+          </p>
         </section>
         <section className="py-4 pt-4">
           <h2 className="text-2xl lg:text-4xl">利用規約</h2>

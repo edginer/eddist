@@ -138,7 +138,7 @@ sequenceDiagram
 ```
 
 ### Post flow
-TODO: need to further discussion
+TODO: Scope out from the user registration flow phase1
 ```mermaid
 sequenceDiagram
     participant User

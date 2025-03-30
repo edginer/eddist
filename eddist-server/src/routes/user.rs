@@ -1,12 +1,13 @@
 use axum::{
     body::Body,
     extract::{Path, State},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Extension, Json, Router,
 };
+use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
-use http::HeaderMap;
+use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -55,7 +56,8 @@ async fn get_user_page(
     let Some(user_sid) = user_sid else {
         // TODO: more user-friendly error page
         return Response::builder()
-            .status(400)
+            .status(302)
+            .header("Location", "/user/login?utm_source=user-page")
             .body(Body::from("User is not registered"))
             .unwrap();
     };
@@ -63,11 +65,24 @@ async fn get_user_page(
     let Ok(UserPageServiceOutput { user }) = state
         .services
         .user_page()
-        .execute(UserPageServiceInput { user_sid })
+        .execute(UserPageServiceInput {
+            user_sid: user_sid.clone(),
+        })
         .await
     else {
+        let reset_user_sid = Cookie::build(("user-sid", ""))
+            .path("/")
+            .http_only(true)
+            .secure(true)
+            .max_age(time::Duration::ZERO)
+            .build();
         return Response::builder()
-            .status(400)
+            .status(302)
+            .header(
+                "Set-Cookie",
+                HeaderValue::from_str(&reset_user_sid.to_string()).unwrap(),
+            )
+            .header("Location", "/user/login?utm_source=user-page")
             .body(Body::from("User not found"))
             .unwrap();
     };
@@ -76,6 +91,8 @@ async fn get_user_page(
         .generate_new_csrf_token("user-page", 60 * 60)
         .await
         .unwrap();
+
+    log::info!("csrf token issued: {csrf_token}, user_sid: {user_sid}");
 
     let html = state
         .template_engine
@@ -88,7 +105,15 @@ async fn get_user_page(
         )
         .unwrap();
 
-    Html(html).into_response()
+    Response::builder()
+        .status(200)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "private, max-age=0")
+        .header("X-Frame-Options", "DENY")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Referrer-Policy", "no-referrer")
+        .body(Body::from(html))
+        .unwrap()
 }
 
 async fn get_user_register_temp_url(
@@ -130,7 +155,7 @@ async fn get_user_register_temp_url(
                 .template_engine
                 .render(
                     "user-reg-temp-url.get",
-                    &serde_json::json!(
+                    &json!(
                         {
                             "available_idps": available_idps,
                         }
@@ -141,18 +166,30 @@ async fn get_user_register_temp_url(
             let mut res_builder = Response::builder();
             {
                 let headers = res_builder.headers_mut().unwrap();
+
+                let user_state_id_cookie = Cookie::build(("userreg-state-id", state_cookie))
+                    .path("/")
+                    .http_only(true)
+                    .secure(true)
+                    .max_age(time::Duration::seconds(60 * 3))
+                    .build();
+                let user_sid_cookie = Cookie::build(("user-sid", ""))
+                    .path("/")
+                    .http_only(true)
+                    .secure(true)
+                    .max_age(time::Duration::ZERO)
+                    .build();
+
                 headers.append(
                     "Set-Cookie",
-                    format!("userreg-state-id={state_cookie}; Path=/; HttpOnly; Secure")
-                        .parse()
-                        .unwrap(),
+                    HeaderValue::from_str(&user_sid_cookie.to_string()).unwrap(),
                 );
                 headers.append(
                     "Set-Cookie",
-                    "user-sid=; Path=/; HttpOnly; Secure; Max-Age=0"
-                        .parse()
-                        .unwrap(),
+                    HeaderValue::from_str(&user_state_id_cookie.to_string()).unwrap(),
                 );
+
+                headers.append("Cache-Control", HeaderValue::from_static("no-store"));
             }
 
             res_builder.status(200).body(Body::from(html)).unwrap()
@@ -219,6 +256,7 @@ async fn get_user_reg_redirect_to_idp_authz(
 
     Response::builder()
         .status(302)
+        .header("Cache-Control", "no-store")
         .header("Location", output.authz_url)
         .body(Body::empty())
         .unwrap()
@@ -251,11 +289,7 @@ async fn get_user_login(State(state): State<AppState>, jar: CookieJar) -> Respon
                 .template_engine
                 .render(
                     "login-idp-selection.get",
-                    &serde_json::json!(
-                        {
-                            "available_idps": available_idps,
-                        }
-                    ),
+                    &json!({ "available_idps": available_idps }),
                 )
                 .unwrap();
 
@@ -304,6 +338,7 @@ async fn get_user_login_redirect_to_idp_authz(
 
     Response::builder()
         .status(302)
+        .header("Cache-Control", "no-store")
         .header(
             "Set-Cookie",
             format!(

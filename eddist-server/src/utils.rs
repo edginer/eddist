@@ -92,13 +92,14 @@ impl CsrfState {
             ]
             .concat(),
         );
+        let token = token.trim_end_matches('=');
 
         let csrf_token = format!("{key}-{token}");
         let redis_csrf_key = format!("csrf-token:{csrf_token}");
 
         conn.set_ex::<_, _, ()>(&redis_csrf_key, "", ttl).await?;
 
-        Ok(token)
+        Ok(csrf_token)
     }
 
     pub async fn verify_csrf_token(&self, token: &str) -> anyhow::Result<bool> {

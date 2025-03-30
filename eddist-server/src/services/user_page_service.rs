@@ -19,9 +19,12 @@ impl<U: UserRepository + Clone> AppService<UserPageServiceInput, UserPageService
 {
     async fn execute(&self, input: UserPageServiceInput) -> anyhow::Result<UserPageServiceOutput> {
         let mut redis_conn = self.1.clone();
-        let user_id = redis_conn
-            .get::<_, String>(&format!("user:session:{}", input.user_sid))
-            .await?;
+        let Some(user_id) = redis_conn
+            .get::<_, Option<String>>(&format!("user:session:{}", input.user_sid))
+            .await?
+        else {
+            return Err(anyhow::anyhow!("user not found"));
+        };
 
         let Some(user) = self.0.get_user_by_id(user_id.parse().unwrap()).await? else {
             return Err(anyhow::anyhow!("user not found"));
