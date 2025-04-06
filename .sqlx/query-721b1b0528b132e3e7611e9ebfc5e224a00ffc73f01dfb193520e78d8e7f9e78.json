@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE authed_tokens\n            SET registered_user_id = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "721b1b0528b132e3e7611e9ebfc5e224a00ffc73f01dfb193520e78d8e7f9e78"
+}

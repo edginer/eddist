@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO user_authed_tokens (id, user_id, authed_token_id, created_at, updated_at)\n            VALUES (?, ?, ?, NOW(), NOW())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "afe14ba140defcb748cba5d0c59198f490451fed7b7b53bb4e2f36c95979901f"
+}
