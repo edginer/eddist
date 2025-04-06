@@ -463,7 +463,7 @@ async fn get_user_authz_idp_callback(
                     "userreg-state-id=; Path=/; HttpOnly; Secure; Max-Age=0",
                 )
                 .status(400)
-                .body(Body::from(format!("Failed to get user")))
+                .body(Body::from("Failed to get user".to_string()))
                 .unwrap();
         }
     };

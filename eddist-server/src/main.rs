@@ -67,12 +67,12 @@ mod domain {
         pub mod res_creation_span_management_service;
     }
 
-    pub(crate) mod user {
-        pub mod idp;
-        pub mod user;
-        pub mod user_login_state;
-        pub mod user_reg_state;
-    }
+    pub(crate) mod user;
+    //  {
+    //     pub mod idp;
+    //     pub mod user_login_state;
+    //     pub mod user_reg_state;
+    // }
 
     pub(crate) mod authed_token;
     pub(crate) mod captcha_like;

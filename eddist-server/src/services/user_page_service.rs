@@ -1,6 +1,6 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 
-use crate::{domain::user::user::User, repositories::user_repository::UserRepository};
+use crate::{domain::user::User, repositories::user_repository::UserRepository};
 
 use super::AppService;
 

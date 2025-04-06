@@ -2,7 +2,7 @@ use sqlx::{MySql, MySqlPool, Transaction};
 use uuid::Uuid;
 
 use crate::{
-    domain::user::user::{User, UserIdp},
+    domain::user::{User, UserIdp},
     transaction_repository,
 };
 

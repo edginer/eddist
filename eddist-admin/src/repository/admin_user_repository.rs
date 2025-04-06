@@ -109,8 +109,7 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
                 }
                 acc
             })
-            .into_iter()
-            .map(|(_, user)| user)
+            .into_values()
             .collect())
     }
 }
