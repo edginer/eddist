@@ -7,6 +7,15 @@ interface Board {
   default_name: string;
 }
 
+declare global {
+  interface Window {
+    eddistData: {
+      bbsName: string;
+      availableUserRegistration: boolean;
+    };
+  }
+}
+
 function TopPage() {
   const { data: boards } = useSuspenseQuery({
     queryKey: ["boards"],
@@ -17,7 +26,9 @@ function TopPage() {
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
       <article className="flex-1">
         <header>
-          <h1 className="text-3xl lg:text-5xl">エッヂ掲示板</h1>
+          <h1 className="text-3xl lg:text-5xl">
+            {window.eddistData?.bbsName ?? "エッヂ掲示板"}
+          </h1>
         </header>
         <section className="py-4 pt-8">
           <h2 className="text-2xl lg:text-4xl">板一覧</h2>
@@ -43,18 +54,20 @@ function TopPage() {
             認証ページ
           </a>
         </section>
-        <section>
-          <h2 className="text-2xl lg:text-4xl">ユーザーページ・ログイン</h2>
-          <a
-            href="/user"
-            className="text-blue-500 text-left py-2 pt-4 lg:text-lg"
-          >
-            ユーザーページ
-          </a>
-          <p className="text-left py-2 lg:text-lg">
-            ユーザー登録を行うには書き込みを行う必要があります
-          </p>
-        </section>
+        {window.eddistData?.availableUserRegistration && (
+          <section>
+            <h2 className="text-2xl lg:text-4xl">ユーザーページ・ログイン</h2>
+            <a
+              href="/user"
+              className="text-blue-500 text-left py-2 pt-4 lg:text-lg"
+            >
+              ユーザーページ
+            </a>
+            <p className="text-left py-2 lg:text-lg">
+              ユーザー登録を行うには書き込みを行う必要があります
+            </p>
+          </section>
+        )}
         <section className="py-4 pt-4">
           <h2 className="text-2xl lg:text-4xl">利用規約</h2>
           <p className="text-left py-2 lg:text-lg">

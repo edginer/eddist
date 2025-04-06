@@ -144,6 +144,11 @@ fn render_index_html(
                 &serde_json::json!({
                     "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string()),
                     "canonical": canonical,
+                    "available_user_registration": env::var("ENABLE_USER_REGISTRATION")
+                        .ok()
+                        .map(|v| v == "true")
+                        .unwrap_or(false)
+                        .to_string(),
                 }),
             )
             .unwrap(),

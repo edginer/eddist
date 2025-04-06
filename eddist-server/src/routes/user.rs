@@ -30,21 +30,34 @@ use crate::{
 };
 
 pub fn user_routes() -> Router<AppState> {
-    Router::new()
-        .route("/", get(get_user_page))
-        .route("/register/:tempUrlPath", get(get_user_register_temp_url))
-        .route(
-            "/register/authz/idp/:idpName",
-            get(get_user_reg_redirect_to_idp_authz),
-        )
-        .route("/login", get(get_user_login))
-        .route(
-            "/login/authz/idp/:idpName",
-            get(get_user_login_redirect_to_idp_authz),
-        )
-        .route("/logout", get(get_user_logout))
-        .route("/auth/callback", get(get_user_authz_idp_callback))
-        .route("/api/auth-code", post(post_auth_code_at_user_page))
+    let user_registration_enabled =
+        if std::env::var("ENABLE_USER_REGISTRATION").unwrap_or("false".to_string()) == "true" {
+            log::info!("User registration is enabled");
+            true
+        } else {
+            log::info!("User registration is disabled");
+            false
+        };
+
+    if user_registration_enabled {
+        Router::new()
+            .route("/", get(get_user_page))
+            .route("/register/:tempUrlPath", get(get_user_register_temp_url))
+            .route(
+                "/register/authz/idp/:idpName",
+                get(get_user_reg_redirect_to_idp_authz),
+            )
+            .route("/login", get(get_user_login))
+            .route(
+                "/login/authz/idp/:idpName",
+                get(get_user_login_redirect_to_idp_authz),
+            )
+            .route("/logout", get(get_user_logout))
+            .route("/auth/callback", get(get_user_authz_idp_callback))
+            .route("/api/auth-code", post(post_auth_code_at_user_page))
+    } else {
+        Router::new()
+    }
 }
 
 async fn get_user_page(

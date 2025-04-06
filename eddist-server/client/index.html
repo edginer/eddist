@@ -9,6 +9,12 @@
   <link rel="canonical" href="{{canonical}}" />
   {{/if}}
   <title>{{bbs_name}}</title>
+  <script>
+    window.eddistData = {
+      bbsName: "{{bbs_name}}",
+      availableUserRegistration: {{ available_user_registration }},
+    }
+  </script>
 </head>
 
 <body>
