@@ -481,3 +481,35 @@ export const updateCap = ({
   };
   return { mutate };
 };
+
+const COMPACT_THREAD = "/boards/{board_key}/threads-compaction/";
+
+export const compactThread = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof COMPACT_THREAD]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(COMPACT_THREAD, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const GET_USER_SEARCH = "/users/search/";
+
+export const getUserSearch = ({
+  params,
+}: UseQueryOptions<paths[typeof GET_USER_SEARCH]["get"]>) => {
+  return useSuspenseQuery({
+    queryKey: [GET_USER_SEARCH],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_USER_SEARCH, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};

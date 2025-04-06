@@ -417,7 +417,7 @@ async fn get_user_authz_idp_callback(
             .unwrap();
     }
 
-    let UserAuthzIdpCallbackServiceOutput { user_sid } = state
+    let user_sid = match state
         .services
         .user_authz_idp_callback()
         .execute(UserAuthzIdpCallbackServiceInput {
@@ -426,7 +426,34 @@ async fn get_user_authz_idp_callback(
             callback_kind,
         })
         .await
-        .unwrap();
+    {
+        Ok(UserAuthzIdpCallbackServiceOutput { user_sid }) => user_sid,
+        Err(e) if e.to_string().contains("user not found") => {
+            return Response::builder()
+                .header(
+                    "Set-Cookie",
+                    "userlogin-state-id=; Path=/; HttpOnly; Secure; Max-Age=0",
+                )
+                .status(400)
+                .body(Body::from("Failed to get user (maybe unregistered)"))
+                .unwrap();
+        }
+        Err(e) => {
+            log::error!("Failed to get user: {e}");
+            return Response::builder()
+                .header(
+                    "Set-Cookie",
+                    "userlogin-state-id=; Path=/; HttpOnly; Secure; Max-Age=0",
+                )
+                .header(
+                    "Set-Cookie",
+                    "userreg-state-id=; Path=/; HttpOnly; Secure; Max-Age=0",
+                )
+                .status(400)
+                .body(Body::from(format!("Failed to get user")))
+                .unwrap();
+        }
+    };
 
     let mut builder = Response::builder();
     let headers = builder.headers_mut().unwrap();

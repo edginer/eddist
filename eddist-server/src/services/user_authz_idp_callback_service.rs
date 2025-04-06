@@ -52,7 +52,9 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             CallbackKind::Login => format!("userlogin:oauth2:authreq:{}", input.state_id),
         };
 
-        let user_state = redis_conn.get_del::<_, String>(redis_authreq_key).await?;
+        // TODO: currently, get_del does not work well
+        let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
+        redis_conn.del::<_, ()>(&redis_authreq_key).await?;
 
         let user_sid = match input.callback_kind {
             CallbackKind::Register => {
@@ -97,27 +99,45 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             )
             .await;
 
-        let user_id = Uuid::now_v7();
-
-        let tx = self.user_repo.begin().await?;
-        let tx = self
+        let sub = id_token_claims.subject().to_string();
+        let user_id = if let Some(u) = self
             .user_repo
-            .create_user_with_idp(
-                CreatingUser {
-                    user_id,
-                    user_name: user_name_generator(),
-                    idp_id: idp.id,
-                    idp_sub: id_token_claims.subject().to_string(),
-                },
-                tx,
-            )
-            .await?;
+            .get_user_by_idp_sub(&idp.idp_name, &sub)
+            .await?
+        {
+            let tx = self.user_repo.begin().await?;
+            let tx = self
+                .user_repo
+                .bind_user_authed_token(u.id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .await?;
+            tx.commit().await?;
 
-        let tx = self
-            .user_repo
-            .bind_user_authed_token(user_id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
-            .await?;
-        tx.commit().await?;
+            u.id
+        } else {
+            let user_id = Uuid::now_v7();
+
+            let tx = self.user_repo.begin().await?;
+            let tx = self
+                .user_repo
+                .create_user_with_idp(
+                    CreatingUser {
+                        user_id,
+                        user_name: user_name_generator(),
+                        idp_id: idp.id,
+                        idp_sub: sub,
+                    },
+                    tx,
+                )
+                .await?;
+
+            let tx = self
+                .user_repo
+                .bind_user_authed_token(user_id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .await?;
+            tx.commit().await?;
+
+            user_id
+        };
 
         let mut hasher = sha3::Sha3_512::new();
         hasher.update(Uuid::now_v7().to_string());

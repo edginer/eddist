@@ -9,7 +9,8 @@ type NavBarSectionKind =
   | "caps"
   | "ngwords"
   | "global"
-  | "authed-token";
+  | "authed-token"
+  | "users";
 
 const Hamburger = () => (
   <svg
@@ -50,6 +51,9 @@ const NavBarSection = ({
       break;
     case "authed-token":
       displayText = "Authed Token";
+      break;
+    case "users":
+      displayText = "Users";
       break;
   }
 
@@ -96,6 +100,7 @@ const Layout: React.FC = () => {
             selected={navBarSection === "authed-token"}
             kind="authed-token"
           />
+          <NavBarSection selected={navBarSection === "users"} kind="users" />
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -153,12 +158,17 @@ const Layout: React.FC = () => {
                   Global
                 </Link>
               </li>
-              <li className="pl-2 border-slate-400">
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
                 <Link
                   to="/dashboard/authed-token"
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Authed Token
+                </Link>
+              </li>
+              <li className="pl-2 border-slate-400">
+                <Link to="/users" onClick={() => setIsNavbarOpen((x) => !x)}>
+                  Users
                 </Link>
               </li>
             </ul>

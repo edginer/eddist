@@ -1,5 +1,4 @@
 import { Alert, Button, Label, Table, TextInput } from "flowbite-react";
-import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 import { useCallback, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";

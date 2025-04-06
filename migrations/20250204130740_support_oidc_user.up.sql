@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS
     users (
         id BINARY(16) PRIMARY KEY,
         user_name VARCHAR(255) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
         created_at DATETIME(3) NOT NULL,
         updated_at DATETIME(3) NOT NULL
     );
