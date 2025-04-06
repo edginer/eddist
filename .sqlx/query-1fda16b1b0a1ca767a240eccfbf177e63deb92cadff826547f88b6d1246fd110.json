@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                us.id AS \"user_id: Uuid\",\n                us.user_name AS \"user_name: String\",\n                us.created_at AS \"user_created_at: chrono::NaiveDateTime\",\n                us.updated_at AS \"user_updated_at: chrono::NaiveDateTime\",\n                idps.id AS \"idp_id: Uuid\",\n                idps.idp_name AS \"idp_name: String\",\n                idps.idp_display_name AS \"idp_display_name: String\",\n                uib.idp_sub AS \"idp_sub: String\",\n                uib.created_at AS \"idp_bind_created_at: chrono::NaiveDateTime\",\n                uib.updated_at AS \"idp_bind_updated_at: chrono::NaiveDateTime\"\n            FROM users AS us\n            JOIN user_idp_bindings AS uib ON us.id = uib.user_id\n            JOIN idps AS idps ON uib.idp_id = idps.id\n            WHERE idps.idp_name = ? AND uib.idp_sub = ?\n            ",
+  "query": "\n            SELECT\n                us.id AS \"user_id: Uuid\",\n                us.user_name AS \"user_name: String\",\n                us.enabled AS \"user_enabled: bool\",\n                us.created_at AS \"user_created_at: chrono::NaiveDateTime\",\n                us.updated_at AS \"user_updated_at: chrono::NaiveDateTime\",\n                idps.id AS \"idp_id: Uuid\",\n                idps.idp_name AS \"idp_name: String\",\n                idps.idp_display_name AS \"idp_display_name: String\",\n                uib.idp_sub AS \"idp_sub: String\",\n                uib.created_at AS \"idp_bind_created_at: chrono::NaiveDateTime\",\n                uib.updated_at AS \"idp_bind_updated_at: chrono::NaiveDateTime\"\n            FROM users AS us\n            JOIN user_idp_bindings AS uib ON us.id = uib.user_id\n            JOIN idps AS idps ON uib.idp_id = idps.id\n            WHERE us.id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -23,6 +23,15 @@
       },
       {
         "ordinal": 2,
+        "name": "user_enabled: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "user_created_at: chrono::NaiveDateTime",
         "type_info": {
           "type": "Datetime",
@@ -31,7 +40,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "user_updated_at: chrono::NaiveDateTime",
         "type_info": {
           "type": "Datetime",
@@ -40,7 +49,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "idp_id: Uuid",
         "type_info": {
           "type": "String",
@@ -49,7 +58,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "idp_name: String",
         "type_info": {
           "type": "VarString",
@@ -58,7 +67,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "idp_display_name: String",
         "type_info": {
           "type": "VarString",
@@ -67,7 +76,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "idp_sub: String",
         "type_info": {
           "type": "VarString",
@@ -76,7 +85,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "idp_bind_created_at: chrono::NaiveDateTime",
         "type_info": {
           "type": "Datetime",
@@ -85,7 +94,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "idp_bind_updated_at: chrono::NaiveDateTime",
         "type_info": {
           "type": "Datetime",
@@ -95,9 +104,10 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -110,5 +120,5 @@
       false
     ]
   },
-  "hash": "408cb4ae1c2482e3d296ef7696af55f4944abdebb9a4d4621e2aec1af10f8433"
+  "hash": "1fda16b1b0a1ca767a240eccfbf177e63deb92cadff826547f88b6d1246fd110"
 }

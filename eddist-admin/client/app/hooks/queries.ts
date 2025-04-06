@@ -513,3 +513,18 @@ export const getUserSearch = ({
     },
   });
 };
+
+const UPDATE_USER_STATUS = "/users/{user_id}/status/";
+
+export const updateUserStatus = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_USER_STATUS]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_USER_STATUS, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};

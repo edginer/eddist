@@ -41,6 +41,10 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
             return Err(anyhow::anyhow!("user not found"));
         };
 
+        if !user.enabled {
+            return Err(anyhow::anyhow!("user not enabled"));
+        }
+
         let mut tokens = self
             .1
             .get_authed_token_by_auth_code(&input.auth_code)

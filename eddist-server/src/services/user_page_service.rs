@@ -30,6 +30,10 @@ impl<U: UserRepository + Clone> AppService<UserPageServiceInput, UserPageService
             return Err(anyhow::anyhow!("user not found"));
         };
 
+        if !user.enabled {
+            return Err(anyhow::anyhow!("user not enabled"));
+        }
+
         Ok(UserPageServiceOutput { user })
     }
 }

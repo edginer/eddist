@@ -50,6 +50,7 @@ impl UserRepository for UserRepositoryImpl {
             SELECT
                 us.id AS "user_id: Uuid",
                 us.user_name AS "user_name: String",
+                us.enabled AS "user_enabled: bool",
                 us.created_at AS "user_created_at: chrono::NaiveDateTime",
                 us.updated_at AS "user_updated_at: chrono::NaiveDateTime",
                 idps.id AS "idp_id: Uuid",
@@ -84,6 +85,7 @@ impl UserRepository for UserRepositoryImpl {
                     acc = Some(User {
                         id: row.user_id,
                         user_name: row.user_name,
+                        enabled: row.user_enabled,
                         idps: vec![UserIdp {
                             idp_id: row.idp_id,
                             idp_name: row.idp_name,
@@ -114,6 +116,7 @@ impl UserRepository for UserRepositoryImpl {
             SELECT
                 us.id AS "user_id: Uuid",
                 us.user_name AS "user_name: String",
+                us.enabled AS "user_enabled: bool",
                 us.created_at AS "user_created_at: chrono::NaiveDateTime",
                 us.updated_at AS "user_updated_at: chrono::NaiveDateTime",
                 idps.id AS "idp_id: Uuid",
@@ -149,6 +152,7 @@ impl UserRepository for UserRepositoryImpl {
                     acc = Some(User {
                         id: row.user_id,
                         user_name: row.user_name,
+                        enabled: row.user_enabled,
                         idps: vec![UserIdp {
                             idp_id: row.idp_id,
                             idp_name: row.idp_name,
@@ -269,6 +273,7 @@ impl UserRepository for UserRepositoryImpl {
 struct UserIdpSelection {
     pub user_id: Uuid,
     pub user_name: String,
+    pub user_enabled: bool,
     pub user_created_at: chrono::NaiveDateTime,
     pub user_updated_at: chrono::NaiveDateTime,
     pub idp_id: Uuid,

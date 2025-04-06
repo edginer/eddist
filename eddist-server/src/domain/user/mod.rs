@@ -10,6 +10,7 @@ pub mod user_reg_state;
 pub struct User {
     pub id: Uuid,
     pub user_name: String,
+    pub enabled: bool,
     pub idps: Vec<UserIdp>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,

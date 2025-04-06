@@ -1134,6 +1134,48 @@
           }
         }
       }
+    },
+    "/users/{user_id}/status/": {
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_user_status",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "User ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStatusUpdateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update user status successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1943,9 +1985,17 @@
           "id",
           "user_name",
           "enabled",
-          "idp_bindings"
+          "idp_bindings",
+          "authed_token_ids"
         ],
         "properties": {
+          "authed_token_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "enabled": {
             "type": "boolean"
           },
@@ -1986,6 +2036,17 @@
           "user_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "UserStatusUpdateInput": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
           }
         }
       }

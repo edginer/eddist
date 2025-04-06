@@ -340,6 +340,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/{user_id}/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_user_status"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -563,6 +579,7 @@ export interface components {
             mail?: string | null;
         };
         User: {
+            authed_token_ids: string[];
             enabled: boolean;
             /** Format: uuid */
             id: string;
@@ -576,6 +593,9 @@ export interface components {
             idp_sub: string;
             /** Format: uuid */
             user_id: string;
+        };
+        UserStatusUpdateInput: {
+            enabled: boolean;
         };
     };
     responses: never;
@@ -1327,6 +1347,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"][];
+                };
+            };
+        };
+    };
+    update_user_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserStatusUpdateInput"];
+            };
+        };
+        responses: {
+            /** @description Update user status successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
                 };
             };
         };

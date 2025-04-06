@@ -167,7 +167,10 @@ const Layout: React.FC = () => {
                 </Link>
               </li>
               <li className="pl-2 border-slate-400">
-                <Link to="/users" onClick={() => setIsNavbarOpen((x) => !x)}>
+                <Link
+                  to="/dashboard/users"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
                   Users
                 </Link>
               </li>

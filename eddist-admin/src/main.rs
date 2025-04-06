@@ -235,7 +235,8 @@ async fn main() {
         .route("/caps", post(bbs::create_cap))
         .route("/caps/:capId", delete(bbs::delete_cap))
         .route("/caps/:capId", patch(bbs::update_cap))
-        .route("/users/search", get(bbs::search_users));
+        .route("/users/search", get(bbs::search_users))
+        .route("/users/:userId/status", patch(bbs::update_user_status));
 
     let state = AppState {
         oauth2_client: client,
@@ -517,6 +518,7 @@ pub struct User {
     user_name: String,
     enabled: bool,
     idp_bindings: Vec<UserIdpBinding>,
+    authed_token_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -525,6 +527,11 @@ pub struct UserIdpBinding {
     user_id: Uuid,
     idp_name: String,
     idp_sub: String,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct UserStatusUpdateInput {
+    enabled: bool,
 }
 
 mod bbs {
@@ -550,7 +557,7 @@ mod bbs {
         },
         Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
         DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput,
-        UpdateCapInput, UpdateNgWordInput, UpdateResInput, User,
+        UpdateCapInput, UpdateNgWordInput, UpdateResInput, User, UserStatusUpdateInput,
     };
 
     #[utoipa::path(
@@ -1429,6 +1436,41 @@ mod bbs {
 
         Json(users)
     }
+
+    #[utoipa::path(
+        patch,
+        path = "/users/{user_id}/status/",
+        responses(
+            (status = 200, description = "Update user status successfully", body = User),
+        ),
+        params(
+            ("user_id" = Uuid, Path, description = "User ID"),
+        ),
+        request_body = UserStatusUpdateInput
+    )]
+    pub async fn update_user_status(
+        State(state): State<DefaultAppState>,
+        Path(user_id): Path<Uuid>,
+        Json(body): Json<UserStatusUpdateInput>,
+    ) -> Response {
+        state
+            .user_repo
+            .update_user_status(user_id, body.enabled)
+            .await
+            .unwrap();
+
+        let users = state
+            .user_repo
+            .search_users(Some(user_id), None, None)
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(200)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&users[0]).unwrap().into())
+            .unwrap()
+    }
 }
 
 #[derive(OpenApi)]
@@ -1463,6 +1505,7 @@ mod bbs {
         bbs::delete_cap,
         bbs::threads_compaction,
         bbs::search_users,
+        bbs::update_user_status,
     ),
     components(schemas(
         Board,
@@ -1489,6 +1532,7 @@ mod bbs {
         ThreadCompactionInput,
         User,
         UserIdpBinding,
+        UserStatusUpdateInput,
     ))
 )]
 struct ApiDoc;
