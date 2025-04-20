@@ -55,6 +55,7 @@ pub async fn get_dat_txt(
                 } else {
                     // Redirect to kako thread
                     Response::builder()
+                        .header("Cache-Control", "s-maxage=86400, max-age=86400")
                         .status(302)
                         .header(
                             "Location",

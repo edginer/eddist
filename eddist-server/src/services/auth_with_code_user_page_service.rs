@@ -68,6 +68,10 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
 
         let tx = self.0.begin().await?;
         let tx = self.0.bind_user_authed_token(user.id, token.id, tx).await?;
+        let tx = self
+            .1
+            .update_authed_token_id_seed(token.id, token.author_id_seed, tx)
+            .await?;
         tx.commit().await?;
 
         self.1
