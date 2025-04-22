@@ -135,6 +135,7 @@ impl<T: BbsRepository + Clone, P: PubRepository>
         let res_span_svc = ResCreationSpanManagementService::new(
             redis_conn.clone(),
             board_info.base_response_creation_span_sec as u64,
+            board_info.base_thread_creation_span_sec as u64, // ignorable
         );
         if res_span_svc
             .is_within_creation_span(
