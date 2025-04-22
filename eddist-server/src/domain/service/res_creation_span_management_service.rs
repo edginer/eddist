@@ -176,7 +176,7 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("res_creation_span:{authed_token}");
+        let key = format!("thread_creation_span:{authed_token}");
         redis_conn
             .set_ex::<_, _, ()>(key, timestamp, self.thread_span)
             .await
@@ -191,7 +191,7 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("res_creation_span_ip:{ip}");
+        let key = format!("thread_creation_span_ip:{ip}");
         redis_conn
             .set_ex::<_, _, ()>(key, timestamp, self.thread_span)
             .await
