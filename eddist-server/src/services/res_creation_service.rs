@@ -95,7 +95,7 @@ impl<T: BbsRepository + Clone, P: PubRepository>
         res_core.validate_content_length(&board_info)?;
         client_info.validate_client_info(&board_info, false)?;
 
-        let res = Res::new_from_res(
+        let mut res = Res::new_from_res(
             res_core,
             &input.board_key,
             created_at,
@@ -104,6 +104,18 @@ impl<T: BbsRepository + Clone, P: PubRepository>
             input.authed_token_cookie,
             false,
         );
+
+        // Restrict the image posting below level 2
+        if let Some(tinker) = &input.tinker {
+            if tinker.level() < 2 && res.get_all_images().len() > 0 {
+                return Err(BbsCgiError::NgWordDetected);
+            }
+        } else {
+            if res.get_all_images().len() > 0 {
+                // Does not allow image URL
+                return Err(BbsCgiError::NgWordDetected);
+            }
+        }
 
         let auth_service = BbsCgiAuthService::new(self.0.clone());
         let authed_token = auth_service
