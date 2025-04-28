@@ -101,10 +101,14 @@ impl<T: ResState> Res<T> {
             }
         }
         // Additionally, detect plain domain URLs like "example.com"
-        for token in text.split_whitespace() {
-            if !token.contains("://") && token.contains('.') && token.chars().all(|c| c.is_ascii())
-            {
-                urls.push(token.to_string());
+        for line in text.split("<br>") {
+            for token in line.split(|c: char| c.is_ascii_control() || c.is_whitespace()) {
+                if !token.contains("://")
+                    && token.contains('.')
+                    && token.chars().all(|c| c.is_ascii())
+                {
+                    urls.push(token.to_string());
+                }
             }
         }
 
@@ -114,7 +118,10 @@ impl<T: ResState> Res<T> {
                     let url_core = url
                         .replace("http://", "")
                         .replace("https://", "")
-                        .replace("ttp://", "");
+                        .replace("ttps://", "")
+                        .replace("ttp://", "")
+                        .replace("tp://", "")
+                        .replace("tps://", "");
 
                     let (domain, has_path) = if let Some((domain, path)) = url_core.split_once('/')
                     {
@@ -472,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_get_all_images() {
-        let content = "Image: https://example.com/pic.png page: https://example.com/page.html another non-image: http://site.org/image.jpg, non-image: plainexample.com\nimgur.com/abc123";
+        let content = "Image: https://example.com/pic.png page: https://example.com/page.html another non-image: http://site.org/image.jpg, non-image: plainexample.com\nimgur.com/abc123 ";
         let mut res = Res::<Dummy> {
             author_name: "".to_string(),
             cap: None,
