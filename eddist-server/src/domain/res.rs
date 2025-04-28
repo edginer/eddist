@@ -48,6 +48,7 @@ pub struct Res<T: ResState> {
     is_abone: bool,
     is_email_authed: bool,
     board_key: String,
+    urls: Option<Vec<String>>,
     _state: std::marker::PhantomData<T>,
 }
 
@@ -74,6 +75,89 @@ impl<T: ResState> Res<T> {
 
     pub fn metadent_type(&self) -> MetadentType {
         self.metadent_type
+    }
+
+    pub fn get_all_urls(&mut self) -> Vec<String> {
+        let text = &self.body;
+        let mut urls = Vec::new();
+        let prefixes = ["https://", "http://", "ttp://"];
+        let mut pos = 0;
+        // Extract URLs with explicit scheme prefixes
+        while let Some(slice) = text.get(pos..) {
+            if let Some((found_index, _)) = prefixes
+                .iter()
+                .filter_map(|p| slice.find(p).map(|i| (i + pos, *p)))
+                .min_by_key(|(i, _)| *i)
+            {
+                let substring = text.get(found_index..).unwrap();
+                let end_offset = substring
+                    .find(char::is_whitespace)
+                    .unwrap_or_else(|| substring.len());
+                let url = substring.get(..end_offset).unwrap();
+                urls.push(url.to_string());
+                pos = found_index + end_offset;
+            } else {
+                break;
+            }
+        }
+        // Additionally, detect plain domain URLs like "example.com"
+        for token in text.split_whitespace() {
+            if !token.contains("://") && token.contains('.') && token.chars().all(|c| c.is_ascii())
+            {
+                urls.push(token.to_string());
+            }
+        }
+
+        self.urls = Some(
+            urls.into_iter()
+                .map(|url| {
+                    let url_core = url
+                        .replace("http://", "")
+                        .replace("https://", "")
+                        .replace("ttp://", "");
+
+                    let (domain, has_path) = if let Some((domain, path)) = url_core.split_once('/')
+                    {
+                        (domain, !path.is_empty())
+                    } else {
+                        (&url_core as &str, false)
+                    };
+
+                    if has_path {
+                        url_core
+                    } else {
+                        domain
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '-' || *c == '.')
+                            .collect()
+                    }
+                })
+                .collect(),
+        );
+
+        self.urls.clone().unwrap_or_default()
+    }
+
+    pub fn get_all_images(&mut self) -> Vec<String> {
+        if self.urls.is_none() {
+            self.get_all_urls();
+        }
+
+        let mut images = Vec::new();
+        if let Some(urls) = &self.urls {
+            for url in urls {
+                if url.ends_with(".jpg")
+                    || url.ends_with(".jpeg")
+                    || url.ends_with(".png")
+                    || url.ends_with(".gif")
+                    || url.ends_with(".webp")
+                    || url.contains("imgur.com")
+                {
+                    images.push(url.clone());
+                }
+            }
+        }
+        images
     }
 }
 
@@ -132,6 +216,7 @@ impl Res<AuthorIdUninitialized> {
             is_abone,
             is_email_authed,
             board_key: board_key.to_string(),
+            urls: None,
             _state: std::marker::PhantomData,
         }
     }
@@ -207,6 +292,7 @@ impl Res<AuthorIdUninitialized> {
             is_abone: self.is_abone,
             is_email_authed: self.is_email_authed,
             board_key: self.board_key,
+            urls: self.urls,
             _state: std::marker::PhantomData,
         }
     }
@@ -336,4 +422,87 @@ fn sanitize_email(email: &str) -> String {
 
 fn sanitize_body(body: &str) -> String {
     sanitize_num_refs(&sanitize_base(body, true))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    struct Dummy;
+    impl ResState for Dummy {}
+
+    #[test]
+    fn test_get_all_urls() {
+        let content = "Visit http://example.com and also check https://rust-lang.org, then plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test";
+        let mut res = Res::<Dummy> {
+            author_name: "".to_string(),
+            cap: None,
+            trip: None,
+            authed_token: None,
+            author_id: None,
+            created_at: Utc::now(),
+            mail: "".to_string(),
+            body: content.to_string(),
+            metadent_type: MetadentType::None,
+            client_info: ClientInfo {
+                user_agent: "".to_string(),
+                asn_num: 0,
+                ip_addr: "".to_string(),
+                tinker: None,
+            },
+            is_abone: false,
+            is_email_authed: false,
+            board_key: "".to_string(),
+            urls: None,
+            _state: std::marker::PhantomData,
+        };
+        let urls = res.get_all_urls();
+        let mut urls_sorted = urls.clone();
+        urls_sorted.sort();
+        let mut expected = vec![
+            "example.com".to_string(),
+            "rust-lang.org".to_string(),
+            "plainexample.com".to_string(),
+            "fake.com/aaa.vvv".to_string(),
+        ];
+        expected.sort();
+        assert_eq!(expected, urls_sorted);
+    }
+
+    #[test]
+    fn test_get_all_images() {
+        let content = "Image: https://example.com/pic.png page: https://example.com/page.html another non-image: http://site.org/image.jpg, non-image: plainexample.com\nimgur.com/abc123";
+        let mut res = Res::<Dummy> {
+            author_name: "".to_string(),
+            cap: None,
+            trip: None,
+            authed_token: None,
+            author_id: None,
+            created_at: Utc::now(),
+            mail: "".to_string(),
+            body: content.to_string(),
+            metadent_type: MetadentType::None,
+            client_info: ClientInfo {
+                user_agent: "".to_string(),
+                asn_num: 0,
+                ip_addr: "".to_string(),
+                tinker: None,
+            },
+            is_abone: false,
+            is_email_authed: false,
+            board_key: "".to_string(),
+            urls: None,
+            _state: std::marker::PhantomData,
+        };
+        let images = res.get_all_images();
+        let mut expected = vec![
+            "example.com/pic.png".to_string(),
+            "imgur.com/abc123".to_string(),
+        ];
+        expected.sort();
+        let mut images_sorted = images.clone();
+        images_sorted.sort();
+        assert_eq!(expected, images_sorted);
+    }
 }
