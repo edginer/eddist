@@ -56,6 +56,9 @@ pub enum BbsCgiError {
     #[error("短期間にスレ立てすぎです (Lv{tinker_level}は{span_sec}秒以内に1回スレを立てることができます)")]
     TooManyCreatingThread { tinker_level: u32, span_sec: i32 },
 
+    #[error("短期間にスレ立てすぎです")]
+    TooManyCreatingThreadWithoutTinker,
+
     #[error("初回書き込み時にはスレッドを立てることができません")]
     TmpCanNotCreateThread,
 
@@ -91,6 +94,7 @@ impl BbsCgiError {
             BbsCgiError::ContentEmpty(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
+            BbsCgiError::TooManyCreatingThreadWithoutTinker => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
@@ -115,6 +119,7 @@ impl BbsCgiError {
             BbsCgiError::ContentEmpty(_) => "ContentEmpty",
             BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
+            BbsCgiError::TooManyCreatingThreadWithoutTinker => "TooManyCreatingThreadWithoutTinker",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",

@@ -161,7 +161,17 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         } else {
             None
         };
-        let res = res.set_author_id(&authed_token, cap_name);
+        let mut res = res.set_author_id(&authed_token, cap_name);
+
+        // Restrict the image posting below level 2
+        if let Some(tinker) = &input.tinker {
+            if tinker.level() < 2 && res.get_all_images().len() > 0 {
+                return Err(BbsCgiError::NgWordDetected);
+            }
+        } else if res.get_all_images().len() > 0 {
+            // Does not allow image URL
+            return Err(BbsCgiError::NgWordDetected);
+        }
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)
@@ -173,6 +183,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         let res_span_svc = ResCreationSpanManagementService::new(
             redis_conn.clone(),
             board_info.base_response_creation_span_sec as u64,
+            board_info.base_thread_creation_span_sec as u64, // ignorable
         );
         if res_span_svc
             .is_within_creation_span(

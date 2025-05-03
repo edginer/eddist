@@ -41,6 +41,7 @@ use template::load_template_engine;
 use tokio::net::TcpListener;
 use tower::{util::ServiceExt as ServiceExtTower, Layer};
 use tower_http::{
+    catch_panic::CatchPanicLayer,
     classify::ServerErrorsFailureClass,
     normalize_path::NormalizePathLayer,
     services::{ServeDir, ServeFile},
@@ -334,6 +335,13 @@ async fn main() -> anyhow::Result<()> {
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
         .with_state(app_state)
+        .layer(CatchPanicLayer::custom(|e| {
+            tracing::error!("Panic: {e:?}");
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from("Internal Server Error"))
+                .unwrap()
+        }))
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(
             TraceLayer::new_for_http()

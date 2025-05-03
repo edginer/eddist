@@ -173,6 +173,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
         let res_span_svc = ResCreationSpanManagementService::new(
             redis_conn.clone(),
             board_info.base_response_creation_span_sec as u64,
+            board_info.base_thread_creation_span_sec as u64,
         );
         if res_span_svc
             .is_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
@@ -182,6 +183,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
                 board_info.base_response_creation_span_sec,
             ));
         };
+        if res_span_svc
+            .is_thread_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
+            .await
+        {
+            return Err(BbsCgiError::TooManyCreatingThreadWithoutTinker);
+        }
+
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
             .get_ng_words(&input.board_key)
             .await?;
@@ -208,6 +216,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
                 .await?;
             res_span_svc
                 .update_last_res_creation_time(
+                    &authed_token_clone,
+                    &input.ip_addr,
+                    unix_time as u64,
+                )
+                .await;
+            res_span_svc
+                .update_last_thread_creation_time(
                     &authed_token_clone,
                     &input.ip_addr,
                     unix_time as u64,
