@@ -1,4 +1,4 @@
-use std::{borrow::Cow, env, thread};
+use std::{borrow::Cow, env};
 
 use anyhow::anyhow;
 use chrono::Utc;
@@ -166,10 +166,10 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
 
         // Restrict the image posting below level 2
         if let Some(tinker) = &input.tinker {
-            if tinker.level() < 2 && res.get_all_images().len() > 0 {
+            if tinker.level() < 2 && !res.get_all_images().is_empty() {
                 return Err(BbsCgiError::NgWordDetected);
             }
-        } else if res.get_all_images().len() > 0 {
+        } else if !res.get_all_images().is_empty() {
             // Does not allow image URL
             return Err(BbsCgiError::NgWordDetected);
         }

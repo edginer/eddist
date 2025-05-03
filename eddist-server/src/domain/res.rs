@@ -16,7 +16,7 @@ use super::{
     authed_token::AuthedToken,
     metadent::MetadentType,
     res_core::ResCore,
-    utils::{SimpleSecret, sanitize_base, sanitize_num_refs},
+    utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
 };
 
 pub trait ResState {}
@@ -100,7 +100,7 @@ impl<T: ResState> Res<T> {
             // Extract URLs with explicit scheme prefixes
             let mut pos = 0;
 
-            while let Some(slsl_idx) = line.get(pos..).map(|x| x.find("//")).flatten() {
+            while let Some(slsl_idx) = line.get(pos..).and_then(|x| x.find("//")) {
                 // Check previous characters of "//" to find the prefix
                 let slsl_idx = slsl_idx + pos;
                 let mut found_prefix = None;
@@ -119,7 +119,7 @@ impl<T: ResState> Res<T> {
                 let substring = line.get(found_index..).unwrap();
                 let end_offset = substring
                     .find(|c: char| c.is_ascii_control() || c.is_whitespace() || !c.is_ascii())
-                    .unwrap_or_else(|| substring.len());
+                    .unwrap_or(substring.len());
                 let url = substring.get(..end_offset).unwrap();
                 urls.push(url.to_string());
                 pos = found_index + end_offset;
@@ -130,10 +130,7 @@ impl<T: ResState> Res<T> {
                 .split(|c: char| c.is_ascii_control() || c.is_whitespace() || !c.is_ascii())
                 .filter(|t| t.contains('.'))
             {
-                if !token.contains("//")
-                    && token.contains('.')
-                    && token.chars().all(|c| c.is_ascii())
-                {
+                if !token.contains("//") && token.contains('.') && token.is_ascii() {
                     urls.push(token.to_string());
                 }
             }

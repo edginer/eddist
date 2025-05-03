@@ -194,9 +194,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             .await?;
 
         match user {
-            Some(user) if !user.enabled => {
-                return Err(anyhow::anyhow!("user is disabled"));
-            }
+            Some(user) if !user.enabled => Err(anyhow::anyhow!("user is disabled")),
             Some(user) => {
                 let mut hasher = sha3::Sha3_512::new();
                 hasher.update(Uuid::now_v7().to_string());
