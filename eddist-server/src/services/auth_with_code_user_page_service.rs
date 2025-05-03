@@ -1,11 +1,11 @@
 use chrono::Utc;
 use metrics::counter;
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use sqlx::MySql;
 
 use crate::{
     repositories::{bbs_repository::BbsRepository, user_repository::UserRepository},
-    utils::TransactionRepository,
+    utils::{TransactionRepository, redis::user_session_key},
 };
 
 use super::AppService;
@@ -34,7 +34,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
     ) -> anyhow::Result<AuthWithCodeUserPageServiceOutput> {
         let mut redis_conn = self.2.clone();
         let user_id = redis_conn
-            .get::<_, String>(&format!("user:session:{}", input.user_sid))
+            .get::<_, String>(user_session_key(&input.user_sid))
             .await?;
 
         let Some(user) = self.0.get_user_by_id(user_id.parse().unwrap()).await? else {

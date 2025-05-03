@@ -1,7 +1,7 @@
-use rand::{distributions::Uniform, rngs::OsRng, Rng};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use rand::{Rng, distributions::Uniform, rngs::OsRng};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::domain::authed_token::AuthedToken;
+use crate::{domain::authed_token::AuthedToken, utils::redis::user_reg_temp_url_register_key};
 
 pub const USER_REG_TEMP_URL_LEN: usize = 5;
 
@@ -28,13 +28,13 @@ impl UserRegTempUrlService {
         let temp_url_query = generate_random_string(USER_REG_TEMP_URL_LEN);
         // first, duplicate check
         let temp_url_path = if redis_conn
-            .exists::<_, bool>(format!("userreg:tempurl:register:{temp_url_query}"))
+            .exists::<_, bool>(user_reg_temp_url_register_key(&temp_url_query))
             .await?
         {
             // NOTE: retry only once (we does not consider collision between `exists` and `set`, it's very rare case)
             let temp_url_query = generate_random_string(USER_REG_TEMP_URL_LEN);
             if redis_conn
-                .exists::<_, bool>(format!("userreg:tempurl:register:{temp_url_query}"))
+                .exists::<_, bool>(user_reg_temp_url_register_key(&temp_url_query))
                 .await?
             {
                 return Err(anyhow::anyhow!("Failed to generate temp_url_query"));
@@ -46,7 +46,7 @@ impl UserRegTempUrlService {
 
         redis_conn
             .set_ex::<_, _, ()>(
-                format!("userreg:tempurl:register:{temp_url_path}"),
+                user_reg_temp_url_register_key(&temp_url_path),
                 authed_token.id.to_string().clone(),
                 60 * 3,
             )

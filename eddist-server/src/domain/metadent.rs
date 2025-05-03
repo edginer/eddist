@@ -183,5 +183,5 @@ pub fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> Stri
 pub fn generate_date_seed(time: DateTime<Utc>) -> u32 {
     let n = time.timestamp() as u64;
     let seed = (n / (60 * 60 * 24) / 7) % i32::MAX as u64;
-    rand::rngs::StdRng::seed_from_u64(seed).gen()
+    rand::rngs::StdRng::seed_from_u64(seed).r#gen()
 }

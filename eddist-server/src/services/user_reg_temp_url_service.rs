@@ -8,6 +8,7 @@ use crate::{
         user::user_reg_state::UserRegState,
     },
     repositories::idp_repository::IdpRepository,
+    utils::redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
 };
 
 use super::AppService;
@@ -43,11 +44,11 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
 
         if let Some(user_sid) = &input.user_sid {
             if redis_conn
-                .exists::<_, bool>(format!("user:session:{user_sid}"))
+                .exists::<_, bool>(user_session_key(user_sid))
                 .await?
             {
                 redis_conn
-                    .del::<_, ()>(format!("userreg:tempurl:register:{}", input.temp_url_path))
+                    .del::<_, ()>(user_reg_temp_url_register_key(&input.temp_url_path))
                     .await?;
                 return Ok(UserRegTempUrlServiceOutput::Registered);
             }
@@ -55,7 +56,7 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
 
         // TODO: non-existance url
         let authed_token = redis_conn
-            .get_del::<_, String>(format!("userreg:tempurl:register:{}", input.temp_url_path))
+            .get_del::<_, String>(user_reg_temp_url_register_key(&input.temp_url_path))
             .await?;
 
         let idps = self.idp_repo.get_idps().await?;
@@ -81,7 +82,7 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
 
         redis_conn
             .set_ex::<_, _, ()>(
-                format!("userreg:oauth2:state:{}", state_cookie),
+                user_reg_oauth2_state_key(&state_cookie),
                 serde_json::to_string(&user_reg_state)?,
                 60 * 3,
             )

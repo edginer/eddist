@@ -1,4 +1,4 @@
-use std::{borrow::Cow, env};
+use std::{borrow::Cow, env, thread};
 
 use anyhow::anyhow;
 use chrono::Utc;
@@ -37,6 +37,7 @@ use crate::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         user_repository::UserRepository,
     },
+    utils::redis::thread_cache_key,
 };
 
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
@@ -201,10 +202,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         // Check thread:{board_key}:{thread_number} exists. If not, does not rpush to the list but still creates the response in the database.
         let is_exists = matches!(
             redis_conn
-                .send_packed_command(&Cmd::exists(format!(
-                    "thread:{}:{}",
-                    input.board_key, input.thread_number
-                )))
+                .send_packed_command(&Cmd::exists(thread_cache_key(&input.board_key, input.thread_number)))
                 .await
                 .map_err(|e| BbsCgiError::Other(e.into()))?,
             Value::Int(i) if i > 0
@@ -212,7 +210,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         let order = if is_exists {
             let Value::Int(order) = redis_conn
                 .send_packed_command(&Cmd::rpush(
-                    format!("thread:{}:{}", input.board_key, input.thread_number),
+                    thread_cache_key(&input.board_key, input.thread_number),
                     res.get_sjis_bytes(&board.default_name, None).get_inner(),
                 ))
                 .await

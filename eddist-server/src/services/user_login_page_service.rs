@@ -1,7 +1,10 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 use serde::Serialize;
 
-use crate::repositories::{idp_repository::IdpRepository, user_repository::UserRepository};
+use crate::{
+    repositories::{idp_repository::IdpRepository, user_repository::UserRepository},
+    utils::redis::user_session_key,
+};
 
 use super::AppService;
 
@@ -27,7 +30,7 @@ impl<U: UserRepository + Clone, I: IdpRepository + Clone>
 
         if let Some(user_sid) = input.user_sid {
             if redis_conn
-                .exists::<_, bool>(format!("user:session:{}", user_sid))
+                .exists::<_, bool>(user_session_key(&user_sid))
                 .await?
             {
                 return Ok(UserLoginPageServiceOutput::LoggedIn);

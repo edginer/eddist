@@ -31,6 +31,7 @@ use crate::{
         bbs_repository::{BbsRepository, CreatingThread},
         user_repository::UserRepository,
     },
+    utils::redis::thread_cache_key,
 };
 
 use super::BbsCgiService;
@@ -209,7 +210,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
         let redis_result = tokio::spawn(async move {
             redis_conn
                 .send_packed_command(&Cmd::rpush(
-                    format!("thread:{}:{unix_time}", input.board_key),
+                    thread_cache_key(&input.board_key, unix_time as u64),
                     res.get_sjis_bytes(&board.default_name, Some(&title))
                         .get_inner(),
                 ))
@@ -230,7 +231,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
                 .await;
             redis_conn
                 .send_packed_command(&Cmd::expire(
-                    format!("thread:{}:{unix_time}", input.board_key),
+                    thread_cache_key(&input.board_key, unix_time as u64),
                     60 * 60 * 24 * 7,
                 ))
                 .await

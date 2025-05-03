@@ -16,7 +16,7 @@ use super::{
     authed_token::AuthedToken,
     metadent::MetadentType,
     res_core::ResCore,
-    utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
+    utils::{SimpleSecret, sanitize_base, sanitize_num_refs},
 };
 
 pub trait ResState {}

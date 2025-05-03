@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use base64::Engine;
-use chacha20poly1305::{aead::Aead, KeyInit};
+use chacha20poly1305::{KeyInit, aead::Aead};
 use eddist_core::cache_aside::{self, AsCache, ToCache};
-use openidconnect::{core::CoreProviderMetadata, ClientId, ClientSecret};
+use openidconnect::{ClientId, ClientSecret, core::CoreProviderMetadata};
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 

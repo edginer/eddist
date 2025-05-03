@@ -1,12 +1,59 @@
 use std::env;
 
+use ::redis::AsyncCommands as _;
 use base64::Engine;
 use eddist_core::{domain::tinker::Tinker, utils::is_prod};
 use http::HeaderMap;
 use jwt_simple::prelude::MACLike;
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::csrf_key;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
+
+pub(crate) mod redis {
+    pub fn csrf_key(key: &str) -> String {
+        format!("csrf-token:{key}")
+    }
+
+    pub fn thread_cache_key(board_key: &str, thread_number: u64) -> String {
+        format!("thread:{board_key}:{thread_number}")
+    }
+
+    pub fn res_creation_span_key(authed_token: &str) -> String {
+        format!("res_creation_span:{authed_token}")
+    }
+
+    pub fn res_creation_span_ip_key(ip: &str) -> String {
+        format!("res_creation_span_ip:{ip}")
+    }
+
+    pub fn thread_creation_span_key(authed_token: &str) -> String {
+        format!("thread_creation_span:{authed_token}")
+    }
+
+    pub fn thread_creation_span_ip_key(ip: &str) -> String {
+        format!("thread_creation_span_ip:{ip}")
+    }
+
+    pub fn user_session_key(user_sid: &str) -> String {
+        format!("user:session:{user_sid}")
+    }
+
+    pub fn user_reg_temp_url_register_key(temp_url_query: &str) -> String {
+        format!("userreg:tempurl:register:{temp_url_query}")
+    }
+
+    pub fn user_reg_oauth2_state_key(state_id: &str) -> String {
+        format!("userreg:oauth2:state:{state_id}")
+    }
+
+    pub fn user_reg_oauth2_authreq_key(state_id: &str) -> String {
+        format!("userreg:oauth2:authreq:{state_id}")
+    }
+
+    pub fn user_login_oauth2_authreq_key(state_id: &str) -> String {
+        format!("userlogin:oauth2:authreq:{state_id}")
+    }
+}
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
     let origin_ip = headers
@@ -72,11 +119,11 @@ macro_rules! transaction_repository {
 
 #[derive(Clone)]
 pub struct CsrfState {
-    redis: ConnectionManager,
+    redis: ::redis::aio::ConnectionManager,
 }
 
 impl CsrfState {
-    pub fn new(redis: ConnectionManager) -> Self {
+    pub fn new(redis: ::redis::aio::ConnectionManager) -> Self {
         Self { redis }
     }
 
@@ -95,9 +142,9 @@ impl CsrfState {
         let token = token.trim_end_matches('=');
 
         let csrf_token = format!("{key}-{token}");
-        let redis_csrf_key = format!("csrf-token:{csrf_token}");
 
-        conn.set_ex::<_, _, ()>(&redis_csrf_key, "", ttl).await?;
+        conn.set_ex::<_, _, ()>(csrf_key(&csrf_token), "", ttl)
+            .await?;
 
         Ok(csrf_token)
     }
@@ -105,8 +152,9 @@ impl CsrfState {
     pub async fn verify_csrf_token(&self, key_token: &str) -> anyhow::Result<bool> {
         let mut conn = self.redis.clone();
 
-        let redis_csrf_key = format!("csrf-token:{key_token}");
-        let csrf_result = conn.get_del::<_, Option<String>>(&redis_csrf_key).await?;
+        let csrf_result = conn
+            .get_del::<_, Option<String>>(&csrf_key(key_token))
+            .await?;
 
         Ok(csrf_result.is_some())
     }

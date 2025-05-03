@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 
 use axum::{
+    Form,
     extract::State,
     response::{Html, IntoResponse},
-    Form,
 };
 use http::HeaderMap;
 use serde_json::json;
 
 use crate::{
+    AppState,
     domain::captcha_like::CaptchaLikeConfig,
     error::BbsPostAuthWithCodeError,
     services::{
-        auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         AppService,
+        auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
     },
     utils::{get_origin_ip, get_ua},
-    AppState,
 };
 
 // NOTE: this system will be changed in the future
@@ -90,7 +90,7 @@ pub async fn post_auth_code(
                         )
                         .unwrap(),
                 )
-            }
+            };
         }
     };
 

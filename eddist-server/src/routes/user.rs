@@ -1,18 +1,20 @@
 use axum::{
+    Extension, Json, Router,
     body::Body,
     extract::{Path, State},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Extension, Json, Router,
 };
-use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
+use axum_extra::extract::cookie::Cookie;
 use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    AppState,
     services::{
+        AppService,
         auth_with_code_user_page_service::AuthWithCodeUserPageServiceInput,
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
@@ -23,10 +25,8 @@ use crate::{
         user_page_service::{UserPageServiceInput, UserPageServiceOutput},
         user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
-        AppService,
     },
-    utils::{get_ua, CsrfState},
-    AppState,
+    utils::{CsrfState, get_ua},
 };
 
 pub fn user_routes() -> Router<AppState> {
@@ -241,7 +241,7 @@ async fn get_user_reg_redirect_to_idp_authz(
             return Response::builder()
                 .status(400)
                 .body(Body::from("Failed to redirect to IDP"))
-                .unwrap()
+                .unwrap();
         }
     };
 
@@ -316,7 +316,7 @@ async fn get_user_login_redirect_to_idp_authz(
             return Response::builder()
                 .status(400)
                 .body(Body::from("Failed to redirect to IDP"))
-                .unwrap()
+                .unwrap();
         }
     };
 

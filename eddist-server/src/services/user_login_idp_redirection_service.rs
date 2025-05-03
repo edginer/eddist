@@ -3,9 +3,11 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
+        service::oidc_client_service::OidcClientService,
+        user::user_login_state::{self, UserLoginState},
     },
     repositories::idp_repository::IdpRepository,
+    utils::redis::user_login_oauth2_authreq_key,
 };
 
 use super::AppService;
@@ -51,10 +53,7 @@ impl<I: IdpRepository + Clone>
 
         redis_conn
             .set_ex::<_, _, String>(
-                format!(
-                    "userlogin:oauth2:authreq:{}",
-                    user_login_state.user_login_state_id
-                ),
+                user_login_oauth2_authreq_key(&user_login_state.user_login_state_id),
                 serde_json::to_string(&user_login_state)?,
                 60 * 15,
             )

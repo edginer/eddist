@@ -1,5 +1,7 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 
+use crate::utils::redis::user_session_key;
+
 use super::AppService;
 
 #[derive(Clone)]
@@ -20,7 +22,7 @@ impl AppService<UserLogoutServiceInput, ()> for UserLogoutService {
         let mut redis_conn = self.0.clone();
 
         redis_conn
-            .del::<_, bool>(format!("user:session:{user_sid}"))
+            .del::<_, bool>(user_session_key(&user_sid))
             .await?;
 
         Ok(())

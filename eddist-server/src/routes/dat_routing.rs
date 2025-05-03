@@ -10,12 +10,12 @@ use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 use http::{HeaderMap, StatusCode};
 
 use crate::{
+    AppState,
     services::{
-        kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
-        thread_retrieval_service::ThreadRetrievalServiceInput, AppService,
+        AppService, kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
+        thread_retrieval_service::ThreadRetrievalServiceInput,
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
-    AppState,
 };
 
 pub async fn get_dat_txt(

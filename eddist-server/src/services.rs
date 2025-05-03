@@ -85,11 +85,11 @@ pub struct AppServiceContainer<
 }
 
 impl<
-        B: BbsRepository + Clone,
-        U: UserRepository + Clone,
-        I: IdpRepository + Clone,
-        P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+    B: BbsRepository + Clone,
+    U: UserRepository + Clone,
+    I: IdpRepository + Clone,
+    P: PubRepository,
+> AppServiceContainer<B, U, I, P>
 {
     pub fn new(
         bbs_repo: B,
@@ -150,11 +150,11 @@ impl<
 }
 
 impl<
-        B: BbsRepository + 'static,
-        U: UserRepository + 'static,
-        I: IdpRepository + 'static,
-        P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+    B: BbsRepository + 'static,
+    U: UserRepository + 'static,
+    I: IdpRepository + 'static,
+    P: PubRepository,
+> AppServiceContainer<B, U, I, P>
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
         &self.auth_with_code

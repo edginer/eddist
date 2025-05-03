@@ -14,7 +14,10 @@ use crate::{
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
-    utils::TransactionRepository,
+    utils::{
+        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
+        TransactionRepository,
+    },
 };
 
 use super::AppService;
@@ -48,8 +51,8 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let mut redis_conn = self.redis_conn.clone();
 
         let redis_authreq_key = match input.callback_kind {
-            CallbackKind::Register => format!("userreg:oauth2:authreq:{}", input.state_id),
-            CallbackKind::Login => format!("userlogin:oauth2:authreq:{}", input.state_id),
+            CallbackKind::Register => user_reg_oauth2_authreq_key(&input.state_id),
+            CallbackKind::Login => user_login_oauth2_authreq_key(&input.state_id),
         };
 
         // TODO: currently, get_del does not work well
@@ -151,7 +154,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
         redis_conn
             .set_ex::<_, _, ()>(
-                format!("user:session:{user_sid}"),
+                user_session_key(&user_sid),
                 user_id.to_string(),
                 60 * 60 * 24 * 365,
             )
@@ -201,7 +204,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
                 redis_conn
                     .set_ex::<_, _, ()>(
-                        format!("user:session:{user_sid}"),
+                        user_session_key(&user_sid),
                         user.id.to_string(),
                         60 * 60 * 24 * 365,
                     )

@@ -3,6 +3,7 @@ use redis::{aio::ConnectionManager, AsyncCommands};
 use crate::{
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
     repositories::idp_repository::IdpRepository,
+    utils::redis::{user_reg_oauth2_authreq_key, user_reg_oauth2_state_key},
 };
 
 use super::AppService;
@@ -42,7 +43,7 @@ impl<I: IdpRepository + Clone>
             .ok_or_else(|| anyhow::anyhow!("idp client not found: {}", input.idp_name))?;
 
         let Ok(user_reg_state) = redis_conn
-            .get_del::<_, String>(format!("userreg:oauth2:state:{}", input.user_reg_state_id))
+            .get_del::<_, String>(user_reg_oauth2_state_key(&input.user_reg_state_id))
             .await
         else {
             return Err(anyhow::anyhow!("user_reg_state_id not found"));
@@ -62,7 +63,7 @@ impl<I: IdpRepository + Clone>
 
         redis_conn
             .set_ex::<_, _, ()>(
-                format!("userreg:oauth2:authreq:{}", input.user_reg_state_id),
+                user_reg_oauth2_authreq_key(&input.user_reg_state_id),
                 serde_json::to_string(&user_reg_state)?,
                 60 * 15,
             )

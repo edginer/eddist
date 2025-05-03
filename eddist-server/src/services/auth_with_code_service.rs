@@ -100,7 +100,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         let handles = clients_responses
             .iter()
-            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
+            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
             .collect::<Vec<_>>();
         let results = join_all(handles).await;
         for r in results {

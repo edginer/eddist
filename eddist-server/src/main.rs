@@ -2,17 +2,17 @@ use core::str;
 use std::{convert::Infallible, env, time::Duration};
 
 use axum::{
+    Extension, Json, Router, ServiceExt as AxumServiceExt,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, Request as AxumRequest, State},
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Extension, Json, Router, ServiceExt as AxumServiceExt,
 };
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::board::{validate_board_key, BoardInfo},
+    domain::board::{BoardInfo, validate_board_key},
     tracing::init_tracing,
     utils::is_prod,
 };
@@ -32,14 +32,14 @@ use routes::{
     user::user_routes,
 };
 use services::{
-    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
     AppService, AppServiceContainer,
+    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
 use tokio::net::TcpListener;
-use tower::{util::ServiceExt as ServiceExtTower, Layer};
+use tower::{Layer, util::ServiceExt as ServiceExtTower};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     classify::ServerErrorsFailureClass,
@@ -48,7 +48,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 use utils::CsrfState;
 
 mod shiftjis;
@@ -85,6 +85,7 @@ mod domain {
 mod error;
 mod services;
 mod template;
+
 pub(crate) mod external {
     pub mod captcha_like_client;
     pub mod oidc_client;
