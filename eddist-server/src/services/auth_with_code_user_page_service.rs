@@ -64,13 +64,31 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
             return Err(anyhow::anyhow!("auth code is duplicated"));
         }
 
+        let Some(authed_token_id) = self
+            .0
+            .get_all_authed_tokens_by_user_id(user.id)
+            .await?
+            .first()
+            .cloned()
+        else {
+            return Err(anyhow::anyhow!(
+                "user not found in authed tokens: auth_with_code svc"
+            ));
+        };
+
+        let old_authed_token = self
+            .1
+            .get_authed_token_by_id(authed_token_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("authed token not found"))?;
+
         let token = tokens.pop().unwrap();
 
         let tx = self.0.begin().await?;
         let tx = self.0.bind_user_authed_token(user.id, token.id, tx).await?;
         let tx = self
             .1
-            .update_authed_token_id_seed(token.id, token.author_id_seed, tx)
+            .update_authed_token_id_seed(token.id, old_authed_token.author_id_seed, tx)
             .await?;
         tx.commit().await?;
 

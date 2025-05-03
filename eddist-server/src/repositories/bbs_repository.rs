@@ -37,6 +37,7 @@ pub trait BbsRepository: Send + Sync + 'static {
     ) -> anyhow::Result<Option<Thread>>;
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>>;
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>>;
+    async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>>;
     async fn get_authed_token_by_origin_ip_and_auth_code(
         &self,
         ip: &str,
@@ -392,6 +393,46 @@ impl BbsRepository for BbsRepositoryImpl {
                 registered_user_id
             FROM authed_tokens WHERE token = ?",
             token
+        );
+
+        let authed_token = query.fetch_optional(&self.pool).await?;
+
+        Ok(authed_token.map(|x| AuthedToken {
+            id: x.id.try_into().unwrap(),
+            token: x.token,
+            origin_ip: IpAddr::new(x.origin_ip.clone()),
+            reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+            writing_ua: x.writing_ua,
+            authed_ua: x.authed_ua,
+            auth_code: x.auth_code,
+            created_at: x.created_at.and_utc(),
+            authed_at: x.authed_at.map(|x| x.and_utc()),
+            validity: x.validity != 0,
+            last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
+            author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+        }))
+    }
+
+    async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>> {
+        let query = query_as!(
+            SelectionAuthedToken,
+            "SELECT 
+                id, 
+                token, 
+                origin_ip, 
+                reduced_origin_ip, 
+                writing_ua, 
+                authed_ua, 
+                auth_code, 
+                created_at, 
+                authed_at, 
+                validity, 
+                last_wrote_at,
+                author_id_seed,
+                registered_user_id
+            FROM authed_tokens WHERE id = ?",
+            id.as_bytes().to_vec()
         );
 
         let authed_token = query.fetch_optional(&self.pool).await?;
