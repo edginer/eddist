@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT registered_user_id IS NOT NULL AS is_binded\n            FROM authed_tokens\n            WHERE id = ?\n            ",
+  "query": "\n            SELECT registered_user_id IS NOT NULL AS \"is_binded: bool\"\n            FROM authed_tokens\n            WHERE id = ?\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "is_binded",
+        "name": "is_binded: bool",
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "b32d989ce11f39851d26388f75802eb8ff805d699d8c5882502109facf9d0942"
+  "hash": "87bd64f6c80b24fa26d784fa57fa7143a355c5fef2477f61989dfc5b1599c3bf"
 }
