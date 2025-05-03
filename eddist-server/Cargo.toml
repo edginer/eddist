@@ -47,6 +47,7 @@ tower-http = { version = "0.5.2", features = [
     "timeout",
     "fs",
     "normalize-path",
+    "catch-panic",
 ] }
 tracing = "0.1.40"
 uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
