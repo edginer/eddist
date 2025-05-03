@@ -80,30 +80,57 @@ impl<T: ResState> Res<T> {
     pub fn get_all_urls(&mut self) -> Vec<String> {
         let text = &self.body;
         let mut urls = Vec::new();
-        let prefixes = ["https://", "http://", "ttp://"];
-        let mut pos = 0;
-        // Extract URLs with explicit scheme prefixes
-        while let Some(slice) = text.get(pos..) {
-            if let Some((found_index, _)) = prefixes
-                .iter()
-                .filter_map(|p| slice.find(p).map(|i| (i + pos, *p)))
-                .min_by_key(|(i, _)| *i)
-            {
-                let substring = text.get(found_index..).unwrap();
+
+        let prefixes = [
+            "https://", "http://", "ttp://", "ttps://", "tps://", "tp://", "p://", "ps://", "s://",
+            "://", "//",
+        ];
+
+        let no_slsl_prefixes = [
+            "https:", "http:", "ttp:", "ttps:", "tps:", "tp:", "p:", "ps:", "s:", ":", "",
+        ];
+
+        let lines = text.split("<br>");
+        for line in lines {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            // Extract URLs with explicit scheme prefixes
+            let mut pos = 0;
+
+            while let Some(slsl_idx) = line.get(pos..).map(|x| x.find("//")).flatten() {
+                // Check previous characters of "//" to find the prefix
+                let slsl_idx = slsl_idx + pos;
+                let mut found_prefix = None;
+                for prefix in no_slsl_prefixes.iter() {
+                    if line.get(pos..slsl_idx).unwrap().ends_with(prefix) {
+                        found_prefix = Some(prefix);
+                        break;
+                    }
+                }
+
+                let found_index = match found_prefix {
+                    Some(prefix) => slsl_idx - prefix.len(),
+                    None => slsl_idx,
+                };
+
+                let substring = line.get(found_index..).unwrap();
                 let end_offset = substring
-                    .find(char::is_whitespace)
+                    .find(|c: char| c.is_ascii_control() || c.is_whitespace() || !c.is_ascii())
                     .unwrap_or_else(|| substring.len());
                 let url = substring.get(..end_offset).unwrap();
                 urls.push(url.to_string());
                 pos = found_index + end_offset;
-            } else {
-                break;
             }
-        }
-        // Additionally, detect plain domain URLs like "example.com"
-        for line in text.split("<br>") {
-            for token in line.split(|c: char| c.is_ascii_control() || c.is_whitespace()) {
-                if !token.contains("://")
+
+            // Additionally, detect plain domain URLs like "example.com"
+            for token in line
+                .split(|c: char| c.is_ascii_control() || c.is_whitespace() || !c.is_ascii())
+                .filter(|t| t.contains('.'))
+            {
+                if !token.contains("//")
                     && token.contains('.')
                     && token.chars().all(|c| c.is_ascii())
                 {
@@ -115,13 +142,9 @@ impl<T: ResState> Res<T> {
         self.urls = Some(
             urls.into_iter()
                 .map(|url| {
-                    let url_core = url
-                        .replace("http://", "")
-                        .replace("https://", "")
-                        .replace("ttps://", "")
-                        .replace("ttp://", "")
-                        .replace("tp://", "")
-                        .replace("tps://", "");
+                    let url_core = prefixes
+                        .iter()
+                        .fold(url, |acc, prefix| acc.replace(prefix, ""));
 
                     let (domain, has_path) = if let Some((domain, path)) = url_core.split_once('/')
                     {
@@ -441,7 +464,15 @@ mod tests {
 
     #[test]
     fn test_get_all_urls() {
-        let content = "Visit http://example.com and also check https://rust-lang.org, then plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test";
+        let content = r#"Visit http://example.com 
+and also check https://rust-lang.org, then
+plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
+あいうえおexample2.com,あいうえお
+あいうえおexample3.comあいうえお
+あいうえおps://example4.comあいうえお
+//example5.comあいうえおexample6.com
+         "#
+        .replace("\n", "<br>");
         let mut res = Res::<Dummy> {
             author_name: "".to_string(),
             cap: None,
@@ -472,6 +503,11 @@ mod tests {
             "rust-lang.org".to_string(),
             "plainexample.com".to_string(),
             "fake.com/aaa.vvv".to_string(),
+            "example2.com".to_string(),
+            "example3.com".to_string(),
+            "example4.com".to_string(),
+            "example5.com".to_string(),
+            "example6.com".to_string(),
         ];
         expected.sort();
         assert_eq!(expected, urls_sorted);
@@ -479,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_get_all_images() {
-        let content = "Image: https://example.com/pic.png page: https://example.com/page.html another non-image: http://site.org/image.jpg, non-image: plainexample.com\nimgur.com/abc123 ";
+        let content = "Image: https://example.com/pic.png page: https://example.com/page.html another non-image: http://site.org/image.jpg, non-image: plainexample.com<br>imgur.com/abc123<br>https://example.com/another.png";
         let mut res = Res::<Dummy> {
             author_name: "".to_string(),
             cap: None,
@@ -506,6 +542,7 @@ mod tests {
         let mut expected = vec![
             "example.com/pic.png".to_string(),
             "imgur.com/abc123".to_string(),
+            "example.com/another.png".to_string(),
         ];
         expected.sort();
         let mut images_sorted = images.clone();
