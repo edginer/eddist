@@ -102,10 +102,10 @@ impl CsrfState {
         Ok(csrf_token)
     }
 
-    pub async fn verify_csrf_token(&self, token: &str) -> anyhow::Result<bool> {
+    pub async fn verify_csrf_token(&self, key_token: &str) -> anyhow::Result<bool> {
         let mut conn = self.redis.clone();
 
-        let redis_csrf_key = format!("csrf-token:{token}");
+        let redis_csrf_key = format!("csrf-token:{key_token}");
         let csrf_result = conn.get_del::<_, Option<String>>(&redis_csrf_key).await?;
 
         Ok(csrf_result.is_some())
