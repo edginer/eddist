@@ -47,7 +47,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
 
         let mut tokens = self
             .1
-            .get_authed_token_by_auth_code(&input.auth_code)
+            .get_unauthed_authed_token_by_auth_code(&input.auth_code)
             .await?
             .into_iter()
             // Filter tokens created within 15 minutes using created_at and now

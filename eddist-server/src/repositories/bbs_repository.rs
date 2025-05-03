@@ -42,7 +42,7 @@ pub trait BbsRepository: Send + Sync + 'static {
         ip: &str,
         auth_code: &str,
     ) -> anyhow::Result<Option<AuthedToken>>;
-    async fn get_authed_token_by_auth_code(
+    async fn get_unauthed_authed_token_by_auth_code(
         &self,
         auth_code: &str,
     ) -> anyhow::Result<Vec<AuthedToken>>;
@@ -458,7 +458,7 @@ impl BbsRepository for BbsRepositoryImpl {
         }))
     }
 
-    async fn get_authed_token_by_auth_code(
+    async fn get_unauthed_authed_token_by_auth_code(
         &self,
         auth_code: &str,
     ) -> anyhow::Result<Vec<AuthedToken>> {

@@ -41,9 +41,9 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
 
         let mut redis_conn = self.redis_conn.clone();
 
-        if let Some(user_cookie) = &input.user_cookie {
+        if let Some(user_sid) = &input.user_sid {
             if redis_conn
-                .exists::<_, bool>(format!("user:session:{user_cookie}"))
+                .exists::<_, bool>(format!("user:session:{user_sid}"))
                 .await?
             {
                 redis_conn
@@ -103,7 +103,7 @@ pub struct AvailableIdp {
 
 pub struct UserRegTempUrlServiceInput {
     pub temp_url_path: String,
-    pub user_cookie: Option<String>,
+    pub user_sid: Option<String>,
 }
 
 pub enum UserRegTempUrlServiceOutput {

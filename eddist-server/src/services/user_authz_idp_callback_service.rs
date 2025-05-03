@@ -100,11 +100,13 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             .await;
 
         let sub = id_token_claims.subject().to_string();
+
         let user_id = if let Some(u) = self
             .user_repo
             .get_user_by_idp_sub(&idp.idp_name, &sub)
             .await?
         {
+            // Already user is registered
             let tx = self.user_repo.begin().await?;
             let tx = self
                 .user_repo

@@ -69,11 +69,6 @@ mod domain {
     }
 
     pub(crate) mod user;
-    //  {
-    //     pub mod idp;
-    //     pub mod user_login_state;
-    //     pub mod user_reg_state;
-    // }
 
     pub(crate) mod authed_token;
     pub(crate) mod captcha_like;

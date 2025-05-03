@@ -49,10 +49,10 @@ CREATE TABLE IF NOT EXISTS
         INDEX (user_id)
     );
 
--- Use generated columns with non-nullable columns if peformance problems arise?
 ALTER TABLE authed_tokens ADD COLUMN require_user_registration
     BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Use generated columns with non-nullable columns if peformance problems arise?
 ALTER TABLE authed_tokens ADD COLUMN registered_user_id
     BINARY(16);
 
