@@ -52,9 +52,8 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                     hasher.update(metadent.as_bytes());
                     // from u8; 16 to base64
                     let result = hasher.finalize();
-                    let metadent =
-                        base64::engine::general_purpose::STANDARD.encode(&result)[1..9].to_string();
-                    metadent
+
+                    base64::engine::general_purpose::STANDARD.encode(result)[1..9].to_string()
                 })
             })
             .collect();

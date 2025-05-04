@@ -1,9 +1,14 @@
-use std::{borrow::Cow, env};
+use std::{borrow::Cow, env, sync::OnceLock};
 
 use chrono::Utc;
-use eddist_core::domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker};
+use eddist_core::{
+    domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker},
+    simple_rate_limiter::RateLimiter,
+    utils::is_user_registration_enabled,
+};
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::{
@@ -13,6 +18,7 @@ use crate::{
         res_core::ResCore,
         service::{
             bbscgi_auth_service::BbsCgiAuthService,
+            bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
@@ -22,30 +28,36 @@ use crate::{
         utils::{sanitize_base, sanitize_num_refs},
     },
     error::{BbsCgiError, NotFoundParamType},
-    repositories::bbs_repository::{BbsRepository, CreatingThread},
+    repositories::{
+        bbs_repository::{BbsRepository, CreatingThread},
+        user_repository::UserRepository,
+    },
+    utils::redis::thread_cache_key,
 };
 
 use super::BbsCgiService;
 
-#[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository>(T, ConnectionManager);
+pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
-impl<T: BbsRepository> TheradCreationService<T> {
-    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
-        Self(repo, redis_conn)
+#[derive(Clone)]
+pub struct TheradCreationService<T: BbsRepository, U: UserRepository>(T, U, ConnectionManager);
+
+impl<T: BbsRepository, U: UserRepository> TheradCreationService<T, U> {
+    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager) -> Self {
+        Self(repo, user_repo, redis_conn)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone>
+impl<T: BbsRepository + Clone, U: UserRepository + Clone>
     BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
-    for TheradCreationService<T>
+    for TheradCreationService<T, U>
 {
     async fn execute(
         &self,
         input: TheradCreationServiceInput,
     ) -> Result<ThreadCreationServiceOutput, BbsCgiError> {
-        let mut redis_conn = self.1.clone();
+        let mut redis_conn = self.2.clone();
         let bbs_repo = self.0.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
@@ -107,6 +119,30 @@ impl<T: BbsRepository + Clone>
                 created_at,
             )
             .await?;
+
+        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+            let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
+                Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
+            });
+            {
+                let mut rate_limiter = rate_limiter.lock().await;
+                if !rate_limiter.check_and_add(&authed_token.token) {
+                    return Err(BbsCgiError::TooManyUserCreationAttempt);
+                }
+            }
+
+            let user_reg_url_svc = UserRegTempUrlService::new(redis_conn.clone());
+            return match user_reg_url_svc
+                .create_userreg_temp_url(&authed_token)
+                .await?
+            {
+                UserRegUrlKind::Registered => Err(BbsCgiError::UserAlreadyRegistered),
+                UserRegUrlKind::NotRegistered(user_reg_url) => {
+                    Err(BbsCgiError::UserRegTempUrl { url: user_reg_url })
+                }
+            };
+        }
+
         let cap_name = if let Some(cap) = res.cap() {
             let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
             self.0
@@ -175,7 +211,7 @@ impl<T: BbsRepository + Clone>
         let redis_result = tokio::spawn(async move {
             redis_conn
                 .send_packed_command(&Cmd::rpush(
-                    format!("thread:{}:{unix_time}", input.board_key),
+                    thread_cache_key(&input.board_key, unix_time as u64),
                     res.get_sjis_bytes(&board.default_name, Some(&title))
                         .get_inner(),
                 ))
@@ -196,7 +232,7 @@ impl<T: BbsRepository + Clone>
                 .await;
             redis_conn
                 .send_packed_command(&Cmd::expire(
-                    format!("thread:{}:{unix_time}", input.board_key),
+                    thread_cache_key(&input.board_key, unix_time as u64),
                     60 * 60 * 24 * 7,
                 ))
                 .await

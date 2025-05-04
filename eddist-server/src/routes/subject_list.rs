@@ -6,9 +6,9 @@ use axum::{
 use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 
 use crate::{
-    services::{thread_list_service::BoardKey, AppService},
-    shiftjis::{SJisResponseBuilder, SjisContentType},
     AppState,
+    services::{AppService, thread_list_service::BoardKey},
+    shiftjis::{SJisResponseBuilder, SjisContentType},
 };
 
 pub async fn get_subject_txt(
@@ -28,7 +28,7 @@ pub async fn get_subject_txt(
             } else {
                 log::error!("Failed to get thread list: {e:?}");
                 Response::builder().status(500).body(Body::empty()).unwrap()
-            }
+            };
         }
     };
 
@@ -62,7 +62,7 @@ pub async fn get_subject_txt_with_metadent(
             } else {
                 log::error!("Failed to get thread list: {e:?}");
                 Response::builder().status(500).body(Body::empty()).unwrap()
-            }
+            };
         }
     };
 

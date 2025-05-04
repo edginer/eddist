@@ -1,7 +1,10 @@
 use anyhow::anyhow;
 use redis::{aio::ConnectionManager, Cmd, Value};
 
-use crate::{domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository};
+use crate::{
+    domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,
+    utils::redis::thread_cache_key,
+};
 
 use super::AppService;
 
@@ -26,7 +29,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
 
         match redis_conn
             .send_packed_command(&Cmd::lrange(
-                format!("thread:{}:{}", input.board_key, input.thread_number),
+                thread_cache_key(&input.board_key, input.thread_number),
                 0,
                 -1,
             ))

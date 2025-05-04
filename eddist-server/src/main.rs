@@ -2,17 +2,17 @@ use core::str;
 use std::{convert::Infallible, env, time::Duration};
 
 use axum::{
+    Extension, Json, Router, ServiceExt as AxumServiceExt,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, Request as AxumRequest, State},
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Json, Router, ServiceExt as AxumServiceExt,
 };
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::board::{validate_board_key, BoardInfo},
+    domain::board::{BoardInfo, validate_board_key},
     tracing::init_tracing,
     utils::is_prod,
 };
@@ -20,21 +20,26 @@ use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
-use repositories::{bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl};
+use repositories::{
+    bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
+    idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+};
 use routes::{
     auth_code::{get_auth_code, post_auth_code},
     bbs_cgi::post_bbs_cgi,
     dat_routing::{get_dat_txt, get_kako_dat_txt},
     subject_list::{get_subject_txt, get_subject_txt_with_metadent},
+    user::user_routes,
 };
 use services::{
-    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
     AppService, AppServiceContainer,
+    board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
+use template::load_template_engine;
 use tokio::net::TcpListener;
-use tower::{util::ServiceExt as ServiceExtTower, Layer};
+use tower::{Layer, util::ServiceExt as ServiceExtTower};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     classify::ServerErrorsFailureClass,
@@ -43,20 +48,27 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
+use utils::CsrfState;
 
 mod shiftjis;
 mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
+    pub(crate) mod idp_repository;
+    pub(crate) mod user_repository;
 }
 mod domain {
     pub(crate) mod service {
         pub mod bbscgi_auth_service;
+        pub mod bbscgi_user_reg_temp_url_service;
         pub mod board_info_service;
         pub mod ng_word_reading_service;
+        pub mod oidc_client_service;
         pub mod res_creation_span_management_service;
     }
+
+    pub(crate) mod user;
 
     pub(crate) mod authed_token;
     pub(crate) mod captcha_like;
@@ -72,72 +84,50 @@ mod domain {
 }
 mod error;
 mod services;
+mod template;
+
 pub(crate) mod external {
     pub mod captcha_like_client;
+    pub mod oidc_client;
 }
-mod utils;
+pub(crate) mod utils;
 mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;
     pub mod statics;
     pub mod subject_list;
+    pub mod user;
 }
 
 #[derive(Clone)]
 struct AppState {
-    services: AppServiceContainer<BbsRepositoryImpl, RedisPubRepository>,
+    services: AppServiceContainer<
+        BbsRepositoryImpl,
+        UserRepositoryImpl,
+        IdpRepositoryImpl,
+        RedisPubRepository,
+    >,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
     template_engine: Handlebars<'static>,
 }
 
 impl AppState {
-    pub fn get_container(&self) -> &AppServiceContainer<BbsRepositoryImpl, RedisPubRepository> {
+    pub fn get_container(
+        &self,
+    ) -> &AppServiceContainer<
+        BbsRepositoryImpl,
+        UserRepositoryImpl,
+        IdpRepositoryImpl,
+        RedisPubRepository,
+    > {
         &self.services
     }
 
     pub fn tinker_secret(&self) -> &str {
         &self.tinker_secret
     }
-}
-
-fn load_template_engine(index_html_path: &str) -> Handlebars<'static> {
-    let mut template_engine = Handlebars::new();
-    template_engine
-        .register_template_string("auth-code.get", include_str!("templates/auth-code.get.hbs"))
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "term-of-usage.get",
-            include_str!("templates/term-of-usage.get.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "auth-code.post.success",
-            include_str!("templates/auth-code.post.success.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "auth-code.post.failed",
-            include_str!("templates/auth-code.post.failed.hbs"),
-        )
-        .unwrap();
-    template_engine
-        .register_template_string(
-            "setting-txt.get",
-            include_str!("templates/setting-txt.get.hbs"),
-        )
-        .unwrap();
-
-    let index_html = std::fs::read_to_string(index_html_path).unwrap();
-    template_engine
-        .register_template_string("dist-index_html", &index_html)
-        .unwrap();
-
-    template_engine
 }
 
 fn render_index_html(
@@ -151,6 +141,11 @@ fn render_index_html(
                 &serde_json::json!({
                     "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string()),
                     "canonical": canonical,
+                    "available_user_registration": env::var("ENABLE_USER_REGISTRATION")
+                        .ok()
+                        .map(|v| v == "true")
+                        .unwrap_or(false)
+                        .to_string(),
                 }),
             )
             .unwrap(),
@@ -229,8 +224,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app_state = AppState {
         services: AppServiceContainer::new(
-            BbsRepositoryImpl::new(pool),
-            conn_mgr,
+            BbsRepositoryImpl::new(pool.clone()),
+            UserRepositoryImpl::new(pool.clone()),
+            IdpRepositoryImpl::new(pool),
+            conn_mgr.clone(),
             pub_repo,
             *s3_client,
         ),
@@ -266,6 +263,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
+        .nest("/user", user_routes())
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
             "/:boardKey",
@@ -379,7 +377,8 @@ async fn main() -> anyhow::Result<()> {
                         // ...
                     },
                 ),
-        );
+        )
+        .layer(Extension(CsrfState::new(conn_mgr)));
 
     let app = if env::var("AXUM_METRICS") == Ok("true".to_string()) {
         app.layer(prometheus_layer)

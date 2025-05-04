@@ -6,7 +6,7 @@ use hyper::StatusCode;
 use time::Duration;
 
 use crate::{
-    external::captcha_like_client::CaptchaLikeError, SJisResponseBuilder, SjisContentType,
+    SJisResponseBuilder, SjisContentType, external::captcha_like_client::CaptchaLikeError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -27,7 +27,9 @@ pub enum BbsCgiError {
     #[error("既に同時刻にスレッドが作成されています")]
     SameTimeThreadCration,
 
-    #[error("認証コード'{auth_code}'を用いて、以下のURLから認証を行ってください \n {base_url}/auth-code")]
+    #[error(
+        "認証コード'{auth_code}'を用いて、以下のURLから認証を行ってください \n {base_url}/auth-code"
+    )]
     Unauthenticated {
         auth_code: String,
         base_url: String,
@@ -53,7 +55,9 @@ pub enum BbsCgiError {
     #[error("短期間に書き込みすぎです ({0}秒以内に1回書き込むことができます)")]
     TooManyCreatingRes(i32),
 
-    #[error("短期間にスレ立てすぎです (Lv{tinker_level}は{span_sec}秒以内に1回スレを立てることができます)")]
+    #[error(
+        "短期間にスレ立てすぎです (Lv{tinker_level}は{span_sec}秒以内に1回スレを立てることができます)"
+    )]
     TooManyCreatingThread { tinker_level: u32, span_sec: i32 },
 
     #[error("短期間にスレ立てすぎです")]
@@ -64,6 +68,15 @@ pub enum BbsCgiError {
 
     #[error("この板は現在読み込み専用です")]
     ReadOnlyBoard,
+
+    #[error("以下のURLを利用してユーザー登録を行ってください \n {url}")]
+    UserRegTempUrl { url: String },
+
+    #[error("この端末は既にユーザー登録されています")]
+    UserAlreadyRegistered,
+
+    #[error("ユーザー登録の試行回数が多すぎます")]
+    TooManyUserCreationAttempt,
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -88,6 +101,9 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingThreadWithoutTinker => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
+            BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
+            BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
+            BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -110,6 +126,9 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingThreadWithoutTinker => "TooManyCreatingThreadWithoutTinker",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
+            BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
+            BbsCgiError::UserAlreadyRegistered => "UserAlreadyRegistered",
+            BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

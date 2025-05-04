@@ -74,3 +74,7 @@ rust-s3 = { version = "0.35.1", default-features = false, features = [
 ] }
 http = "1.1.0"
 tower = "0.5.1"
+openidconnect = "4.0.0"
+url = "2.5.4"
+chacha20poly1305 = "0.10.1"
+toml = "0.8.20"

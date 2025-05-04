@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b1c4b69c33db206a1623bb114746b08f0647341ea88b6532f7580929dedd212f"
+}

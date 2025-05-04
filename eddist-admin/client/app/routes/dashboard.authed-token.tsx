@@ -1,10 +1,12 @@
+import { useSearchParams } from "@remix-run/react";
 import { Alert, Button, Label, Table, TextInput } from "flowbite-react";
-import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";
 
 const Page = () => {
+  const [searchParams] = useSearchParams();
+
   const [authedToken, setAuthedToken] = useState("");
   const [authedTokenData, setAuthedTokenData] =
     useState<components["schemas"]["AuthedToken"]>();
@@ -29,6 +31,15 @@ const Page = () => {
       setSetsearchError(error.message);
     }
   }, [authedToken, setAuthedTokenData]);
+
+  useEffect(() => {
+    if (searchParams.has("token")) {
+      const token = searchParams.get("token");
+      if (token) {
+        setAuthedToken(token);
+      }
+    }
+  }, [searchParams]);
 
   return (
     <div className="p-4">
@@ -83,7 +94,7 @@ const Page = () => {
                   <Table.Row>
                     <Table.Cell>Authed UA</Table.Cell>
                     <Table.Cell>
-                      {authedTokenData?.authed_at ?? "N/A"}
+                      {authedTokenData?.authed_ua ?? "N/A"}
                     </Table.Cell>
                   </Table.Row>
                   <Table.Row>

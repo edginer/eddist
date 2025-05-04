@@ -136,7 +136,7 @@ pub fn sanitize_ascii_numeric_character_reference(input: &str) -> String {
                 }
             }
             while let Some(&next) = iter.peek() {
-                if (is_hex && next.is_digit(16)) || (!is_hex && next.is_digit(10)) {
+                if (is_hex && next.is_ascii_hexdigit()) || (!is_hex && next.is_ascii_digit()) {
                     num_str.push(next);
                     original.push(iter.next().unwrap());
                 } else {

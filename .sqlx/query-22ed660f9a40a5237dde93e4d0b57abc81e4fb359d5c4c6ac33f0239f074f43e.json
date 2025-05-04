@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO user_idp_bindings (id, user_id, idp_id, idp_sub, created_at, updated_at)\n            VALUES (?, ?, ?, ?, NOW(), NOW())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "22ed660f9a40a5237dde93e4d0b57abc81e4fb359d5c4c6ac33f0239f074f43e"
+}

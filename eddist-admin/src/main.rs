@@ -21,6 +21,7 @@ use repository::{
         ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
     admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+    admin_user_repository::{AdminUserRepository, AdminUserRepositoryImpl},
     authed_token_repository::{AuthedTokenRepository, AuthedTokenRepositoryImpl},
     cap_repository::{CapRepository, CapRepositoryImpl},
     ngword_repository::{NgWordRepository, NgWordRepositoryImpl},
@@ -47,6 +48,7 @@ pub(crate) mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
     pub mod admin_repository;
+    pub mod admin_user_repository;
     pub mod authed_token_repository;
     pub mod cap_repository;
     pub mod ngword_repository;
@@ -88,6 +90,7 @@ struct AppState<
     N: NgWordRepository + Clone,
     A: AuthedTokenRepository + Clone,
     C: CapRepository + Clone,
+    U: AdminUserRepository + Clone,
 > {
     oauth2_client: oauth2::basic::BasicClient,
     admin_bbs_repo: T,
@@ -95,6 +98,7 @@ struct AppState<
     admin_archive_repo: R,
     authed_token_repo: A,
     cap_repo: C,
+    user_repo: U,
     redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -104,6 +108,7 @@ type DefaultAppState = AppState<
     NgWordRepositoryImpl,
     AuthedTokenRepositoryImpl,
     CapRepositoryImpl,
+    AdminUserRepositoryImpl,
 >;
 
 #[tokio::main]
@@ -229,7 +234,9 @@ async fn main() {
         .route("/caps", get(bbs::get_caps))
         .route("/caps", post(bbs::create_cap))
         .route("/caps/:capId", delete(bbs::delete_cap))
-        .route("/caps/:capId", patch(bbs::update_cap));
+        .route("/caps/:capId", patch(bbs::update_cap))
+        .route("/users/search", get(bbs::search_users))
+        .route("/users/:userId/status", patch(bbs::update_user_status));
 
     let state = AppState {
         oauth2_client: client,
@@ -242,7 +249,8 @@ async fn main() {
             .unwrap(),
         admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
         authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
-        cap_repo: CapRepositoryImpl::new(pool),
+        cap_repo: CapRepositoryImpl::new(pool.clone()),
+        user_repo: AdminUserRepositoryImpl::new(pool),
     };
 
     let app = Router::new()
@@ -504,6 +512,28 @@ pub struct ThreadCompactionInput {
     target_count: u32,
 }
 
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct User {
+    id: Uuid,
+    user_name: String,
+    enabled: bool,
+    idp_bindings: Vec<UserIdpBinding>,
+    authed_token_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct UserIdpBinding {
+    id: Uuid,
+    user_id: Uuid,
+    idp_name: String,
+    idp_sub: String,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct UserStatusUpdateInput {
+    enabled: bool,
+}
+
 mod bbs {
     use axum::{
         extract::{Path, Query, State},
@@ -520,13 +550,14 @@ mod bbs {
         repository::{
             admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
             admin_bbs_repository::AdminBbsRepository,
+            admin_user_repository::AdminUserRepository,
             authed_token_repository::AuthedTokenRepository,
             cap_repository::CapRepository,
             ngword_repository::NgWordRepository,
         },
         Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
         DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput,
-        UpdateCapInput, UpdateNgWordInput, UpdateResInput,
+        UpdateCapInput, UpdateNgWordInput, UpdateResInput, User, UserStatusUpdateInput,
     };
 
     #[utoipa::path(
@@ -1375,6 +1406,71 @@ mod bbs {
             .body(axum::body::Body::empty())
             .unwrap()
     }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, IntoParams)]
+    pub struct UserSearchQuery {
+        pub user_id: Option<Uuid>,
+        pub user_name: Option<String>,
+        pub authed_token_id: Option<Uuid>,
+    }
+
+    #[utoipa::path(
+        get,
+        path = "/users/search/",
+        params(
+            UserSearchQuery
+        ),
+        responses(
+            (status = 200, description = "List users successfully", body = Vec<User>),
+        )
+    )]
+    pub async fn search_users(
+        State(state): State<DefaultAppState>,
+        Query(query): Query<UserSearchQuery>,
+    ) -> Json<Vec<User>> {
+        let users = state
+            .user_repo
+            .search_users(query.user_id, query.user_name, query.authed_token_id)
+            .await
+            .unwrap();
+
+        Json(users)
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/users/{user_id}/status/",
+        responses(
+            (status = 200, description = "Update user status successfully", body = User),
+        ),
+        params(
+            ("user_id" = Uuid, Path, description = "User ID"),
+        ),
+        request_body = UserStatusUpdateInput
+    )]
+    pub async fn update_user_status(
+        State(state): State<DefaultAppState>,
+        Path(user_id): Path<Uuid>,
+        Json(body): Json<UserStatusUpdateInput>,
+    ) -> Response {
+        state
+            .user_repo
+            .update_user_status(user_id, body.enabled)
+            .await
+            .unwrap();
+
+        let users = state
+            .user_repo
+            .search_users(Some(user_id), None, None)
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(200)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&users[0]).unwrap().into())
+            .unwrap()
+    }
 }
 
 #[derive(OpenApi)]
@@ -1407,6 +1503,9 @@ mod bbs {
         bbs::create_cap,
         bbs::update_cap,
         bbs::delete_cap,
+        bbs::threads_compaction,
+        bbs::search_users,
+        bbs::update_user_status,
     ),
     components(schemas(
         Board,
@@ -1430,6 +1529,10 @@ mod bbs {
         Cap,
         CreationCapInput,
         UpdateCapInput,
+        ThreadCompactionInput,
+        User,
+        UserIdpBinding,
+        UserStatusUpdateInput,
     ))
 )]
 struct ApiDoc;

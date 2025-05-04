@@ -628,6 +628,40 @@
         }
       }
     },
+    "/boards/{board_key}/threads-compaction/": {
+      "post": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "threads_compaction",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThreadCompactionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Compaction thread successfully"
+          }
+        }
+      }
+    },
     "/boards/{board_key}/threads/": {
       "get": {
         "tags": [
@@ -1040,6 +1074,102 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NgWord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/search/": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "search_users",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "user_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "authed_token_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List users successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/status/": {
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_user_status",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "User ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStatusUpdateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update user status successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
                 }
               }
             }
@@ -1722,6 +1852,19 @@
           }
         }
       },
+      "ThreadCompactionInput": {
+        "type": "object",
+        "required": [
+          "target_count"
+        ],
+        "properties": {
+          "target_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Tinker": {
         "type": "object",
         "required": [
@@ -1833,6 +1976,77 @@
           "mail": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "user_name",
+          "enabled",
+          "idp_bindings",
+          "authed_token_ids"
+        ],
+        "properties": {
+          "authed_token_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idp_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserIdpBinding"
+            }
+          },
+          "user_name": {
+            "type": "string"
+          }
+        }
+      },
+      "UserIdpBinding": {
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "idp_name",
+          "idp_sub"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "idp_sub": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UserStatusUpdateInput": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
           }
         }
       }

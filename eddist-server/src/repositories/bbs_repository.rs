@@ -8,14 +8,14 @@ use eddist_core::domain::{
     res::ResView,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, types::Json, MySqlPool};
+use sqlx::{MySqlPool, query, query_as, types::Json};
 use uuid::Uuid;
 
 use crate::domain::{
     authed_token::AuthedToken, metadent::MetadentType, ng_word::NgWord, thread::Thread,
 };
 
-#[mockall::automock]
+// #[mockall::automock]
 #[async_trait::async_trait]
 pub trait BbsRepository: Send + Sync + 'static {
     async fn get_boards(&self) -> anyhow::Result<Vec<Board>>;
@@ -37,11 +37,16 @@ pub trait BbsRepository: Send + Sync + 'static {
     ) -> anyhow::Result<Option<Thread>>;
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>>;
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>>;
+    async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>>;
     async fn get_authed_token_by_origin_ip_and_auth_code(
         &self,
         ip: &str,
         auth_code: &str,
     ) -> anyhow::Result<Option<AuthedToken>>;
+    async fn get_unauthed_authed_token_by_auth_code(
+        &self,
+        auth_code: &str,
+    ) -> anyhow::Result<Vec<AuthedToken>>;
     async fn create_thread(&self, thread: CreatingThread) -> anyhow::Result<()>;
     async fn create_response(&self, res: CreatingRes) -> anyhow::Result<()>;
     async fn create_authed_token(&self, authed_token: CreatingAuthedToken) -> anyhow::Result<()>;
@@ -57,6 +62,12 @@ pub trait BbsRepository: Send + Sync + 'static {
         last_wrote: DateTime<Utc>,
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
+    async fn update_authed_token_id_seed<'a>(
+        &'a self,
+        token_id: Uuid,
+        author_id_seed: Vec<u8>,
+        tx: sqlx::Transaction<'a, sqlx::MySql>,
+    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
     async fn get_cap_by_board_key(
@@ -378,7 +389,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 authed_at, 
                 validity, 
                 last_wrote_at,
-                author_id_seed
+                author_id_seed,
+                registered_user_id
             FROM authed_tokens WHERE token = ?",
             token
         );
@@ -398,17 +410,14 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
 
-    async fn get_authed_token_by_origin_ip_and_auth_code(
-        &self,
-        reduced_ip: &str,
-        auth_code: &str,
-    ) -> anyhow::Result<Option<AuthedToken>> {
+    async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT
+            "SELECT 
                 id, 
                 token, 
                 origin_ip, 
@@ -420,8 +429,53 @@ impl BbsRepository for BbsRepositoryImpl {
                 authed_at, 
                 validity, 
                 last_wrote_at,
-                author_id_seed
-            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
+                author_id_seed,
+                registered_user_id
+            FROM authed_tokens WHERE id = ?",
+            id.as_bytes().to_vec()
+        );
+
+        let authed_token = query.fetch_optional(&self.pool).await?;
+
+        Ok(authed_token.map(|x| AuthedToken {
+            id: x.id.try_into().unwrap(),
+            token: x.token,
+            origin_ip: IpAddr::new(x.origin_ip.clone()),
+            reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+            writing_ua: x.writing_ua,
+            authed_ua: x.authed_ua,
+            auth_code: x.auth_code,
+            created_at: x.created_at.and_utc(),
+            authed_at: x.authed_at.map(|x| x.and_utc()),
+            validity: x.validity != 0,
+            last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
+            author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+        }))
+    }
+
+    async fn get_authed_token_by_origin_ip_and_auth_code(
+        &self,
+        reduced_ip: &str,
+        auth_code: &str,
+    ) -> anyhow::Result<Option<AuthedToken>> {
+        let query = query_as!(
+            SelectionAuthedToken,
+            r#"SELECT
+                id, 
+                token, 
+                origin_ip, 
+                reduced_origin_ip, 
+                writing_ua, 
+                authed_ua, 
+                auth_code, 
+                created_at, 
+                authed_at, 
+                validity, 
+                last_wrote_at,
+                author_id_seed,
+                registered_user_id
+            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
             reduced_ip,
             auth_code
         );
@@ -441,7 +495,54 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
+    }
+
+    async fn get_unauthed_authed_token_by_auth_code(
+        &self,
+        auth_code: &str,
+    ) -> anyhow::Result<Vec<AuthedToken>> {
+        let query = query_as!(
+            SelectionAuthedToken,
+            r#"SELECT
+                id, 
+                token, 
+                origin_ip, 
+                reduced_origin_ip, 
+                writing_ua, 
+                authed_ua, 
+                auth_code, 
+                created_at, 
+                authed_at, 
+                validity, 
+                last_wrote_at,
+                author_id_seed,
+                registered_user_id
+            FROM authed_tokens WHERE auth_code = ? AND validity = false"#,
+            auth_code
+        );
+
+        let authed_tokens = query.fetch_all(&self.pool).await?;
+
+        Ok(authed_tokens
+            .into_iter()
+            .map(|x| AuthedToken {
+                id: x.id.try_into().unwrap(),
+                token: x.token,
+                origin_ip: IpAddr::new(x.origin_ip.clone()),
+                reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+                writing_ua: x.writing_ua,
+                authed_ua: x.authed_ua,
+                auth_code: x.auth_code,
+                created_at: x.created_at.and_utc(),
+                authed_at: x.authed_at.map(|x| x.and_utc()),
+                validity: x.validity != 0,
+                last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
+                author_id_seed: x.author_id_seed,
+                registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+            })
+            .collect())
     }
 
     async fn create_thread(&self, thread: CreatingThread) -> anyhow::Result<()> {
@@ -692,6 +793,23 @@ impl BbsRepository for BbsRepositoryImpl {
         Ok(())
     }
 
+    async fn update_authed_token_id_seed<'a>(
+        &'a self,
+        token_id: Uuid,
+        author_id_seed: Vec<u8>,
+        mut tx: sqlx::Transaction<'a, sqlx::MySql>,
+    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>> {
+        let query = query!(
+            "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
+            author_id_seed,
+            token_id.as_bytes().to_vec(),
+        );
+
+        query.execute(&mut *tx).await?;
+
+        Ok(tx)
+    }
+
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>> {
         let ng_words = sqlx::query_as!(
             NgWord,
@@ -806,6 +924,7 @@ struct SelectionAuthedToken {
     validity: i8, // TINYINT
     last_wrote_at: Option<NaiveDateTime>,
     author_id_seed: Vec<u8>,
+    registered_user_id: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Copy)]

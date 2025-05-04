@@ -100,7 +100,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         let handles = clients_responses
             .iter()
-            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
+            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
             .collect::<Vec<_>>();
         let results = join_all(handles).await;
         for r in results {
@@ -118,7 +118,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         self.0
             .activate_authed_status(&token.token, &input.user_agent, now)
             .await?;
-        counter!("issue_authed_token", "state" => "success").increment(1);
+        counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
 
         Ok(AuthWithCodeServiceOutput { token: token.token })
     }

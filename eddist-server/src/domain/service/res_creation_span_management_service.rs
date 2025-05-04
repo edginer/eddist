@@ -1,4 +1,9 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
+
+use crate::utils::redis::{
+    res_creation_span_ip_key, res_creation_span_key, thread_creation_span_ip_key,
+    thread_creation_span_key,
+};
 
 #[derive(Clone)]
 pub struct ResCreationSpanManagementService {
@@ -41,8 +46,10 @@ impl ResCreationSpanManagementService {
         let mut redis_conn = self.redis_conn.clone();
         let span = self.span;
 
-        let key = format!("res_creation_span:{authed_token}");
-        let before_res_time = redis_conn.get::<_, u64>(&key).await.unwrap_or(0);
+        let before_res_time = redis_conn
+            .get::<_, u64>(&res_creation_span_key(authed_token))
+            .await
+            .unwrap_or(0);
 
         timestamp - before_res_time < span
     }
@@ -56,8 +63,10 @@ impl ResCreationSpanManagementService {
         let mut redis_conn = self.redis_conn.clone();
         let span = self.span;
 
-        let key = format!("res_creation_span_ip:{ip}");
-        let before_res_time = redis_conn.get::<_, u64>(&key).await.unwrap_or(0);
+        let before_res_time = redis_conn
+            .get::<_, u64>(&res_creation_span_ip_key(ip))
+            .await
+            .unwrap_or(0);
 
         timestamp - before_res_time < span
     }
@@ -83,9 +92,8 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("res_creation_span:{authed_token}");
         redis_conn
-            .set_ex::<_, _, ()>(key, timestamp, self.span)
+            .set_ex::<_, _, ()>(res_creation_span_key(authed_token), timestamp, self.span)
             .await
             .unwrap();
     }
@@ -98,9 +106,8 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("res_creation_span_ip:{ip}");
         redis_conn
-            .set_ex::<_, _, ()>(key, timestamp, self.span)
+            .set_ex::<_, _, ()>(res_creation_span_ip_key(ip), timestamp, self.span)
             .await
             .unwrap();
     }
@@ -131,8 +138,10 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("thread_creation_span:{authed_token}");
-        let before_res_time = redis_conn.get::<_, u64>(&key).await.unwrap_or(0);
+        let before_res_time = redis_conn
+            .get::<_, u64>(thread_creation_span_key(authed_token))
+            .await
+            .unwrap_or(0);
 
         timestamp - before_res_time < self.thread_span
     }
@@ -145,8 +154,10 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("thread_creation_span_ip:{ip}");
-        let before_res_time = redis_conn.get::<_, u64>(&key).await.unwrap_or(0);
+        let before_res_time = redis_conn
+            .get::<_, u64>(thread_creation_span_ip_key(ip))
+            .await
+            .unwrap_or(0);
 
         timestamp - before_res_time < self.thread_span
     }
@@ -176,9 +187,12 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("thread_creation_span:{authed_token}");
         redis_conn
-            .set_ex::<_, _, ()>(key, timestamp, self.thread_span)
+            .set_ex::<_, _, ()>(
+                thread_creation_span_key(authed_token),
+                timestamp,
+                self.thread_span,
+            )
             .await
             .unwrap();
     }
@@ -191,9 +205,8 @@ impl ResCreationSpanManagementService {
 
         let mut redis_conn = self.redis_conn.clone();
 
-        let key = format!("thread_creation_span_ip:{ip}");
         redis_conn
-            .set_ex::<_, _, ()>(key, timestamp, self.thread_span)
+            .set_ex::<_, _, ()>(thread_creation_span_ip_key(ip), timestamp, self.thread_span)
             .await
             .unwrap();
     }

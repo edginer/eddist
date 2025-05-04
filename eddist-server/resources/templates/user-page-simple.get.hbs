@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ユーザーページ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ユーザーページ</h1>
+    <h2>ユーザー名: {{ user_name }}</h2>
+    <h3>認証を行う</h3>
+    <form id="auth-form" method="POST" action="/api/authenticate">
+        <label for="auth-code">6桁の認証コードを入力してください:</label><br>
+        <input type="text" id="auth-code" name="auth_code" maxlength="6" pattern="\d{6}" required>
+        <button type="submit">送信</button>
+    </form>
+    <p id="error-message" style="color: red; display: none;"></p>
+
+    <script>
+        document.getElementById('auth-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const authCode = document.getElementById('auth-code').value;
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.style.display = 'none';
+
+            try {
+                const response = await fetch('/user/api/auth-code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token }}',
+                    },
+                    body: JSON.stringify({ auth_code: authCode }),
+                });
+
+                if (response.status === 200) {
+                    const successMessage = document.getElementById('error-message');
+                    successMessage.style.color = 'green';
+                    successMessage.style.display = 'block';
+                    successMessage.textContent = '認証に成功しました！';
+                } else if (response.status === 400) {
+                    errorMessage.style.display = 'block';
+                    errorMessage.textContent = '認証に失敗しました。（認証期限切れ、異なる端末で認証しようとしている、または誤った認証コード）';
+                } else {
+                    errorMessage.style.display = 'block';
+                    errorMessage.textContent = 'エラーが発生しました。';
+                }
+            } catch (error) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'エラーが発生しました。';
+            }
+
+            document.getElementById('auth-code').value = '';
+        });
+    </script>
+</body>
+</html>
