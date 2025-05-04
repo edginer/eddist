@@ -94,7 +94,7 @@ const Page = () => {
                   <Table.Row>
                     <Table.Cell>Authed UA</Table.Cell>
                     <Table.Cell>
-                      {authedTokenData?.authed_at ?? "N/A"}
+                      {authedTokenData?.authed_ua ?? "N/A"}
                     </Table.Cell>
                   </Table.Row>
                   <Table.Row>
