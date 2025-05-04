@@ -168,11 +168,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         // Restrict the image posting below level 2
         if let Some(tinker) = &input.tinker {
             if tinker.level() < 2 && !res.get_all_images().is_empty() {
-                return Err(BbsCgiError::NgWordDetected);
+                return Err(BbsCgiError::ImageUrlBelowLv2);
             }
         } else if !res.get_all_images().is_empty() {
             // Does not allow image URL
-            return Err(BbsCgiError::NgWordDetected);
+            return Err(BbsCgiError::ImageUrlBelowLv2);
         }
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
