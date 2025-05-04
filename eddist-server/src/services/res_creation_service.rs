@@ -10,6 +10,7 @@ use eddist_core::{
         tinker::Tinker,
     },
     simple_rate_limiter::RateLimiter,
+    utils::is_user_registration_enabled,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
@@ -130,7 +131,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             )
             .await?;
 
-        if input.body.starts_with("!userreg") {
+        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });

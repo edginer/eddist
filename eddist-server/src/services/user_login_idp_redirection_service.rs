@@ -3,8 +3,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        service::oidc_client_service::OidcClientService,
-        user::user_login_state::{self, UserLoginState},
+        service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
     },
     repositories::idp_repository::IdpRepository,
     utils::redis::user_login_oauth2_authreq_key,

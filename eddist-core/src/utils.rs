@@ -7,6 +7,13 @@ pub fn is_prod() -> bool {
     )
 }
 
+pub fn is_user_registration_enabled() -> bool {
+    matches!(
+        std::env::var("ENABLE_USER_REGISTRATION").as_deref(),
+        Ok("true")
+    )
+}
+
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {
     let datetime = datetime.checked_add_signed(TimeDelta::hours(9)).unwrap();
     let weekday = datetime.weekday();

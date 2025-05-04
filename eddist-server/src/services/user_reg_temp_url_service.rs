@@ -1,5 +1,6 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 use serde::Serialize;
+use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
@@ -7,30 +8,36 @@ use crate::{
         service::bbscgi_user_reg_temp_url_service::USER_REG_TEMP_URL_LEN,
         user::user_reg_state::UserRegState,
     },
-    repositories::idp_repository::IdpRepository,
-    utils::redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
+    repositories::{idp_repository::IdpRepository, user_repository::UserRepository},
+    utils::{
+        redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
+        TransactionRepository,
+    },
 };
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserRegTempUrlService<I: IdpRepository> {
+pub struct UserRegTempUrlService<I: IdpRepository, U: UserRepository> {
     idp_repo: I,
+    user_repo: U,
     redis_conn: ConnectionManager,
 }
 
-impl<I: IdpRepository + Clone> UserRegTempUrlService<I> {
-    pub fn new(idp_repo: I, redis_conn: ConnectionManager) -> Self {
+impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserRegTempUrlService<I, U> {
+    pub fn new(idp_repo: I, user_repo: U, redis_conn: ConnectionManager) -> Self {
         Self {
             idp_repo,
+            user_repo,
             redis_conn,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
-    for UserRegTempUrlService<I>
+impl<I: IdpRepository + Clone, U: UserRepository + Clone + TransactionRepository<MySql>>
+    AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
+    for UserRegTempUrlService<I, U>
 {
     async fn execute(
         &self,
@@ -43,13 +50,26 @@ impl<I: IdpRepository + Clone> AppService<UserRegTempUrlServiceInput, UserRegTem
         let mut redis_conn = self.redis_conn.clone();
 
         if let Some(user_sid) = &input.user_sid {
-            if redis_conn
-                .exists::<_, bool>(user_session_key(user_sid))
+            if let Some(user_id) = redis_conn
+                .get::<_, Option<String>>(user_session_key(user_sid))
                 .await?
             {
-                redis_conn
-                    .del::<_, ()>(user_reg_temp_url_register_key(&input.temp_url_path))
+                let Some(authed_token_id) = redis_conn
+                    .get_del::<_, Option<String>>(user_reg_temp_url_register_key(
+                        &input.temp_url_path,
+                    ))
+                    .await?
+                else {
+                    return Ok(UserRegTempUrlServiceOutput::NotFound);
+                };
+
+                let mut tx = self.user_repo.begin().await?;
+                tx = self
+                    .user_repo
+                    .bind_user_authed_token(user_id.parse()?, authed_token_id.parse()?, tx)
                     .await?;
+                tx.commit().await?;
+
                 return Ok(UserRegTempUrlServiceOutput::Registered);
             }
         }

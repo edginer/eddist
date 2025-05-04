@@ -1,20 +1,19 @@
 use axum::{
-    Extension, Json, Router,
     body::Body,
     extract::{Path, State},
     response::{IntoResponse, Response},
     routing::{get, post},
+    Extension, Json, Router,
 };
-use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::CookieJar;
+use eddist_core::utils::is_user_registration_enabled;
 use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    AppState,
     services::{
-        AppService,
         auth_with_code_user_page_service::AuthWithCodeUserPageServiceInput,
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
@@ -25,19 +24,20 @@ use crate::{
         user_page_service::{UserPageServiceInput, UserPageServiceOutput},
         user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
+        AppService,
     },
-    utils::{CsrfState, get_ua},
+    utils::{get_ua, CsrfState},
+    AppState,
 };
 
 pub fn user_routes() -> Router<AppState> {
-    let user_registration_enabled =
-        if std::env::var("ENABLE_USER_REGISTRATION").unwrap_or("false".to_string()) == "true" {
-            log::info!("User registration is enabled");
-            true
-        } else {
-            log::info!("User registration is disabled");
-            false
-        };
+    let user_registration_enabled = is_user_registration_enabled();
+
+    if user_registration_enabled {
+        log::info!("User registration is enabled");
+    } else {
+        log::info!("User registration is disabled");
+    }
 
     if user_registration_enabled {
         Router::new()

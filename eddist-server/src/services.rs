@@ -74,7 +74,7 @@ pub struct AppServiceContainer<
     thread_retrival: ThreadRetrievalService<B>,
     kako_thread_retrieval: KakoThreadRetrievalService,
 
-    user_reg_temp_url: UserRegTempUrlService<I>,
+    user_reg_temp_url: UserRegTempUrlService<I, U>,
     user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
     user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
     user_page: UserPageService<U>,
@@ -85,11 +85,11 @@ pub struct AppServiceContainer<
 }
 
 impl<
-    B: BbsRepository + Clone,
-    U: UserRepository + Clone,
-    I: IdpRepository + Clone,
-    P: PubRepository,
-> AppServiceContainer<B, U, I, P>
+        B: BbsRepository + Clone,
+        U: UserRepository + Clone,
+        I: IdpRepository + Clone,
+        P: PubRepository,
+    > AppServiceContainer<B, U, I, P>
 {
     pub fn new(
         bbs_repo: B,
@@ -119,7 +119,11 @@ impl<
             thread_retrival: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
             kako_thread_retrieval: KakoThreadRetrievalService::new(bucket),
 
-            user_reg_temp_url: UserRegTempUrlService::new(idp_repo.clone(), redis_conn.clone()),
+            user_reg_temp_url: UserRegTempUrlService::new(
+                idp_repo.clone(),
+                user_repo.clone(),
+                redis_conn.clone(),
+            ),
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
                 idp_repo.clone(),
                 redis_conn.clone(),
@@ -150,11 +154,11 @@ impl<
 }
 
 impl<
-    B: BbsRepository + 'static,
-    U: UserRepository + 'static,
-    I: IdpRepository + 'static,
-    P: PubRepository,
-> AppServiceContainer<B, U, I, P>
+        B: BbsRepository + 'static,
+        U: UserRepository + 'static,
+        I: IdpRepository + 'static,
+        P: PubRepository,
+    > AppServiceContainer<B, U, I, P>
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
         &self.auth_with_code
@@ -192,7 +196,7 @@ impl<
         &self.kako_thread_retrieval
     }
 
-    pub fn user_reg_temp_url(&self) -> &UserRegTempUrlService<I> {
+    pub fn user_reg_temp_url(&self) -> &UserRegTempUrlService<I, U> {
         &self.user_reg_temp_url
     }
 
