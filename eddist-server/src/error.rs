@@ -6,7 +6,7 @@ use hyper::StatusCode;
 use time::Duration;
 
 use crate::{
-    SJisResponseBuilder, SjisContentType, external::captcha_like_client::CaptchaLikeError,
+    external::captcha_like_client::CaptchaLikeError, SJisResponseBuilder, SjisContentType,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -45,6 +45,9 @@ pub enum BbsCgiError {
 
     #[error("NGワードが含まれています")]
     NgWordDetected,
+
+    #[error("Lv2未満のユーザーは画像URLを投稿できません")]
+    ImageUrlBelowLv2,
 
     #[error("{0}が長すぎます")]
     ContentLengthExceeded(ContentLengthExceededParamType),
@@ -94,6 +97,7 @@ impl BbsCgiError {
             BbsCgiError::InvalidAuthedToken => StatusCode::BAD_REQUEST,
             BbsCgiError::RevokedAuthedToken => StatusCode::FORBIDDEN,
             BbsCgiError::NgWordDetected => StatusCode::OK,
+            BbsCgiError::ImageUrlBelowLv2 => StatusCode::OK,
             BbsCgiError::ContentLengthExceeded(_) => StatusCode::OK,
             BbsCgiError::ContentEmpty(_) => StatusCode::OK,
             BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
@@ -119,6 +123,7 @@ impl BbsCgiError {
             BbsCgiError::InvalidAuthedToken => "InvalidAuthedToken",
             BbsCgiError::RevokedAuthedToken => "RevokedAuthedToken",
             BbsCgiError::NgWordDetected => "NgWordDetected",
+            BbsCgiError::ImageUrlBelowLv2 => "ImageUrlBelowLv2",
             BbsCgiError::ContentLengthExceeded(_) => "ContentLengthExceeded",
             BbsCgiError::ContentEmpty(_) => "ContentEmpty",
             BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
