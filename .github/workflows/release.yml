@@ -90,6 +90,8 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-persistence:${{ env.VERSION }}
       - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ github.ref_name }} --generate-notes
       - name: Notify Discord
