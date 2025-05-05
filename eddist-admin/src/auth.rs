@@ -388,7 +388,6 @@ pub async fn get_login_callback(
     }
 }
 
-#[async_trait::async_trait]
 impl<S> FromRequestParts<S> for AdminSession
 where
     S: Send + Sync,

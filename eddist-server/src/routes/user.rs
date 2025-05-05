@@ -42,14 +42,14 @@ pub fn user_routes() -> Router<AppState> {
     if user_registration_enabled {
         Router::new()
             .route("/", get(get_user_page))
-            .route("/register/:tempUrlPath", get(get_user_register_temp_url))
+            .route("/register/{tempUrlPath}", get(get_user_register_temp_url))
             .route(
-                "/register/authz/idp/:idpName",
+                "/register/authz/idp/{idpName}",
                 get(get_user_reg_redirect_to_idp_authz),
             )
             .route("/login", get(get_user_login))
             .route(
-                "/login/authz/idp/:idpName",
+                "/login/authz/idp/{idpName}",
                 get(get_user_login_redirect_to_idp_authz),
             )
             .route("/logout", get(get_user_logout))

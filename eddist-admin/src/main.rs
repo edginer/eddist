@@ -182,67 +182,73 @@ async fn main() {
     let api_routes = Router::new()
         .route("/boards", get(bbs::get_boards))
         .route("/boards", post(bbs::create_board))
-        .route("/boards/:boardKey", get(bbs::get_board))
-        .route("/boards/:boardKey/info", get(bbs::get_board_info))
-        .route("/boards/:boardKey", patch(bbs::edit_board))
-        .route("/boards/:boardKey/threads", get(bbs::get_threads))
-        .route("/boards/:boardKey/threads/:threadId", get(bbs::get_thread))
+        .route("/boards/{boardKey}", get(bbs::get_board))
+        .route("/boards/{boardKey}/info", get(bbs::get_board_info))
+        .route("/boards/{boardKey}", patch(bbs::edit_board))
+        .route("/boards/{boardKey}/threads", get(bbs::get_threads))
         .route(
-            "/boards/:boardKey/threads/:threadId/responses",
+            "/boards/{boardKey}/threads/{threadId}",
+            get(bbs::get_thread),
+        )
+        .route(
+            "/boards/{boardKey}/threads/{threadId}/responses",
             get(bbs::get_responses),
         )
-        .route("/boards/:boardKey/archives", get(bbs::get_archived_threads))
         .route(
-            "/boards/:boardKey/archives/:threadId",
+            "/boards/{boardKey}/archives",
+            get(bbs::get_archived_threads),
+        )
+        .route(
+            "/boards/{boardKey}/archives/{threadId}",
             get(bbs::get_archived_thread),
         )
         .route(
-            "/boards/:boardKey/archives/:threadId/responses",
+            "/boards/{boardKey}/archives/{threadId}/responses",
             get(bbs::get_archived_responses),
         )
         .route(
-            "/boards/:boardKey/threads/:threadId/responses/:resId",
+            "/boards/{boardKey}/threads/{threadId}/responses/{resId}",
             patch(bbs::update_response),
         )
         .route(
-            "/boards/:boardKey/dat-archives/:threadNumber",
+            "/boards/{boardKey}/dat-archives/{threadNumber}",
             get(bbs::get_dat_archived_thread),
         )
         .route(
-            "/boards/:boardKey/admin-dat-archives/:threadNumber",
+            "/boards/{boardKey}/admin-dat-archives/{threadNumber}",
             get(bbs::get_admin_dat_archived_thread),
         )
         .route(
-            "/boards/:boardKey/dat-archives/:threadNumber/responses",
+            "/boards/{boardKey}/dat-archives/{threadNumber}/responses",
             patch(bbs::update_archived_res),
         )
         .route(
-            "/boards/:boardKey/dat-archives/:threadNumber/responses/:resOrder",
+            "/boards/{boardKey}/dat-archives/{threadNumber}/responses/{resOrder}",
             delete(bbs::delete_archived_res),
         )
         .route(
-            "/boards/:boardKey/dat-archives/:threadNumber",
+            "/boards/{boardKey}/dat-archives/{threadNumber}",
             delete(bbs::delete_archived_thread),
         )
         .route(
-            "/boards/:boardKey/threads-compaction/",
+            "/boards/{boardKey}/threads-compaction/",
             post(bbs::threads_compaction),
         )
-        .route("/authed_tokens/:authedTokenId", get(bbs::get_authed_token))
+        .route("/authed_tokens/{authedTokenId}", get(bbs::get_authed_token))
         .route(
-            "/authed_tokens/:authedTokenId",
+            "/authed_tokens/{authedTokenId}",
             delete(bbs::delete_authed_token),
         )
         .route("/ng_words", get(bbs::get_ng_words))
         .route("/ng_words", post(bbs::create_ng_word))
-        .route("/ng_words/:ngWordId", delete(bbs::delete_ng_word))
-        .route("/ng_words/:ngWordId", patch(bbs::update_ng_word))
+        .route("/ng_words/{ngWordId}", delete(bbs::delete_ng_word))
+        .route("/ng_words/{ngWordId}", patch(bbs::update_ng_word))
         .route("/caps", get(bbs::get_caps))
         .route("/caps", post(bbs::create_cap))
-        .route("/caps/:capId", delete(bbs::delete_cap))
-        .route("/caps/:capId", patch(bbs::update_cap))
+        .route("/caps/{capId}", delete(bbs::delete_cap))
+        .route("/caps/{capId}", patch(bbs::update_cap))
         .route("/users/search", get(bbs::search_users))
-        .route("/users/:userId/status", patch(bbs::update_user_status));
+        .route("/users/{userId}/status", patch(bbs::update_user_status));
 
     let state = AppState {
         oauth2_client: client,
@@ -554,16 +560,19 @@ mod bbs {
 
     use crate::{
         repository::{
-            admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
+            admin_archive_repository::{
+                AdminArchiveRepository, ArchivedAdminThread, ArchivedResUpdate, ArchivedThread,
+            },
             admin_bbs_repository::AdminBbsRepository,
             admin_user_repository::AdminUserRepository,
             authed_token_repository::AuthedTokenRepository,
             cap_repository::CapRepository,
             ngword_repository::NgWordRepository,
         },
-        Board, Cap, CreateBoardInput, CreationCapInput, CreationNgWordInput, DefaultAppState,
-        DeleteAuthedTokenInput, EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput,
-        UpdateCapInput, UpdateNgWordInput, UpdateResInput, User, UserStatusUpdateInput,
+        AuthedToken, Board, BoardInfo, Cap, CreateBoardInput, CreationCapInput,
+        CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput, EditBoardInput, NgWord, Res,
+        Thread, ThreadCompactionInput, UpdateCapInput, UpdateNgWordInput, UpdateResInput, User,
+        UserStatusUpdateInput,
     };
 
     #[utoipa::path(

@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.80"
-axum = "0.7.5"
-axum-extra = { version = "0.9.3", features = ["cookie"] }
+axum = "0.8.4"
+axum-extra = { version = "0.10.1", features = ["cookie"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 dotenvy = "0.15.7"
@@ -35,11 +35,11 @@ sqlx = { version = "0.8.5", default-features = false, features = [
     "json",
     "uuid",
 ] }
-thiserror = "1.0.61"
+thiserror = "2.0.12"
 time = "0.3.36"
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-util = "0.7.11"
-tower-http = { version = "0.5.2", features = [
+tower-http = { version = "0.6.2", features = [
     "compression-br",
     "compression-gzip",
     "trace",
@@ -64,7 +64,7 @@ futures = "0.3.30"
 handlebars = "6.1.0"
 metrics = "0.24.2"
 metrics-exporter-prometheus = "0.17.0"
-axum-prometheus = "0.7.0"
+axum-prometheus = "0.8.0"
 sha1 = { version = "0.10.6", default-features = false }
 rust-s3 = { version = "0.35.1", default-features = false, features = [
     "tokio-rustls-tls",
