@@ -1,4 +1,4 @@
-import { Link, useParams } from "@remix-run/react";
+import { Link, useParams } from "react-router";
 import { Button, Modal } from "flowbite-react";
 import { useState } from "react";
 import { toast } from "react-toastify";

@@ -1,10 +1,4 @@
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "@remix-run/react";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { Spinner } from "flowbite-react";
 import "./tailwind.css";
 import { ErrorBoundary } from "react-error-boundary";
