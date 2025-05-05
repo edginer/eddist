@@ -14,7 +14,7 @@ use eddist_core::{
     tracing::init_tracing,
     utils::is_prod,
 };
-use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
+use oauth2::{AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl, TokenUrl};
 use repository::{
     admin_archive_repository::{
         AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedAdminRes, ArchivedAdminThread,
@@ -92,7 +92,13 @@ struct AppState<
     C: CapRepository + Clone,
     U: AdminUserRepository + Clone,
 > {
-    oauth2_client: oauth2::basic::BasicClient,
+    oauth2_client: oauth2::basic::BasicClient<
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
+    >,
     admin_bbs_repo: T,
     ng_word_repo: N,
     admin_archive_repo: R,
@@ -125,14 +131,14 @@ async fn main() {
         dotenvy::dotenv().unwrap();
     }
 
-    let client = oauth2::basic::BasicClient::new(
-        ClientId::new(std::env::var("EDDIST_ADMIN_CLIENT_ID").unwrap()),
-        Some(ClientSecret::new(
-            std::env::var("EDDIST_ADMIN_CLIENT_SECRET").unwrap(),
-        )),
-        AuthUrl::new(std::env::var("EDDIST_ADMIN_AUTH_URL").unwrap()).unwrap(),
-        Some(TokenUrl::new(std::env::var("EDDIST_ADMIN_TOKEN_URL").unwrap()).unwrap()),
-    )
+    let client = oauth2::basic::BasicClient::new(ClientId::new(
+        std::env::var("EDDIST_ADMIN_CLIENT_ID").unwrap(),
+    ))
+    .set_client_secret(ClientSecret::new(
+        std::env::var("EDDIST_ADMIN_CLIENT_SECRET").unwrap(),
+    ))
+    .set_auth_uri(AuthUrl::new(std::env::var("EDDIST_ADMIN_AUTH_URL").unwrap()).unwrap())
+    .set_token_uri(TokenUrl::new(std::env::var("EDDIST_ADMIN_TOKEN_URL").unwrap()).unwrap())
     .set_redirect_uri(
         RedirectUrl::new(std::env::var("EDDIST_ADMIN_LOGIN_CALLBACK_URL").unwrap()).unwrap(),
     );
