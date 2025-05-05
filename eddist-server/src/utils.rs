@@ -4,7 +4,6 @@ use ::redis::AsyncCommands as _;
 use base64::Engine;
 use eddist_core::{domain::tinker::Tinker, utils::is_prod};
 use http::HeaderMap;
-use jwt_simple::prelude::MACLike;
 use redis::csrf_key;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
@@ -89,14 +88,24 @@ pub fn get_asn_num(headers: &HeaderMap) -> u32 {
 }
 
 pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
-    let key = jwt_simple::prelude::HS256Key::from_bytes(
-        &base64::engine::general_purpose::STANDARD
-            .decode(secret.trim())
-            .unwrap(),
-    );
-    let tinker = key.verify_token::<Tinker>(tinker, None).ok()?;
+    let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.validate_exp = false;
+    validation.validate_nbf = false;
+    validation.validate_aud = false;
+    validation.required_spec_claims.clear();
 
-    Some(tinker.custom)
+    let tinker = jsonwebtoken::decode::<Tinker>(
+        tinker,
+        &jsonwebtoken::DecodingKey::from_secret(
+            &base64::engine::general_purpose::STANDARD
+                .decode(secret.trim())
+                .unwrap(),
+        ),
+        &validation,
+    )
+    .unwrap();
+
+    Some(tinker.claims)
 }
 
 #[async_trait::async_trait]
