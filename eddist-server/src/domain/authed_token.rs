@@ -32,7 +32,7 @@ impl AuthedToken {
         let token = format!("{token:x}");
         let ip_addr = IpAddr::new(origin_ip);
         let reduced_ip = ReducedIpAddr::from(ip_addr.clone());
-        let auth_code = rand::thread_rng().gen_range(0..1000000);
+        let auth_code = rand::rng().random_range(0..1000000);
         let auth_code = format!("{auth_code:06}");
 
         Self {

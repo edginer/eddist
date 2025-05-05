@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use redis::{aio::ConnectionManager, Cmd, Value};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::{
     domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,
@@ -28,30 +28,14 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
         let mut redis_conn = self.1.clone();
 
         match redis_conn
-            .send_packed_command(&Cmd::lrange(
+            .lrange::<_, Vec<u8>>(
                 thread_cache_key(&input.board_key, input.thread_number),
                 0,
                 -1,
-            ))
+            )
             .await
-            .unwrap()
-            .into_sequence()
         {
-            Ok(sjis_result) if !sjis_result.is_empty() => {
-                let sjis_result = sjis_result
-                    .into_iter()
-                    .filter_map(|x| {
-                        if let Value::Data(data) = x {
-                            Some(data)
-                        } else {
-                            None
-                        }
-                    })
-                    .flatten()
-                    .collect::<Vec<_>>();
-
-                Ok(ThreadResListRaw { raw: sjis_result })
-            }
+            Ok(sjis_result) if !sjis_result.is_empty() => Ok(ThreadResListRaw { raw: sjis_result }),
             _ => {
                 let Some(board) = self.0.get_board(&input.board_key).await? else {
                     return Err(anyhow!("failed to find board"));

@@ -6,12 +6,12 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.81"
-axum = "0.7.5"
+axum = "0.8.4"
 chrono = "0.4.38"
 dotenvy = "0.15.7"
 log = "0.4.22"
-tower-sessions = "0.12.2"
-sqlx = { version = "0.8.0", default-features = false, features = [
+tower-sessions = "0.14.0"
+sqlx = { version = "0.8.5", default-features = false, features = [
     "runtime-tokio",
     "tls-rustls",
     "mysql",
@@ -20,12 +20,12 @@ sqlx = { version = "0.8.0", default-features = false, features = [
     "json",
     "uuid",
 ] }
-tokio = { version = "1.39.2", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 tower-http = { version = "0.5.2", features = ["fs", "trace", "normalize-path"] }
 tracing = "0.1.40"
 uuid = { version = "1.10.0", features = ["v7", "v4"] }
-oauth2 = "4.4.2"
-reqwest = { version = "0.11", default-features = false, features = [
+oauth2 = { version = "5.0.0", features = ["reqwest"] }
+reqwest = { version = "0.12.15", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
@@ -34,9 +34,9 @@ serde = { version = "1.0.205", features = ["derive"] }
 serde_json = { version = "1.0.122" }
 jsonwebtoken = "9.3.0"
 base64 = "0.22.1"
-redis = { version = "0.25.4", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.30.0", features = ["tokio-comp", "connection-manager"] }
 eddist-core = { path = "../eddist-core" }
-utoipa = { version = "4.2.3", features = ["uuid", "axum_extras", "chrono"] }
+utoipa = { version = "5.3.1", features = ["uuid", "axum_extras", "chrono"] }
 tower-layer = "0.3.3"
 rust-s3 = { version = "0.35.1", default-features = false, features = [
     "tokio-rustls-tls",

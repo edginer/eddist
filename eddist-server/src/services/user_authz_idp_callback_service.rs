@@ -1,6 +1,6 @@
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, Rng};
 use redis::{aio::ConnectionManager, AsyncCommands};
 use sqlx::MySql;
 use uuid::Uuid;
@@ -383,12 +383,12 @@ fn user_name_generator() -> String {
         ("mixer", "grinder"),
     ];
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let (left_index, right_family_index, right_first_index) = (
-        rng.gen_range(0..left.len()),
-        rng.gen_range(0..right.len()),
-        rng.gen_range(0..right.len()),
+        rng.random_range(0..left.len()),
+        rng.random_range(0..right.len()),
+        rng.random_range(0..right.len()),
     );
 
     let random_str = rng

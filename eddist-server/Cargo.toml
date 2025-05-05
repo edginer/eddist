@@ -8,10 +8,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.80"
-axum = "0.7.5"
-axum-extra = { version = "0.9.3", features = ["cookie"] }
+axum = "0.8.4"
+axum-extra = { version = "0.10.1", features = ["cookie"] }
 base64 = "0.22.1"
-brotli = "6.0.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 dotenvy = "0.15.7"
 encoding_rs = { version = "0.8.34", features = ["fast-kanji-encode"] }
@@ -21,13 +20,13 @@ hyper-util = "0.1.6"
 jsonwebtoken = "9.3.0"
 log = "0.4.22"
 md-5 = "0.10.6"
-mockall = "0.12.1"
+mockall = "0.13.1"
 pwhash = "1.0.0"
-rand = "0.8.5"
-redis = { version = "0.25.4", features = ["tokio-comp", "connection-manager"] }
+rand = "0.9.1"
+redis = { version = "0.30.0", features = ["tokio-comp", "connection-manager"] }
 serde = { version = "1.0.205", features = ["derive"] }
 serde_json = { version = "1.0.118" }
-sqlx = { version = "0.8.0", default-features = false, features = [
+sqlx = { version = "0.8.5", default-features = false, features = [
     "runtime-tokio",
     "tls-rustls",
     "mysql",
@@ -36,11 +35,11 @@ sqlx = { version = "0.8.0", default-features = false, features = [
     "json",
     "uuid",
 ] }
-thiserror = "1.0.61"
+thiserror = "2.0.12"
 time = "0.3.36"
-tokio = { version = "1.39.2", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 tokio-util = "0.7.11"
-tower-http = { version = "0.5.2", features = [
+tower-http = { version = "0.6.2", features = [
     "compression-br",
     "compression-gzip",
     "trace",
@@ -52,7 +51,7 @@ tower-http = { version = "0.5.2", features = [
 tracing = "0.1.40"
 uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
 regex = "1.10.6"
-reqwest = { version = "0.12.5", default-features = false, features = [
+reqwest = { version = "0.12.15", default-features = false, features = [
     "rustls-tls",
     "json",
     "charset",
@@ -60,12 +59,11 @@ reqwest = { version = "0.12.5", default-features = false, features = [
 eddist-core = { path = "../eddist-core" }
 sha3 = "0.10.8"
 sha2 = "0.10.8"
-jwt-simple = "0.12.9"
 futures = "0.3.30"
 handlebars = "6.1.0"
-metrics = "0.23.0"
-metrics-exporter-prometheus = "0.15.3"
-axum-prometheus = "0.7.0"
+metrics = "0.24.2"
+metrics-exporter-prometheus = "0.17.0"
+axum-prometheus = "0.8.0"
 sha1 = { version = "0.10.6", default-features = false }
 rust-s3 = { version = "0.35.1", default-features = false, features = [
     "tokio-rustls-tls",

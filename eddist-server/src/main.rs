@@ -2,17 +2,17 @@ use core::str;
 use std::{convert::Infallible, env, time::Duration};
 
 use axum::{
-    Extension, Json, Router, ServiceExt as AxumServiceExt,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, Request as AxumRequest, State},
     http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
+    Extension, Json, Router, ServiceExt as AxumServiceExt,
 };
 use axum_prometheus::PrometheusMetricLayer;
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{
-    domain::board::{BoardInfo, validate_board_key},
+    domain::board::{validate_board_key, BoardInfo},
     tracing::init_tracing,
     utils::is_prod,
 };
@@ -32,14 +32,14 @@ use routes::{
     user::user_routes,
 };
 use services::{
-    AppService, AppServiceContainer,
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+    AppService, AppServiceContainer,
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
 use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
 use tokio::net::TcpListener;
-use tower::{Layer, util::ServiceExt as ServiceExtTower};
+use tower::{util::ServiceExt as ServiceExtTower, Layer};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     classify::ServerErrorsFailureClass,
@@ -48,7 +48,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{Span, info_span};
+use tracing::{info_span, Span};
 use utils::CsrfState;
 
 mod shiftjis;
@@ -252,21 +252,24 @@ async fn main() -> anyhow::Result<()> {
         .route("/robots.txt", get(get_robots_txt))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
-        .route("/:boardKey/subject.txt", get(get_subject_txt))
+        .route("/{boardKey}/subject.txt", get(get_subject_txt))
         .route(
-            "/:boardKey/subject-metadent.txt",
+            "/{boardKey}/subject-metadent.txt",
             get(get_subject_txt_with_metadent),
         )
-        .route("/:boardKey/head.txt", get(get_head_txt))
-        .route("/:boardKey/SETTING.TXT", get(get_setting_txt))
-        .route("/:boardKey/dat/:threadId", get(get_dat_txt))
-        .route("/:boardKey/kako/:th4/:th5/:threadId", get(get_kako_dat_txt))
+        .route("/{boardKey}/head.txt", get(get_head_txt))
+        .route("/{boardKey}/SETTING.TXT", get(get_setting_txt))
+        .route("/{boardKey}/dat/{threadId}", get(get_dat_txt))
+        .route(
+            "/{boardKey}/kako/{th4}/{th5}/{threadId}",
+            get(get_kako_dat_txt),
+        )
         .route("/terms", get(get_term_of_usage))
         .route("/api/boards", get(get_api_boards))
         .nest("/user", user_routes())
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
-            "/:boardKey",
+            "/{boardKey}",
             get(
                 |State(state): State<AppState>, Path(board_key): Path<String>| async move {
                     render_index_html(
@@ -285,7 +288,7 @@ async fn main() -> anyhow::Result<()> {
             }),
         )
         .route_service(
-            "/assets/:item",
+            "/assets/{item}",
             get(|Path(item): Path<String>| async move {
                 serve_dir_inner
                     .clone()
@@ -299,7 +302,7 @@ async fn main() -> anyhow::Result<()> {
             }),
         )
         .route(
-            "/:boardKey/:threadId",
+            "/{boardKey}/{threadId}",
             get(
                 |State(app_state): State<AppState>,
                  Path((board_key, thread_id)): Path<(String, String)>| async move {
@@ -313,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
             ),
         )
         .route(
-            "/test/read.cgi/:boardKey/:threadId",
+            "/test/read.cgi/{boardKey}/{threadId}",
             get(
                 |Path((board_key, thread_id)): Path<(String, String)>| async move {
                     Redirect::permanent(&format!("/{}/{}", board_key, thread_id))
@@ -321,7 +324,7 @@ async fn main() -> anyhow::Result<()> {
             ),
         )
         .route(
-            "/test/read.cgi/:boardKey/:threadId/*pos",
+            "/test/read.cgi/{boardKey}/{threadId}/{*pos}",
             get(
                 |Path((board_key, thread_id)): Path<(String, String)>| async move {
                     Redirect::permanent(&format!("/{}/{}", board_key, thread_id))

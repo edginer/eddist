@@ -10,8 +10,8 @@ use axum::{
 use chrono::{TimeDelta, Utc};
 use jsonwebtoken::errors::ErrorKind;
 use oauth2::{
-    reqwest::async_http_client, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier,
-    RefreshToken, Scope, TokenResponse,
+    reqwest, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RefreshToken,
+    Scope, TokenResponse,
 };
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
@@ -39,6 +39,18 @@ pub struct Auth0UserInfo {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Auth0AccessToken {
     pub exp: i64,
+}
+
+static HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+fn get_http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap()
+    })
 }
 
 pub async fn verify_access_token(access_token: &str) -> Result<KeycloakAccessToken, ErrorKind> {
@@ -148,7 +160,7 @@ pub async fn auth_simple_header(
                             .iter()
                             .map(|s| Scope::new(s.to_string())),
                     )
-                    .request_async(oauth2::reqwest::async_http_client)
+                    .request_async(get_http_client())
                     .await
                 else {
                     session.delete().await.unwrap();
@@ -344,7 +356,7 @@ pub async fn get_login_callback(
     let token = oauth_client
         .exchange_code(code)
         .set_pkce_verifier(PkceCodeVerifier::new(oauth_session.pkce_verifier))
-        .request_async(async_http_client)
+        .request_async(get_http_client())
         .await;
 
     match token {
@@ -376,7 +388,6 @@ pub async fn get_login_callback(
     }
 }
 
-#[async_trait::async_trait]
 impl<S> FromRequestParts<S> for AdminSession
 where
     S: Send + Sync,

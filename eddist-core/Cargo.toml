@@ -7,7 +7,7 @@ edition = "2021"
 serde = { version = "1.0.205", features = ["derive"] }
 chrono = "0.4.38"
 # TODO: Remove this dependency and replace it with trait
-redis = { version = "0.25.4", features = ["tokio-comp"] }
+redis = { version = "0.30.0", features = ["tokio-comp"] }
 anyhow = "1.0.86"
 serde_json = { version = "1.0.118" }
 uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
@@ -15,4 +15,4 @@ encoding_rs = "0.8.34"
 sha3 = "0.10.8"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-metrics = "0.23.0"
+metrics = "0.24.2"
