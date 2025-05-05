@@ -26,6 +26,6 @@ rust-s3 = { version = "0.35.1", default-features = false, features = [
 ] }
 uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
 dotenvy = "0.15.7"
-redis = { version = "0.25.4", features = ["tokio-comp"] }
+redis = { version = "0.30.0", features = ["tokio-comp"] }
 log = "0.4.22"
 encoding_rs = { version = "0.8.34", features = ["fast-kanji-encode"] }

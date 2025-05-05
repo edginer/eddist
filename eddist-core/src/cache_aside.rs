@@ -34,14 +34,27 @@ where
     let cached_data = redis_conn
         .req_packed_command(&redis::Cmd::get(&cache_key))
         .await?;
-    if let Value::Data(cached_data) = cached_data {
-        let cached_value = serde_json::from_slice::<T>(&cached_data)?;
-        if cached_value.expired_at() > chrono::Utc::now().timestamp() as u64 {
-            return Ok(cached_value.get());
-        } else {
-            redis_conn
-                .req_packed_command(&redis::Cmd::del(&cache_key))
-                .await?;
+    match cached_data {
+        Value::BulkString(cached_data) => {
+            let cached_value = serde_json::from_slice::<T>(&cached_data)?;
+            if cached_value.expired_at() > chrono::Utc::now().timestamp() as u64 {
+                return Ok(cached_value.get());
+            } else {
+                redis_conn
+                    .req_packed_command(&redis::Cmd::del(&cache_key))
+                    .await?;
+            }
+        }
+        Value::Nil => {
+            // Cache miss, proceed to fetch from the database
+        }
+        Value::ServerError(err) => {
+            return Err(
+                anyhow::anyhow!("errors in cache aside redis resp").context(format!("{err:?}"))
+            );
+        }
+        _ => {
+            panic!("unexpected redis response");
         }
     }
 
