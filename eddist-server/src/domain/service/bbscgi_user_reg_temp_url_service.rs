@@ -1,5 +1,5 @@
-use rand::{Rng, distributions::Uniform, rngs::OsRng};
-use redis::{AsyncCommands, aio::ConnectionManager};
+use rand::{distr::Uniform, Rng};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::{domain::authed_token::AuthedToken, utils::redis::user_reg_temp_url_register_key};
 
@@ -69,13 +69,11 @@ fn generate_random_string(len: usize) -> String {
     // NOTE: We have removed 'I', 'i', 'L', 'l', 'O', 'o', '0', '1' from the usual alphanumeric set.
     let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
 
-    let mut rng = OsRng;
-
-    let index_dist = Uniform::from(0..charset.len());
+    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
 
     (0..len)
         .map(|_| {
-            let idx = rng.sample(index_dist);
+            let idx = rand::rng().sample(index_dist);
             charset[idx] as char
         })
         .collect()
