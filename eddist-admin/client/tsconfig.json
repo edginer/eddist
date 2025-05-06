@@ -37,7 +37,7 @@
     },
     "rootDirs": [
       ".",
-      "./react-router/types"
+      "./.react-router/types"
     ],
     // Vite takes care of building everything, not tsc.
     "noEmit": true
