@@ -312,7 +312,8 @@ async fn get_user_login_redirect_to_idp_authz(
         .await
     {
         Ok(o) => o,
-        Err(_) => {
+        Err(e) => {
+            log::error!("Failed to redirect to IDP: {e}");
             return Response::builder()
                 .status(400)
                 .body(Body::from("Failed to redirect to IDP"))
