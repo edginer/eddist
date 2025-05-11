@@ -6,6 +6,15 @@ import { twMerge } from "tailwind-merge";
 import PostResponseModal from "../components/PostResponseModal";
 import type { Board } from "./TopPage";
 import type { Route } from "./+types/ThreadPage";
+import useSWR from "swr";
+
+export const headers = (_: Route.HeadersArgs) => {
+  return {
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "max-age=15, s-maxage=15",
+  };
+};
 
 interface Response {
   name: string;
@@ -68,31 +77,34 @@ const convertThreadTextToResponseList = (text: string) => {
   };
 };
 
+const getThread = async (boardKey: string, threadKey: string) => {
+  const res = await fetch(
+    `${import.meta.env.VITE_SSR_BASE_URL}/${boardKey}/dat/${threadKey}.dat`,
+    {
+      headers: {
+        "Content-Type": "text/plain; charset=shift_jis",
+      },
+      redirect: "manual",
+    }
+  );
+  const sjisText = await res.blob();
+  const arrayBuffer = await sjisText.arrayBuffer();
+  const text = new TextDecoder("shift_jis").decode(arrayBuffer);
+  return convertThreadTextToResponseList(text);
+};
+
 export const loader = async ({ params }: Route.LoaderArgs) => {
-  const threadPromise = async () => {
-    const res = await fetch(
-      `${import.meta.env.VITE_SSR_BASE_URL}/${params.boardKey}/dat/${
-        params.threadKey
-      }.dat`,
-      {
-        headers: {
-          "Content-Type": "text/plain; charset=shift_jis",
-        },
-        redirect: "manual",
-      }
-    );
-    const sjisText = await res.blob();
-    const arrayBuffer = await sjisText.arrayBuffer();
-    const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-    return convertThreadTextToResponseList(text);
-  };
+  if (!params.boardKey || !params.threadKey) {
+    throw new Error("Invalid parameters");
+  }
+
   const boardsPromise = async () => {
     return await fetch(`${import.meta.env.VITE_SSR_BASE_URL}/api/boards`).then(
       (res) => res.json() as Promise<Board[]>
     );
   };
   const [thread, boards] = await Promise.all([
-    threadPromise(),
+    getThread(params.boardKey!, params.threadKey!),
     boardsPromise(),
   ]);
 
@@ -106,11 +118,18 @@ export const loader = async ({ params }: Route.LoaderArgs) => {
 };
 
 const ThreadPage = ({
-  loaderData: { boards, thread: posts },
+  loaderData: { boards, thread },
 }: Route.ComponentProps) => {
   const params = useParams();
 
   const [creatingResponse, setCreatingResponse] = useState(false);
+  const { data: posts, mutate } = useSWR(
+    `${params.boardKey}/dat/${params.threadKey}.dat`,
+    () => getThread(params.boardKey!, params.threadKey!),
+    {
+      fallbackData: thread,
+    }
+  );
 
   return (
     <div>
@@ -119,10 +138,9 @@ const ThreadPage = ({
         setOpen={setCreatingResponse}
         boardKey={params.boardKey!}
         threadKey={params.threadKey!}
-        refetchThread={async () => {}}
-        // refetchThread={refetch}
+        refetchThread={mutate}
       />
-      <header className="flex justify-between items-center">
+      <header className="lg:flex justify-between items-center hidden">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
@@ -144,8 +162,8 @@ const ThreadPage = ({
           書き込み
         </Button>
       </header>
-      <HR className="my-4" />
-      <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md mt-4">
+      <HR className="my-4 lg:block hidden" />
+      <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md md:mt-4">
         <div className="p-4 bg-gray-100 border-b border-gray-300">
           <div
             className="text-lg"
