@@ -41,7 +41,7 @@ const PostThreadModal = (props: PostThreadModalProps) => {
         authCode={authCode}
       />
       <ModalHeader className="border-gray-200 dark:border-gray-600">
-        <h3 className="lg:text-2xl">スレッド作成</h3>
+        <span className="lg:text-2xl">スレッド作成</span>
       </ModalHeader>
       <ModalBody>
         <form

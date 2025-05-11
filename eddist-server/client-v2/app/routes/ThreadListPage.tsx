@@ -1,19 +1,13 @@
-import { Button, HR } from "flowbite-react";
-import { useState, useEffect, useRef } from "react";
+import { Button } from "flowbite-react";
+import { useState } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
 import useSWR from "swr";
 import PostThreadModal from "../components/PostThreadModal";
-import type { Board } from "./TopPage";
 import type { Route } from "./+types/ThreadListPage";
-
-interface Thread {
-  title: string;
-  id: number;
-  responseCount: number;
-  authorId?: string;
-}
+import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 
 export const headers = (_: Route.HeadersArgs) => {
   return {
@@ -21,47 +15,6 @@ export const headers = (_: Route.HeadersArgs) => {
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "max-age=5, s-maxage=1",
   };
-};
-
-const convertSubjectTextToThreadList = (text: string): Thread[] => {
-  const lines = text.split("\n");
-  const threadList = lines
-    .map((line) => {
-      const lineRegex = /^(\d{9,10}\.dat)<>(.*) \((\d{1,5})\)$/;
-      const lineRegexWithId =
-        /^(\d{9,10}\.dat)<>(.*) \[(.{4,13})★\] \((\d{1,5})\)$/;
-      const match = line.match(lineRegexWithId);
-      if (match == null) {
-        const match2 = line.match(lineRegex);
-        if (match2 == null) {
-          return undefined;
-        }
-
-        const id = parseInt(match2[1].split(".")[0]);
-        const title = match2[2];
-        const responseCount = parseInt(match2[3]);
-
-        return {
-          title,
-          id,
-          responseCount,
-          authorId: undefined,
-        };
-      }
-      const id = parseInt(match[1].split(".")[0]);
-      const title = match[2];
-      const authorId = match[3];
-      const responseCount = parseInt(match[4]);
-
-      return {
-        title,
-        id,
-        responseCount,
-        authorId,
-      };
-    })
-    .filter((thread) => thread != null) as Thread[];
-  return threadList;
 };
 
 const convertLinuxTimeToDateString = (linuxTime: number): string => {
@@ -77,34 +30,10 @@ const convertLinuxTimeToDateString = (linuxTime: number): string => {
   return datetimeStr;
 };
 
-const fetchThreadList = async (boardKey: string) => {
-  const res = await fetch(
-    `${import.meta.env.VITE_SSR_BASE_URL}/${boardKey}/subject.txt`,
-    {
-      headers: {
-        "Content-Type": "text/plain; charset=shift_jis",
-      },
-    }
-  );
-  const sjisText = await res.blob();
-  const arrayBuffer = await sjisText.arrayBuffer();
-  const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-
-  return convertSubjectTextToThreadList(text);
-};
-
 export const loader = async ({ params }: Route.LoaderArgs) => {
-  const threadListPromise = async () => fetchThreadList(params.boardKey!);
-
-  const boardsPromise = async () => {
-    return await fetch(`${import.meta.env.VITE_SSR_BASE_URL}/api/boards`).then(
-      (res) => res.json() as Promise<Board[]>
-    );
-  };
-
   const [threadList, boards] = await Promise.all([
-    threadListPromise(),
-    boardsPromise(),
+    fetchThreadList(params.boardKey!),
+    fetchBoards(),
   ]);
 
   return {

@@ -1,12 +1,13 @@
-import { Button, HR } from "flowbite-react";
-import { useState, useEffect, useRef } from "react";
+import { Button } from "flowbite-react";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaPen } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
 import PostResponseModal from "../components/PostResponseModal";
-import type { Board } from "./TopPage";
 import type { Route } from "./+types/ThreadPage";
 import useSWR from "swr";
+import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchThread, type Response } from "~/api-client/thread";
 
 export const headers = (_: Route.HeadersArgs) => {
   return {
@@ -16,96 +17,14 @@ export const headers = (_: Route.HeadersArgs) => {
   };
 };
 
-interface Response {
-  name: string;
-  mail: string;
-  date: string;
-  authorId: string;
-  body: string;
-  id: number;
-}
-
-const convertThreadTextToResponseList = (text: string) => {
-  const lines = text.split("\n").filter((x) => x !== "");
-  let threadTitle = "";
-  const responses = lines.map((line, idx) => {
-    const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
-    const match = line.match(lineRegex);
-    if (match == null) {
-      // あぼーん<>あぼーん<><> あぼーん<> てす
-      const aboneRegex = /^(.*)<>(.*)<><> あぼーん<>(.*)$/;
-      const aboneMatch = line.match(aboneRegex);
-      if (aboneMatch == null) {
-        throw new Error(`Invalid response line: ${line}`);
-      }
-
-      if (idx === 0) {
-        threadTitle = aboneMatch[3];
-      }
-
-      return {
-        name: aboneMatch[1],
-        mail: "",
-        date: "",
-        authorId: "",
-        body: "あぼーん",
-        id: idx + 1,
-      };
-    }
-    const name = match[1];
-    const mail = match[2];
-    const date = match[3];
-    const authorId = match[4];
-    const body = match[5];
-    if (idx === 0) {
-      threadTitle = match[6];
-    }
-
-    return {
-      name,
-      mail,
-      date,
-      authorId,
-      body,
-      id: idx + 1,
-    };
-  });
-
-  return {
-    threadName: threadTitle,
-    responses: responses satisfies Response[],
-  };
-};
-
-const getThread = async (boardKey: string, threadKey: string) => {
-  const res = await fetch(
-    `${import.meta.env.VITE_SSR_BASE_URL}/${boardKey}/dat/${threadKey}.dat`,
-    {
-      headers: {
-        "Content-Type": "text/plain; charset=shift_jis",
-      },
-      redirect: "manual",
-    }
-  );
-  const sjisText = await res.blob();
-  const arrayBuffer = await sjisText.arrayBuffer();
-  const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-  return convertThreadTextToResponseList(text);
-};
-
 export const loader = async ({ params }: Route.LoaderArgs) => {
   if (!params.boardKey || !params.threadKey) {
     throw new Error("Invalid parameters");
   }
 
-  const boardsPromise = async () => {
-    return await fetch(`${import.meta.env.VITE_SSR_BASE_URL}/api/boards`).then(
-      (res) => res.json() as Promise<Board[]>
-    );
-  };
   const [thread, boards] = await Promise.all([
-    getThread(params.boardKey!, params.threadKey!),
-    boardsPromise(),
+    fetchThread(params.boardKey!, params.threadKey!),
+    fetchBoards(),
   ]);
 
   return {
@@ -125,38 +44,64 @@ const ThreadPage = ({
   const [creatingResponse, setCreatingResponse] = useState(false);
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
-    () => getThread(params.boardKey!, params.threadKey!),
+    () => fetchThread(params.boardKey!, params.threadKey!),
     {
       fallbackData: thread,
     }
   );
 
+  // Find current board
+  const currentBoard = boards?.find(
+    (board: { board_key: string }) => board.board_key === params.boardKey
+  );
+
+  const boardName = currentBoard?.name || "";
+  const threadName = posts?.threadName || "";
+
   return (
-    <div className="relative pt-16">
-      <header
-        className={
-          "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
-        }
-      >
+    <div className="flex flex-col">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
-          <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
+          <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
-        <h1 className="text-2xl lg:text-4xl flex-grow truncate">
-          {
-            boards?.find(
-              (board: { board_key: string }) =>
-                board.board_key === params.boardKey
-            )?.name
-          }
-        </h1>
+
+        <>
+          {/* Mobile header - Board name above thread name */}
+          <div className="flex-grow md:hidden">
+            <p className="text-xs text-gray-600 truncate">{boardName}</p>
+            <h1
+              className="text-sm line-clamp-2 font-medium break-all"
+              title={threadName}
+              dangerouslySetInnerHTML={{ __html: threadName }}
+            ></h1>
+          </div>
+
+          {/* Desktop header - Board name and thread name on same line */}
+          <div className="hidden md:flex flex-grow items-center">
+            <h1 className="text-2xl truncate" title={boardName}>
+              {boardName}
+            </h1>
+            {threadName && (
+              <>
+                <span className="mx-2">-</span>
+                <p
+                  className="text-xl flex-grow"
+                  title={threadName}
+                  dangerouslySetInnerHTML={{ __html: threadName }}
+                ></p>
+              </>
+            )}
+          </div>
+        </>
         <Button
           onClick={() => setCreatingResponse(true)}
           className={twMerge(
-            "px-4 py-2 lg:px-6 lg:py-3 mx-2",
+            "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-auto",
             params.boardKey || params.threadKey || "hidden"
           )}
         >
-          書き込み
+          <FaPen className="lg:mr-3" />
+          <span className="lg:block hidden">書き込み</span>
         </Button>
       </header>
 
@@ -168,29 +113,70 @@ const ThreadPage = ({
         refetchThread={mutate}
       />
 
-      <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md md:mt-4">
-        <div className="p-4 bg-gray-100 border-b border-gray-300">
-          <div
-            className="text-lg"
-            dangerouslySetInnerHTML={{ __html: posts?.threadName ?? "" }}
-          ></div>
-        </div>
-        <div className="overflow-y-auto max-h-[calc(100vh-11rem)] lg:max-h-[calc(100vh-14rem)]">
-          {posts?.responses.map((post) => (
-            <div key={post.id} className="border-b border-gray-300 p-4">
-              <div className="text-sm text-gray-500">
-                {post.id}. {post.name} {post.date} ID: {post.authorId}
+      <main className="flex-grow pt-18 lg:pt-16 overflow-y-auto">
+        <div className="max-w-screen-xl mx-auto">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-md">
+            {posts?.responses.map((post) => (
+              <div key={post.id} className="border-b border-gray-300 p-4">
+                <div className="text-sm text-gray-500">
+                  {post.id}. {processPostName(post.name)} {post.date}{" "}
+                  <span
+                    className={authorIdResponseCountToColor(
+                      posts.authorIdMap.get(post.authorId)?.length ?? 0
+                    )}
+                  >
+                    ID: {post.authorId}{" "}
+                    {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
+                      1 && (
+                      <span>
+                        ({post.authorIdAppearBeforeCount}/
+                        {posts.authorIdMap.get(post.authorId)?.length})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div
+                  className="text-gray-800 mt-2"
+                  dangerouslySetInnerHTML={{ __html: post.body }}
+                ></div>
               </div>
-              <div
-                className="text-gray-800 mt-2"
-                dangerouslySetInnerHTML={{ __html: post.body }}
-              ></div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
+};
+
+const processPostName = (name: string) => {
+  // </b>(Lv1 xxxx-xxxx)<b> to <b>Lv1 xxxx-xxxx</b> (string to <b className="...">string</b> (React component))
+  const regex = /<\/b>(.*?)<b>/g;
+
+  const parts = name.split(regex);
+  const processedParts = parts.map((part, index) => {
+    if (index % 2 === 0) {
+      return part;
+    } else {
+      return (
+        <span key={index} className=" text-cyan-700">
+          {part}
+        </span>
+      );
+    }
+  });
+  return processedParts;
+};
+
+const authorIdResponseCountToColor = (
+  authorIdResponseCount: number
+): string => {
+  if (authorIdResponseCount <= 1) {
+    return "";
+  } else if (authorIdResponseCount <= 5) {
+    return "text-blue-500";
+  } else {
+    return "text-red-500";
+  }
 };
 
 export default ThreadPage;

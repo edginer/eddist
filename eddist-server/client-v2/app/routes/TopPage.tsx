@@ -1,11 +1,6 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/TopPage";
-
-export interface Board {
-  name: string;
-  board_key: string;
-  default_name: string;
-}
+import { fetchBoards, type Board } from "~/api-client/board";
 
 export const loader = async () => {
   return {
@@ -13,9 +8,7 @@ export const loader = async () => {
       bbsName: "エッチ掲示板",
       availableUserRegistration: true,
     },
-    boards: await fetch(`${import.meta.env.VITE_SSR_BASE_URL}/api/boards`).then(
-      (res) => res.json() as Promise<Board[]>
-    ),
+    boards: await fetchBoards(),
   };
 };
 
