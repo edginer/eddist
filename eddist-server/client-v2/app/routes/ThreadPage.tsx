@@ -1,5 +1,5 @@
 import { Button } from "flowbite-react";
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { Link, useParams } from "react-router";
 import { FaArrowLeft, FaPen } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
@@ -42,6 +42,35 @@ const ThreadPage = ({
   const params = useParams();
 
   const [creatingResponse, setCreatingResponse] = useState(false);
+  const [selectedAuthorPosts, setSelectedAuthorPosts] = useState<
+    Response[] | null
+  >(null);
+  const [popupPosition, setPopupPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [popupAdjustedPosition, setPopupAdjustedPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (popupPosition && popupRef.current) {
+      const popupRect = popupRef.current.getBoundingClientRect();
+      let x = popupPosition.x;
+      let y = popupPosition.y;
+      // Ensure popup stays within window bounds with a 10px margin
+      if (x + popupRect.width > window.innerWidth - 10) {
+        x = window.innerWidth - popupRect.width - 10;
+      }
+      if (y + popupRect.height > window.innerHeight - 10) {
+        y = window.innerHeight - popupRect.height - 10;
+      }
+      setPopupAdjustedPosition({ x, y });
+    }
+  }, [popupPosition]);
+
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
     () => fetchThread(params.boardKey!, params.threadKey!),
@@ -59,7 +88,7 @@ const ThreadPage = ({
   const threadName = posts?.threadName || "";
 
   return (
-    <div className="flex flex-col">
+    <div className={twMerge("flex flex-col")}>
       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
@@ -77,15 +106,15 @@ const ThreadPage = ({
           </div>
 
           {/* Desktop header - Board name and thread name on same line */}
-          <div className="hidden md:flex flex-grow items-center">
-            <h1 className="text-2xl truncate" title={boardName}>
+          <div className="hidden md:flex items-center flex-grow">
+            <h1 className="text-2xl whitespace-nowrap" title={boardName}>
               {boardName}
             </h1>
             {threadName && (
               <>
-                <span className="mx-2">-</span>
+                <span className="mx-3 ml-4">-</span>
                 <p
-                  className="text-xl flex-grow"
+                  className="text-xl line-clamp-2 break-all"
                   title={threadName}
                   dangerouslySetInnerHTML={{ __html: threadName }}
                 ></p>
@@ -96,7 +125,7 @@ const ThreadPage = ({
         <Button
           onClick={() => setCreatingResponse(true)}
           className={twMerge(
-            "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-auto",
+            "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
             params.boardKey || params.threadKey || "hidden"
           )}
         >
@@ -113,7 +142,7 @@ const ThreadPage = ({
         refetchThread={mutate}
       />
 
-      <main className="flex-grow pt-18 lg:pt-16 overflow-y-auto">
+      <main className={twMerge("flex-grow pt-18 lg:pt-16", "overflow-y-auto")}>
         <div className="max-w-screen-xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
             {posts?.responses.map((post) => (
@@ -121,6 +150,29 @@ const ThreadPage = ({
                 <div className="text-sm text-gray-500">
                   {post.id}. {processPostName(post.name)} {post.date}{" "}
                   <span
+                    onClick={(e) => {
+                      const postsByAuthor = posts?.authorIdMap.get(
+                        post.authorId
+                      );
+                      if (postsByAuthor) {
+                        // Adjust coordinates: ensure popup appears within window bounds
+                        const x = Math.min(
+                          e.clientX - 10,
+                          window.innerWidth - 300
+                        );
+                        const y = Math.min(
+                          e.clientY - 10,
+                          window.innerHeight - 300
+                        );
+                        setPopupPosition({ x, y });
+                        setSelectedAuthorPosts(
+                          postsByAuthor.map(([post]) => ({
+                            ...post,
+                          }))
+                        );
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
                     className={authorIdResponseCountToColor(
                       posts.authorIdMap.get(post.authorId)?.length ?? 0
                     )}
@@ -136,7 +188,7 @@ const ThreadPage = ({
                   </span>
                 </div>
                 <div
-                  className="text-gray-800 mt-2"
+                  className="text-gray-800 mt-2 break-words"
                   dangerouslySetInnerHTML={{ __html: post.body }}
                 ></div>
               </div>
@@ -144,14 +196,83 @@ const ThreadPage = ({
           </div>
         </div>
       </main>
+      <div
+        className="fixed inset-0 bg-transparent z-100"
+        style={{ touchAction: "none" }}
+        hidden={!popupAdjustedPosition || !selectedAuthorPosts}
+        onClick={() => {
+          setSelectedAuthorPosts(null);
+          setPopupPosition(null);
+        }}
+      >
+        <div
+          ref={popupRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            left: popupAdjustedPosition?.x,
+            top: popupAdjustedPosition?.y,
+          }}
+          className="bg-white p-4 rounded-md w-11/12 max-w-md max-h-[calc(100vh-40px)] overflow-y-auto border-2 border-gray-500"
+        >
+          {selectedAuthorPosts &&
+            selectedAuthorPosts.map((post) => (
+              <div key={post.id} className="border-b border-gray-300 py-2">
+                <div className="text-sm">
+                  {post.id}. {processPostName(post.name)} {post.date}{" "}
+                  <span
+                    onClick={(e) => {
+                      const postsByAuthor = posts?.authorIdMap.get(
+                        post.authorId
+                      );
+                      if (postsByAuthor) {
+                        // Adjust coordinates: ensure popup appears within window bounds
+                        const x = Math.min(
+                          e.clientX - 10,
+                          window.innerWidth - 300
+                        );
+                        const y = Math.min(
+                          e.clientY - 10,
+                          window.innerHeight - 300
+                        );
+                        setPopupPosition({ x, y });
+                        setSelectedAuthorPosts(
+                          postsByAuthor.map(([post]) => ({
+                            ...post,
+                          }))
+                        );
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
+                    className={authorIdResponseCountToColor(
+                      posts.authorIdMap.get(post.authorId)?.length ?? 0
+                    )}
+                  >
+                    ID: {post.authorId}{" "}
+                    {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
+                      1 && (
+                      <span>
+                        ({post.authorIdAppearBeforeCount}/
+                        {posts.authorIdMap.get(post.authorId)?.length})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div
+                  className="text-gray-800 break-words"
+                  dangerouslySetInnerHTML={{ __html: post.body }}
+                ></div>
+              </div>
+            ))}
+        </div>
+      </div>
     </div>
   );
 };
 
 const processPostName = (name: string) => {
-  // </b>(Lv1 xxxx-xxxx)<b> to <b>Lv1 xxxx-xxxx</b> (string to <b className="...">string</b> (React component))
+  // </b>(Lv1 xxxx-xxxx)<b> to <b>Lv1 xxxx-xxxx</b>
   const regex = /<\/b>(.*?)<b>/g;
-
   const parts = name.split(regex);
   const processedParts = parts.map((part, index) => {
     if (index % 2 === 0) {
