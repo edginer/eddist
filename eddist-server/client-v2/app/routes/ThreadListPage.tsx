@@ -1,5 +1,5 @@
 import { Button, HR } from "flowbite-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
@@ -135,18 +135,16 @@ const ThreadListPage = ({
   const [creatingThread, setCreatingThread] = useState(false);
 
   return (
-    <div>
-      <PostThreadModal
-        boardKey={params.boardKey!}
-        open={creatingThread}
-        setOpen={setCreatingThread}
-        refetchThreadList={mutate}
-      />
-      <header className="flex justify-between items-center">
+    <div className="relative pt-16">
+      <header
+        className={
+          "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
+        }
+      >
         <Link to="/">
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
-        <h1 className="text-3xl lg:text-5xl flex-grow">
+        <h1 className="text-2xl lg:text-4xl flex-grow truncate">
           {
             boards?.find(
               (board: { board_key: string }) =>
@@ -156,12 +154,22 @@ const ThreadListPage = ({
         </h1>
         <Button
           onClick={() => setCreatingThread(true)}
-          className={twMerge("px-6 py-3 mx-4", params.boardKey || "hidden")}
+          className={twMerge(
+            "px-4 py-2 lg:px-6 lg:py-3 mx-2",
+            params.boardKey || "hidden"
+          )}
         >
           スレッド作成
         </Button>
       </header>
-      <HR className="my-4" />
+
+      <PostThreadModal
+        boardKey={params.boardKey!}
+        open={creatingThread}
+        setOpen={setCreatingThread}
+        refetchThreadList={mutate}
+      />
+
       <div className="flex flex-col lg:flex-grow">
         {threadList.map((thread, i) => (
           <div key={thread.id} className="block">

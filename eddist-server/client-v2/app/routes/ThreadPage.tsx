@@ -1,5 +1,5 @@
 import { Button, HR } from "flowbite-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router";
 import { FaArrowLeft } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
@@ -132,19 +132,16 @@ const ThreadPage = ({
   );
 
   return (
-    <div>
-      <PostResponseModal
-        open={creatingResponse}
-        setOpen={setCreatingResponse}
-        boardKey={params.boardKey!}
-        threadKey={params.threadKey!}
-        refetchThread={mutate}
-      />
-      <header className="lg:flex justify-between items-center hidden">
+    <div className="relative pt-16">
+      <header
+        className={
+          "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
+        }
+      >
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
-        <h1 className="text-3xl lg:text-5xl flex-grow">
+        <h1 className="text-2xl lg:text-4xl flex-grow truncate">
           {
             boards?.find(
               (board: { board_key: string }) =>
@@ -155,14 +152,22 @@ const ThreadPage = ({
         <Button
           onClick={() => setCreatingResponse(true)}
           className={twMerge(
-            "px-6 py-3 mx-4",
+            "px-4 py-2 lg:px-6 lg:py-3 mx-2",
             params.boardKey || params.threadKey || "hidden"
           )}
         >
           書き込み
         </Button>
       </header>
-      <HR className="my-4 lg:block hidden" />
+
+      <PostResponseModal
+        open={creatingResponse}
+        setOpen={setCreatingResponse}
+        boardKey={params.boardKey!}
+        threadKey={params.threadKey!}
+        refetchThread={mutate}
+      />
+
       <div className="mx-auto bg-white border border-gray-300 rounded-lg shadow-md md:mt-4">
         <div className="p-4 bg-gray-100 border-b border-gray-300">
           <div
