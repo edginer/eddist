@@ -10,7 +10,11 @@ export interface Response {
 
 export const fetchThread = async (boardKey: string, threadKey: string) => {
   const res = await fetch(
-    `${import.meta.env.VITE_SSR_BASE_URL}/${boardKey}/dat/${threadKey}.dat`,
+    `${
+      import.meta.env.SSR
+        ? import.meta.env.VITE_EDDIST_SERVER_URL
+        : import.meta.env.VITE_SSR_BASE_URL
+    }/${boardKey}/dat/${threadKey}.dat`,
     {
       headers: {
         "Content-Type": "text/plain; charset=shift_jis",

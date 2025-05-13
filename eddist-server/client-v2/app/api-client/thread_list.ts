@@ -48,7 +48,11 @@ const convertSubjectTextToThreadList = (text: string): Thread[] => {
 
 export const fetchThreadList = async (boardKey: string) => {
   const res = await fetch(
-    `${import.meta.env.VITE_SSR_BASE_URL}/${boardKey}/subject.txt`,
+    `${
+      import.meta.env.SSR
+        ? import.meta.env.VITE_EDDIST_SERVER_URL
+        : import.meta.env.VITE_SSR_BASE_URL
+    }/${boardKey}/subject.txt`,
     {
       headers: {
         "Content-Type": "text/plain; charset=shift_jis",
