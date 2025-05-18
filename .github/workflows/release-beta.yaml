@@ -12,7 +12,7 @@ permissions:
 jobs:
   trigger-check:
     if: |
-      github.event.comment.body == '/beta deploy' &&
+      github.event.comment.body == '/deploy beta' &&
       startsWith(github.event.issue.pull_request.html_url, 'https://')
     runs-on: ubuntu-22.04
     outputs:
@@ -177,4 +177,4 @@ jobs:
           issue-number: ${{ github.event.issue.number }}
           body: >
             Sorry @${{ github.event.comment.user.login }}, you're not authorized
-            to run `/beta deploy`.
+            to run `/deploy beta`.
