@@ -24,10 +24,12 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
 
   const [thread, boards] = await Promise.all([
     fetchThread(params.boardKey!, params.threadKey!, {
-      baseUrl: context.EDDIST_SERVER_URL,
+      baseUrl:
+        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
     }),
     fetchBoards({
-      baseUrl: context.EDDIST_SERVER_URL,
+      baseUrl:
+        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
     }),
   ]);
 

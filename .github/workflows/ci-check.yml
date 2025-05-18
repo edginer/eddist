@@ -48,7 +48,7 @@ jobs:
             eddist-server/client-v2/pnpm-lock.yaml
             eddist-admin/client/pnpm-lock.yaml
       - name: Install pnpm dependencies
-        run: pnpm install
+        run: pnpm install && pnpm -F eddist-client-v2 install
       - name: Build eddist-client
         run: pnpm -F eddist-client build
       - name: Check eddist-client

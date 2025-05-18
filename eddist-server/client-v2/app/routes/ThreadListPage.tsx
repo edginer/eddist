@@ -33,10 +33,12 @@ const convertLinuxTimeToDateString = (linuxTime: number): string => {
 export const loader = async ({ params, context }: Route.LoaderArgs) => {
   const [threadList, boards] = await Promise.all([
     fetchThreadList(params.boardKey!, {
-      baseUrl: context.EDDIST_SERVER_URL,
+      baseUrl:
+        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
     }),
     fetchBoards({
-      baseUrl: context.EDDIST_SERVER_URL,
+      baseUrl:
+        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
     }),
   ]);
 
