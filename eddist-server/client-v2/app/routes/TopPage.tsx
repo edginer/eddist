@@ -2,13 +2,16 @@ import { Link } from "react-router";
 import type { Route } from "./+types/TopPage";
 import { fetchBoards, type Board } from "~/api-client/board";
 
-export const loader = async () => {
+export const loader = async ({ context }: Route.LoaderArgs) => {
   return {
     eddistData: {
       bbsName: "エッチ掲示板",
       availableUserRegistration: true,
     },
-    boards: await fetchBoards(),
+    boards: await fetchBoards({
+      baseUrl:
+        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
+    }),
   };
 };
 

@@ -8,12 +8,18 @@ export interface Response {
   authorIdAppearBeforeCount: number;
 }
 
-export const fetchThread = async (boardKey: string, threadKey: string) => {
+export const fetchThread = async (
+  boardKey: string,
+  threadKey: string,
+  options?:
+    | {
+        baseUrl: string;
+      }
+    | undefined
+) => {
   const res = await fetch(
     `${
-      import.meta.env.SSR
-        ? import.meta.env.VITE_EDDIST_SERVER_URL
-        : import.meta.env.VITE_SSR_BASE_URL
+      (import.meta.env.SSR && options?.baseUrl) || ""
     }/${boardKey}/dat/${threadKey}.dat`,
     {
       headers: {

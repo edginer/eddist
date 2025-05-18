@@ -109,6 +109,16 @@ jobs:
             ghcr.io/edginer/eddist:${{ github.sha }}
             ghcr.io/edginer/eddist:beta
 
+      - name: Build & Push eddist-client
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-client/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-client:${{ github.sha }}
+            ghcr.io/edginer/eddist-client:beta
+
       - name: Build & Push eddist-admin
         uses: docker/build-push-action@v6
         with:

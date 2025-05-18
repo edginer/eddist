@@ -1,11 +1,11 @@
-export const fetchBoards = async () => {
+export const fetchBoards: (options?: {
+  baseUrl: string;
+}) => Promise<Board[]> = async (options) => {
+  console.log(import.meta);
+  console.log(options);
   return await fetch(
-    `${
-      import.meta.env.SSR
-        ? import.meta.env.VITE_EDDIST_SERVER_URL
-        : import.meta.env.VITE_SSR_BASE_URL
-    }/api/boards`
-  ).then((res) => res.json() as Promise<Board[]>);
+    `${(import.meta.env.SSR && options?.baseUrl) || ""}/api/boards`
+  ).then((res) => res.json() satisfies Promise<Board[]>);
 };
 
 export interface Board {

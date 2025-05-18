@@ -17,14 +17,18 @@ export const headers = (_: Route.HeadersArgs) => {
   };
 };
 
-export const loader = async ({ params }: Route.LoaderArgs) => {
+export const loader = async ({ params, context }: Route.LoaderArgs) => {
   if (!params.boardKey || !params.threadKey) {
     throw new Error("Invalid parameters");
   }
 
   const [thread, boards] = await Promise.all([
-    fetchThread(params.boardKey!, params.threadKey!),
-    fetchBoards(),
+    fetchThread(params.boardKey!, params.threadKey!, {
+      baseUrl: context.EDDIST_SERVER_URL,
+    }),
+    fetchBoards({
+      baseUrl: context.EDDIST_SERVER_URL,
+    }),
   ]);
 
   return {
@@ -177,7 +181,7 @@ const ThreadPage = ({
                       posts.authorIdMap.get(post.authorId)?.length ?? 0
                     )}
                   >
-                    ID: {post.authorId}{" "}
+                    ID:{post.authorId}{" "}
                     {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
                       1 && (
                       <span>
@@ -248,7 +252,7 @@ const ThreadPage = ({
                       posts.authorIdMap.get(post.authorId)?.length ?? 0
                     )}
                   >
-                    ID: {post.authorId}{" "}
+                    ID:{post.authorId}{" "}
                     {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
                       1 && (
                       <span>
