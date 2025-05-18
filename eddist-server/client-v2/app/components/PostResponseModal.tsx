@@ -18,6 +18,7 @@ interface PostResponseModalProps {
   setOpen: (open: boolean) => void;
   boardKey: string;
   threadKey: string;
+  className?: string;
   refetchThread: () => Promise<unknown>;
 }
 
@@ -30,7 +31,12 @@ const PostResponseModal = (props: PostResponseModalProps) => {
   const [errorMessage, setErrorMessage] = useState("");
 
   return (
-    <Modal show={props.open} size="5xl" onClose={() => props.setOpen(false)}>
+    <Modal
+      show={props.open}
+      size="5xl"
+      onClose={() => props.setOpen(false)}
+      className={props.className}
+    >
       <AuthCodeModal
         openAuthCodeModal={openAuthCodeModal}
         setOpenAuthCodeModal={setOpenAuthCodeModal}

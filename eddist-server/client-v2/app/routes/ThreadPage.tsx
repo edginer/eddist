@@ -1,5 +1,5 @@
 import { Button } from "flowbite-react";
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { FaArrowLeft, FaPen } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
@@ -8,6 +8,7 @@ import type { Route } from "./+types/ThreadPage";
 import useSWR from "swr";
 import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchThread, type Response } from "~/api-client/thread";
+import React from "react";
 
 export const headers = (_: Route.HeadersArgs) => {
   return {
@@ -42,40 +43,88 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   };
 };
 
+interface Popup {
+  id: number;
+  x: number;
+  y: number;
+  posts: Response[];
+  ref: React.RefObject<HTMLDivElement | null>;
+}
+
+let popupCounter = 0;
+
+// Set maximum width and height for popups
+const MAX_POPUP_WIDTH_DESKTOP = "90vw";
+const MAX_POPUP_HEIGHT_DESKTOP = "90vh";
+const MAX_POPUP_WIDTH_MOBILE = "95vw";
+const MAX_POPUP_HEIGHT_MOBILE = "calc(90vh - 50px)";
+const MOBILE_BREAKPOINT = 768; // Tailwind's default mobile breakpoint
+
 const ThreadPage = ({
   loaderData: { boards, thread },
 }: Route.ComponentProps) => {
   const params = useParams();
 
-  const [creatingResponse, setCreatingResponse] = useState(false);
-  const [selectedAuthorPosts, setSelectedAuthorPosts] = useState<
-    Response[] | null
-  >(null);
-  const [popupPosition, setPopupPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [popupAdjustedPosition, setPopupAdjustedPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const popupRef = useRef<HTMLDivElement | null>(null);
+  const [popups, setPopups] = useState<Popup[]>([]);
 
-  useLayoutEffect(() => {
-    if (popupPosition && popupRef.current) {
-      const popupRect = popupRef.current.getBoundingClientRect();
-      let x = popupPosition.x;
-      let y = popupPosition.y;
-      // Ensure popup stays within window bounds with a 10px margin
-      if (x + popupRect.width > window.innerWidth - 10) {
-        x = window.innerWidth - popupRect.width - 10;
+  useEffect(() => {
+    const htmlEl = document.documentElement;
+    const originalOverflow = htmlEl.style.overflow;
+    const originalPaddingRight = htmlEl.style.paddingRight;
+
+    if (popups.length > 0) {
+      const scrollbarWidth = window.innerWidth - htmlEl.clientWidth;
+      if (scrollbarWidth > 0) {
+        htmlEl.style.paddingRight = `${scrollbarWidth}px`;
       }
-      if (y + popupRect.height > window.innerHeight - 10) {
-        y = window.innerHeight - popupRect.height - 10;
-      }
-      setPopupAdjustedPosition({ x, y });
+      htmlEl.style.overflow = "hidden";
+    } else {
+      htmlEl.style.overflow = originalOverflow;
+      htmlEl.style.paddingRight = originalPaddingRight;
     }
-  }, [popupPosition]);
+
+    return () => {
+      htmlEl.style.overflow = originalOverflow;
+      htmlEl.style.paddingRight = originalPaddingRight;
+    };
+  }, [popups.length]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popups.length === 0) return;
+      const top = popups[popups.length - 1];
+      if (top.ref.current && !top.ref.current.contains(e.target as Node)) {
+        setPopups((p) => p.slice(0, -1));
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [popups]);
+
+  const openPopup = (e: React.MouseEvent, authorId: string) => {
+    const postsByAuthor = posts.authorIdMap.get(authorId)?.map(([p]) => p);
+    if (!postsByAuthor) return;
+
+    // use mobile and desktop breakpoints to determine the position of the popup
+    let x, y;
+    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+
+    if (isMobile) {
+      x = window.innerWidth * 0.025;
+      y = window.innerHeight * 0.05;
+    } else {
+      x = Math.min(e.clientX - 10, window.innerWidth - 300);
+      y = Math.min(e.clientY - 10, window.innerHeight - 300);
+    }
+
+    const ref = React.createRef<HTMLDivElement>();
+    setPopups((prev) => [
+      ...prev,
+      { id: ++popupCounter, x, y, posts: postsByAuthor, ref },
+    ]);
+  };
+
+  const [creatingResponse, setCreatingResponse] = useState(false);
 
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
@@ -95,7 +144,7 @@ const ThreadPage = ({
 
   return (
     <div className={twMerge("flex flex-col")}>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
+      <header className="fixed top-0 left-0 right-0 z-[10000] bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
@@ -146,6 +195,7 @@ const ThreadPage = ({
         boardKey={params.boardKey!}
         threadKey={params.threadKey!}
         refetchThread={mutate}
+        className="z-[10001]"
       />
 
       <main className={twMerge("flex-grow pt-18 lg:pt-16", "overflow-y-auto")}>
@@ -156,28 +206,7 @@ const ThreadPage = ({
                 <div className="text-sm text-gray-500">
                   {post.id}. {processPostName(post.name)} {post.date}{" "}
                   <span
-                    onClick={(e) => {
-                      const postsByAuthor = posts?.authorIdMap.get(
-                        post.authorId
-                      );
-                      if (postsByAuthor) {
-                        // Adjust coordinates: ensure popup appears within window bounds
-                        const x = Math.min(
-                          e.clientX - 10,
-                          window.innerWidth - 300
-                        );
-                        const y = Math.min(
-                          e.clientY - 10,
-                          window.innerHeight - 300
-                        );
-                        setPopupPosition({ x, y });
-                        setSelectedAuthorPosts(
-                          postsByAuthor.map(([post]) => ({
-                            ...post,
-                          }))
-                        );
-                      }
-                    }}
+                    onClick={(e) => openPopup(e, post.authorId)}
                     style={{ cursor: "pointer" }}
                     className={authorIdResponseCountToColor(
                       posts.authorIdMap.get(post.authorId)?.length ?? 0
@@ -202,76 +231,58 @@ const ThreadPage = ({
           </div>
         </div>
       </main>
-      <div
-        className="fixed inset-0 bg-transparent z-100"
-        style={{ touchAction: "none" }}
-        hidden={!popupAdjustedPosition || !selectedAuthorPosts}
-        onClick={() => {
-          setSelectedAuthorPosts(null);
-          setPopupPosition(null);
-        }}
-      >
-        <div
-          ref={popupRef}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            left: popupAdjustedPosition?.x,
-            top: popupAdjustedPosition?.y,
-          }}
-          className="bg-white p-4 rounded-md w-11/12 max-w-md max-h-[calc(100vh-40px)] overflow-y-auto border-2 border-gray-500"
-        >
-          {selectedAuthorPosts &&
-            selectedAuthorPosts.map((post) => (
-              <div key={post.id} className="border-b border-gray-300 py-2">
-                <div className="text-sm">
-                  {post.id}. {processPostName(post.name)} {post.date}{" "}
+      {popups.map((popup, idx) => {
+        const isTop = idx === popups.length - 1;
+        const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+
+        return (
+          <div
+            key={popup.id}
+            ref={popup.ref}
+            style={{
+              top: isMobile ? popup.y + 48 : popup.y,
+              left: popup.x,
+              zIndex: 100 + idx,
+            }}
+            className={twMerge(
+              "bg-white border border-gray-300 rounded-lg shadow-md p-2 fixed whitespace-normal",
+              isMobile
+                ? `max-w-[${MAX_POPUP_WIDTH_MOBILE}px] w-[${MAX_POPUP_WIDTH_MOBILE}px] max-h-[${MAX_POPUP_HEIGHT_MOBILE}px]`
+                : `max-w-[${MAX_POPUP_WIDTH_DESKTOP}px] w-auto max-h-[${MAX_POPUP_HEIGHT_DESKTOP}px]`,
+              isTop
+                ? "overflow-y-auto pointer-events-auto"
+                : "overflow-y-hidden pointer-events-none"
+            )}
+          >
+            {popup.posts.map((p) => (
+              <div
+                key={p.id}
+                className="border-b border-gray-200 mb-2 pb-2 last:border-none last:mb-0 last:pb-0"
+              >
+                <div className="text-sm text-gray-500">
+                  {p.id}. {p.name} {p.date}{" "}
                   <span
-                    onClick={(e) => {
-                      const postsByAuthor = posts?.authorIdMap.get(
-                        post.authorId
-                      );
-                      if (postsByAuthor) {
-                        // Adjust coordinates: ensure popup appears within window bounds
-                        const x = Math.min(
-                          e.clientX - 10,
-                          window.innerWidth - 300
-                        );
-                        const y = Math.min(
-                          e.clientY - 10,
-                          window.innerHeight - 300
-                        );
-                        setPopupPosition({ x, y });
-                        setSelectedAuthorPosts(
-                          postsByAuthor.map(([post]) => ({
-                            ...post,
-                          }))
-                        );
-                      }
-                    }}
-                    style={{ cursor: "pointer" }}
-                    className={authorIdResponseCountToColor(
-                      posts.authorIdMap.get(post.authorId)?.length ?? 0
-                    )}
+                    onClick={(e) => openPopup(e, p.authorId)}
+                    className="text-blue-600 cursor-pointer"
                   >
-                    ID:{post.authorId}{" "}
-                    {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
-                      1 && (
+                    ID:{p.authorId}{" "}
+                    {(posts.authorIdMap.get(p.authorId)?.length ?? 0) > 1 && (
                       <span>
-                        ({post.authorIdAppearBeforeCount}/
-                        {posts.authorIdMap.get(post.authorId)?.length})
+                        ({p.authorIdAppearBeforeCount}/
+                        {posts.authorIdMap.get(p.authorId)?.length})
                       </span>
                     )}
                   </span>
                 </div>
                 <div
-                  className="text-gray-800 break-words"
-                  dangerouslySetInnerHTML={{ __html: post.body }}
-                ></div>
+                  className="text-gray-800 mt-1 break-words"
+                  dangerouslySetInnerHTML={{ __html: p.body }}
+                />
               </div>
             ))}
-        </div>
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
