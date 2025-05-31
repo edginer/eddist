@@ -1,5 +1,5 @@
 import { Button } from "flowbite-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { FaArrowLeft, FaPen } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
@@ -37,9 +37,17 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   return {
     thread,
     boards,
+    eddistData: {
+      bbsName: "エッチ掲示板",
+      availableUserRegistration: true,
+    },
   } satisfies {
     thread: { threadName: string; responses: Response[] };
     boards: Board[];
+    eddistData: {
+      bbsName: string;
+      availableUserRegistration: boolean;
+    };
   };
 };
 
@@ -55,13 +63,28 @@ let popupCounter = 0;
 
 // Set maximum width and height for popups
 const MAX_POPUP_WIDTH_DESKTOP = "90vw";
-const MAX_POPUP_HEIGHT_DESKTOP = "90vh";
 const MAX_POPUP_WIDTH_MOBILE = "95vw";
 const MAX_POPUP_HEIGHT_MOBILE = "calc(90vh - 50px)";
 const MOBILE_BREAKPOINT = 768; // Tailwind's default mobile breakpoint
 
+const Meta = ({
+  bbsName,
+  threadName,
+}: {
+  bbsName: string;
+  threadName: string;
+}) => (
+  <>
+    <title>{`${threadName} - ${bbsName}`}</title>
+    <meta property="og:title" content={`${bbsName} | ${threadName}`} />
+    <meta property="og:site_name" content={bbsName} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:title" content={`${bbsName} | ${threadName}`} />
+  </>
+);
+
 const ThreadPage = ({
-  loaderData: { boards, thread },
+  loaderData: { boards, thread, eddistData },
 }: Route.ComponentProps) => {
   const params = useParams();
 
@@ -101,11 +124,9 @@ const ThreadPage = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [popups]);
 
-  const openPopup = (e: React.MouseEvent, authorId: string) => {
-    const postsByAuthor = posts.authorIdMap.get(authorId)?.map(([p]) => p);
-    if (!postsByAuthor) return;
+  const openPopup = (e: React.MouseEvent, indices: number[]) => {
+    if (indices.length === 0) return;
 
-    // use mobile and desktop breakpoints to determine the position of the popup
     let x, y;
     const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -118,9 +139,12 @@ const ThreadPage = ({
     }
 
     const ref = React.createRef<HTMLDivElement>();
+    const postsByIndices = indices
+      .filter((i) => i >= 0 && i < posts.responses.length)
+      .map((i) => posts.responses[i]);
     setPopups((prev) => [
       ...prev,
-      { id: ++popupCounter, x, y, posts: postsByAuthor, ref },
+      { id: ++popupCounter, x, y, posts: postsByIndices, ref },
     ]);
   };
 
@@ -140,16 +164,23 @@ const ThreadPage = ({
   );
 
   const boardName = currentBoard?.name || "";
-  const threadName = posts?.threadName || "";
+  const threadName = useMemo(
+    () => decodeNumericCharRefsStr(posts?.threadName || ""),
+    [posts?.threadName]
+  );
 
   return (
     <div className={twMerge("flex flex-col")}>
-      <header className="fixed top-0 left-0 right-0 z-[10000] bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
+      <header className="fixed top-0 left-0 right-0 z-5 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
 
         <>
+          <Meta
+            bbsName={eddistData?.bbsName || "エッヂ掲示板"}
+            threadName={threadName}
+          />
           {/* Mobile header - Board name above thread name */}
           <div className="flex-grow md:hidden">
             <p className="text-xs text-gray-600 truncate">{boardName}</p>
@@ -195,7 +226,6 @@ const ThreadPage = ({
         boardKey={params.boardKey!}
         threadKey={params.threadKey!}
         refetchThread={mutate}
-        className="z-[10001]"
       />
 
       <main className={twMerge("flex-grow pt-18 lg:pt-16", "overflow-y-auto")}>
@@ -206,7 +236,18 @@ const ThreadPage = ({
                 <div className="text-sm text-gray-500">
                   {post.id}. {processPostName(post.name)} {post.date}{" "}
                   <span
-                    onClick={(e) => openPopup(e, post.authorId)}
+                    onClick={(e) =>
+                      openPopup(
+                        e,
+                        posts.responses.reduce(
+                          (acc, cur, i) =>
+                            cur.authorId === post.authorId
+                              ? acc.concat(i)
+                              : acc,
+                          [] as number[]
+                        )
+                      )
+                    }
                     style={{ cursor: "pointer" }}
                     className={authorIdResponseCountToColor(
                       posts.authorIdMap.get(post.authorId)?.length ?? 0
@@ -222,10 +263,9 @@ const ThreadPage = ({
                     )}
                   </span>
                 </div>
-                <div
-                  className="text-gray-800 mt-2 break-words"
-                  dangerouslySetInnerHTML={{ __html: post.body }}
-                ></div>
+                <div className="text-gray-800 mt-2 break-words">
+                  {processPostBody(post.body, openPopup)}
+                </div>
               </div>
             ))}
           </div>
@@ -242,13 +282,19 @@ const ThreadPage = ({
             style={{
               top: isMobile ? popup.y + 48 : popup.y,
               left: popup.x,
-              zIndex: 100 + idx,
+              maxHeight: isMobile
+                ? MAX_POPUP_HEIGHT_MOBILE
+                : Math.min(
+                    window.innerHeight * 0.9,
+                    window.innerHeight - popup.y - 20
+                  ),
+              zIndex: 1 + idx,
             }}
             className={twMerge(
               "bg-white border border-gray-300 rounded-lg shadow-md p-2 fixed whitespace-normal",
               isMobile
-                ? `max-w-[${MAX_POPUP_WIDTH_MOBILE}px] w-[${MAX_POPUP_WIDTH_MOBILE}px] max-h-[${MAX_POPUP_HEIGHT_MOBILE}px]`
-                : `max-w-[${MAX_POPUP_WIDTH_DESKTOP}px] w-auto max-h-[${MAX_POPUP_HEIGHT_DESKTOP}px]`,
+                ? `max-w-[${MAX_POPUP_WIDTH_MOBILE}px] w-[${MAX_POPUP_WIDTH_MOBILE}px]`
+                : `max-w-[${MAX_POPUP_WIDTH_DESKTOP}px] w-auto`,
               isTop
                 ? "overflow-y-auto pointer-events-auto"
                 : "overflow-y-hidden pointer-events-none"
@@ -262,7 +308,16 @@ const ThreadPage = ({
                 <div className="text-sm text-gray-500">
                   {p.id}. {p.name} {p.date}{" "}
                   <span
-                    onClick={(e) => openPopup(e, p.authorId)}
+                    onClick={(e) =>
+                      openPopup(
+                        e,
+                        posts.responses.reduce(
+                          (acc, cur, i) =>
+                            cur.authorId === p.authorId ? acc.concat(i) : acc,
+                          [] as number[]
+                        )
+                      )
+                    }
                     className="text-blue-600 cursor-pointer"
                   >
                     ID:{p.authorId}{" "}
@@ -274,10 +329,9 @@ const ThreadPage = ({
                     )}
                   </span>
                 </div>
-                <div
-                  className="text-gray-800 mt-1 break-words"
-                  dangerouslySetInnerHTML={{ __html: p.body }}
-                />
+                <div className="text-gray-800 mt-1 break-words">
+                  {processPostBody(p.body, openPopup)}
+                </div>
               </div>
             ))}
           </div>
@@ -316,5 +370,53 @@ const authorIdResponseCountToColor = (
     return "text-red-500";
   }
 };
+
+const processPostBody = (
+  body: string,
+  popup: (e: React.MouseEvent, indices: number[]) => void
+) => {
+  const parts = [];
+  const regex = /(&gt;&gt;\d{1,4})/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(body)) !== null) {
+    const { index } = match;
+    if (index > lastIndex) {
+      parts.push({ text: body.slice(lastIndex, index), isMatch: false });
+    }
+
+    parts.push({ text: match[0].replaceAll("&gt;", ">"), isMatch: true });
+    lastIndex = index + match[0].length;
+  }
+
+  if (lastIndex < body.length) {
+    parts.push({ text: body.slice(lastIndex), isMatch: false });
+  }
+
+  return (
+    <span>
+      {parts.map((part, i) =>
+        part.isMatch ? (
+          <span
+            key={i}
+            className="text-blue-400 hover:text-blue-600 cursor-pointer"
+            onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
+          >
+            {part.text}
+          </span>
+        ) : (
+          <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
+        )
+      )}
+    </span>
+  );
+};
+
+const decodeNumericCharRefsStr = (str: string) =>
+  str.replace(/&#(x?)([0-9a-fA-F]+);/g, (_, hex, code) => {
+    const charCode = hex ? parseInt(code, 16) : parseInt(code, 10);
+    return String.fromCodePoint(charCode);
+  });
 
 export default ThreadPage;

@@ -15,9 +15,20 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
   };
 };
 
+const Meta = ({ bbsName }: { bbsName: string }) => (
+  <>
+    <title>{bbsName}</title>
+    <meta property="og:title" content={`${bbsName}}`} />
+    <meta property="og:site_name" content={bbsName} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:title" content={`${bbsName}`} />
+  </>
+);
+
 function TopPage({ loaderData: { eddistData, boards } }: Route.ComponentProps) {
   return (
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+      <Meta bbsName={eddistData?.bbsName ?? "エッヂ掲示板"} />
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">

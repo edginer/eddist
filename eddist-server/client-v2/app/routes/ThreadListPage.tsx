@@ -45,17 +45,39 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   return {
     threadList,
     boards,
+    eddistData: {
+      bbsName: "エッチ掲示板",
+      availableUserRegistration: true,
+    },
   } satisfies {
     threadList: Thread[];
     boards: Board[];
+    eddistData: {
+      bbsName: string;
+      availableUserRegistration: boolean;
+    };
   };
 };
 
+const Meta = ({
+  bbsName,
+  boardName,
+}: {
+  bbsName: string;
+  boardName: string;
+}) => (
+  <>
+    <title>{`${boardName} - ${bbsName}`}</title>
+    <meta property="og:title" content={`${bbsName} | ${boardName}`} />
+    <meta property="og:site_name" content={bbsName} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:title" content={`${bbsName} | ${boardName}`} />
+  </>
+);
+
 const ThreadListPage = ({
-  loaderData: { threadList: data, boards },
-}: Route.ComponentProps & {
-  loaderData: { threadList: Thread[]; boards: Board[] };
-}) => {
+  loaderData: { threadList: data, boards, eddistData },
+}: Route.ComponentProps) => {
   const params = useParams();
   const navigate = useNavigate();
 
@@ -76,6 +98,15 @@ const ThreadListPage = ({
           "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
         }
       >
+        <Meta
+          bbsName={eddistData.bbsName}
+          boardName={
+            boards?.find(
+              (board: { board_key: string }) =>
+                board.board_key === params.boardKey
+            )?.name ?? "スレッド一覧"
+          }
+        />
         <Link to="/">
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
