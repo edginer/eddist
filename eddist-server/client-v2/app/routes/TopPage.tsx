@@ -6,7 +6,7 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
   return {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: context.AVAILABLE_USER_REGISTRATION ?? false,
+      availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
     },
     boards: await fetchBoards({
       baseUrl:
