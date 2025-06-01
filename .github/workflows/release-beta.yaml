@@ -51,6 +51,10 @@ jobs:
         id: checkout
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
+      - name: Determine PR commit SHA
+        id: get-sha
+        run: |
+          echo "pr_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
       - name: Setup Rust
         uses: hecrj/setup-rust-action@v2
@@ -113,7 +117,7 @@ jobs:
           file: docker-prod/eddist/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist:${{ steps.checkout.outputs.sha }}
+            ghcr.io/edginer/eddist:${{ env.pr_sha }}
             ghcr.io/edginer/eddist:beta
 
       - name: Build & Push eddist-client
@@ -123,7 +127,7 @@ jobs:
           file: docker-prod/eddist-client/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-client:${{ steps.checkout.outputs.sha }}
+            ghcr.io/edginer/eddist-client:${{ env.pr_sha }}
             ghcr.io/edginer/eddist-client:beta
 
       - name: Build & Push eddist-admin
@@ -133,7 +137,7 @@ jobs:
           file: docker-prod/eddist-admin/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-admin:${{ steps.checkout.outputs.sha }}
+            ghcr.io/edginer/eddist-admin:${{ env.pr_sha }}
             ghcr.io/edginer/eddist-admin:beta
 
       - name: Build & Push eddist-cron
@@ -143,7 +147,7 @@ jobs:
           file: docker-prod/eddist-cron/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-cron:${{ steps.checkout.outputs.sha }}
+            ghcr.io/edginer/eddist-cron:${{ env.pr_sha }}
             ghcr.io/edginer/eddist-cron:beta
 
       - name: Build & Push eddist-persistence
@@ -153,7 +157,7 @@ jobs:
           file: docker-prod/eddist-persistence/Dockerfile
           push: true
           tags: |
-            ghcr.io/edginer/eddist-persistence:${{ steps.checkout.outputs.sha }}
+            ghcr.io/edginer/eddist-persistence:${{ env.pr_sha }}
             ghcr.io/edginer/eddist-persistence:beta
 
       - name: Dispatch to Beta Repo
@@ -162,7 +166,7 @@ jobs:
           token: ${{ secrets.DEPLOY_REPO_PAT }}
           repository: ${{ secrets.DEPLOY_REPO_URL2 }}
           event-type: update-image-beta
-          client-payload: '{"image-tag":"${{ steps.checkout.outputs.sha }}"}'
+          client-payload: '{"image-tag":"${{ env.pr_sha }}"}'
       - name: Comment success
         uses: peter-evans/create-or-update-comment@v3
         with:
@@ -170,7 +174,7 @@ jobs:
           issue-number: ${{ github.event.issue.number }}
           body: >
             ✅ Beta deployment triggered successfully for @${{ github.event.comment.user.login }}!  
-            Images built with tag `${{ steps.checkout.outputs.sha }}` and dispatched for update-image-beta.
+            Images built with tag `${{ env.pr_sha }}` and dispatched for update-image-beta.
 
   deny:
     needs: trigger-check
