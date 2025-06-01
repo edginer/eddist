@@ -35,7 +35,7 @@ if (DEVELOPMENT) {
     console.log("Starting production server");
     app.use(
         "/assets",
-        express.static("build/client/assets", { immutable: true, maxAge: "1y" }),
+        express.static("build/client/assets", { maxAge: "5m" }),
     );
     app.use(morgan("tiny"));
     app.use(express.static("build/client", { maxAge: "1h" }));

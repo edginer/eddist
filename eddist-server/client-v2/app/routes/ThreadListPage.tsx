@@ -18,16 +18,13 @@ export const headers = (_: Route.HeadersArgs) => {
 };
 
 const convertLinuxTimeToDateString = (linuxTime: number): string => {
-  const dateTime = new Date(linuxTime * 1000);
-
-  const datetimeStr = dateTime.toLocaleString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return datetimeStr;
+  const date = new Date(linuxTime * 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}/${month}/${day} ${hour}:${minute}`;
 };
 
 export const loader = async ({ params, context }: Route.LoaderArgs) => {
@@ -46,8 +43,8 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     threadList,
     boards,
     eddistData: {
-      bbsName: "エッチ掲示板",
-      availableUserRegistration: true,
+      bbsName: context.BBS_NAME ?? "エッヂ掲示板",
+      availableUserRegistration: context.AVAILABLE_USER_REGISTRATION ?? false,
     },
   } satisfies {
     threadList: Thread[];

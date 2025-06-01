@@ -14,7 +14,7 @@ export const headers = (_: Route.HeadersArgs) => {
   return {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "max-age=15, s-maxage=15",
+    "Cache-Control": "max-age=15, s-maxage=30",
   };
 };
 
@@ -38,8 +38,8 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     thread,
     boards,
     eddistData: {
-      bbsName: "エッチ掲示板",
-      availableUserRegistration: true,
+      bbsName: context.BBS_NAME ?? "エッヂ掲示板",
+      availableUserRegistration: context.AVAILABLE_USER_REGISTRATION ?? false,
     },
   } satisfies {
     thread: { threadName: string; responses: Response[] };
@@ -49,6 +49,22 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
       availableUserRegistration: boolean;
     };
   };
+};
+
+const lastResponseDate = (responses: Response[]): Date | undefined => {
+  if (responses.length === 0) return undefined;
+  const lastResponse = responses[responses.length - 1];
+  // Date format is 2025/06/01(日) 15:36:48.602
+  const dateParts = lastResponse.date.split(" ");
+  const dateStr = dateParts[0].replace(/\(.+\)/, ""); // Remove day of the week
+  const timeStr = dateParts[1].split(".")[0]; // Remove milliseconds
+  const fullDateStr = `${dateStr} ${timeStr}`;
+  return new Date(fullDateStr);
+};
+
+const diffFromNow = (date: Date): number => {
+  const now = new Date();
+  return Math.floor((now.getTime() - date.getTime()) / 1000); // Return difference in seconds
 };
 
 interface Popup {
@@ -169,6 +185,26 @@ const ThreadPage = ({
     [posts?.threadName]
   );
 
+  if (
+    thread.redirected &&
+    diffFromNow(lastResponseDate(posts?.responses || []) || new Date(0)) >
+      60 * 60 * 24 * 3
+  ) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <p className="text-gray-600">
+          このスレッドは3日以上前にdat落ちしたため、Webブラウザからは閲覧できません。
+        </p>
+        <p className="text-gray-600">
+          専用ブラウザなどを使用して閲覧してください。
+        </p>
+        <Link to={`/${params.boardKey}`} className="mt-4 text-blue-500">
+          戻る
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className={twMerge("flex flex-col")}>
       <header className="fixed top-0 left-0 right-0 z-5 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
@@ -177,10 +213,7 @@ const ThreadPage = ({
         </Link>
 
         <>
-          <Meta
-            bbsName={eddistData?.bbsName || "エッヂ掲示板"}
-            threadName={threadName}
-          />
+          <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
           {/* Mobile header - Board name above thread name */}
           <div className="flex-grow md:hidden">
             <p className="text-xs text-gray-600 truncate">{boardName}</p>
@@ -318,7 +351,10 @@ const ThreadPage = ({
                         )
                       )
                     }
-                    className="text-blue-600 cursor-pointer"
+                    style={{ cursor: "pointer" }}
+                    className={authorIdResponseCountToColor(
+                      posts.authorIdMap.get(p.authorId)?.length ?? 0
+                    )}
                   >
                     ID:{p.authorId}{" "}
                     {(posts.authorIdMap.get(p.authorId)?.length ?? 0) > 1 && (

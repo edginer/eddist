@@ -34,7 +34,10 @@ export const fetchThread = async (
   const sjisText = await res.blob();
   const arrayBuffer = await sjisText.arrayBuffer();
   const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-  return convertThreadTextToResponseList(text);
+  return {
+    ...convertThreadTextToResponseList(text),
+    redirected: res.redirected,
+  };
 };
 
 const convertThreadTextToResponseList = (text: string) => {
