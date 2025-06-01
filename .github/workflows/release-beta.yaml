@@ -1,0 +1,191 @@
+name: Beta Build & Dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  packages: write
+  checks: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  trigger-check:
+    if: |
+      github.event.comment.body == '/deploy beta' &&
+      github.event.issue.pull_request != null
+    runs-on: ubuntu-22.04
+    outputs:
+      allowed: ${{ steps.team-check.outputs.is_member }}
+    steps:
+      - name: Check if commenter is in project-eddist/beta-deployer
+        id: team-check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PJ_EDDIST_MEMBERS }} 
+          script: |
+            const org = 'project-eddist';
+            const team_slug = 'beta-deployer';
+            const username = context.payload.comment.user.login;
+            try {
+              await github.rest.teams.getMembershipForUserInOrg({
+                org,
+                team_slug,
+                username
+              });
+              return core.setOutput('is_member', 'true');
+            } catch (e) {
+              return core.setOutput('is_member', 'false');
+            }
+
+  build-and-dispatch:
+    needs: trigger-check
+    if: needs.trigger-check.outputs.allowed == 'true'
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        id: checkout
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+      - name: Determine PR commit SHA
+        id: get-sha
+        run: |
+          echo "pr_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+
+      - name: Load Rust & build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+          version: "latest"
+
+      - name: Setup Node.js & cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            eddist-server/client/pnpm-lock.yaml
+            eddist-server/client-v2/pnpm-lock.yaml
+            eddist-admin/client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build eddist-client
+        run: pnpm -F eddist-client build
+
+      - name: Build eddist-client-v2
+        run: pnpm -F eddist-client-v2 build
+
+      - name: Build eddist-admin-client
+        run: pnpm -F eddist-admin-client build
+
+      - name: Rust release build
+        run: cargo build --release
+
+      - name: Remove .dockerignore
+        run: rm .dockerignore
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push eddist
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist:${{ env.pr_sha }}
+            ghcr.io/edginer/eddist:beta
+
+      - name: Build & Push eddist-client
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-client/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-client:${{ env.pr_sha }}
+            ghcr.io/edginer/eddist-client:beta
+
+      - name: Build & Push eddist-admin
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-admin/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-admin:${{ env.pr_sha }}
+            ghcr.io/edginer/eddist-admin:beta
+
+      - name: Build & Push eddist-cron
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-cron/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-cron:${{ env.pr_sha }}
+            ghcr.io/edginer/eddist-cron:beta
+
+      - name: Build & Push eddist-persistence
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-persistence/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-persistence:${{ env.pr_sha }}
+            ghcr.io/edginer/eddist-persistence:beta
+
+      - name: Dispatch to Beta Repo
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_REPO_PAT }}
+          repository: ${{ secrets.DEPLOY_REPO_URL2 }}
+          event-type: update-image-beta
+          client-payload: '{"image-tag":"${{ env.pr_sha }}"}'
+      - name: Comment success
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            ✅ Beta deployment triggered successfully for @${{ github.event.comment.user.login }}!  
+            Images built with tag `${{ env.pr_sha }}` and dispatched for update-image-beta.
+
+  deny:
+    needs: trigger-check
+    if: needs.trigger-check.outputs.allowed == 'false'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Comment Denial
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            Sorry @${{ github.event.comment.user.login }}, you're not authorized
+            to run `/deploy beta`.
