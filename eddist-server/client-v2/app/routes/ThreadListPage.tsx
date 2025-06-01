@@ -44,7 +44,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     boards,
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: context.AVAILABLE_USER_REGISTRATION ?? false,
+      availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
     },
   } satisfies {
     threadList: Thread[];
