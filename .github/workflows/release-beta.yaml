@@ -8,6 +8,7 @@ permissions:
   contents: read
   packages: write
   checks: write
+  issues: write
 
 jobs:
   trigger-check:
@@ -22,6 +23,7 @@ jobs:
         id: team-check
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PJ_EDDIST_MEMBERS }} 
           script: |
             const org = 'project-eddist';
             const team_slug = 'beta-deployer';
