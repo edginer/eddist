@@ -326,7 +326,7 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/test/read.cgi/{boardKey}/{threadId}/{*pos}",
             get(
-                |Path((board_key, thread_id)): Path<(String, String)>| async move {
+                |Path((board_key, thread_id, _)): Path<(String, String, String)>| async move {
                     Redirect::permanent(&format!("/{}/{}", board_key, thread_id))
                 },
             ),
