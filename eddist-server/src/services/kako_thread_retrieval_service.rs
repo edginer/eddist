@@ -29,8 +29,9 @@ impl AppService<KakoThreadRetrievalServiceInput, Vec<u8>> for KakoThreadRetrieva
                 }
                 _ => {
                     log::error!(
-                        "Error retrieving kako thread: {err:?}, path: {}",
-                        format!("{}/dat/{}.dat", input.board_key, input.thread_number)
+                        "Error retrieving kako thread: {err:?}, path: {}/dat/{}.dat",
+                        input.board_key,
+                        input.thread_number
                     );
                     Err(anyhow::anyhow!("Error retrieving thread: {err:?}"))
                 }
