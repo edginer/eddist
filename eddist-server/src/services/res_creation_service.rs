@@ -279,7 +279,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
 
         counter!("response_creation", "board_key" => input.board_key).increment(1);
 
-        Ok(ResCreationServiceOutput { tinker })
+        let res_order = if order <= 2000 { Some(order) } else { None };
+
+        Ok(ResCreationServiceOutput { tinker, res_order })
     }
 }
 
@@ -298,4 +300,5 @@ pub struct ResCreationServiceInput {
 
 pub struct ResCreationServiceOutput {
     pub tinker: Tinker,
+    pub res_order: Option<i32>,
 }

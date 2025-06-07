@@ -4,3 +4,8 @@
 captcha-config.json
 node_modules/
 .idea/
+
+# Claude Code files
+.claude/
+.cursor/
+CLAUDE.md

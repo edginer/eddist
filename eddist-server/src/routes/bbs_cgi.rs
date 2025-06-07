@@ -9,15 +9,15 @@ use http::HeaderMap;
 use jsonwebtoken::EncodingKey;
 
 use crate::{
-    AppState,
     error::{BbsCgiError, InsufficientParamType, InvalidParamType},
     services::{
-        BbsCgiService,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
+        BbsCgiService,
     },
-    shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
+    shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType},
     utils::{get_asn_num, get_origin_ip, get_tinker, get_ua},
+    AppState,
 };
 
 pub async fn post_bbs_cgi(
@@ -92,13 +92,13 @@ pub async fn post_bbs_cgi(
         resp
     }
 
-    let tinker = if is_thread {
+    let (tinker, res_order) = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
         };
 
         let svc = state.services.thread_creation();
-        match svc
+        let tinker = match svc
             .execute(TheradCreationServiceInput {
                 board_key,
                 title,
@@ -117,7 +117,8 @@ pub async fn post_bbs_cgi(
             Err(e) => {
                 return on_error(e, true);
             }
-        }
+        };
+        (tinker, None)
     } else {
         let Some(thread_number) = form.get("key").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Key).into_response();
@@ -142,14 +143,14 @@ pub async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(ResCreationServiceOutput { tinker }) => tinker,
+            Ok(ResCreationServiceOutput { tinker, res_order }) => (tinker, res_order),
             Err(e) => {
                 return on_error(e, false);
             }
         }
     };
 
-    SJisResponseBuilder::new(SJisStr::from(
+    let mut response = SJisResponseBuilder::new(SJisStr::from(
         r#"<html><!-- 2ch_X:true -->
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=x-sjis">
@@ -173,7 +174,11 @@ pub async fn post_bbs_cgi(
         "edge-token".to_string(),
         tinker.authed_token().to_string(),
         time::Duration::days(365),
-    )
-    .build()
-    .into_response()
+    );
+
+    if let Some(order) = res_order {
+        response = response.add_header("x-resnum".to_string(), order.to_string());
+    }
+
+    response.build().into_response()
 }
