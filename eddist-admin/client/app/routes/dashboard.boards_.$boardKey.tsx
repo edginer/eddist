@@ -1,5 +1,5 @@
 import ThreadList from "../components/ThreadList";
-import { Link, useParams } from "@remix-run/react";
+import { Link, useParams } from "react-router";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
 import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";

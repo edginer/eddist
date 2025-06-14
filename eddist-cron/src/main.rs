@@ -423,22 +423,30 @@ async fn retry(
             .await;
         retry_count += 1;
         retry_delay *= 2;
-        if let Ok(result) = result {
-            if result.status_code() == 200 {
-                if let Ok((_, code)) = s3_client
-                    .head_object(format!(
-                        "{}/{}/{}.dat",
-                        board_key,
-                        if is_admin { "admin" } else { "dat" },
-                        thread_number
-                    ))
-                    .await
-                {
-                    if code != 404 {
-                        is_err = false;
+        match result {
+            Ok(result) => {
+                if result.status_code() == 200 {
+                    if let Ok((_, code)) = s3_client
+                        .head_object(format!(
+                            "{}/{}/{}.dat",
+                            board_key,
+                            if is_admin { "admin" } else { "dat" },
+                            thread_number
+                        ))
+                        .await
+                    {
+                        if code != 404 {
+                            is_err = false;
+                        }
                     }
                 }
             }
+            err => log::error!(
+                "Failed to upload {}/{}.dat: {err:?}, retry count: {}",
+                if is_admin { "admin" } else { "normal" },
+                thread_number,
+                retry_count
+            ),
         }
     }
 
