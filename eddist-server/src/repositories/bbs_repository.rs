@@ -8,7 +8,7 @@ use eddist_core::domain::{
     res::ResView,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{MySqlPool, query, query_as, types::Json};
+use sqlx::{query, query_as, types::Json, MySqlPool};
 use uuid::Uuid;
 
 use crate::domain::{
@@ -232,53 +232,33 @@ impl BbsRepository for BbsRepositoryImpl {
         let threads = query_as!(
             SelectionThreadWithMetadent,
             r#" 
-            WITH MinCreatedAt AS (
                 SELECT 
-                    thread_id, 
-                    MIN(created_at) AS min_created_at
+                    t.id AS "id: Uuid",
+                    t.board_id AS "board_id: Uuid",
+                    t.thread_number AS thread_number,
+                    t.last_modified_at AS last_modified_at,
+                    t.sage_last_modified_at AS sage_last_modified_at,
+                    t.title AS title,
+                    t.authed_token_id AS "authed_token_id: Uuid",
+                    t.metadent AS metadent,
+                    t.response_count AS response_count,
+                    t.no_pool AS "no_pool: bool",
+                    t.active AS "active: bool",
+                    t.archived AS "archived: bool",
+                    t.archive_converted AS "archive_converted: bool",
+                    (
+                        SELECT r.client_info 
+                        FROM responses r
+                        WHERE r.thread_id = t.id 
+                        AND r.res_order = 1
+                    ) AS "client_info! : Json<ClientInfo>"
                 FROM 
-                    responses
-                GROUP BY 
-                    thread_id
-            ),
-            FirstResponses AS (
-                SELECT 
-                    r.thread_id,
-                    r.client_info
-                FROM 
-                    responses r
-                INNER JOIN 
-                    MinCreatedAt m 
-                ON 
-                    r.thread_id = m.thread_id 
-                    AND r.created_at = m.min_created_at
-            )
-            SELECT 
-                t.id AS "id: Uuid",
-                t.board_id AS "board_id: Uuid",
-                t.thread_number AS thread_number,
-                t.last_modified_at AS last_modified_at,
-                t.sage_last_modified_at AS sage_last_modified_at,
-                t.title AS title,
-                t.authed_token_id AS "authed_token_id: Uuid",
-                t.metadent AS metadent,
-                t.response_count AS response_count,
-                t.no_pool AS "no_pool: bool",
-                t.active AS "active: bool",
-                t.archived AS "archived: bool",
-                t.archive_converted AS "archive_converted: bool",
-                r.client_info AS "client_info! : Json<ClientInfo>"
-            FROM 
-                threads AS t
-            LEFT JOIN 
-                FirstResponses r 
-            ON 
-                r.thread_id = t.id
-            WHERE 
-                t.board_id = ? AND
-                t.archived = 0
-            ORDER BY 
-                t.sage_last_modified_at DESC;
+                    threads AS t
+                WHERE 
+                    t.board_id = ?
+                    AND t.archived = 0
+                ORDER BY 
+                    t.sage_last_modified_at DESC
 "#,
             board_id
         )
