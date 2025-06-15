@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        HCAPTCHA_URL, HCaptchaResponse, MONOCLE_URL, MonocleResponse, TURNSTILE_URL,
-        TurnstileResponse,
+        HCaptchaResponse, MonocleResponse, TurnstileResponse, HCAPTCHA_URL, MONOCLE_URL,
+        TURNSTILE_URL,
     },
     utils::SimpleSecret,
 };
@@ -150,19 +150,21 @@ impl CaptchaClient for MonocleClient {
         let verify_ip = |v4ip: Option<&str>, v6ip: Option<&str>| {
             let from_client_ip_addr = ReducedIpAddr::from(ip_addr.to_string());
 
-            let monocle_ip = if from_client_ip_addr.is_v4() {
-                let Some(monocle_v4ip) = v4ip else {
-                    return false;
-                };
-                monocle_v4ip
-            } else {
-                let Some(monocle_v6ip) = v6ip else {
-                    return false;
-                };
-                monocle_v6ip
-            };
+            // Check if either IPv4 or IPv6 from spur.us matches the client IP
+            let v4_match = v4ip
+                .map(|monocle_v4ip| {
+                    from_client_ip_addr == ReducedIpAddr::from(monocle_v4ip.to_string())
+                })
+                .unwrap_or(false);
 
-            from_client_ip_addr == ReducedIpAddr::from(monocle_ip.to_string())
+            let v6_match = v6ip
+                .map(|monocle_v6ip| {
+                    from_client_ip_addr == ReducedIpAddr::from(monocle_v6ip.to_string())
+                })
+                .unwrap_or(false);
+
+            // Return true if either IP version matches
+            v4_match || v6_match
         };
 
         let res = self

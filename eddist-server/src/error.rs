@@ -312,10 +312,10 @@ impl Display for ContentEmptyParamType {
 pub enum BbsPostAuthWithCodeError {
     #[error("書き込み時のIPアドレスと異なるか、入力した6桁の数字が誤りです")]
     FailedToFindAuthedToken,
-    #[error("既に認証済みです")]
-    AlreadyValid,
     #[error("認証コードの有効期限が切れています。再度認証してください")]
     ExpiredActivationCode,
+    #[error("認証に失敗しました。時間をおいてから再度認証してください")]
+    AuthCodeCollision,
     #[error(transparent)]
     CaptchaError(#[from] CaptchaLikeError),
 }
