@@ -13,6 +13,7 @@ use crate::{
     },
     repositories::bbs_repository::BbsRepository,
 };
+use eddist_core::domain::ip_addr::ReducedIpAddr;
 
 use super::AppService;
 
@@ -123,6 +124,22 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                 }
                 Err(e) => return Err(e.into()),
                 _ => {}
+            }
+        }
+
+        // Check IP equality for users not using spur.us (Monocle already handles IPv4/IPv6 checking)
+        let has_monocle = input.captcha_like_configs.iter().any(|config| {
+            matches!(config, CaptchaLikeConfig::Monocle { .. })
+        });
+        
+        if !has_monocle {
+            let token_origin_ip = ReducedIpAddr::from(token.reduced_ip.clone());
+            let request_origin_ip = ReducedIpAddr::from(input.origin_ip.clone());
+            
+            if token_origin_ip != request_origin_ip {
+                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
+                    .increment(1);
+                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
             }
         }
 
