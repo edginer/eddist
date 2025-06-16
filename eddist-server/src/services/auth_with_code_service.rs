@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 use futures::future::join_all;
 use metrics::counter;
 use tracing::{error_span, info_span};
@@ -14,6 +13,7 @@ use crate::{
     },
     repositories::bbs_repository::BbsRepository,
 };
+use eddist_core::domain::ip_addr::ReducedIpAddr;
 
 use super::AppService;
 
@@ -73,24 +73,36 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .collect::<Vec<_>>();
         counter!("issue_authed_token", "state" => "request").increment(1);
 
-        let ip_addr = IpAddr::new(input.origin_ip.clone());
-        let reduced = ReducedIpAddr::from(ip_addr.clone());
-        let Some(token) = self
+        // Get all unauthed tokens with the auth code (non-IP checking)
+        let candidate_tokens = self
             .0
-            .get_authed_token_by_origin_ip_and_auth_code(&reduced.to_string(), &input.code)
-            .await?
-        else {
-            counter!("issue_authed_token", "state" => "failed", "reason" => "ip_check")
+            .get_unauthed_authed_token_by_auth_code(&input.code)
+            .await?;
+
+        // Filter out already authed tokens (only check unauthed tokens)
+        let unauthed_tokens: Vec<_> = candidate_tokens
+            .into_iter()
+            .filter(|token| token.authed_at.is_none()) // Only include tokens that are not yet authed
+            .collect();
+
+        // Handle auth_code collisions - if multiple unauthed tokens exist, delete them and return error
+        if unauthed_tokens.len() > 1 {
+            // Delete all unauthed tokens with this auth_code to resolve collision
+            for candidate in &unauthed_tokens {
+                self.0.delete_authed_token(&candidate.token).await?;
+            }
+            counter!("issue_authed_token", "state" => "failed", "reason" => "auth_code_collision")
                 .increment(1);
-            info_span!("failed to find authed token", reduced_ip = %reduced.to_string(), origin_ip = %ip_addr, code = %input.code);
+            return Err(BbsPostAuthWithCodeError::AuthCodeCollision.into());
+        }
+
+        // Check if we found exactly one unauthed token
+        let Some(token) = unauthed_tokens.into_iter().next() else {
+            counter!("issue_authed_token", "state" => "failed", "reason" => "not_found")
+                .increment(1);
+            info_span!("failed to find authed token", code = %input.code);
             return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
         };
-
-        if token.validity {
-            counter!("issue_authed_token" , "state" => "failed", "reason" => "already_valid")
-                .increment(1);
-            return Err(BbsPostAuthWithCodeError::AlreadyValid.into());
-        }
 
         let now = Utc::now();
         if token.is_activation_expired(now) {
@@ -100,7 +112,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         let handles = clients_responses
             .iter()
-            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
+            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
             .collect::<Vec<_>>();
         let results = join_all(handles).await;
         for r in results {
@@ -112,6 +124,22 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                 }
                 Err(e) => return Err(e.into()),
                 _ => {}
+            }
+        }
+
+        // Check IP equality for users not using spur.us (Monocle already handles IPv4/IPv6 checking)
+        let has_monocle = input.captcha_like_configs.iter().any(|config| {
+            matches!(config, CaptchaLikeConfig::Monocle { .. })
+        });
+        
+        if !has_monocle {
+            let token_origin_ip = ReducedIpAddr::from(token.reduced_ip.clone());
+            let request_origin_ip = ReducedIpAddr::from(input.origin_ip.clone());
+            
+            if token_origin_ip != request_origin_ip {
+                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
+                    .increment(1);
+                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
             }
         }
 

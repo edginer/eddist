@@ -62,6 +62,7 @@ pub trait BbsRepository: Send + Sync + 'static {
         last_wrote: DateTime<Utc>,
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
+    async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()>;
     async fn update_authed_token_id_seed<'a>(
         &'a self,
         token_id: Uuid,
@@ -765,6 +766,17 @@ impl BbsRepository for BbsRepositoryImpl {
         let query = query!(
             "UPDATE authed_tokens SET validity = ? WHERE token = ?",
             false,
+            token
+        );
+
+        query.execute(&self.pool).await?;
+
+        Ok(())
+    }
+
+    async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()> {
+        let query = query!(
+            "DELETE FROM authed_tokens WHERE token = ?",
             token
         );
 

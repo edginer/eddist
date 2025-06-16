@@ -1,8 +1,10 @@
-<html>
+<!DOCTYPE html>
+<html lang="ja">
 <head>
     <title>コード認証画面</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     {{#if cf_site_key}}
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     {{/if}}
@@ -14,19 +16,362 @@
         src="https://mcl.spur.us/d/mcl.js?tk={{monocle_site_key}}"
         id="_mcl"></script>
     {{/if}}
-<body>
-    <p>認証を進める前に、本掲示板における利用規約への同意が必要です</p>
-    <a href="/terms">利用規約</a>
-    <p>認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください</p>
-    <form action="/auth-code" method="POST" id="login-form" class="monocle-enriched">
-        {{#if cf_site_key}}
-        <div class="cf-turnstile" data-sitekey="{{cf_site_key}}" data-theme="light"></div>
-        {{/if}}
-        {{#if hcaptcha_site_key}}
-        <div class="h-captcha" data-sitekey="{{hcaptcha_site_key}}"></div>
-        {{/if}}
-        <input type="number" name="auth-code" placeholder="6桁の認証コード">
-        <input type="submit" value="利用規約に同意して認証を行う">
-    </form>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col max-w-4xl mx-auto p-4">
+        <article class="flex-1">
+            <header class="text-center py-8">
+                <h1 class="text-3xl lg:text-5xl font-bold text-gray-900 mb-4">コード認証</h1>
+                <div class="border-b border-gray-300 w-full"></div>
+            </header>
+            
+            <section class="py-8">
+                <div class="bg-white rounded-lg shadow-sm border p-6 lg:p-8 space-y-6">
+                    <div class="space-y-4">
+                        <h2 class="text-2xl lg:text-3xl font-semibold text-gray-900">利用規約への同意</h2>
+                        <p class="text-gray-700 lg:text-lg leading-relaxed">
+                            認証を進める前に以下の利用規約を確認して、同意する必要があります。
+                        </p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <button 
+                                id="show-tou-btn" 
+                                type="button"
+                                class="text-blue-600 hover:text-blue-800 font-medium lg:text-lg underline decoration-blue-600"
+                            >
+                                利用規約を確認して同意する
+                            </button>
+                        </div>
+                        <div id="tou-status" class="hidden">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <p class="text-green-800 font-medium lg:text-lg">
+                                    利用規約に同意しました
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-6">
+                        <h2 class="text-2xl lg:text-3xl font-semibold text-gray-900 mb-4">認証手順</h2>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <p class="text-gray-700 lg:text-lg leading-relaxed">
+                                認証を進めるために、事前に書き込みを行い6桁の認証コードを取得してください
+                            </p>
+                        </div>
+
+                        <form action="/auth-code" method="POST" id="login-form" class="monocle-enriched space-y-6">
+                            {{#if cf_site_key}}
+                            <div class="flex justify-center">
+                                <div class="cf-turnstile" data-sitekey="{{cf_site_key}}" data-theme="light"></div>
+                            </div>
+                            {{/if}}
+                            {{#if hcaptcha_site_key}}
+                            <div class="flex justify-center">
+                                <div class="h-captcha" data-sitekey="{{hcaptcha_site_key}}"></div>
+                            </div>
+                            {{/if}}
+                            
+                            <div class="space-y-2">
+                                <label for="auth-code" class="block text-sm font-medium text-gray-900">認証コード</label>
+                                <input 
+                                    type="number" 
+                                    name="auth-code" 
+                                    id="auth-code"
+                                    placeholder="6桁の認証コード"
+                                    maxlength="6"
+                                    class="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-mono"
+                                    required
+                                >
+                            </div>
+                            
+                            <button 
+                                type="submit" 
+                                id="submit-btn"
+                                disabled
+                                class="w-full bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg lg:text-lg cursor-not-allowed"
+                            >
+                                利用規約に同意して認証を行う
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </article>
+        
+        <footer class="py-6 text-center mt-8">
+            <p class="text-xs text-gray-400">
+                This BBS is powered by 
+                <a href="https://github.com/edginer/eddist" class="text-gray-500 hover:text-gray-700 underline">
+                    Eddist
+                </a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Terms of Use Modal -->
+    <div id="tou-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900">利用規約</h2>
+                </div>
+                
+                <div id="tou-content" class="flex-1 p-6 overflow-y-auto text-sm leading-relaxed">
+                    <div id="loading-content" class="text-center py-8">
+                        <p class="text-gray-600">利用規約を読み込み中...</p>
+                    </div>
+                    <div id="scroll-indicator" class="text-center hidden">
+                        <p class="text-yellow-600 font-medium">規約をすべて読むために、最後までスクロールしてください</p>
+                    </div>
+                </div>
+                
+                <div class="p-6 border-t border-gray-200 flex justify-between items-center">
+                    <button 
+                        id="close-modal-btn" 
+                        type="button"
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                    >
+                        キャンセル
+                    </button>
+                    <button 
+                        id="agree-btn" 
+                        type="button"
+                        disabled
+                        class="px-6 py-2 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed"
+                    >
+                        利用規約に同意する
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const showTouBtn = document.getElementById('show-tou-btn');
+            const modal = document.getElementById('tou-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const agreeBtn = document.getElementById('agree-btn');
+            const submitBtn = document.getElementById('submit-btn');
+            const touStatus = document.getElementById('tou-status');
+            const touContent = document.getElementById('tou-content');
+            const scrollIndicator = document.getElementById('scroll-indicator');
+            
+            let hasScrolledToBottom = false;
+            let hasAgreed = false;
+            let contentLoaded = false;
+
+            // Show modal when "利用規約を確認して同意する" is clicked
+            showTouBtn.addEventListener('click', function() {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                loadToUContent();
+            });
+
+            // Close modal
+            function closeModal() {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            }
+
+            closeModalBtn.addEventListener('click', closeModal);
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Check if user has scrolled to the bottom
+            function checkScrollPosition() {
+                if (!contentLoaded) return;
+                
+                const scrollTop = touContent.scrollTop;
+                const scrollHeight = touContent.scrollHeight;
+                const clientHeight = touContent.clientHeight;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 10) { // 10px tolerance
+                    hasScrolledToBottom = true;
+                    scrollIndicator.style.display = 'none';
+                    agreeBtn.disabled = false;
+                    agreeBtn.className = 'px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200';
+                }
+            }
+
+            touContent.addEventListener('scroll', checkScrollPosition);
+
+            // Load ToU content from server
+            async function loadToUContent() {
+                if (contentLoaded) {
+                    checkScrollPosition();
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/terms');
+                    if (!response.ok) {
+                        throw new Error('Failed to load terms');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Clear loading message
+                    document.getElementById('loading-content').remove();
+                    
+                    // Create content container
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'space-y-4';
+                    
+                    // Render sections
+                    data.sections.forEach(section => {
+                        const sectionEl = document.createElement('div');
+                        sectionEl.className = 'mb-4';
+                        
+                        // Section title
+                        const titleEl = document.createElement('h3');
+                        titleEl.className = 'text-lg font-semibold text-gray-900 mb-2';
+                        titleEl.textContent = section.title;
+                        sectionEl.appendChild(titleEl);
+                        
+                        // Section content
+                        if (section.content) {
+                            const contentP = document.createElement('p');
+                            contentP.className = 'text-gray-700 leading-relaxed mb-2';
+                            contentP.textContent = section.content;
+                            sectionEl.appendChild(contentP);
+                        }
+                        
+                        // Lists
+                        if (section.list) {
+                            const ol = document.createElement('ol');
+                            ol.className = 'list-decimal list-inside text-gray-700 mb-2 space-y-1';
+                            section.list.forEach(item => {
+                                const li = document.createElement('li');
+                                li.textContent = item;
+                                ol.appendChild(li);
+                            });
+                            sectionEl.appendChild(ol);
+                        }
+                        
+                        // Additional content
+                        if (section.additional) {
+                            const additionalP = document.createElement('p');
+                            additionalP.className = 'text-gray-700 leading-relaxed mb-2';
+                            additionalP.textContent = section.additional;
+                            sectionEl.appendChild(additionalP);
+                        }
+                        
+                        // Additional lists
+                        if (section.additional_list) {
+                            const ol = document.createElement('ol');
+                            ol.className = 'list-decimal list-inside text-gray-700 mb-2';
+                            section.additional_list.forEach(item => {
+                                const li = document.createElement('li');
+                                li.textContent = item;
+                                ol.appendChild(li);
+                            });
+                            sectionEl.appendChild(ol);
+                        }
+                        
+                        // Subsections (for 第4条)
+                        if (section.sections) {
+                            const mainOl = document.createElement('ol');
+                            mainOl.className = 'list-decimal list-inside text-gray-700 space-y-2';
+                            
+                            section.sections.forEach(subsection => {
+                                const li = document.createElement('li');
+                                li.className = 'space-y-1';
+                                
+                                const subtitle = document.createElement('strong');
+                                subtitle.textContent = subsection.subtitle;
+                                li.appendChild(subtitle);
+                                
+                                const ul = document.createElement('ul');
+                                ul.className = 'list-disc list-inside ml-4 mt-1 space-y-1';
+                                subsection.items.forEach(item => {
+                                    const subLi = document.createElement('li');
+                                    subLi.textContent = item;
+                                    ul.appendChild(subLi);
+                                });
+                                li.appendChild(ul);
+                                mainOl.appendChild(li);
+                            });
+                            sectionEl.appendChild(mainOl);
+                        }
+                        
+                        contentDiv.appendChild(sectionEl);
+                    });
+                    
+                    // Add separator
+                    const hr = document.createElement('hr');
+                    hr.className = 'my-6';
+                    contentDiv.appendChild(hr);
+                    
+                    // Footnotes
+                    if (data.footnotes) {
+                        const footnotesOl = document.createElement('ol');
+                        footnotesOl.className = 'list-decimal list-inside text-sm text-gray-600 space-y-1 mb-4';
+                        data.footnotes.forEach(footnote => {
+                            const li = document.createElement('li');
+                            li.textContent = footnote;
+                            footnotesOl.appendChild(li);
+                        });
+                        contentDiv.appendChild(footnotesOl);
+                    }
+                    
+                    // Another separator
+                    const hr2 = document.createElement('hr');
+                    hr2.className = 'my-4';
+                    contentDiv.appendChild(hr2);
+                    
+                    // Contact
+                    if (data.contact) {
+                        const contactP = document.createElement('p');
+                        contactP.className = 'text-sm text-gray-600 mb-8';
+                        contactP.textContent = `問い合わせ先: ${data.contact}`;
+                        contentDiv.appendChild(contactP);
+                    }
+                    
+                    // Add content to modal
+                    touContent.insertBefore(contentDiv, scrollIndicator);
+                    
+                    // Show scroll indicator
+                    scrollIndicator.classList.remove('hidden');
+                    
+                    contentLoaded = true;
+                    checkScrollPosition();
+                    
+                } catch (error) {
+                    console.error('Error loading ToU:', error);
+                    document.getElementById('loading-content').innerHTML = 
+                        '<p class="text-red-600">利用規約の読み込みに失敗しました。<a href="/terms" target="_blank" class="underline">こちらから確認してください</a></p>';
+                }
+            }
+
+            // Handle agreement
+            agreeBtn.addEventListener('click', function() {
+                if (hasScrolledToBottom) {
+                    hasAgreed = true;
+                    closeModal();
+                    
+                    // Update UI
+                    showTouBtn.parentElement.style.display = 'none';
+                    touStatus.classList.remove('hidden');
+                    
+                    // Enable submit button
+                    submitBtn.disabled = false;
+                    submitBtn.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 lg:text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2';
+                }
+            });
+
+            // Prevent form submission if not agreed
+            document.getElementById('login-form').addEventListener('submit', function(e) {
+                if (!hasAgreed) {
+                    e.preventDefault();
+                    alert('利用規約に同意してください。');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
