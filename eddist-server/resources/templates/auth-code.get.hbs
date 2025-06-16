@@ -119,9 +119,6 @@
                     <div id="loading-content" class="text-center py-8">
                         <p class="text-gray-600">利用規約を読み込み中...</p>
                     </div>
-                    <div id="scroll-indicator" class="text-center hidden">
-                        <p class="text-yellow-600 font-medium">規約をすべて読むために、最後までスクロールしてください</p>
-                    </div>
                 </div>
                 
                 <div class="p-6 border-t border-gray-200 flex justify-between items-center">
@@ -154,7 +151,6 @@
             const submitBtn = document.getElementById('submit-btn');
             const touStatus = document.getElementById('tou-status');
             const touContent = document.getElementById('tou-content');
-            const scrollIndicator = document.getElementById('scroll-indicator');
             
             let hasScrolledToBottom = false;
             let hasAgreed = false;
@@ -192,7 +188,6 @@
                 
                 if (scrollTop + clientHeight >= scrollHeight - 10) { // 10px tolerance
                     hasScrolledToBottom = true;
-                    scrollIndicator.style.display = 'none';
                     agreeBtn.disabled = false;
                     agreeBtn.className = 'px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200';
                 }
@@ -319,24 +314,8 @@
                         contentDiv.appendChild(footnotesOl);
                     }
                     
-                    // Another separator
-                    const hr2 = document.createElement('hr');
-                    hr2.className = 'my-4';
-                    contentDiv.appendChild(hr2);
-                    
-                    // Contact
-                    if (data.contact) {
-                        const contactP = document.createElement('p');
-                        contactP.className = 'text-sm text-gray-600 mb-8';
-                        contactP.textContent = `問い合わせ先: ${data.contact}`;
-                        contentDiv.appendChild(contactP);
-                    }
-                    
                     // Add content to modal
-                    touContent.insertBefore(contentDiv, scrollIndicator);
-                    
-                    // Show scroll indicator
-                    scrollIndicator.classList.remove('hidden');
+                    touContent.appendChild(contentDiv);
                     
                     contentLoaded = true;
                     checkScrollPosition();
