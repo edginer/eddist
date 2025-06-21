@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await
                 .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior");
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
                 Ok(())
             })
         })

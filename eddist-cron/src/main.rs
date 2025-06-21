@@ -31,12 +31,14 @@ async fn main() {
     let pool = MySqlPoolOptions::new()
         .after_connect(|conn, _| {
             use sqlx::Executor;
-            
+
             Box::pin(async move {
-                conn.execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')")
-                    .await
-                    .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior");
+                conn.execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
                 Ok(())
             })
         })
