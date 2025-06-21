@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": " \n            WITH MinCreatedAt AS (\n                SELECT \n                    thread_id, \n                    MIN(created_at) AS min_created_at\n                FROM \n                    responses\n                GROUP BY \n                    thread_id\n            ),\n            FirstResponses AS (\n                SELECT \n                    r.thread_id,\n                    r.client_info\n                FROM \n                    responses r\n                INNER JOIN \n                    MinCreatedAt m \n                ON \n                    r.thread_id = m.thread_id \n                    AND r.created_at = m.min_created_at\n            )\n            SELECT \n                t.id AS \"id: Uuid\",\n                t.board_id AS \"board_id: Uuid\",\n                t.thread_number AS thread_number,\n                t.last_modified_at AS last_modified_at,\n                t.sage_last_modified_at AS sage_last_modified_at,\n                t.title AS title,\n                t.authed_token_id AS \"authed_token_id: Uuid\",\n                t.metadent AS metadent,\n                t.response_count AS response_count,\n                t.no_pool AS \"no_pool: bool\",\n                t.active AS \"active: bool\",\n                t.archived AS \"archived: bool\",\n                t.archive_converted AS \"archive_converted: bool\",\n                r.client_info AS \"client_info! : Json<ClientInfo>\"\n            FROM \n                threads AS t\n            LEFT JOIN \n                FirstResponses r \n            ON \n                r.thread_id = t.id\n            WHERE \n                t.board_id = ? AND\n                t.archived = 0\n            ORDER BY \n                t.sage_last_modified_at DESC;\n",
+  "query": " \n                SELECT \n                    t.id AS \"id: Uuid\",\n                    t.board_id AS \"board_id: Uuid\",\n                    t.thread_number AS thread_number,\n                    t.last_modified_at AS last_modified_at,\n                    t.sage_last_modified_at AS sage_last_modified_at,\n                    t.title AS title,\n                    t.authed_token_id AS \"authed_token_id: Uuid\",\n                    t.metadent AS metadent,\n                    t.response_count AS response_count,\n                    t.no_pool AS \"no_pool: bool\",\n                    t.active AS \"active: bool\",\n                    t.archived AS \"archived: bool\",\n                    t.archive_converted AS \"archive_converted: bool\",\n                    (\n                        SELECT r.client_info \n                        FROM responses r\n                        WHERE r.thread_id = t.id \n                        AND r.res_order = 1\n                    ) AS \"client_info! : Json<ClientInfo>\"\n                FROM \n                    threads AS t\n                WHERE \n                    t.board_id = ?\n                    AND t.archived = 0\n                ORDER BY \n                    t.sage_last_modified_at DESC\n",
   "describe": {
     "columns": [
       {
@@ -125,7 +125,7 @@
         "name": "client_info! : Json<ClientInfo>",
         "type_info": {
           "type": "Json",
-          "flags": "BLOB | BINARY | NO_DEFAULT_VALUE",
+          "flags": "BINARY",
           "max_size": 4294967292
         }
       }
@@ -150,5 +150,5 @@
       true
     ]
   },
-  "hash": "b6945c30c1b84804f10b60cddda99757ff9896232e09e470600434c9f7928261"
+  "hash": "6cb671d86cbce897cce77f842565c5c49f66f5c3619002e2edb07b37680d8606"
 }

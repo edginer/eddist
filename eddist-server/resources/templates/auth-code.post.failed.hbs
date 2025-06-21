@@ -1,11 +1,66 @@
-<html>
+<!DOCTYPE html>
+<html lang="ja">
 <head>
-    <title>認証失敗 - Failed</title>
+    <title>認証失敗</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body>
-    <p>認証に失敗しました</p>
-    <p>理由: {{reason}}</p>
+<body class="bg-gray-50">
+    <div class="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col max-w-4xl mx-auto p-4">
+        <article class="flex-1">
+            <header class="text-center py-8">
+                <h1 class="text-3xl lg:text-5xl font-bold text-gray-900 mb-4">認証失敗</h1>
+                <div class="border-b border-gray-300 w-full"></div>
+            </header>
+            
+            <section class="py-8">
+                <div class="bg-white rounded-lg shadow-sm border p-6 lg:p-8">
+                    <div class="text-center space-y-6">
+                        <div class="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                            <div class="w-8 h-8 bg-red-600 rounded-full"></div>
+                        </div>
+                        <h2 class="text-2xl lg:text-3xl font-semibold text-red-600">認証に失敗しました</h2>
+                        
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <p class="text-red-800 font-medium lg:text-lg">
+                                理由: {{reason}}
+                            </p>
+                        </div>
+                        
+                        <div class="space-y-4 pt-4">
+                            <p class="text-gray-700 lg:text-lg">
+                                以下の操作をお試しください：
+                            </p>
+                            <ul class="text-left list-disc list-inside space-y-2 text-gray-700 lg:text-lg max-w-md mx-auto">
+                                <li>認証コードが正しく入力されているか確認してください</li>
+                                <li>認証コードの有効期限が切れていないか確認してください</li>
+                                <li>書き込みを行ってから再度お試しください</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="pt-6 space-y-3">
+                            <a href="/auth-code" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 lg:text-lg">
+                                再度認証を試す
+                            </a>
+                            <br>
+                            <a href="/" class="inline-block text-blue-600 hover:text-blue-800 font-medium lg:text-lg underline">
+                                トップページに戻る
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </article>
+        
+        <footer class="py-6 text-center mt-8">
+            <p class="text-xs text-gray-400">
+                This BBS is powered by 
+                <a href="https://github.com/edginer/eddist" class="text-gray-500 hover:text-gray-700 underline">
+                    Eddist
+                </a>
+            </p>
+        </footer>
+    </div>
 </body>
 </html>

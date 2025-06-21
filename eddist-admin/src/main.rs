@@ -153,7 +153,21 @@ async fn main() {
     let serve_dir = ServeDir::new(serve_dir)
         .not_found_service(ServeFile::new(format!("{serve_dir}/index.html")));
 
-    let pool = sqlx::mysql::MySqlPool::connect(&std::env::var("DATABASE_URL").unwrap())
+    let pool = sqlx::mysql::MySqlPoolOptions::new()
+        .after_connect(|conn, _| {
+            use sqlx::Executor;
+
+            Box::pin(async move {
+                conn.execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
+                Ok(())
+            })
+        })
+        .connect(&std::env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();
 

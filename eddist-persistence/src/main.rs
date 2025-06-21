@@ -74,7 +74,14 @@ async fn main() -> anyhow::Result<()> {
             };
             let db_conn = sqlx::MySqlConnection::connect(&env::var("DATABASE_URL").unwrap()).await;
             let db_conn = match db_conn {
-                Ok(db_conn) => Some(db_conn),
+                Ok(mut db_conn) => {
+                    // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior
+                    use sqlx::Executor;
+                    if let Err(e) = db_conn.execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')").await {
+                        error_span!("failed to set TIME_TRUNCATE_FRACTIONAL mode", error = e.to_string().as_str());
+                    }
+                    Some(db_conn)
+                }
                 Err(sqlx::Error::Io(e)) => {
                     error_span!("failed to connect to db", error = e.to_string().as_str());
                     None

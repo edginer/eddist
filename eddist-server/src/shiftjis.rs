@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use axum::{
-    http::HeaderValue,
+    http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
@@ -84,6 +84,7 @@ pub struct SJisResponseBuilder {
     content_type: SjisContentType,
     status_code: StatusCode,
     cookies: CookieJar,
+    headers: Vec<(String, String)>,
 }
 
 pub enum SjisContentType {
@@ -100,6 +101,7 @@ impl SJisResponseBuilder {
             content_type: SjisContentType::TextPlain,
             status_code: StatusCode::OK,
             cookies: CookieJar::new(),
+            headers: Vec::new(),
         }
     }
 
@@ -140,6 +142,12 @@ impl SJisResponseBuilder {
         Self { cookies, ..self }
     }
 
+    pub fn add_header(self, key: String, value: String) -> Self {
+        let mut headers = self.headers;
+        headers.push((key, value));
+        Self { headers, ..self }
+    }
+
     pub fn build(self) -> SJisResponse {
         let mut resp = Response::new(self.body.get_inner().into());
         let headers = resp.headers_mut();
@@ -168,6 +176,14 @@ impl SJisResponseBuilder {
                 "Set-Cookie",
                 HeaderValue::from_str(&cookie.to_string()).unwrap(),
             );
+        }
+
+        for (key, value) in self.headers {
+            if let Ok(header_name) = HeaderName::try_from(key) {
+                if let Ok(header_value) = HeaderValue::from_str(&value) {
+                    headers.append(header_name, header_value);
+                }
+            }
         }
 
         let status_code = resp.status_mut();
