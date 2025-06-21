@@ -172,13 +172,20 @@ async fn main() -> anyhow::Result<()> {
     let pool = MySqlPoolOptions::new()
         .after_connect(|conn, _| {
             use sqlx::Executor;
-
-            // Set transaction isolation level to `READ-COMMITTED`
             Box::pin(async move {
+                // Set transaction isolation level to `READ-COMMITTED`
                 conn.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
                     .await
                     .unwrap();
                 log::info!("Set transaction isolation level to `READ-COMMITTED`");
+
+                // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono's %3f truncation behavior
+                conn.execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior");
                 Ok(())
             })
         })
