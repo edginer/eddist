@@ -6,6 +6,7 @@ use eddist_core::{
     domain::{
         cap::calculate_cap_hash,
         client_info::ClientInfo,
+        ip_addr::ReducedIpAddr,
         pubsub_repository::{CreatingRes, PubSubItem},
         tinker::Tinker,
     },
@@ -190,7 +191,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         if res_span_svc
             .is_within_creation_span(
                 &authed_token.token,
-                &input.ip_addr,
+                &ReducedIpAddr::from(input.ip_addr.clone()).to_string(),
                 created_at.timestamp() as u64,
             )
             .await
