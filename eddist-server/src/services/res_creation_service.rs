@@ -231,7 +231,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         res_span_svc
             .update_last_res_creation_time(
                 &authed_token.token,
-                &input.ip_addr,
+                &ReducedIpAddr::from(input.ip_addr.clone()).to_string(),
                 created_at.timestamp() as u64,
             )
             .await;
