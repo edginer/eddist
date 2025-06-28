@@ -178,9 +178,10 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
             if chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at()
                 < board_info.base_response_creation_span_sec as u64
             {
-                return Err(BbsCgiError::TooManyCreatingRes(
-                    board_info.base_response_creation_span_sec,
-                ));
+                return Err(BbsCgiError::TooManyCreatingRes {
+                    tinker_level: tinker.level(),
+                    span_sec: board_info.base_response_creation_span_sec,
+                });
             }
             if is_thread {
                 if let Some(last_created_thread_at) = tinker.last_created_thread_at() {

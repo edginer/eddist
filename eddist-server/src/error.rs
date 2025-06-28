@@ -55,8 +55,8 @@ pub enum BbsCgiError {
     #[error("{0}が空です")]
     ContentEmpty(ContentEmptyParamType),
 
-    #[error("短期間に書き込みすぎです ({0}秒以内に1回書き込むことができます)")]
-    TooManyCreatingRes(i32),
+    #[error("短期間に書き込みすぎです (Lv{tinker_level}は{span_sec}秒以内に1回書き込むことができます)")]
+    TooManyCreatingRes { tinker_level: u32, span_sec: i32 },
 
     #[error(
         "短期間にスレ立てすぎです (Lv{tinker_level}は{span_sec}秒以内に1回スレを立てることができます)"
@@ -100,7 +100,7 @@ impl BbsCgiError {
             BbsCgiError::ImageUrlBelowLv2 => StatusCode::OK,
             BbsCgiError::ContentLengthExceeded(_) => StatusCode::OK,
             BbsCgiError::ContentEmpty(_) => StatusCode::OK,
-            BbsCgiError::TooManyCreatingRes(_) => StatusCode::OK,
+            BbsCgiError::TooManyCreatingRes { .. } => StatusCode::OK,
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
             BbsCgiError::TooManyCreatingThreadWithoutTinker => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
@@ -126,7 +126,7 @@ impl BbsCgiError {
             BbsCgiError::ImageUrlBelowLv2 => "ImageUrlBelowLv2",
             BbsCgiError::ContentLengthExceeded(_) => "ContentLengthExceeded",
             BbsCgiError::ContentEmpty(_) => "ContentEmpty",
-            BbsCgiError::TooManyCreatingRes(_) => "TooManyCreatingRes",
+            BbsCgiError::TooManyCreatingRes { .. } => "TooManyCreatingRes",
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
             BbsCgiError::TooManyCreatingThreadWithoutTinker => "TooManyCreatingThreadWithoutTinker",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
