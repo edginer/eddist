@@ -1,7 +1,7 @@
 import { useQuery as useSuspenseQuery } from "@tanstack/react-query";
 import { Button, HR } from "flowbite-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { FaArrowLeft } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
 import PostResponseModal from "../PostResponseModal";
