@@ -24,6 +24,7 @@ use crate::{
             },
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
+            user_restriction_service::UserRestrictionService,
         },
         utils::{sanitize_base, sanitize_num_refs},
     },
@@ -31,6 +32,7 @@ use crate::{
     repositories::{
         bbs_repository::{BbsRepository, CreatingThread},
         user_repository::UserRepository,
+        user_restriction_repository::UserRestrictionRepository,
     },
     utils::redis::thread_cache_key,
 };
@@ -40,18 +42,18 @@ use super::BbsCgiService;
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository, U: UserRepository>(T, U, ConnectionManager);
+pub struct TheradCreationService<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository>(T, U, ConnectionManager, R);
 
-impl<T: BbsRepository, U: UserRepository> TheradCreationService<T, U> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager) -> Self {
-        Self(repo, user_repo, redis_conn)
+impl<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository> TheradCreationService<T, U, R> {
+    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, user_restriction_repo: R) -> Self {
+        Self(repo, user_repo, redis_conn, user_restriction_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone>
+impl<T: BbsRepository + Clone, U: UserRepository + Clone, R: UserRestrictionRepository + Clone>
     BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
-    for TheradCreationService<T, U>
+    for TheradCreationService<T, U, R>
 {
     async fn execute(
         &self,
@@ -115,7 +117,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
                 input.ip_addr.clone(),
-                input.user_agent,
+                input.user_agent.clone(),
                 created_at,
             )
             .await?;
@@ -203,6 +205,21 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             .await?;
         if (&res, title.clone()).contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
+        }
+
+        // Check user restriction rules
+        let user_restriction_svc = UserRestrictionService::new(self.3.clone());
+        let user_attrs = eddist_core::domain::user_restriction_filter::UserAttributes {
+            ip_addr: input.ip_addr.clone(),
+            user_agent: input.user_agent.clone(),
+            asn_num: input.asn_num,
+        };
+        // Thread creation includes response creation, so check both types
+        if user_restriction_svc.is_user_restricted(&user_attrs, 
+            crate::domain::service::user_restriction_service::RestrictionType::CreatingThread).await? 
+            || user_restriction_svc.is_user_restricted(&user_attrs, 
+            crate::domain::service::user_restriction_service::RestrictionType::CreatingResponse).await? {
+            return Err(BbsCgiError::UserRestricted);
         }
 
         let authed_token_clone = authed_token.token.clone();

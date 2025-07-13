@@ -66,6 +66,9 @@ pub enum BbsCgiError {
     #[error("短期間にスレ立てすぎです")]
     TooManyCreatingThreadWithoutTinker,
 
+    #[error("あなたのアクセスは制限されています")]
+    UserRestricted,
+
     #[error("初回書き込み時にはスレッドを立てることができません")]
     TmpCanNotCreateThread,
 
@@ -103,6 +106,7 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingRes { .. } => StatusCode::OK,
             BbsCgiError::TooManyCreatingThread { .. } => StatusCode::OK,
             BbsCgiError::TooManyCreatingThreadWithoutTinker => StatusCode::OK,
+            BbsCgiError::UserRestricted => StatusCode::OK,
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
@@ -129,6 +133,7 @@ impl BbsCgiError {
             BbsCgiError::TooManyCreatingRes { .. } => "TooManyCreatingRes",
             BbsCgiError::TooManyCreatingThread { .. } => "TooManyCreatingThread",
             BbsCgiError::TooManyCreatingThreadWithoutTinker => "TooManyCreatingThreadWithoutTinker",
+            BbsCgiError::UserRestricted => "UserRestricted",
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
@@ -316,6 +321,8 @@ pub enum BbsPostAuthWithCodeError {
     ExpiredActivationCode,
     #[error("認証に失敗しました。時間をおいてから再度認証してください")]
     AuthCodeCollision,
+    #[error("あなたのアクセスは制限されています")]
+    UserRestricted,
     #[error(transparent)]
     CaptchaError(#[from] CaptchaLikeError),
 }

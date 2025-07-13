@@ -1,11 +1,63 @@
 use std::vec;
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{query, query_as, types::Json, FromRow, MySqlPool};
 use uuid::Uuid;
 
 use crate::{Board, BoardInfo, CreateBoardInput, EditBoardInput, Res, Thread};
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RestrictionType {
+    CreatingResponse,
+    CreatingThread,
+    AuthCode,
+    All,
+}
+
+impl RestrictionType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RestrictionType::CreatingResponse => "creating_response",
+            RestrictionType::CreatingThread => "creating_thread",
+            RestrictionType::AuthCode => "auth_code",
+            RestrictionType::All => "all",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "creating_response" => Some(RestrictionType::CreatingResponse),
+            "creating_thread" => Some(RestrictionType::CreatingThread),
+            "auth_code" => Some(RestrictionType::AuthCode),
+            "all" => Some(RestrictionType::All),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UserRestrictionRule {
+    pub id: Uuid,
+    pub name: String,
+    pub filter_expression: String,
+    pub restriction_type: RestrictionType,
+    pub active: bool,
+    pub created_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+    pub created_by: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct UpdateUserRestrictionRule {
+    pub name: Option<String>,
+    pub filter_expression: Option<String>,
+    pub restriction_type: Option<RestrictionType>,
+    pub active: Option<bool>,
+    pub description: Option<String>,
+}
 
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {
@@ -59,6 +111,13 @@ pub trait AdminBbsRepository: Send + Sync {
     ) -> anyhow::Result<Res>;
 
     async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()>;
+
+    // User restriction rules
+    async fn get_all_user_restriction_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>>;
+    async fn get_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>>;
+    async fn create_user_restriction_rule(&self, rule: &UserRestrictionRule) -> anyhow::Result<()>;
+    async fn update_user_restriction_rule(&self, id: Uuid, update: &UpdateUserRestrictionRule) -> anyhow::Result<Option<UserRestrictionRule>>;
+    async fn delete_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<bool>;
 }
 
 #[derive(Clone)]
@@ -206,7 +265,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             WHERE
                 id = ?
             "#,
-            id.as_bytes().to_vec()
+            id.as_bytes().to_vec().to_vec()
         )
         .fetch_one(pool)
         .await?;
@@ -972,7 +1031,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             WHERE
                 id = ?
             "#,
-            id.as_bytes().to_vec()
+            id.as_bytes().to_vec().to_vec()
         )
         .fetch_one(pool)
         .await?;
@@ -1015,5 +1074,139 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
         .await?;
 
         Ok(())
+    }
+
+    async fn get_all_user_restriction_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {
+        let rows = query_as!(
+            UserRestrictionRuleRow,
+            r#"
+            SELECT id, name, filter_expression, restriction_type, active, created_at, updated_at, created_by, description
+            FROM user_restriction_rules
+            ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&self.0)
+        .await?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>> {
+        let row = query_as!(
+            UserRestrictionRuleRow,
+            r#"
+            SELECT id, name, filter_expression, restriction_type, active, created_at, updated_at, created_by, description
+            FROM user_restriction_rules
+            WHERE id = ?
+            "#,
+            id.as_bytes().to_vec()
+        )
+        .fetch_optional(&self.0)
+        .await?;
+
+        Ok(row.map(Into::into))
+    }
+
+    async fn create_user_restriction_rule(&self, rule: &UserRestrictionRule) -> anyhow::Result<()> {
+        query!(
+            r#"
+            INSERT INTO user_restriction_rules (id, name, filter_expression, restriction_type, active, created_at, updated_at, created_by, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+            rule.id.as_bytes().to_vec(),
+            rule.name,
+            rule.filter_expression,
+            rule.restriction_type.as_str(),
+            rule.active,
+            rule.created_at,
+            rule.updated_at,
+            rule.created_by,
+            rule.description
+        )
+        .execute(&self.0)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn update_user_restriction_rule(&self, id: Uuid, update: &UpdateUserRestrictionRule) -> anyhow::Result<Option<UserRestrictionRule>> {
+        let mut set_clauses = vec!["updated_at = CURRENT_TIMESTAMP".to_string()];
+        let mut values: Vec<String> = vec![];
+
+        if let Some(ref name) = update.name {
+            set_clauses.push("name = ?".to_string());
+            values.push(name.clone());
+        }
+        if let Some(ref filter_expression) = update.filter_expression {
+            set_clauses.push("filter_expression = ?".to_string());
+            values.push(filter_expression.clone());
+        }
+        if let Some(ref restriction_type) = update.restriction_type {
+            set_clauses.push("restriction_type = ?".to_string());
+            values.push(restriction_type.as_str().to_string());
+        }
+        if let Some(active) = update.active {
+            set_clauses.push("active = ?".to_string());
+            values.push(active.to_string());
+        }
+        if let Some(ref description) = update.description {
+            set_clauses.push("description = ?".to_string());
+            values.push(description.clone());
+        }
+
+        let sql = format!(
+            "UPDATE user_restriction_rules SET {} WHERE id = ?",
+            set_clauses.join(", ")
+        );
+
+        let result = query(&sql)
+            .execute(&self.0)
+            .await?;
+
+        if result.rows_affected() > 0 {
+            self.get_user_restriction_rule(id).await
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn delete_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<bool> {
+        let result = query!(
+            "DELETE FROM user_restriction_rules WHERE id = ?",
+            id.as_bytes().to_vec()
+        )
+        .execute(&self.0)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+}
+
+#[derive(FromRow)]
+struct UserRestrictionRuleRow {
+    id: Vec<u8>,
+    name: String,
+    filter_expression: String,
+    restriction_type: String,
+    active: i8,
+    created_at: chrono::NaiveDateTime,
+    updated_at: chrono::NaiveDateTime,
+    created_by: Option<String>,
+    description: Option<String>,
+}
+
+impl From<UserRestrictionRuleRow> for UserRestrictionRule {
+    fn from(row: UserRestrictionRuleRow) -> Self {
+        Self {
+            id: Uuid::from_slice(&row.id).unwrap(),
+            name: row.name,
+            filter_expression: row.filter_expression,
+            restriction_type: RestrictionType::from_str(&row.restriction_type).unwrap_or(RestrictionType::CreatingResponse),
+            active: row.active != 0,
+            created_at: DateTime::from_naive_utc_and_offset(row.created_at, Utc),
+            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at, Utc),
+            created_by: row.created_by,
+            description: row.description,
+        }
     }
 }

@@ -87,6 +87,7 @@ impl BbsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> BbsRepositoryImpl {
         BbsRepositoryImpl { pool }
     }
+
 }
 
 #[async_trait::async_trait]
@@ -855,6 +856,11 @@ impl BbsRepository for BbsRepositoryImpl {
 
         Ok(cap)
     }
+
+
+
+
+
 }
 
 #[derive(Debug)]
@@ -959,3 +965,4 @@ pub struct CreatingAuthedToken {
     pub created_at: DateTime<Utc>,
     pub author_id_seed: Vec<u8>,
 }
+

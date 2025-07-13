@@ -32,12 +32,13 @@ use crate::{
             },
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
+            user_restriction_service::UserRestrictionService,
         },
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
-        user_repository::UserRepository,
+        user_repository::UserRepository, user_restriction_repository::UserRestrictionRepository,
     },
     utils::redis::thread_cache_key,
 };
@@ -45,23 +46,24 @@ use crate::{
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
 
 #[derive(Clone)]
-pub struct ResCreationService<T: BbsRepository, U: UserRepository, P: PubRepository>(
+pub struct ResCreationService<T: BbsRepository, U: UserRepository, P: PubRepository, R: UserRestrictionRepository>(
     T,
     U,
     ConnectionManager,
     P,
+    R,
 );
 
-impl<T: BbsRepository, U: UserRepository, P: PubRepository> ResCreationService<T, U, P> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, pub_repo: P) -> Self {
-        Self(repo, user_repo, redis_conn, pub_repo)
+impl<T: BbsRepository, U: UserRepository, P: PubRepository, R: UserRestrictionRepository> ResCreationService<T, U, P, R> {
+    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, pub_repo: P, user_restriction_repo: R) -> Self {
+        Self(repo, user_repo, redis_conn, pub_repo, user_restriction_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
+impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository, R: UserRestrictionRepository + Clone>
     BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
-    for ResCreationService<T, U, P>
+    for ResCreationService<T, U, P, R>
 {
     async fn execute(
         &self,
@@ -127,7 +129,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
                 input.ip_addr.clone(),
-                input.user_agent,
+                input.user_agent.clone(),
                 created_at,
             )
             .await?;
@@ -181,6 +183,18 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             .await?;
         if res.contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
+        }
+
+        // Check user restriction rules
+        let user_restriction_svc = UserRestrictionService::new(self.4.clone());
+        let user_attrs = eddist_core::domain::user_restriction_filter::UserAttributes {
+            ip_addr: input.ip_addr.clone(),
+            user_agent: input.user_agent.clone(),
+            asn_num: input.asn_num,
+        };
+        if user_restriction_svc.is_user_restricted(&user_attrs, 
+            crate::domain::service::user_restriction_service::RestrictionType::CreatingResponse).await? {
+            return Err(BbsCgiError::UserRestricted);
         }
 
         // Determine response creation span and tinker level based on tinker

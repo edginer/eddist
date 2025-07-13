@@ -24,6 +24,7 @@ use crate::{
     repositories::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         idp_repository::IdpRepository, user_repository::UserRepository,
+        user_restriction_repository::UserRestrictionRepository,
     },
 };
 
@@ -63,12 +64,13 @@ pub struct AppServiceContainer<
     U: UserRepository + 'static,
     I: IdpRepository + 'static,
     P: PubRepository,
+    R: UserRestrictionRepository + 'static,
 > {
-    auth_with_code: AuthWithCodeService<B>,
+    auth_with_code: AuthWithCodeService<B, R>,
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
-    res_creation: ResCreationService<B, U, P>,
-    thread_creation: TheradCreationService<B, U>,
+    res_creation: ResCreationService<B, U, P, R>,
+    thread_creation: TheradCreationService<B, U, R>,
     thread_list: ThreadListService<B>,
     metadent_thread_list: MetadentThreadListService<B>,
     thread_retrival: ThreadRetrievalService<B>,
@@ -89,7 +91,8 @@ impl<
         U: UserRepository + Clone,
         I: IdpRepository + Clone,
         P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+        R: UserRestrictionRepository + Clone,
+    > AppServiceContainer<B, U, I, P, R>
 {
     pub fn new(
         bbs_repo: B,
@@ -98,9 +101,10 @@ impl<
         redis_conn: ConnectionManager,
         pub_repo: P,
         bucket: Bucket,
+        user_restriction_repo: R,
     ) -> Self {
         AppServiceContainer {
-            auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
+            auth_with_code: AuthWithCodeService::new(bbs_repo.clone(), user_restriction_repo.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
@@ -108,11 +112,13 @@ impl<
                 user_repo.clone(),
                 redis_conn.clone(),
                 pub_repo,
+                user_restriction_repo.clone(),
             ),
             thread_creation: TheradCreationService::new(
                 bbs_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
+                user_restriction_repo,
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
@@ -158,9 +164,10 @@ impl<
         U: UserRepository + 'static,
         I: IdpRepository + 'static,
         P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+        R: UserRestrictionRepository + 'static,
+    > AppServiceContainer<B, U, I, P, R>
 {
-    pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
+    pub fn auth_with_code(&self) -> &AuthWithCodeService<B, R> {
         &self.auth_with_code
     }
 
@@ -168,11 +175,11 @@ impl<
         &self.board_info
     }
 
-    pub fn res_creation(&self) -> &ResCreationService<B, U, P> {
+    pub fn res_creation(&self) -> &ResCreationService<B, U, P, R> {
         &self.res_creation
     }
 
-    pub fn thread_creation(&self) -> &TheradCreationService<B, U> {
+    pub fn thread_creation(&self) -> &TheradCreationService<B, U, R> {
         &self.thread_creation
     }
 

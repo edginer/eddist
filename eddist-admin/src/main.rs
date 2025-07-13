@@ -20,7 +20,7 @@ use repository::{
         AdminArchiveRepository, AdminArchiveRepositoryImpl, ArchivedAdminRes, ArchivedAdminThread,
         ArchivedRes, ArchivedResUpdate, ArchivedThread,
     },
-    admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl},
+    admin_bbs_repository::{AdminBbsRepository, AdminBbsRepositoryImpl, RestrictionType},
     admin_user_repository::{AdminUserRepository, AdminUserRepositoryImpl},
     authed_token_repository::{AuthedTokenRepository, AuthedTokenRepositoryImpl},
     cap_repository::{CapRepository, CapRepositoryImpl},
@@ -262,7 +262,12 @@ async fn main() {
         .route("/caps/{capId}", delete(bbs::delete_cap))
         .route("/caps/{capId}", patch(bbs::update_cap))
         .route("/users/search", get(bbs::search_users))
-        .route("/users/{userId}/status", patch(bbs::update_user_status));
+        .route("/users/{userId}/status", patch(bbs::update_user_status))
+        .route("/user-restriction-rules", get(bbs::get_user_restriction_rules))
+        .route("/user-restriction-rules", post(bbs::create_user_restriction_rule))
+        .route("/user-restriction-rules/{id}", get(bbs::get_user_restriction_rule))
+        .route("/user-restriction-rules/{id}", patch(bbs::update_user_restriction_rule))
+        .route("/user-restriction-rules/{id}", delete(bbs::delete_user_restriction_rule));
 
     let state = AppState {
         oauth2_client: client,
@@ -560,6 +565,54 @@ pub struct UserStatusUpdateInput {
     enabled: bool,
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserRestrictionRuleResponse {
+    id: Uuid,
+    name: String,
+    filter_expression: String,
+    restriction_type: RestrictionType,
+    active: bool,
+    created_at: chrono::DateTime<Utc>,
+    updated_at: chrono::DateTime<Utc>,
+    created_by: Option<String>,
+    description: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateUserRestrictionRuleRequest {
+    name: String,
+    filter_expression: String,
+    restriction_type: RestrictionType,
+    active: bool,
+    created_by: Option<String>,
+    description: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UpdateUserRestrictionRuleRequest {
+    name: Option<String>,
+    filter_expression: Option<String>,
+    restriction_type: Option<RestrictionType>,
+    active: Option<bool>,
+    description: Option<String>,
+}
+
+impl From<crate::repository::admin_bbs_repository::UserRestrictionRule> for UserRestrictionRuleResponse {
+    fn from(rule: crate::repository::admin_bbs_repository::UserRestrictionRule) -> Self {
+        Self {
+            id: rule.id,
+            name: rule.name,
+            filter_expression: rule.filter_expression,
+            restriction_type: rule.restriction_type,
+            active: rule.active,
+            created_at: rule.created_at,
+            updated_at: rule.updated_at,
+            created_by: rule.created_by,
+            description: rule.description,
+        }
+    }
+}
+
 mod bbs {
     use axum::{
         extract::{Path, Query, State},
@@ -573,6 +626,7 @@ mod bbs {
     use uuid::Uuid;
 
     use crate::{
+        UserRestrictionRuleResponse, CreateUserRestrictionRuleRequest, UpdateUserRestrictionRuleRequest,
         repository::{
             admin_archive_repository::{
                 AdminArchiveRepository, ArchivedAdminThread, ArchivedResUpdate, ArchivedThread,
@@ -1500,6 +1554,151 @@ mod bbs {
             .body(serde_json::to_string(&users[0]).unwrap().into())
             .unwrap()
     }
+
+    // User Restriction Rules API endpoints
+    #[utoipa::path(
+        get,
+        path = "/user-restriction-rules/",
+        responses(
+            (status = 200, description = "List user restriction rules successfully", body = Vec<UserRestrictionRuleResponse>),
+        )
+    )]
+    pub async fn get_user_restriction_rules(
+        State(state): State<DefaultAppState>,
+    ) -> Result<Json<Vec<UserRestrictionRuleResponse>>, (axum::http::StatusCode, String)> {
+        let rules = state.admin_bbs_repo
+            .get_all_user_restriction_rules()
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        
+        let response_rules: Vec<UserRestrictionRuleResponse> = rules.into_iter().map(Into::into).collect();
+        Ok(Json(response_rules))
+    }
+
+    #[utoipa::path(
+        get,
+        path = "/user-restriction-rules/{id}/",
+        responses(
+            (status = 200, description = "Get user restriction rule successfully", body = UserRestrictionRuleResponse),
+            (status = 404, description = "Rule not found"),
+        ),
+        params(
+            ("id" = Uuid, Path, description = "Rule ID"),
+        )
+    )]
+    pub async fn get_user_restriction_rule(
+        Path(id): Path<Uuid>,
+        State(state): State<DefaultAppState>,
+    ) -> Result<Json<UserRestrictionRuleResponse>, (axum::http::StatusCode, String)> {
+        let rule = state.admin_bbs_repo
+            .get_user_restriction_rule(id)
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .ok_or((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()))?;
+        
+        Ok(Json(rule.into()))
+    }
+
+    #[utoipa::path(
+        post,
+        path = "/user-restriction-rules/",
+        responses(
+            (status = 200, description = "Create user restriction rule successfully", body = UserRestrictionRuleResponse),
+            (status = 400, description = "Invalid restriction type"),
+        ),
+        request_body = CreateUserRestrictionRuleRequest
+    )]
+    pub async fn create_user_restriction_rule(
+        State(state): State<DefaultAppState>,
+        Json(request): Json<CreateUserRestrictionRuleRequest>,
+    ) -> Result<Json<UserRestrictionRuleResponse>, (axum::http::StatusCode, String)> {
+        let restriction_type = request.restriction_type;
+
+        let rule = crate::repository::admin_bbs_repository::UserRestrictionRule {
+            id: Uuid::now_v7(),
+            name: request.name,
+            filter_expression: request.filter_expression,
+            restriction_type,
+            active: request.active,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            created_by: request.created_by,
+            description: request.description,
+        };
+
+        state.admin_bbs_repo
+            .create_user_restriction_rule(&rule)
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        Ok(Json(rule.into()))
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/user-restriction-rules/{id}/",
+        responses(
+            (status = 200, description = "Update user restriction rule successfully", body = UserRestrictionRuleResponse),
+            (status = 400, description = "Invalid restriction type"),
+            (status = 404, description = "Rule not found"),
+        ),
+        params(
+            ("id" = Uuid, Path, description = "Rule ID"),
+        ),
+        request_body = UpdateUserRestrictionRuleRequest
+    )]
+    pub async fn update_user_restriction_rule(
+        Path(id): Path<Uuid>,
+        State(state): State<DefaultAppState>,
+        Json(request): Json<UpdateUserRestrictionRuleRequest>,
+    ) -> Result<Json<UserRestrictionRuleResponse>, (axum::http::StatusCode, String)> {
+        let restriction_type = request.restriction_type;
+
+        let update = crate::repository::admin_bbs_repository::UpdateUserRestrictionRule {
+            name: request.name,
+            filter_expression: request.filter_expression,
+            restriction_type,
+            active: request.active,
+            description: request.description,
+        };
+
+        let updated_rule = state.admin_bbs_repo
+            .update_user_restriction_rule(id, &update)
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .ok_or((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()))?;
+
+        Ok(Json(updated_rule.into()))
+    }
+
+    #[utoipa::path(
+        delete,
+        path = "/user-restriction-rules/{id}/",
+        responses(
+            (status = 200, description = "Delete user restriction rule successfully", body = bool),
+            (status = 404, description = "Rule not found"),
+        ),
+        params(
+            ("id" = Uuid, Path, description = "Rule ID"),
+        )
+    )]
+    pub async fn delete_user_restriction_rule(
+        Path(id): Path<Uuid>,
+        State(state): State<DefaultAppState>,
+    ) -> Result<Json<bool>, (axum::http::StatusCode, String)> {
+        let deleted = state.admin_bbs_repo
+            .delete_user_restriction_rule(id)
+            .await
+            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        if !deleted {
+            return Err((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()));
+        }
+
+        Ok(Json(true))
+    }
+
+
 }
 
 #[derive(OpenApi)]
@@ -1535,6 +1734,11 @@ mod bbs {
         bbs::threads_compaction,
         bbs::search_users,
         bbs::update_user_status,
+        bbs::get_user_restriction_rules,
+        bbs::get_user_restriction_rule,
+        bbs::create_user_restriction_rule,
+        bbs::update_user_restriction_rule,
+        bbs::delete_user_restriction_rule,
     ),
     components(schemas(
         Board,
@@ -1562,6 +1766,9 @@ mod bbs {
         User,
         UserIdpBinding,
         UserStatusUpdateInput,
+        UserRestrictionRuleResponse,
+        CreateUserRestrictionRuleRequest,
+        UpdateUserRestrictionRuleRequest,
     ))
 )]
 struct ApiDoc;

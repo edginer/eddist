@@ -324,6 +324,38 @@ export interface paths {
         patch: operations["update_ng_word"];
         trace?: never;
     };
+    "/user-restriction-rules/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_user_restriction_rules"];
+        put?: never;
+        post: operations["create_user_restriction_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-restriction-rules/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_user_restriction_rule"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_user_restriction_rule"];
+        options?: never;
+        head?: never;
+        patch: operations["update_user_restriction_rule"];
+        trace?: never;
+    };
     "/users/search/": {
         parameters: {
             query?: never;
@@ -447,7 +479,7 @@ export interface components {
             /** Format: int32 */
             asn_num: number;
             ip_addr: string;
-            tinker?: components["schemas"]["Tinker"] | null;
+            tinker?: null | components["schemas"]["Tinker"];
             user_agent: string;
         };
         CreateBoardInput: {
@@ -464,6 +496,14 @@ export interface components {
             name: string;
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
+        };
+        CreateUserRestrictionRuleRequest: {
+            active: boolean;
+            created_by?: string | null;
+            description?: string | null;
+            filter_expression: string;
+            name: string;
+            restriction_type: components["schemas"]["RestrictionType"];
         };
         CreationCapInput: {
             description: string;
@@ -521,6 +561,8 @@ export interface components {
             /** Format: uuid */
             thread_id: string;
         };
+        /** @enum {string} */
+        RestrictionType: "creating_response" | "creating_thread" | "auth_code" | "all";
         Thread: {
             active: boolean;
             archived: boolean;
@@ -578,6 +620,13 @@ export interface components {
             is_abone?: boolean | null;
             mail?: string | null;
         };
+        UpdateUserRestrictionRuleRequest: {
+            active?: boolean | null;
+            description?: string | null;
+            filter_expression?: string | null;
+            name?: string | null;
+            restriction_type?: null | components["schemas"]["RestrictionType"];
+        };
         User: {
             authed_token_ids: string[];
             enabled: boolean;
@@ -593,6 +642,20 @@ export interface components {
             idp_sub: string;
             /** Format: uuid */
             user_id: string;
+        };
+        UserRestrictionRuleResponse: {
+            active: boolean;
+            /** Format: date-time */
+            created_at: string;
+            created_by?: string | null;
+            description?: string | null;
+            filter_expression: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            restriction_type: components["schemas"]["RestrictionType"];
+            /** Format: date-time */
+            updated_at: string;
         };
         UserStatusUpdateInput: {
             enabled: boolean;
@@ -1324,6 +1387,158 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NgWord"];
                 };
+            };
+        };
+    };
+    get_user_restriction_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List user restriction rules successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleResponse"][];
+                };
+            };
+        };
+    };
+    create_user_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRestrictionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Create user restriction rule successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleResponse"];
+                };
+            };
+            /** @description Invalid restriction type */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_user_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get user restriction rule successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleResponse"];
+                };
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_user_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete user restriction rule successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": boolean;
+                };
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_user_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRestrictionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Update user restriction rule successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleResponse"];
+                };
+            };
+            /** @description Invalid restriction type */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

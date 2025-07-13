@@ -528,3 +528,61 @@ export const updateUserStatus = ({
   };
   return { mutate };
 };
+
+const GET_USER_RESTRICTION_RULES = "/user-restriction-rules/";
+
+export const getUserRestrictionRules = ({
+  params,
+}: UseQueryOptions<paths[typeof GET_USER_RESTRICTION_RULES]["get"]>) => {
+  return useSuspenseQuery({
+    queryKey: [GET_USER_RESTRICTION_RULES],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_USER_RESTRICTION_RULES, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const CREATE_USER_RESTRICTION_RULE = "/user-restriction-rules/";
+
+export const createUserRestrictionRule = ({
+  body,
+}: UseQueryOptions<paths[typeof CREATE_USER_RESTRICTION_RULE]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(CREATE_USER_RESTRICTION_RULE, {
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const UPDATE_USER_RESTRICTION_RULE = "/user-restriction-rules/{id}/";
+
+export const updateUserRestrictionRule = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_USER_RESTRICTION_RULE]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_USER_RESTRICTION_RULE, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_USER_RESTRICTION_RULE = "/user-restriction-rules/{id}/";
+
+export const deleteUserRestrictionRule = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_USER_RESTRICTION_RULE]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_USER_RESTRICTION_RULE, {
+      params,
+    });
+  };
+  return { mutate };
+};

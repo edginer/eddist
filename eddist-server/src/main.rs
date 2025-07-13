@@ -23,6 +23,7 @@ use metrics::describe_counter;
 use repositories::{
     bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
     idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use routes::{
     auth_code::{get_auth_code, post_auth_code},
@@ -57,6 +58,7 @@ mod repositories {
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod user_repository;
+    pub(crate) mod user_restriction_repository;
 }
 mod domain {
     pub(crate) mod service {
@@ -66,6 +68,7 @@ mod domain {
         pub mod ng_word_reading_service;
         pub mod oidc_client_service;
         pub mod res_creation_span_management_service;
+        pub mod user_restriction_service;
     }
 
     pub(crate) mod user;
@@ -107,6 +110,7 @@ struct AppState {
         UserRepositoryImpl,
         IdpRepositoryImpl,
         RedisPubRepository,
+        UserRestrictionRepositoryImpl,
     >,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
@@ -121,6 +125,7 @@ impl AppState {
         UserRepositoryImpl,
         IdpRepositoryImpl,
         RedisPubRepository,
+        UserRestrictionRepositoryImpl,
     > {
         &self.services
     }
@@ -233,10 +238,11 @@ async fn main() -> anyhow::Result<()> {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool.clone()),
             UserRepositoryImpl::new(pool.clone()),
-            IdpRepositoryImpl::new(pool),
+            IdpRepositoryImpl::new(pool.clone()),
             conn_mgr.clone(),
             pub_repo,
             *s3_client,
+            UserRestrictionRepositoryImpl::new(pool),
         ),
         tinker_secret,
         captcha_like_configs,

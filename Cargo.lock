@@ -573,6 +573,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cidr"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bdf600c45bd958cf2945c445264471cca8b6c8e67bc87b71affd6d7e5682621"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cipher"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1123,9 +1132,11 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3",
+ "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "wirefilter-engine",
 ]
 
 [[package]]
@@ -2236,6 +2247,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "memmem"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a64a92489e2744ce060c349162be1c5f33c6969234104dbd99ddb5feb08b8c15"
+
+[[package]]
 name = "metrics"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2626,6 +2643,12 @@ dependencies = [
  "smallvec",
  "windows-targets 0.52.6",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pem"
@@ -3516,6 +3539,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
 
 [[package]]
+name = "seq-macro"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
+
+[[package]]
 name = "serde"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3750,6 +3779,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "sliceslice"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "361b80c452f3f8cc2426bf996059740b4c78ef5a5aeb1c1852d8ac4f561b8b4c"
+dependencies = [
+ "cfg-if",
+ "memchr",
+ "paste",
+ "seq-macro",
 ]
 
 [[package]]
@@ -4832,6 +4873,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wildcard"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36241ad0795516b55e3b60e55c7f979d4f324e4aaea4c70d56b548b9164ee4d2"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5160,6 +5210,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9fb597c990f03753e08d3c29efbfcf2019a003b4bf4ba19225c158e1549f0f3"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "wirefilter-engine"
+version = "0.7.0"
+source = "git+https://github.com/cloudflare/wirefilter?rev=b4cc65907b188427db1abd18490674a367df13e9#b4cc65907b188427db1abd18490674a367df13e9"
+dependencies = [
+ "backtrace",
+ "cfg-if",
+ "cidr",
+ "fnv",
+ "getrandom 0.3.2",
+ "memmem",
+ "rand 0.9.1",
+ "regex-automata 0.4.9",
+ "serde",
+ "serde_json",
+ "sliceslice",
+ "thiserror 1.0.69",
+ "wildcard",
 ]
 
 [[package]]

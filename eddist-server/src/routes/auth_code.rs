@@ -16,7 +16,7 @@ use crate::{
         AppService,
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
     },
-    utils::{get_origin_ip, get_ua},
+    utils::{get_asn_num, get_origin_ip, get_ua},
 };
 
 // NOTE: this system will be changed in the future
@@ -64,6 +64,7 @@ pub async fn post_auth_code(
             code: form["auth-code"].to_string(),
             origin_ip: get_origin_ip(&headers).to_string(),
             user_agent: get_ua(&headers).to_string(),
+            asn_num: get_asn_num(&headers),
             captcha_like_configs: state.captcha_like_configs.clone(),
             responses: form,
         })

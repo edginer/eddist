@@ -6,34 +6,52 @@ use metrics::counter;
 use tracing::{error_span, info_span};
 
 use crate::{
-    domain::captcha_like::CaptchaLikeConfig,
-    error::BbsPostAuthWithCodeError,
+    domain::{
+        captcha_like::CaptchaLikeConfig,
+        service::user_restriction_service::UserRestrictionService,
+    },
+    error::{BbsCgiError, BbsPostAuthWithCodeError},
     external::captcha_like_client::{
         CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
     },
-    repositories::bbs_repository::BbsRepository,
+    repositories::{bbs_repository::BbsRepository, user_restriction_repository::UserRestrictionRepository},
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
 
 use super::AppService;
 
 #[derive(Debug, Clone)]
-pub struct AuthWithCodeService<T: BbsRepository>(T);
+pub struct AuthWithCodeService<T: BbsRepository, R: UserRestrictionRepository>(T, R);
 
-impl<T: BbsRepository> AuthWithCodeService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+impl<T: BbsRepository, R: UserRestrictionRepository> AuthWithCodeService<T, R> {
+    pub fn new(repo: T, user_restriction_repo: R) -> Self {
+        Self(repo, user_restriction_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput>
-    for AuthWithCodeService<T>
+impl<T: BbsRepository, R: UserRestrictionRepository + Clone> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput>
+    for AuthWithCodeService<T, R>
 {
     async fn execute(
         &self,
         input: AuthWithCodeServiceInput,
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
+        // Check user restriction rules first
+        let user_restriction_svc = UserRestrictionService::new(self.1.clone());
+        let user_attrs = eddist_core::domain::user_restriction_filter::UserAttributes {
+            ip_addr: input.origin_ip.clone(),
+            user_agent: input.user_agent.clone(),
+            asn_num: input.asn_num,
+        };
+        if user_restriction_svc.is_user_restricted(&user_attrs, 
+            crate::domain::service::user_restriction_service::RestrictionType::AuthCode).await
+            .map_err(|e| match e {
+                BbsCgiError::Other(anyhow_err) => anyhow_err,
+                _ => anyhow::anyhow!("User restriction check failed"),
+            })? {
+            return Err(BbsPostAuthWithCodeError::UserRestricted.into());
+        }
         let clients_responses = input
             .captcha_like_configs
             .iter()
@@ -156,6 +174,7 @@ pub struct AuthWithCodeServiceInput {
     pub code: String,
     pub origin_ip: String,
     pub user_agent: String,
+    pub asn_num: u32,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub responses: HashMap<String, String>,
 }
