@@ -87,7 +87,6 @@ impl BbsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> BbsRepositoryImpl {
         BbsRepositoryImpl { pool }
     }
-
 }
 
 #[async_trait::async_trait]
@@ -776,10 +775,7 @@ impl BbsRepository for BbsRepositoryImpl {
     }
 
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        let query = query!(
-            "DELETE FROM authed_tokens WHERE token = ?",
-            token
-        );
+        let query = query!("DELETE FROM authed_tokens WHERE token = ?", token);
 
         query.execute(&self.pool).await?;
 
@@ -856,11 +852,6 @@ impl BbsRepository for BbsRepositoryImpl {
 
         Ok(cap)
     }
-
-
-
-
-
 }
 
 #[derive(Debug)]
@@ -965,4 +956,3 @@ pub struct CreatingAuthedToken {
     pub created_at: DateTime<Utc>,
     pub author_id_seed: Vec<u8>,
 }
-

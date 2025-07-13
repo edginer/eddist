@@ -6,7 +6,10 @@ use crate::domain::service::user_restriction_service::{RestrictionType, UserRest
 
 #[async_trait::async_trait]
 pub trait UserRestrictionRepository: Send + Sync + 'static {
-    async fn get_active_user_restriction_rules_by_type(&self, restriction_type: RestrictionType) -> anyhow::Result<Vec<UserRestrictionRule>>;
+    async fn get_active_user_restriction_rules_by_type(
+        &self,
+        restriction_type: RestrictionType,
+    ) -> anyhow::Result<Vec<UserRestrictionRule>>;
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +25,10 @@ impl UserRestrictionRepositoryImpl {
 
 #[async_trait::async_trait]
 impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
-    async fn get_active_user_restriction_rules_by_type(&self, restriction_type: RestrictionType) -> anyhow::Result<Vec<UserRestrictionRule>> {
+    async fn get_active_user_restriction_rules_by_type(
+        &self,
+        restriction_type: RestrictionType,
+    ) -> anyhow::Result<Vec<UserRestrictionRule>> {
         let rules = query_as!(
             UserRestrictionRuleRow,
             r#"
@@ -59,7 +65,8 @@ impl From<UserRestrictionRuleRow> for UserRestrictionRule {
             id: Uuid::from_slice(&row.id).unwrap(),
             name: row.name,
             filter_expression: row.filter_expression,
-            restriction_type: RestrictionType::from_str(&row.restriction_type).unwrap_or(RestrictionType::CreatingResponse),
+            restriction_type: RestrictionType::from_str(&row.restriction_type)
+                .unwrap_or(RestrictionType::CreatingResponse),
             active: row.active != 0,
             created_at: DateTime::from_naive_utc_and_offset(row.created_at, Utc),
             updated_at: DateTime::from_naive_utc_and_offset(row.updated_at, Utc),

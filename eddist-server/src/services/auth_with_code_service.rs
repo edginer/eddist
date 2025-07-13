@@ -8,13 +8,15 @@ use tracing::{error_span, info_span};
 use crate::{
     domain::{
         captcha_like::CaptchaLikeConfig,
-        service::user_restriction_service::UserRestrictionService,
+        service::user_restriction_service::{RestrictionType, UserRestrictionService},
     },
     error::{BbsCgiError, BbsPostAuthWithCodeError},
     external::captcha_like_client::{
         CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
     },
-    repositories::{bbs_repository::BbsRepository, user_restriction_repository::UserRestrictionRepository},
+    repositories::{
+        bbs_repository::BbsRepository, user_restriction_repository::UserRestrictionRepository,
+    },
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
 
@@ -30,8 +32,8 @@ impl<T: BbsRepository, R: UserRestrictionRepository> AuthWithCodeService<T, R> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository, R: UserRestrictionRepository + Clone> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput>
-    for AuthWithCodeService<T, R>
+impl<T: BbsRepository, R: UserRestrictionRepository + Clone>
+    AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput> for AuthWithCodeService<T, R>
 {
     async fn execute(
         &self,
@@ -44,12 +46,14 @@ impl<T: BbsRepository, R: UserRestrictionRepository + Clone> AppService<AuthWith
             user_agent: input.user_agent.clone(),
             asn_num: input.asn_num,
         };
-        if user_restriction_svc.is_user_restricted(&user_attrs, 
-            crate::domain::service::user_restriction_service::RestrictionType::AuthCode).await
+        if user_restriction_svc
+            .is_user_restricted(&user_attrs, RestrictionType::AuthCode)
+            .await
             .map_err(|e| match e {
                 BbsCgiError::Other(anyhow_err) => anyhow_err,
                 _ => anyhow::anyhow!("User restriction check failed"),
-            })? {
+            })?
+        {
             return Err(BbsPostAuthWithCodeError::UserRestricted.into());
         }
         let clients_responses = input
@@ -146,14 +150,15 @@ impl<T: BbsRepository, R: UserRestrictionRepository + Clone> AppService<AuthWith
         }
 
         // Check IP equality for users not using spur.us (Monocle already handles IPv4/IPv6 checking)
-        let has_monocle = input.captcha_like_configs.iter().any(|config| {
-            matches!(config, CaptchaLikeConfig::Monocle { .. })
-        });
-        
+        let has_monocle = input
+            .captcha_like_configs
+            .iter()
+            .any(|config| matches!(config, CaptchaLikeConfig::Monocle { .. }));
+
         if !has_monocle {
-            let token_origin_ip = ReducedIpAddr::from(token.reduced_ip.clone());
+            let token_origin_ip = token.reduced_ip.clone();
             let request_origin_ip = ReducedIpAddr::from(input.origin_ip.clone());
-            
+
             if token_origin_ip != request_origin_ip {
                 counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
                     .increment(1);

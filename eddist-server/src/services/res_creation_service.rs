@@ -46,23 +46,34 @@ use crate::{
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
 
 #[derive(Clone)]
-pub struct ResCreationService<T: BbsRepository, U: UserRepository, P: PubRepository, R: UserRestrictionRepository>(
-    T,
-    U,
-    ConnectionManager,
-    P,
-    R,
-);
+pub struct ResCreationService<
+    T: BbsRepository,
+    U: UserRepository,
+    P: PubRepository,
+    R: UserRestrictionRepository,
+>(T, U, ConnectionManager, P, R);
 
-impl<T: BbsRepository, U: UserRepository, P: PubRepository, R: UserRestrictionRepository> ResCreationService<T, U, P, R> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, pub_repo: P, user_restriction_repo: R) -> Self {
+impl<T: BbsRepository, U: UserRepository, P: PubRepository, R: UserRestrictionRepository>
+    ResCreationService<T, U, P, R>
+{
+    pub fn new(
+        repo: T,
+        user_repo: U,
+        redis_conn: ConnectionManager,
+        pub_repo: P,
+        user_restriction_repo: R,
+    ) -> Self {
         Self(repo, user_repo, redis_conn, pub_repo, user_restriction_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository, R: UserRestrictionRepository + Clone>
-    BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
+impl<
+        T: BbsRepository + Clone,
+        U: UserRepository + Clone,
+        P: PubRepository,
+        R: UserRestrictionRepository + Clone,
+    > BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
     for ResCreationService<T, U, P, R>
 {
     async fn execute(
@@ -192,8 +203,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository, R: U
             user_agent: input.user_agent.clone(),
             asn_num: input.asn_num,
         };
-        if user_restriction_svc.is_user_restricted(&user_attrs, 
-            crate::domain::service::user_restriction_service::RestrictionType::CreatingResponse).await? {
+        if user_restriction_svc
+            .is_user_restricted(
+                &user_attrs,
+                crate::domain::service::user_restriction_service::RestrictionType::CreatingResponse,
+            )
+            .await?
+        {
             return Err(BbsCgiError::UserRestricted);
         }
 

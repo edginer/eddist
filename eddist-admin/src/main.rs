@@ -263,11 +263,26 @@ async fn main() {
         .route("/caps/{capId}", patch(bbs::update_cap))
         .route("/users/search", get(bbs::search_users))
         .route("/users/{userId}/status", patch(bbs::update_user_status))
-        .route("/user-restriction-rules", get(bbs::get_user_restriction_rules))
-        .route("/user-restriction-rules", post(bbs::create_user_restriction_rule))
-        .route("/user-restriction-rules/{id}", get(bbs::get_user_restriction_rule))
-        .route("/user-restriction-rules/{id}", patch(bbs::update_user_restriction_rule))
-        .route("/user-restriction-rules/{id}", delete(bbs::delete_user_restriction_rule));
+        .route(
+            "/user-restriction-rules",
+            get(bbs::get_user_restriction_rules),
+        )
+        .route(
+            "/user-restriction-rules",
+            post(bbs::create_user_restriction_rule),
+        )
+        .route(
+            "/user-restriction-rules/{id}",
+            get(bbs::get_user_restriction_rule),
+        )
+        .route(
+            "/user-restriction-rules/{id}",
+            patch(bbs::update_user_restriction_rule),
+        )
+        .route(
+            "/user-restriction-rules/{id}",
+            delete(bbs::delete_user_restriction_rule),
+        );
 
     let state = AppState {
         oauth2_client: client,
@@ -597,7 +612,9 @@ pub struct UpdateUserRestrictionRuleRequest {
     description: Option<String>,
 }
 
-impl From<crate::repository::admin_bbs_repository::UserRestrictionRule> for UserRestrictionRuleResponse {
+impl From<crate::repository::admin_bbs_repository::UserRestrictionRule>
+    for UserRestrictionRuleResponse
+{
     fn from(rule: crate::repository::admin_bbs_repository::UserRestrictionRule) -> Self {
         Self {
             id: rule.id,
@@ -626,7 +643,6 @@ mod bbs {
     use uuid::Uuid;
 
     use crate::{
-        UserRestrictionRuleResponse, CreateUserRestrictionRuleRequest, UpdateUserRestrictionRuleRequest,
         repository::{
             admin_archive_repository::{
                 AdminArchiveRepository, ArchivedAdminThread, ArchivedResUpdate, ArchivedThread,
@@ -637,10 +653,11 @@ mod bbs {
             cap_repository::CapRepository,
             ngword_repository::NgWordRepository,
         },
-        AuthedToken, Board, BoardInfo, Cap, CreateBoardInput, CreationCapInput,
-        CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput, EditBoardInput, NgWord, Res,
-        Thread, ThreadCompactionInput, UpdateCapInput, UpdateNgWordInput, UpdateResInput, User,
-        UserStatusUpdateInput,
+        AuthedToken, Board, BoardInfo, Cap, CreateBoardInput, CreateUserRestrictionRuleRequest,
+        CreationCapInput, CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput,
+        EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput, UpdateCapInput,
+        UpdateNgWordInput, UpdateResInput, UpdateUserRestrictionRuleRequest, User,
+        UserRestrictionRuleResponse, UserStatusUpdateInput,
     };
 
     #[utoipa::path(
@@ -1566,12 +1583,14 @@ mod bbs {
     pub async fn get_user_restriction_rules(
         State(state): State<DefaultAppState>,
     ) -> Result<Json<Vec<UserRestrictionRuleResponse>>, (axum::http::StatusCode, String)> {
-        let rules = state.admin_bbs_repo
+        let rules = state
+            .admin_bbs_repo
             .get_all_user_restriction_rules()
             .await
             .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        
-        let response_rules: Vec<UserRestrictionRuleResponse> = rules.into_iter().map(Into::into).collect();
+
+        let response_rules: Vec<UserRestrictionRuleResponse> =
+            rules.into_iter().map(Into::into).collect();
         Ok(Json(response_rules))
     }
 
@@ -1590,12 +1609,16 @@ mod bbs {
         Path(id): Path<Uuid>,
         State(state): State<DefaultAppState>,
     ) -> Result<Json<UserRestrictionRuleResponse>, (axum::http::StatusCode, String)> {
-        let rule = state.admin_bbs_repo
+        let rule = state
+            .admin_bbs_repo
             .get_user_restriction_rule(id)
             .await
             .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-            .ok_or((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()))?;
-        
+            .ok_or((
+                axum::http::StatusCode::NOT_FOUND,
+                "Rule not found".to_string(),
+            ))?;
+
         Ok(Json(rule.into()))
     }
 
@@ -1626,7 +1649,8 @@ mod bbs {
             description: request.description,
         };
 
-        state.admin_bbs_repo
+        state
+            .admin_bbs_repo
             .create_user_restriction_rule(&rule)
             .await
             .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -1662,11 +1686,15 @@ mod bbs {
             description: request.description,
         };
 
-        let updated_rule = state.admin_bbs_repo
+        let updated_rule = state
+            .admin_bbs_repo
             .update_user_restriction_rule(id, &update)
             .await
             .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-            .ok_or((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()))?;
+            .ok_or((
+                axum::http::StatusCode::NOT_FOUND,
+                "Rule not found".to_string(),
+            ))?;
 
         Ok(Json(updated_rule.into()))
     }
@@ -1686,19 +1714,21 @@ mod bbs {
         Path(id): Path<Uuid>,
         State(state): State<DefaultAppState>,
     ) -> Result<Json<bool>, (axum::http::StatusCode, String)> {
-        let deleted = state.admin_bbs_repo
+        let deleted = state
+            .admin_bbs_repo
             .delete_user_restriction_rule(id)
             .await
             .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         if !deleted {
-            return Err((axum::http::StatusCode::NOT_FOUND, "Rule not found".to_string()));
+            return Err((
+                axum::http::StatusCode::NOT_FOUND,
+                "Rule not found".to_string(),
+            ));
         }
 
         Ok(Json(true))
     }
-
-
 }
 
 #[derive(OpenApi)]

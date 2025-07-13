@@ -42,10 +42,22 @@ use super::BbsCgiService;
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository>(T, U, ConnectionManager, R);
+pub struct TheradCreationService<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository>(
+    T,
+    U,
+    ConnectionManager,
+    R,
+);
 
-impl<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository> TheradCreationService<T, U, R> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, user_restriction_repo: R) -> Self {
+impl<T: BbsRepository, U: UserRepository, R: UserRestrictionRepository>
+    TheradCreationService<T, U, R>
+{
+    pub fn new(
+        repo: T,
+        user_repo: U,
+        redis_conn: ConnectionManager,
+        user_restriction_repo: R,
+    ) -> Self {
         Self(repo, user_repo, redis_conn, user_restriction_repo)
     }
 }
@@ -215,9 +227,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, R: UserRestrictionRepo
             asn_num: input.asn_num,
         };
         // Thread creation includes response creation, so check both types
-        if user_restriction_svc.is_user_restricted(&user_attrs, 
-            crate::domain::service::user_restriction_service::RestrictionType::CreatingThread).await? 
-            || user_restriction_svc.is_user_restricted(&user_attrs, 
+        if user_restriction_svc.is_user_restricted(&user_attrs,
+            crate::domain::service::user_restriction_service::RestrictionType::CreatingThread).await?
+            || user_restriction_svc.is_user_restricted(&user_attrs,
             crate::domain::service::user_restriction_service::RestrictionType::CreatingResponse).await? {
             return Err(BbsCgiError::UserRestricted);
         }

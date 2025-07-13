@@ -25,25 +25,33 @@ impl UserAttributeFilter {
     pub fn new(expression: String) -> Result<Self, FilterParseError> {
         // Validate the expression by parsing it
         let scheme = Self::create_scheme();
-        let _ast = scheme.parse(&expression)
+        let _ast = scheme
+            .parse(&expression)
             .map_err(|e| FilterParseError::ParseError(e.to_string()))?;
-        
+
         Ok(Self { expression })
     }
 
     pub fn matches(&self, attributes: &UserAttributes) -> Result<bool, FilterParseError> {
         let scheme = Self::create_scheme();
-        let ast = scheme.parse(&self.expression)
+        let ast = scheme
+            .parse(&self.expression)
             .map_err(|e| FilterParseError::ParseError(e.to_string()))?;
         let filter = ast.compile();
 
         let mut ctx = ExecutionContext::new(&scheme);
-        
+
         // Add user attributes to execution context
-        let ip_field = scheme.get_field("ip").map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
-        let ua_field = scheme.get_field("ua").map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
-        let asn_field = scheme.get_field("asn").map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
-        
+        let ip_field = scheme
+            .get_field("ip")
+            .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
+        let ua_field = scheme
+            .get_field("ua")
+            .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
+        let asn_field = scheme
+            .get_field("asn")
+            .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
+
         ctx.set_field_value(ip_field, attributes.ip_addr.clone())
             .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
         ctx.set_field_value(ua_field, attributes.user_agent.clone())
@@ -51,7 +59,8 @@ impl UserAttributeFilter {
         ctx.set_field_value(asn_field, attributes.asn_num as i32)
             .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
 
-        let result = filter.execute(&ctx)
+        let result = filter
+            .execute(&ctx)
             .map_err(|e| FilterParseError::InvalidSyntax(e.to_string()))?;
 
         Ok(result)
@@ -61,10 +70,10 @@ impl UserAttributeFilter {
         let scheme = Scheme! {
             // IP address field
             ip: Ip,
-            
-            // User agent field  
+
+            // User agent field
             ua: Bytes,
-            
+
             // ASN field
             asn: Int,
         };
@@ -79,7 +88,8 @@ mod tests {
     fn test_attributes() -> UserAttributes {
         UserAttributes {
             ip_addr: "192.168.1.100".to_string(),
-            user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/91.0".to_string(),
+            user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/91.0"
+                .to_string(),
             asn_num: 12345,
         }
     }
@@ -113,19 +123,28 @@ mod tests {
 
     #[test]
     fn test_logical_and() {
-        let filter = UserAttributeFilter::new(r#"ip == 192.168.1.100 and ua contains "Chrome""#.to_string()).unwrap();
+        let filter =
+            UserAttributeFilter::new(r#"ip == 192.168.1.100 and ua contains "Chrome""#.to_string())
+                .unwrap();
         assert!(filter.matches(&test_attributes()).unwrap());
 
-        let filter = UserAttributeFilter::new(r#"ip == 192.168.1.100 and ua contains "Firefox""#.to_string()).unwrap();
+        let filter = UserAttributeFilter::new(
+            r#"ip == 192.168.1.100 and ua contains "Firefox""#.to_string(),
+        )
+        .unwrap();
         assert!(!filter.matches(&test_attributes()).unwrap());
     }
 
     #[test]
     fn test_logical_or() {
-        let filter = UserAttributeFilter::new(r#"ip == 192.168.1.101 or ua contains "Chrome""#.to_string()).unwrap();
+        let filter =
+            UserAttributeFilter::new(r#"ip == 192.168.1.101 or ua contains "Chrome""#.to_string())
+                .unwrap();
         assert!(filter.matches(&test_attributes()).unwrap());
 
-        let filter = UserAttributeFilter::new(r#"ip == 192.168.1.101 or ua contains "Firefox""#.to_string()).unwrap();
+        let filter =
+            UserAttributeFilter::new(r#"ip == 192.168.1.101 or ua contains "Firefox""#.to_string())
+                .unwrap();
         assert!(!filter.matches(&test_attributes()).unwrap());
     }
 
@@ -150,13 +169,15 @@ mod tests {
     #[test]
     fn test_complex_expression() {
         let filter = UserAttributeFilter::new(
-            r#"(ip in 192.168.0.0/16 or asn == 12345) and ua contains "Chrome""#.to_string()
-        ).unwrap();
+            r#"(ip in 192.168.0.0/16 or asn == 12345) and ua contains "Chrome""#.to_string(),
+        )
+        .unwrap();
         assert!(filter.matches(&test_attributes()).unwrap());
 
         let filter = UserAttributeFilter::new(
-            r#"(ip in 10.0.0.0/8 and asn == 54321) or ua contains "Firefox""#.to_string()
-        ).unwrap();
+            r#"(ip in 10.0.0.0/8 and asn == 54321) or ua contains "Firefox""#.to_string(),
+        )
+        .unwrap();
         assert!(!filter.matches(&test_attributes()).unwrap());
     }
 }

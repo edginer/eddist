@@ -55,7 +55,9 @@ pub enum BbsCgiError {
     #[error("{0}が空です")]
     ContentEmpty(ContentEmptyParamType),
 
-    #[error("短期間に書き込みすぎです (Lv{tinker_level}は{span_sec}秒以内に1回書き込むことができます)")]
+    #[error(
+        "短期間に書き込みすぎです (Lv{tinker_level}は{span_sec}秒以内に1回書き込むことができます)"
+    )]
     TooManyCreatingRes { tinker_level: u32, span_sec: i32 },
 
     #[error(

@@ -1,5 +1,5 @@
 use eddist_core::domain::pubsub_repository::PubSubItem;
-use redis::{AsyncCommands, aio::ConnectionManager};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
 #[derive(Clone)]
 pub struct RedisPubRepository {

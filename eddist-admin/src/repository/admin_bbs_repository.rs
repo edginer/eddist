@@ -114,9 +114,16 @@ pub trait AdminBbsRepository: Send + Sync {
 
     // User restriction rules
     async fn get_all_user_restriction_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>>;
-    async fn get_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>>;
+    async fn get_user_restriction_rule(
+        &self,
+        id: Uuid,
+    ) -> anyhow::Result<Option<UserRestrictionRule>>;
     async fn create_user_restriction_rule(&self, rule: &UserRestrictionRule) -> anyhow::Result<()>;
-    async fn update_user_restriction_rule(&self, id: Uuid, update: &UpdateUserRestrictionRule) -> anyhow::Result<Option<UserRestrictionRule>>;
+    async fn update_user_restriction_rule(
+        &self,
+        id: Uuid,
+        update: &UpdateUserRestrictionRule,
+    ) -> anyhow::Result<Option<UserRestrictionRule>>;
     async fn delete_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<bool>;
 }
 
@@ -1091,7 +1098,10 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn get_user_restriction_rule(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>> {
+    async fn get_user_restriction_rule(
+        &self,
+        id: Uuid,
+    ) -> anyhow::Result<Option<UserRestrictionRule>> {
         let row = query_as!(
             UserRestrictionRuleRow,
             r#"
@@ -1129,7 +1139,11 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
         Ok(())
     }
 
-    async fn update_user_restriction_rule(&self, id: Uuid, update: &UpdateUserRestrictionRule) -> anyhow::Result<Option<UserRestrictionRule>> {
+    async fn update_user_restriction_rule(
+        &self,
+        id: Uuid,
+        update: &UpdateUserRestrictionRule,
+    ) -> anyhow::Result<Option<UserRestrictionRule>> {
         let mut set_clauses = vec!["updated_at = CURRENT_TIMESTAMP".to_string()];
         let mut values: Vec<String> = vec![];
 
@@ -1159,9 +1173,7 @@ impl AdminBbsRepository for AdminBbsRepositoryImpl {
             set_clauses.join(", ")
         );
 
-        let result = query(&sql)
-            .execute(&self.0)
-            .await?;
+        let result = query(&sql).execute(&self.0).await?;
 
         if result.rows_affected() > 0 {
             self.get_user_restriction_rule(id).await
@@ -1201,7 +1213,8 @@ impl From<UserRestrictionRuleRow> for UserRestrictionRule {
             id: Uuid::from_slice(&row.id).unwrap(),
             name: row.name,
             filter_expression: row.filter_expression,
-            restriction_type: RestrictionType::from_str(&row.restriction_type).unwrap_or(RestrictionType::CreatingResponse),
+            restriction_type: RestrictionType::from_str(&row.restriction_type)
+                .unwrap_or(RestrictionType::CreatingResponse),
             active: row.active != 0,
             created_at: DateTime::from_naive_utc_and_offset(row.created_at, Utc),
             updated_at: DateTime::from_naive_utc_and_offset(row.updated_at, Utc),

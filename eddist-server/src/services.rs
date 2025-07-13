@@ -104,7 +104,10 @@ impl<
         user_restriction_repo: R,
     ) -> Self {
         AppServiceContainer {
-            auth_with_code: AuthWithCodeService::new(bbs_repo.clone(), user_restriction_repo.clone()),
+            auth_with_code: AuthWithCodeService::new(
+                bbs_repo.clone(),
+                user_restriction_repo.clone(),
+            ),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
