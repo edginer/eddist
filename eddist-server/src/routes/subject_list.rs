@@ -6,9 +6,9 @@ use axum::{
 use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 
 use crate::{
-    AppState,
-    services::{AppService, thread_list_service::BoardKey},
+    services::{thread_list_service::BoardKey, AppService},
     shiftjis::{SJisResponseBuilder, SjisContentType},
+    AppState,
 };
 
 pub async fn get_subject_txt(

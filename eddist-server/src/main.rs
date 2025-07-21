@@ -20,9 +20,11 @@ use handlebars::Handlebars;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
+use middleware::user_restriction::user_restriction_middleware;
 use repositories::{
     bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
     idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use routes::{
     auth_code::{get_auth_code, post_auth_code},
@@ -33,6 +35,7 @@ use routes::{
 };
 use services::{
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+    user_restriction_service::start_cache_refresh_task,
     AppService, AppServiceContainer,
 };
 use shiftjis::{SJisResponseBuilder, SjisContentType};
@@ -57,6 +60,7 @@ mod repositories {
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod user_repository;
+    pub(crate) mod user_restriction_repository;
 }
 mod domain {
     pub(crate) mod service {
@@ -83,6 +87,7 @@ mod domain {
     pub(crate) mod utils;
 }
 mod error;
+mod middleware;
 mod services;
 mod template;
 
@@ -107,6 +112,7 @@ struct AppState {
         UserRepositoryImpl,
         IdpRepositoryImpl,
         RedisPubRepository,
+        UserRestrictionRepositoryImpl,
     >,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
@@ -121,6 +127,7 @@ impl AppState {
         UserRepositoryImpl,
         IdpRepositoryImpl,
         RedisPubRepository,
+        UserRestrictionRepositoryImpl,
     > {
         &self.services
     }
@@ -229,11 +236,14 @@ async fn main() -> anyhow::Result<()> {
     )
     .unwrap();
 
+    let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
+
     let app_state = AppState {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool.clone()),
             UserRepositoryImpl::new(pool.clone()),
-            IdpRepositoryImpl::new(pool),
+            IdpRepositoryImpl::new(pool.clone()),
+            user_restriction_repo.clone(),
             conn_mgr.clone(),
             pub_repo,
             *s3_client,
@@ -242,6 +252,9 @@ async fn main() -> anyhow::Result<()> {
         captcha_like_configs,
         template_engine,
     };
+
+    // Start background task for user restriction cache refresh
+    start_cache_refresh_task(user_restriction_repo, Duration::from_secs(300));
 
     log::info!("Start application server with 0.0.0.0:8080");
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
@@ -341,7 +354,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .nest_service("/dist", serve_dir.clone())
         .fallback_service(serve_dir)
-        .with_state(app_state)
+        .with_state(app_state.clone())
         .layer(CatchPanicLayer::custom(|e| {
             tracing::error!("Panic: {e:?}");
             Response::builder()
@@ -390,6 +403,12 @@ async fn main() -> anyhow::Result<()> {
                 ),
         )
         .layer(Extension(CsrfState::new(conn_mgr)));
+
+    // Add user restriction middleware
+    let app = app.layer(axum::middleware::from_fn_with_state(
+        app_state.clone(),
+        user_restriction_middleware,
+    ));
 
     let app = if env::var("AXUM_METRICS") == Ok("true".to_string()) {
         app.layer(prometheus_layer)

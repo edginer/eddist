@@ -7,6 +7,7 @@ pub mod domain {
     pub mod res;
     pub mod sjis_str;
     pub mod tinker;
+    pub mod user_restriction;
 }
 
 pub mod cache_aside;

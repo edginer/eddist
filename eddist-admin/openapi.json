@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "info": {
     "title": "eddist-admin",
     "description": "",
@@ -168,7 +168,8 @@
             "description": "Board Key",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -259,8 +260,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -268,9 +271,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "format": "int64",
-              "nullable": true,
               "minimum": 0
             }
           },
@@ -279,9 +284,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "format": "int64",
-              "nullable": true,
               "minimum": 0
             }
           },
@@ -290,9 +297,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "format": "int64",
-              "nullable": true,
               "minimum": 0
             }
           },
@@ -301,9 +310,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "format": "int64",
-              "nullable": true,
               "minimum": 0
             }
           }
@@ -539,8 +550,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null,
-                  "nullable": true
+                  "default": null
                 }
               }
             }
@@ -1081,6 +1091,145 @@
         }
       }
     },
+    "/restriction_rules": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_restriction_rules",
+        "responses": {
+          "200": {
+            "description": "List all restriction rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserRestrictionRuleSchema"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "create_restriction_rule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRestrictionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create restriction rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRestrictionRuleSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restriction_rules/{rule_id}": {
+      "get": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "get_restriction_rule",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "Rule ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get restriction rule by ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRestrictionRuleSchema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "delete_restriction_rule",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "Rule ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete restriction rule"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "bbs"
+        ],
+        "operationId": "update_restriction_rule",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "Rule ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRestrictionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update restriction rule"
+          }
+        }
+      }
+    },
     "/users/search/": {
       "get": {
         "tags": [
@@ -1093,9 +1242,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "format": "uuid",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -1103,8 +1254,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1112,9 +1265,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "format": "uuid",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
             }
           }
         ],
@@ -1195,8 +1350,10 @@
             "type": "string"
           },
           "author_id": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "body": {
             "type": "string"
@@ -1245,8 +1402,10 @@
         ],
         "properties": {
           "author_id": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "body": {
             "type": "string"
@@ -1326,13 +1485,17 @@
         ],
         "properties": {
           "authed_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "authed_ua": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -1343,9 +1506,11 @@
             "format": "uuid"
           },
           "last_wrote_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "origin_ip": {
             "type": "string"
@@ -1442,12 +1607,16 @@
             "type": "boolean"
           },
           "threads_archive_cron": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "threads_archive_trigger_thread_count": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           }
         }
@@ -1507,12 +1676,14 @@
             "type": "string"
           },
           "tinker": {
-            "allOf": [
+            "oneOf": [
+              {
+                "type": "null"
+              },
               {
                 "$ref": "#/components/schemas/Tinker"
               }
-            ],
-            "nullable": true
+            ]
           },
           "user_agent": {
             "type": "string"
@@ -1529,13 +1700,17 @@
         ],
         "properties": {
           "base_response_creation_span_sec": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "base_thread_creation_span_sec": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "board_key": {
@@ -1548,41 +1723,81 @@
             "type": "string"
           },
           "max_author_name_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_email_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_response_body_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_response_body_lines": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_thread_name_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "name": {
             "type": "string"
           },
           "threads_archive_cron": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "threads_archive_trigger_thread_count": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
+          }
+        }
+      },
+      "CreateRestrictionRuleRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "rule_type",
+          "rule_value"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rule_type": {
+            "type": "string"
+          },
+          "rule_value": {
+            "type": "string"
           }
         }
       },
@@ -1624,63 +1839,89 @@
         "type": "object",
         "properties": {
           "base_response_creation_span_sec": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "base_thread_creation_span_sec": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "default_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "local_rule": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "max_author_name_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_email_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_response_body_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_response_body_lines": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "max_thread_name_byte_length": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           },
           "name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "read_only": {
-            "type": "boolean",
-            "nullable": true
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "threads_archive_cron": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "threads_archive_trigger_thread_count": {
-            "type": "integer",
-            "nullable": true,
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0
           }
         }
@@ -1747,8 +1988,10 @@
             "type": "string"
           },
           "author_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "board_id": {
             "type": "string",
@@ -1775,8 +2018,10 @@
             "type": "boolean"
           },
           "mail": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "res_order": {
             "type": "integer",
@@ -1787,6 +2032,15 @@
             "format": "uuid"
           }
         }
+      },
+      "RestrictionRuleTypeSchema": {
+        "type": "string",
+        "enum": [
+          "ASN",
+          "IP",
+          "IPCidr",
+          "UserAgent"
+        ]
       },
       "Thread": {
         "type": "object",
@@ -1885,9 +2139,11 @@
             "minimum": 0
           },
           "last_created_thread_at": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64",
-            "nullable": true,
             "minimum": 0
           },
           "last_level_up_at": {
@@ -1916,24 +2172,32 @@
         "type": "object",
         "properties": {
           "board_ids": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "password": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1941,20 +2205,26 @@
         "type": "object",
         "properties": {
           "board_ids": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "word": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1962,20 +2232,58 @@
         "type": "object",
         "properties": {
           "author_name": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "body": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "is_abone": {
-            "type": "boolean",
-            "nullable": true
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "mail": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateRestrictionRuleRequest": {
+        "type": "object",
+        "properties": {
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_value": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -2036,6 +2344,50 @@
           "user_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "UserRestrictionRuleSchema": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "rule_type",
+          "rule_value",
+          "created_at",
+          "updated_at",
+          "created_by_email"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by_email": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/RestrictionRuleTypeSchema"
+          },
+          "rule_value": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

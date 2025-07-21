@@ -25,6 +25,7 @@ use repository::{
     authed_token_repository::{AuthedTokenRepository, AuthedTokenRepositoryImpl},
     cap_repository::{CapRepository, CapRepositoryImpl},
     ngword_repository::{NgWordRepository, NgWordRepositoryImpl},
+    user_restriction_repository::{UserRestrictionRepository, UserRestrictionRepositoryImpl},
 };
 use s3::creds::Credentials;
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,7 @@ pub(crate) mod repository {
     pub mod authed_token_repository;
     pub mod cap_repository;
     pub mod ngword_repository;
+    pub mod user_restriction_repository;
 }
 pub(crate) mod role;
 
@@ -91,6 +93,7 @@ struct AppState<
     A: AuthedTokenRepository + Clone,
     C: CapRepository + Clone,
     U: AdminUserRepository + Clone,
+    UR: UserRestrictionRepository + Clone,
 > {
     oauth2_client: oauth2::basic::BasicClient<
         EndpointSet,
@@ -105,6 +108,7 @@ struct AppState<
     authed_token_repo: A,
     cap_repo: C,
     user_repo: U,
+    user_restriction_repo: UR,
     redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -115,6 +119,7 @@ type DefaultAppState = AppState<
     AuthedTokenRepositoryImpl,
     CapRepositoryImpl,
     AdminUserRepositoryImpl,
+    UserRestrictionRepositoryImpl,
 >;
 
 #[tokio::main]
@@ -262,7 +267,21 @@ async fn main() {
         .route("/caps/{capId}", delete(bbs::delete_cap))
         .route("/caps/{capId}", patch(bbs::update_cap))
         .route("/users/search", get(bbs::search_users))
-        .route("/users/{userId}/status", patch(bbs::update_user_status));
+        .route("/users/{userId}/status", patch(bbs::update_user_status))
+        .route("/restriction_rules", get(bbs::get_restriction_rules))
+        .route("/restriction_rules", post(bbs::create_restriction_rule))
+        .route(
+            "/restriction_rules/{rule_id}",
+            get(bbs::get_restriction_rule),
+        )
+        .route(
+            "/restriction_rules/{rule_id}",
+            patch(bbs::update_restriction_rule),
+        )
+        .route(
+            "/restriction_rules/{rule_id}",
+            delete(bbs::delete_restriction_rule),
+        );
 
     let state = AppState {
         oauth2_client: client,
@@ -276,7 +295,8 @@ async fn main() {
         admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
         authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
         cap_repo: CapRepositoryImpl::new(pool.clone()),
-        user_repo: AdminUserRepositoryImpl::new(pool),
+        user_repo: AdminUserRepositoryImpl::new(pool.clone()),
+        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool),
     };
 
     let app = Router::new()
@@ -560,19 +580,64 @@ pub struct UserStatusUpdateInput {
     enabled: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateRestrictionRuleRequest {
+    pub name: String,
+    pub rule_type: String,
+    pub rule_value: String,
+    pub expires_at: Option<chrono::DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UpdateRestrictionRuleRequest {
+    pub name: Option<String>,
+    pub rule_type: Option<String>,
+    pub rule_value: Option<String>,
+    pub expires_at: Option<Option<chrono::DateTime<Utc>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UserRestrictionRuleSchema {
+    pub id: String,
+    pub name: String,
+    pub rule_type: RestrictionRuleTypeSchema,
+    pub rule_value: String,
+    pub expires_at: Option<chrono::DateTime<Utc>>,
+    pub created_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+    pub created_by_email: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub enum RestrictionRuleTypeSchema {
+    ASN,
+    IP,
+    IPCidr,
+    UserAgent,
+}
+
 mod bbs {
+    use crate::{RestrictionRuleTypeSchema, UserRestrictionRuleSchema};
     use axum::{
         extract::{Path, Query, State},
         response::Response,
         Json,
     };
     use chrono::{TimeZone, Utc};
-    use eddist_core::domain::{board::validate_board_key, res::ResView};
+    use eddist_core::domain::{
+        board::validate_board_key,
+        res::ResView,
+        user_restriction::{
+            CreateUserRestrictionRuleInput, RestrictionRuleType, UpdateUserRestrictionRuleInput,
+            UserRestrictionRule,
+        },
+    };
     use serde::{Deserialize, Serialize};
     use utoipa::IntoParams;
     use uuid::Uuid;
 
     use crate::{
+        auth::AdminSession,
         repository::{
             admin_archive_repository::{
                 AdminArchiveRepository, ArchivedAdminThread, ArchivedResUpdate, ArchivedThread,
@@ -582,10 +647,12 @@ mod bbs {
             authed_token_repository::AuthedTokenRepository,
             cap_repository::CapRepository,
             ngword_repository::NgWordRepository,
+            user_restriction_repository::UserRestrictionRepository,
         },
-        AuthedToken, Board, BoardInfo, Cap, CreateBoardInput, CreationCapInput,
-        CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput, EditBoardInput, NgWord, Res,
-        Thread, ThreadCompactionInput, UpdateCapInput, UpdateNgWordInput, UpdateResInput, User,
+        AuthedToken, Board, BoardInfo, Cap, CreateBoardInput, CreateRestrictionRuleRequest,
+        CreationCapInput, CreationNgWordInput, DefaultAppState, DeleteAuthedTokenInput,
+        EditBoardInput, NgWord, Res, Thread, ThreadCompactionInput, UpdateCapInput,
+        UpdateNgWordInput, UpdateResInput, UpdateRestrictionRuleRequest, User,
         UserStatusUpdateInput,
     };
 
@@ -1500,6 +1567,156 @@ mod bbs {
             .body(serde_json::to_string(&users[0]).unwrap().into())
             .unwrap()
     }
+
+    #[utoipa::path(
+        get,
+        path = "/restriction_rules",
+        responses(
+            (status = 200, description = "List all restriction rules", body = Vec<UserRestrictionRuleSchema>)
+        )
+    )]
+    pub async fn get_restriction_rules(
+        State(app_state): State<DefaultAppState>,
+    ) -> Json<Vec<UserRestrictionRule>> {
+        let rules = app_state
+            .user_restriction_repo
+            .get_all_rules()
+            .await
+            .unwrap_or_default();
+        Json(rules)
+    }
+
+    #[utoipa::path(
+        post,
+        path = "/restriction_rules",
+        request_body = CreateRestrictionRuleRequest,
+        responses(
+            (status = 201, description = "Create restriction rule", body = UserRestrictionRuleSchema)
+        )
+    )]
+    pub async fn create_restriction_rule(
+        State(app_state): State<DefaultAppState>,
+        admin_session: AdminSession,
+        Json(req): Json<CreateRestrictionRuleRequest>,
+    ) -> Response {
+        // Extract Auth0 user ID from session userinfo
+        let Some(admin_user_id) = admin_session.get_admin_email() else {
+            return Response::builder()
+                .status(401)
+                .body("Unauthorized: No user information available".into())
+                .unwrap();
+        };
+
+        let rule_type = match req.rule_type.parse::<RestrictionRuleType>() {
+            Ok(rt) => rt,
+            Err(_) => {
+                return Response::builder()
+                    .status(400)
+                    .body("Invalid rule_type".into())
+                    .unwrap();
+            }
+        };
+
+        let input = CreateUserRestrictionRuleInput {
+            name: req.name,
+            rule_type,
+            rule_value: req.rule_value,
+            expires_at: req.expires_at,
+            created_by_email: admin_user_id,
+        };
+
+        let rule = app_state
+            .user_restriction_repo
+            .create_rule(input)
+            .await
+            .unwrap();
+
+        Response::builder()
+            .status(201)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&rule).unwrap().into())
+            .unwrap()
+    }
+
+    #[utoipa::path(
+        patch,
+        path = "/restriction_rules/{rule_id}",
+        request_body = UpdateRestrictionRuleRequest,
+        responses(
+            (status = 200, description = "Update restriction rule")
+        ),
+        params(
+            ("rule_id" = Uuid, Path, description = "Rule ID")
+        )
+    )]
+    pub async fn update_restriction_rule(
+        Path(rule_id): Path<Uuid>,
+        State(app_state): State<DefaultAppState>,
+        Json(req): Json<UpdateRestrictionRuleRequest>,
+    ) -> Json<()> {
+        let rule_type = req
+            .rule_type
+            .and_then(|rt| rt.parse::<RestrictionRuleType>().ok());
+
+        let input = UpdateUserRestrictionRuleInput {
+            id: rule_id,
+            name: req.name,
+            rule_type,
+            rule_value: req.rule_value,
+            expires_at: req.expires_at,
+        };
+
+        app_state
+            .user_restriction_repo
+            .update_rule(input)
+            .await
+            .unwrap();
+        Json(())
+    }
+
+    #[utoipa::path(
+        delete,
+        path = "/restriction_rules/{rule_id}",
+        responses(
+            (status = 200, description = "Delete restriction rule")
+        ),
+        params(
+            ("rule_id" = Uuid, Path, description = "Rule ID")
+        )
+    )]
+    pub async fn delete_restriction_rule(
+        Path(rule_id): Path<Uuid>,
+        State(app_state): State<DefaultAppState>,
+    ) -> Json<()> {
+        app_state
+            .user_restriction_repo
+            .delete_rule(rule_id)
+            .await
+            .unwrap();
+        Json(())
+    }
+
+    #[utoipa::path(
+        get,
+        path = "/restriction_rules/{rule_id}",
+        responses(
+            (status = 200, description = "Get restriction rule by ID", body = UserRestrictionRuleSchema)
+        ),
+        params(
+            ("rule_id" = Uuid, Path, description = "Rule ID")
+        )
+    )]
+    pub async fn get_restriction_rule(
+        Path(rule_id): Path<Uuid>,
+        State(app_state): State<DefaultAppState>,
+    ) -> Json<Option<UserRestrictionRule>> {
+        let rule = app_state
+            .user_restriction_repo
+            .get_rule_by_id(rule_id)
+            .await
+            .unwrap();
+        Json(rule)
+    }
 }
 
 #[derive(OpenApi)]
@@ -1535,6 +1752,11 @@ mod bbs {
         bbs::threads_compaction,
         bbs::search_users,
         bbs::update_user_status,
+        bbs::get_restriction_rules,
+        bbs::create_restriction_rule,
+        bbs::get_restriction_rule,
+        bbs::update_restriction_rule,
+        bbs::delete_restriction_rule,
     ),
     components(schemas(
         Board,
@@ -1562,6 +1784,10 @@ mod bbs {
         User,
         UserIdpBinding,
         UserStatusUpdateInput,
+        CreateRestrictionRuleRequest,
+        UpdateRestrictionRuleRequest,
+        UserRestrictionRuleSchema,
+        RestrictionRuleTypeSchema,
     ))
 )]
 struct ApiDoc;

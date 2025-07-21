@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO user_restriction_rules \n            (id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email)\n            VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "608b4031d229939727371579b48cd01bfaec7219507437e809b627cb7946094b"
+}

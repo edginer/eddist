@@ -324,6 +324,38 @@ export interface paths {
         patch: operations["update_ng_word"];
         trace?: never;
     };
+    "/restriction_rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_restriction_rules"];
+        put?: never;
+        post: operations["create_restriction_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/restriction_rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_restriction_rule"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_restriction_rule"];
+        options?: never;
+        head?: never;
+        patch: operations["update_restriction_rule"];
+        trace?: never;
+    };
     "/users/search/": {
         parameters: {
             query?: never;
@@ -447,7 +479,7 @@ export interface components {
             /** Format: int32 */
             asn_num: number;
             ip_addr: string;
-            tinker?: components["schemas"]["Tinker"] | null;
+            tinker?: null | components["schemas"]["Tinker"];
             user_agent: string;
         };
         CreateBoardInput: {
@@ -464,6 +496,13 @@ export interface components {
             name: string;
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
+        };
+        CreateRestrictionRuleRequest: {
+            /** Format: date-time */
+            expires_at?: string | null;
+            name: string;
+            rule_type: string;
+            rule_value: string;
         };
         CreationCapInput: {
             description: string;
@@ -521,6 +560,8 @@ export interface components {
             /** Format: uuid */
             thread_id: string;
         };
+        /** @enum {string} */
+        RestrictionRuleTypeSchema: "ASN" | "IP" | "IPCidr" | "UserAgent";
         Thread: {
             active: boolean;
             archived: boolean;
@@ -578,6 +619,13 @@ export interface components {
             is_abone?: boolean | null;
             mail?: string | null;
         };
+        UpdateRestrictionRuleRequest: {
+            /** Format: date-time */
+            expires_at?: string | null;
+            name?: string | null;
+            rule_type?: string | null;
+            rule_value?: string | null;
+        };
         User: {
             authed_token_ids: string[];
             enabled: boolean;
@@ -593,6 +641,19 @@ export interface components {
             idp_sub: string;
             /** Format: uuid */
             user_id: string;
+        };
+        UserRestrictionRuleSchema: {
+            /** Format: date-time */
+            created_at: string;
+            created_by_email: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            id: string;
+            name: string;
+            rule_type: components["schemas"]["RestrictionRuleTypeSchema"];
+            rule_value: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         UserStatusUpdateInput: {
             enabled: boolean;
@@ -1324,6 +1385,119 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NgWord"];
                 };
+            };
+        };
+    };
+    get_restriction_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all restriction rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleSchema"][];
+                };
+            };
+        };
+    };
+    create_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRestrictionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Create restriction rule */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleSchema"];
+                };
+            };
+        };
+    };
+    get_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get restriction rule by ID */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRestrictionRuleSchema"];
+                };
+            };
+        };
+    };
+    delete_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete restriction rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_restriction_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Rule ID */
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRestrictionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Update restriction rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
