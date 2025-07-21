@@ -1,4 +1,4 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::utils::redis::{
     res_creation_span_ip_key, res_creation_span_key, thread_creation_span_ip_key,

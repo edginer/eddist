@@ -1,4 +1,4 @@
-use eddist_core::cache_aside::{AsCache, ToCache, cache_aside};
+use eddist_core::cache_aside::{cache_aside, AsCache, ToCache};
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 

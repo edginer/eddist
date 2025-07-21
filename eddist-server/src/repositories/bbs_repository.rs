@@ -775,10 +775,7 @@ impl BbsRepository for BbsRepositoryImpl {
     }
 
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        let query = query!(
-            "DELETE FROM authed_tokens WHERE token = ?",
-            token
-        );
+        let query = query!("DELETE FROM authed_tokens WHERE token = ?", token);
 
         query.execute(&self.pool).await?;
 

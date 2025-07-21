@@ -18,12 +18,14 @@ use user_logout_service::UserLogoutService;
 use user_page_service::UserPageService;
 use user_reg_idp_redirection_service::UserRegIdpRedirectionService;
 use user_reg_temp_url_service::UserRegTempUrlService;
+use user_restriction_service::UserRestrictionService;
 
 use crate::{
     error::BbsCgiError,
     repositories::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         idp_repository::IdpRepository, user_repository::UserRepository,
+        user_restriction_repository::UserRestrictionRepository,
     },
 };
 
@@ -44,6 +46,7 @@ pub(crate) mod user_logout_service;
 pub(crate) mod user_page_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
+pub(crate) mod user_restriction_service;
 
 #[mockall::automock]
 #[async_trait::async_trait]
@@ -63,6 +66,7 @@ pub struct AppServiceContainer<
     U: UserRepository + 'static,
     I: IdpRepository + 'static,
     P: PubRepository,
+    R: UserRestrictionRepository + 'static,
 > {
     auth_with_code: AuthWithCodeService<B>,
     board_info: BoardInfoService<B>,
@@ -82,6 +86,7 @@ pub struct AppServiceContainer<
     auth_with_code_user_page: AuthWithCodeUserPageService<U, B>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
     user_logout: UserLogoutService,
+    user_restriction: UserRestrictionService<R>,
 }
 
 impl<
@@ -89,12 +94,14 @@ impl<
         U: UserRepository + Clone,
         I: IdpRepository + Clone,
         P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+        R: UserRestrictionRepository + Clone,
+    > AppServiceContainer<B, U, I, P, R>
 {
     pub fn new(
         bbs_repo: B,
         user_repo: U,
         idp_repo: I,
+        user_restriction_repo: R,
         redis_conn: ConnectionManager,
         pub_repo: P,
         bucket: Bucket,
@@ -149,6 +156,7 @@ impl<
                 redis_conn.clone(),
             ),
             user_logout: UserLogoutService::new(redis_conn),
+            user_restriction: UserRestrictionService::new(user_restriction_repo),
         }
     }
 }
@@ -158,7 +166,8 @@ impl<
         U: UserRepository + 'static,
         I: IdpRepository + 'static,
         P: PubRepository,
-    > AppServiceContainer<B, U, I, P>
+        R: UserRestrictionRepository + 'static,
+    > AppServiceContainer<B, U, I, P, R>
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
         &self.auth_with_code
@@ -226,5 +235,9 @@ impl<
 
     pub fn user_login_idp_redirection(&self) -> &UserLoginIdpRedirectionService<I> {
         &self.user_login_idp_redirection
+    }
+
+    pub fn user_restriction(&self) -> &UserRestrictionService<R> {
+        &self.user_restriction
     }
 }

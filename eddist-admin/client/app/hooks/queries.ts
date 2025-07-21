@@ -528,3 +528,93 @@ export const updateUserStatus = ({
   };
   return { mutate };
 };
+
+const GET_RESTRICTION_RULES = "/restriction_rules";
+
+export const getRestrictionRules = ({
+  params,
+}: UseQueryOptions<paths[typeof GET_RESTRICTION_RULES]["get"]>) => {
+  return useSuspenseQuery({
+    queryKey: [GET_RESTRICTION_RULES],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_RESTRICTION_RULES, {
+        params,
+        signal,
+      });
+
+      if (data) {
+        data.sort((a, b) => {
+          if (a.created_at < b.created_at) {
+            return 1;
+          }
+          if (a.created_at > b.created_at) {
+            return -1;
+          }
+          return 0;
+        });
+      }
+
+      return data;
+    },
+  });
+};
+
+const CREATE_RESTRICTION_RULE = "/restriction_rules";
+
+export const createRestrictionRule = ({
+  body,
+}: UseQueryOptions<paths[typeof CREATE_RESTRICTION_RULE]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(CREATE_RESTRICTION_RULE, {
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const GET_RESTRICTION_RULE = "/restriction_rules/{rule_id}";
+
+export const getRestrictionRule = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_RESTRICTION_RULE]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_RESTRICTION_RULE, params.path.rule_id],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_RESTRICTION_RULE, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const UPDATE_RESTRICTION_RULE = "/restriction_rules/{rule_id}";
+
+export const updateRestrictionRule = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_RESTRICTION_RULE]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_RESTRICTION_RULE, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_RESTRICTION_RULE = "/restriction_rules/{rule_id}";
+
+export const deleteRestrictionRule = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_RESTRICTION_RULE]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_RESTRICTION_RULE, {
+      params,
+    });
+  };
+  return { mutate };
+};

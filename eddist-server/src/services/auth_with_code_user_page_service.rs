@@ -1,11 +1,11 @@
 use chrono::Utc;
 use metrics::counter;
-use redis::{AsyncCommands, aio::ConnectionManager};
+use redis::{aio::ConnectionManager, AsyncCommands};
 use sqlx::MySql;
 
 use crate::{
     repositories::{bbs_repository::BbsRepository, user_repository::UserRepository},
-    utils::{TransactionRepository, redis::user_session_key},
+    utils::{redis::user_session_key, TransactionRepository},
 };
 
 use super::AppService;

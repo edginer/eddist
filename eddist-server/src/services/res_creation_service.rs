@@ -6,6 +6,7 @@ use eddist_core::{
     domain::{
         cap::calculate_cap_hash,
         client_info::ClientInfo,
+        ip_addr::ReducedIpAddr,
         pubsub_repository::{CreatingRes, PubSubItem},
         tinker::Tinker,
     },
@@ -182,22 +183,38 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             return Err(BbsCgiError::NgWordDetected);
         }
 
+        // Determine response creation span and tinker level based on tinker
+        // Level 1 users: 30 seconds, Level 2+ users: 5 seconds (base_response_creation_span_sec)
+        let (tinker_level, response_span_sec) = if let Some(tinker) = &input.tinker {
+            let level = tinker.level();
+            let span = if level < 2 {
+                30_u64
+            } else {
+                board_info.base_response_creation_span_sec as u64
+            };
+            (level, span)
+        } else {
+            // No tinker (not authenticated) - use level 1 and 30 seconds restriction
+            (1, 30_u64)
+        };
+
         let res_span_svc = ResCreationSpanManagementService::new(
             redis_conn.clone(),
-            board_info.base_response_creation_span_sec as u64,
+            response_span_sec,
             board_info.base_thread_creation_span_sec as u64, // ignorable
         );
         if res_span_svc
             .is_within_creation_span(
-                &authed_token.token,
-                &input.ip_addr,
+                &authed_token.reduced_ip.to_string(),
+                &ReducedIpAddr::from(input.ip_addr.clone()).to_string(),
                 created_at.timestamp() as u64,
             )
             .await
         {
-            return Err(BbsCgiError::TooManyCreatingRes(
-                board_info.base_response_creation_span_sec,
-            ));
+            return Err(BbsCgiError::TooManyCreatingRes {
+                tinker_level,
+                span_sec: response_span_sec as i32,
+            });
         };
 
         // Check thread:{board_key}:{thread_number} exists. If not, does not rpush to the list but still creates the response in the database.
@@ -229,8 +246,8 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
 
         res_span_svc
             .update_last_res_creation_time(
-                &authed_token.token,
-                &input.ip_addr,
+                &authed_token.reduced_ip.to_string(),
+                &ReducedIpAddr::from(input.ip_addr.clone()).to_string(),
                 created_at.timestamp() as u64,
             )
             .await;

@@ -16,3 +16,4 @@ sha3 = "0.10.8"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 metrics = "0.24.2"
+ipnet = "2.9"

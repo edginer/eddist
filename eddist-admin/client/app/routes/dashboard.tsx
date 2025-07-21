@@ -10,7 +10,8 @@ type NavBarSectionKind =
   | "ngwords"
   | "global"
   | "authed-token"
-  | "users";
+  | "users"
+  | "restriction-rules";
 
 const Hamburger = () => (
   <svg
@@ -54,6 +55,9 @@ const NavBarSection = ({
       break;
     case "users":
       displayText = "Users";
+      break;
+    case "restriction-rules":
+      displayText = "Restriction Rules";
       break;
   }
 
@@ -101,6 +105,7 @@ const Layout: React.FC = () => {
             kind="authed-token"
           />
           <NavBarSection selected={navBarSection === "users"} kind="users" />
+          <NavBarSection selected={navBarSection === "restriction-rules"} kind="restriction-rules" />
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -166,12 +171,20 @@ const Layout: React.FC = () => {
                   Authed Token
                 </Link>
               </li>
-              <li className="pl-2 border-slate-400">
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
                 <Link
                   to="/dashboard/users"
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Users
+                </Link>
+              </li>
+              <li className="pl-2 border-slate-400">
+                <Link
+                  to="/dashboard/restriction-rules"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
+                  Restriction Rules
                 </Link>
               </li>
             </ul>
