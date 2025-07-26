@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
 };
-use axum_extra::extract::{CookieJar, cookie::Cookie};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
 use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
 

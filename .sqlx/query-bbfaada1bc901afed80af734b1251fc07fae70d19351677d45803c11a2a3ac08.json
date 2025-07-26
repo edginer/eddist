@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "DELETE FROM user_restriction_rules WHERE id = UUID_TO_BIN(?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "bbfaada1bc901afed80af734b1251fc07fae70d19351677d45803c11a2a3ac08"
+}

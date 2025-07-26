@@ -264,6 +264,10 @@ impl AdminSession {
             userinfo: None,
         }
     }
+
+    pub fn get_admin_email(&self) -> Option<String> {
+        self.userinfo.as_ref().map(|info| info.email.clone())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

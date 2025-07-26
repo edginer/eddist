@@ -1,13 +1,13 @@
 use std::env;
 
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    EmptyAdditionalClaims, IdTokenClaims, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
-    TokenResponse,
     core::{
         CoreClient, CoreGenderClaim, CoreJwsSigningAlgorithm, CoreProviderMetadata,
         CoreResponseType,
     },
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
+    EmptyAdditionalClaims, IdTokenClaims, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
+    TokenResponse,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
