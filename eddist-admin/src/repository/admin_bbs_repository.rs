@@ -5,7 +5,7 @@ use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{query, query_as, types::Json, FromRow, MySqlPool};
 use uuid::Uuid;
 
-use crate::{Board, BoardInfo, CreateBoardInput, EditBoardInput, Res, Thread};
+use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput, Res, Thread};
 
 #[async_trait::async_trait]
 pub trait AdminBbsRepository: Send + Sync {

@@ -23,7 +23,7 @@ import { toast } from "react-toastify";
 interface RestrictionRule {
   id: string;
   name: string;
-  rule_type: "ASN" | "IP" | "IPCidr" | "UserAgent";
+  rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
   expires_at?: string | null;
   created_at: string;
@@ -33,7 +33,7 @@ interface RestrictionRule {
 
 interface CreateRestrictionRuleForm {
   name: string;
-  rule_type: "ASN" | "IP" | "IPCidr" | "UserAgent";
+  rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
   expires_at?: string;
 }
@@ -41,7 +41,7 @@ interface CreateRestrictionRuleForm {
 interface EditRestrictionRuleForm {
   id: string;
   name: string;
-  rule_type: "ASN" | "IP" | "IPCidr" | "UserAgent";
+  rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
   expires_at?: string;
 }
@@ -69,7 +69,7 @@ const RestrictionRules = () => {
   } = useForm<EditRestrictionRuleForm>();
 
   const ruleTypeOptions = [
-    { value: "ASN", label: "ASN" },
+    { value: "Asn", label: "ASN" },
     { value: "IP", label: "IP Address" },
     { value: "IPCidr", label: "IP CIDR" },
     { value: "UserAgent", label: "User Agent" },
@@ -107,9 +107,10 @@ const RestrictionRules = () => {
                     name: data.name,
                     rule_type: data.rule_type,
                     rule_value: data.rule_value,
-                    expires_at: createNeverExpires || !data.expires_at
-                      ? undefined
-                      : new Date(data.expires_at).toISOString(),
+                    expires_at:
+                      createNeverExpires || !data.expires_at
+                        ? undefined
+                        : new Date(data.expires_at).toISOString(),
                   },
                 });
                 await mutate();
@@ -212,9 +213,10 @@ const RestrictionRules = () => {
                     name: data.name,
                     rule_type: data.rule_type,
                     rule_value: data.rule_value,
-                    expires_at: editNeverExpires || !data.expires_at
-                      ? undefined
-                      : new Date(data.expires_at).toISOString(),
+                    expires_at:
+                      editNeverExpires || !data.expires_at
+                        ? undefined
+                        : new Date(data.expires_at).toISOString(),
                   },
                 });
                 await mutate();

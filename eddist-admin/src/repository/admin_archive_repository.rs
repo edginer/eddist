@@ -5,7 +5,7 @@ use s3::Bucket;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub trait AdminArchiveRepository: Send + Sync + Clone {
+pub(crate) trait AdminArchiveRepository: Send + Sync + Clone {
     async fn get_thread(
         &self,
         board_key: &str,

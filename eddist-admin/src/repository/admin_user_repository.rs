@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use crate::{User, UserIdpBinding};
+use crate::models::{User, UserIdpBinding};
 
 #[async_trait::async_trait]
 pub trait AdminUserRepository: Send + Sync {

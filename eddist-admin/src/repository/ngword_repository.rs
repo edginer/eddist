@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::{query, query_as, Executor, MySqlPool};
 use uuid::Uuid;
 
-use crate::NgWord;
+use crate::models::NgWord;
 
 #[async_trait::async_trait]
 pub trait NgWordRepository: Send + Sync {
