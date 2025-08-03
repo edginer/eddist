@@ -12,7 +12,7 @@
     "/authed_tokens/{authed_token_id}/": {
       "get": {
         "tags": [
-          "bbs"
+          "auth_tokens"
         ],
         "operationId": "get_authed_token",
         "parameters": [
@@ -42,7 +42,7 @@
       },
       "delete": {
         "tags": [
-          "bbs"
+          "auth_tokens"
         ],
         "operationId": "delete_authed_token",
         "parameters": [
@@ -75,7 +75,7 @@
     "/boards/": {
       "get": {
         "tags": [
-          "bbs"
+          "boards"
         ],
         "operationId": "get_boards",
         "responses": {
@@ -96,7 +96,7 @@
       },
       "post": {
         "tags": [
-          "bbs"
+          "boards"
         ],
         "operationId": "create_board",
         "requestBody": {
@@ -126,7 +126,7 @@
     "/boards/{board_key}/": {
       "get": {
         "tags": [
-          "bbs"
+          "boards"
         ],
         "operationId": "get_board",
         "parameters": [
@@ -158,7 +158,7 @@
       },
       "patch": {
         "tags": [
-          "bbs"
+          "boards"
         ],
         "operationId": "edit_board",
         "parameters": [
@@ -200,7 +200,7 @@
     "/boards/{board_key}/admin-dat-archives/{thread_number}/": {
       "get": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "get_admin_dat_archived_thread",
         "parameters": [
@@ -242,7 +242,7 @@
     "/boards/{board_key}/archives/": {
       "get": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "get_archived_threads",
         "parameters": [
@@ -339,7 +339,7 @@
     "/boards/{board_key}/archives/{thread_id}/": {
       "get": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "get_archived_thread",
         "parameters": [
@@ -384,7 +384,7 @@
     "/boards/{board_key}/archives/{thread_id}/responses/": {
       "get": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "get_archived_responses",
         "parameters": [
@@ -431,7 +431,7 @@
     "/boards/{board_key}/dat-archives/{thread_number}/": {
       "get": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "get_dat_archived_thread",
         "parameters": [
@@ -471,7 +471,7 @@
       },
       "delete": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "delete_archived_thread",
         "parameters": [
@@ -506,7 +506,7 @@
     "/boards/{board_key}/dat-archives/{thread_number}/responses/": {
       "patch": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "update_archived_res",
         "parameters": [
@@ -561,7 +561,7 @@
     "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/": {
       "delete": {
         "tags": [
-          "bbs"
+          "archives"
         ],
         "operationId": "delete_archived_res",
         "parameters": [
@@ -607,7 +607,7 @@
     "/boards/{board_key}/info/": {
       "get": {
         "tags": [
-          "bbs"
+          "boards"
         ],
         "operationId": "get_board_info",
         "parameters": [
@@ -641,7 +641,7 @@
     "/boards/{board_key}/threads-compaction/": {
       "post": {
         "tags": [
-          "bbs"
+          "threads"
         ],
         "operationId": "threads_compaction",
         "parameters": [
@@ -675,7 +675,7 @@
     "/boards/{board_key}/threads/": {
       "get": {
         "tags": [
-          "bbs"
+          "threads"
         ],
         "operationId": "get_threads",
         "parameters": [
@@ -708,7 +708,7 @@
     "/boards/{board_key}/threads/{thread_id}/": {
       "get": {
         "tags": [
-          "bbs"
+          "threads"
         ],
         "operationId": "get_thread",
         "parameters": [
@@ -753,7 +753,7 @@
     "/boards/{board_key}/threads/{thread_id}/responses/": {
       "get": {
         "tags": [
-          "bbs"
+          "threads"
         ],
         "operationId": "get_responses",
         "parameters": [
@@ -800,7 +800,7 @@
     "/boards/{board_key}/threads/{thread_id}/responses/{res_id}/": {
       "patch": {
         "tags": [
-          "bbs"
+          "threads"
         ],
         "operationId": "update_response",
         "parameters": [
@@ -862,7 +862,7 @@
     "/caps/": {
       "get": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "get_caps",
         "responses": {
@@ -883,7 +883,7 @@
       },
       "post": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "create_cap",
         "requestBody": {
@@ -913,7 +913,7 @@
     "/caps/{cap_id}/": {
       "delete": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "delete_cap",
         "parameters": [
@@ -936,7 +936,7 @@
       },
       "patch": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "update_cap",
         "parameters": [
@@ -978,7 +978,7 @@
     "/ng_words/": {
       "get": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "get_ng_words",
         "responses": {
@@ -999,7 +999,7 @@
       },
       "post": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "create_ng_word",
         "requestBody": {
@@ -1029,7 +1029,7 @@
     "/ng_words/{ng_word_id}/": {
       "delete": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "delete_ng_word",
         "parameters": [
@@ -1052,7 +1052,7 @@
       },
       "patch": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "update_ng_word",
         "parameters": [
@@ -1094,7 +1094,7 @@
     "/restriction_rules": {
       "get": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "get_restriction_rules",
         "responses": {
@@ -1115,7 +1115,7 @@
       },
       "post": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "create_restriction_rule",
         "requestBody": {
@@ -1145,7 +1145,7 @@
     "/restriction_rules/{rule_id}": {
       "get": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "get_restriction_rule",
         "parameters": [
@@ -1175,7 +1175,7 @@
       },
       "delete": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "delete_restriction_rule",
         "parameters": [
@@ -1198,7 +1198,7 @@
       },
       "patch": {
         "tags": [
-          "bbs"
+          "moderation"
         ],
         "operationId": "update_restriction_rule",
         "parameters": [
@@ -1233,7 +1233,7 @@
     "/users/search/": {
       "get": {
         "tags": [
-          "bbs"
+          "users"
         ],
         "operationId": "search_users",
         "parameters": [
@@ -1293,7 +1293,7 @@
     "/users/{user_id}/status/": {
       "patch": {
         "tags": [
-          "bbs"
+          "users"
         ],
         "operationId": "update_user_status",
         "parameters": [
@@ -1794,7 +1794,7 @@
             "type": "string"
           },
           "rule_type": {
-            "type": "string"
+            "$ref": "#/components/schemas/RestrictionRuleTypeSchema"
           },
           "rule_value": {
             "type": "string"
@@ -1832,6 +1832,17 @@
           },
           "word": {
             "type": "string"
+          }
+        }
+      },
+      "DeleteAuthedTokenInput": {
+        "type": "object",
+        "required": [
+          "using_origin_ip"
+        ],
+        "properties": {
+          "using_origin_ip": {
+            "type": "boolean"
           }
         }
       },
@@ -2036,7 +2047,7 @@
       "RestrictionRuleTypeSchema": {
         "type": "string",
         "enum": [
-          "ASN",
+          "Asn",
           "IP",
           "IPCidr",
           "UserAgent"
@@ -2274,9 +2285,13 @@
             ]
           },
           "rule_type": {
-            "type": [
-              "string",
-              "null"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RestrictionRuleTypeSchema"
+              }
             ]
           },
           "rule_value": {
@@ -2388,6 +2403,31 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "UserSearchQuery": {
+        "type": "object",
+        "properties": {
+          "authed_token_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "user_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

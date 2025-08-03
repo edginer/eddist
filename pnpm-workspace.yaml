@@ -1,4 +1,3 @@
 packages:
   - "eddist-server/client"
   - "eddist-admin/client"
-  - "eddist-admin/clientv2"

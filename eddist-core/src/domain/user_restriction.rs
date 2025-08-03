@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RestrictionRuleType {
-    ASN,
+    Asn,
     IP,
     IPCidr,
     UserAgent,
@@ -15,7 +15,7 @@ pub enum RestrictionRuleType {
 impl RestrictionRuleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            RestrictionRuleType::ASN => "ASN",
+            RestrictionRuleType::Asn => "ASN",
             RestrictionRuleType::IP => "IP",
             RestrictionRuleType::IPCidr => "IP_CIDR",
             RestrictionRuleType::UserAgent => "USER_AGENT",
@@ -28,7 +28,7 @@ impl FromStr for RestrictionRuleType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "ASN" => Ok(RestrictionRuleType::ASN),
+            "ASN" => Ok(RestrictionRuleType::Asn),
             "IP" => Ok(RestrictionRuleType::IP),
             "IP_CIDR" => Ok(RestrictionRuleType::IPCidr),
             "USER_AGENT" => Ok(RestrictionRuleType::UserAgent),
@@ -70,7 +70,7 @@ impl UserRestrictionRule {
         }
 
         match self.rule_type {
-            RestrictionRuleType::ASN => {
+            RestrictionRuleType::Asn => {
                 if let Ok(rule_asn) = self.rule_value.parse::<u32>() {
                     rule_asn == asn
                 } else {
