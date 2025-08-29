@@ -42,3 +42,37 @@ impl RateLimiter {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_basic_rate_limiting() {
+        let mut limiter = RateLimiter::new(2, Duration::from_secs(60));
+        
+        assert!(limiter.check_and_add("user1"));
+        assert!(limiter.check_and_add("user1"));
+        assert!(!limiter.check_and_add("user1"));
+    }
+
+    #[test]
+    fn test_independent_keys() {
+        let mut limiter = RateLimiter::new(1, Duration::from_secs(60));
+        
+        assert!(limiter.check_and_add("user1"));
+        assert!(!limiter.check_and_add("user1"));
+        assert!(limiter.check_and_add("user2"));
+    }
+
+    #[test]
+    fn test_period_reset() {
+        let mut limiter = RateLimiter::new(1, Duration::from_millis(50));
+        
+        assert!(limiter.check_and_add("user1"));
+        assert!(!limiter.check_and_add("user1"));
+        
+        thread::sleep(Duration::from_millis(60));
+        assert!(limiter.check_and_add("user1"));
+    }
+}
