@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
 
+#[derive(Clone)]
 pub(crate) struct Repository(MySqlPool);
 
 impl Repository {
