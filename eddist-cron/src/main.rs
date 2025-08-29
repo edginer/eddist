@@ -3,7 +3,6 @@ use std::{env, str::FromStr, time::Duration};
 use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
-use rand::Rng;
 use s3::{creds::Credentials, Bucket};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::time::sleep;
@@ -60,6 +59,8 @@ async fn main() {
             // - inactivate (set active to false, archived to true)
 
             let boards = repo.get_all_boards_info().await.unwrap();
+            let mut tasks = Vec::new();
+
             for b in boards {
                 if let (Some(cron), Some(trigger)) = (
                     b.threads_archive_cron,
@@ -88,18 +89,58 @@ async fn main() {
                         continue;
                     }
 
-                    // Randomize thread archive timing (0-59 seconds)
-                    let random_delay = rand::random::<u64>() % 60;
-                    sleep(Duration::from_secs(random_delay)).await;
+                    // Create parallel task for each board
+                    let repo_clone = repo.clone();
+                    let board_key = b.board_key.clone();
 
-                    repo.update_threads_to_inactive(&b.board_key, trigger as u32)
-                        .await
-                        .unwrap();
-                    log::info!(
-                        "`inactivate` Cronjob for board: {} is executed",
-                        b.board_key
-                    );
+                    let task = tokio::spawn(async move {
+                        // Randomize thread archive timing (0-59 seconds)
+                        let random_delay = rand::random::<u64>() % 60;
+                        sleep(Duration::from_secs(random_delay)).await;
+
+                        match repo_clone
+                            .update_threads_to_inactive(&board_key, trigger as u32)
+                            .await
+                        {
+                            Ok(_) => {
+                                log::info!(
+                                    "`inactivate` Cronjob for board: {board_key} is executed"
+                                );
+                                Ok(())
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "`inactivate` Cronjob for board: {board_key} failed: {e}"
+                                );
+                                Err(e)
+                            }
+                        }
+                    });
+
+                    tasks.push(task);
                 }
+            }
+
+            // Wait for all tasks to complete
+            let results = futures::future::join_all(tasks).await;
+            let mut success_count = 0;
+            let mut error_count = 0;
+
+            for result in results {
+                match result {
+                    Ok(Ok(())) => success_count += 1,
+                    Ok(Err(_)) => error_count += 1,
+                    Err(e) => {
+                        log::error!("Task panicked: {}", e);
+                        error_count += 1;
+                    }
+                }
+            }
+
+            if error_count > 0 {
+                log::error!("Some tasks failed: Success: {success_count}, Errors: {error_count}");
+            } else {
+                log::info!("All tasks completed successfully");
             }
         }
         "archive" => {
