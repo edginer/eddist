@@ -168,3 +168,47 @@ impl CsrfState {
         Ok(csrf_result.is_some())
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderMap;
+
+    #[test]
+    fn test_get_origin_ip_cloudflare() {
+        let mut headers = HeaderMap::new();
+        headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
+        
+        std::env::set_var("ENV", "production");
+        assert_eq!(get_origin_ip(&headers), "203.0.113.1");
+        std::env::remove_var("ENV");
+    }
+
+    #[test]
+    fn test_get_origin_ip_x_forwarded() {
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
+        
+        std::env::set_var("ENV", "production");
+        assert_eq!(get_origin_ip(&headers), "198.51.100.1");
+        std::env::remove_var("ENV");
+    }
+
+    #[test]
+    fn test_get_origin_ip_localhost_fallback() {
+        let headers = HeaderMap::new();
+        assert_eq!(get_origin_ip(&headers), "localhost");
+    }
+
+    #[test]
+    fn test_get_ua_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert("User-Agent", "Mozilla/5.0 Test".parse().unwrap());
+        assert_eq!(get_ua(&headers), "Mozilla/5.0 Test");
+    }
+
+    #[test]
+    fn test_get_ua_missing() {
+        let headers = HeaderMap::new();
+        assert_eq!(get_ua(&headers), "unknown");
+    }
+}

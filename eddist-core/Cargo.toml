@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.205", features = ["derive"] }
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = ["serde"] }
 # TODO: Remove this dependency and replace it with trait
 redis = { version = "0.30.0", features = ["tokio-comp"] }
 anyhow = "1.0.86"
