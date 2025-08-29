@@ -1140,6 +1140,7 @@ dependencies = [
  "eddist-core",
  "encoding_rs",
  "log",
+ "rand 0.9.1",
  "redis",
  "rust-s3",
  "sqlx",

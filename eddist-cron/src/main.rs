@@ -3,8 +3,10 @@ use std::{env, str::FromStr, time::Duration};
 use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
+use rand::Rng;
 use s3::{creds::Credentials, Bucket};
 use sqlx::mysql::MySqlPoolOptions;
+use tokio::time::sleep;
 
 mod repository;
 
@@ -82,14 +84,18 @@ async fn main() {
                         .unwrap();
 
                     if executed_time != next {
-                        println!("`inactivate` Cronjob for board: {} is not executed, current time: {}, next time: {}", b.board_key, executed_time, next);
+                        log::info!("`inactivate` Cronjob for board: {} is not executed, current time: {}, next time: {}", b.board_key, executed_time, next);
                         continue;
                     }
+
+                    // Randomize thread archive timing (0-59 seconds)
+                    let random_delay = rand::random::<u64>() % 60;
+                    sleep(Duration::from_secs(random_delay)).await;
 
                     repo.update_threads_to_inactive(&b.board_key, trigger as u32)
                         .await
                         .unwrap();
-                    println!(
+                    log::info!(
                         "`inactivate` Cronjob for board: {} is executed",
                         b.board_key
                     );
