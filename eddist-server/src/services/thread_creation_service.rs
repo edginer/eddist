@@ -32,7 +32,7 @@ use crate::{
         bbs_repository::{BbsRepository, CreatingThread},
         user_repository::UserRepository,
     },
-    utils::redis::thread_cache_key,
+    utils::{redis::thread_cache_key, EMAIL_AUTH_PROHIBITED_USER_AGENTS},
 };
 
 use super::BbsCgiService;
@@ -109,6 +109,15 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             input.authed_token,
             false,
         );
+
+        // Restrict thread creation when email authenticated and User-Agent is in blocked list
+        if res.is_email_authed()
+            && EMAIL_AUTH_PROHIBITED_USER_AGENTS
+                .iter()
+                .any(|blocked| input.user_agent.contains(blocked))
+        {
+            return Err(BbsCgiError::EmailAuthenticatedUnsupportedUserAgent);
+        }
 
         let auth_service = BbsCgiAuthService::new(self.0.clone());
         let authed_token = auth_service
@@ -299,8 +308,14 @@ mod tests {
     #[test]
     fn test_sanitize_thread_name() {
         assert_eq!(sanitize_thread_name("normal title"), "normal title");
-        assert_eq!(sanitize_thread_name("<script>alert()</script>"), "&lt;script&gt;alert()&lt;/script&gt;");
-        assert_eq!(sanitize_thread_name("title with\nnewline"), "title withnewline");
+        assert_eq!(
+            sanitize_thread_name("<script>alert()</script>"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        assert_eq!(
+            sanitize_thread_name("title with\nnewline"),
+            "title withnewline"
+        );
         assert_eq!(sanitize_thread_name("title&#10;test"), "titletest");
     }
 }

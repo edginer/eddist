@@ -39,7 +39,7 @@ use crate::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         user_repository::UserRepository,
     },
-    utils::redis::thread_cache_key,
+    utils::{redis::thread_cache_key, EMAIL_AUTH_PROHIBITED_USER_AGENTS},
 };
 
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
@@ -121,6 +121,15 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             input.authed_token_cookie,
             false,
         );
+
+        // Restrict responses when email authenticated and User-Agent is in blocked list
+        if res.is_email_authed()
+            && EMAIL_AUTH_PROHIBITED_USER_AGENTS
+                .iter()
+                .any(|blocked| input.user_agent.contains(blocked))
+        {
+            return Err(BbsCgiError::EmailAuthenticatedUnsupportedUserAgent);
+        }
 
         let auth_service = BbsCgiAuthService::new(self.0.clone());
         let authed_token = auth_service
