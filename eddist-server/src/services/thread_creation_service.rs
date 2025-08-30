@@ -116,6 +116,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
                 .iter()
                 .any(|blocked| input.user_agent.contains(blocked))
         {
+            log::warn!(
+                "Blocked thread creation attempt with email authentication from prohibited User-Agent. User-Agent: {}, IP: {}",
+                input.user_agent,
+                input.ip_addr
+            );
             return Err(BbsCgiError::EmailAuthenticatedUnsupportedUserAgent);
         }
 
