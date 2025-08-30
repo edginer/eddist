@@ -32,6 +32,7 @@ use crate::{
             },
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
+            level_decrement_service::LevelDecrementService,
         },
     },
     error::{BbsCgiError, NotFoundParamType},
@@ -283,8 +284,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
                 .await;
         });
 
-        let tinker = if let Some(tinker) = input.tinker {
-            if tinker.authed_token() != authed_token.token {
+        let token = authed_token.token.clone();
+        let mut tinker = if let Some(tinker) = input.tinker {
+            if tinker.authed_token() != token {
                 Tinker::new(authed_token.token, created_at)
             } else {
                 tinker
@@ -293,6 +295,21 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             Tinker::new(authed_token.token, created_at)
         }
         .action_on_write(created_at);
+
+        // Check for level decrement: if user is level > 1 and makes more than 5 responses in 30 seconds
+        if tinker.level() > 1 {
+            let level_decrement_svc = LevelDecrementService::new(redis_conn.clone());
+            if level_decrement_svc
+                .check_and_increment_response_count(&token, created_at.timestamp() as u64)
+                .await
+            {
+                tinker = tinker.decrement_level();
+                log::warn!(
+                    "User {} exceeded response rate limit (>5 in 30s), level decremented to {}",
+                    token, tinker.level()
+                );
+            }
+        }
 
         counter!("response_creation", "board_key" => input.board_key).increment(1);
 

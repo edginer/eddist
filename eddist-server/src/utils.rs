@@ -52,6 +52,10 @@ pub(crate) mod redis {
     pub fn user_login_oauth2_authreq_key(state_id: &str) -> String {
         format!("userlogin:oauth2:authreq:{state_id}")
     }
+
+    pub fn level_decrement_rate_limit_key(authed_token: &str) -> String {
+        format!("level_decrement:{authed_token}")
+    }
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {

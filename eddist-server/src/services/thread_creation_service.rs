@@ -24,6 +24,7 @@ use crate::{
             },
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
+            level_decrement_service::LevelDecrementService,
         },
         utils::{sanitize_base, sanitize_num_refs},
     },
@@ -249,8 +250,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             .map_err(|e| BbsCgiError::Other(e.into()))?
             .map_err(|e| BbsCgiError::Other(e.into()))?;
 
-        let tinker = if let Some(tinker) = input.tinker {
-            if tinker.authed_token() != authed_token.token {
+        let token = authed_token.token.clone();
+        let mut tinker = if let Some(tinker) = input.tinker {
+            if tinker.authed_token() != token {
                 Tinker::new(authed_token.token, created_at)
             } else {
                 tinker
@@ -259,6 +261,22 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             Tinker::new(authed_token.token, created_at)
         }
         .action_on_create_thread(created_at);
+
+        // Check for level decrement: if user is level > 1 and makes more than 5 responses in 30 seconds
+        if tinker.level() > 1 {
+            let redis_for_level = self.2.clone();
+            let level_decrement_svc = LevelDecrementService::new(redis_for_level);
+            if level_decrement_svc
+                .check_and_increment_response_count(&token, created_at.timestamp() as u64)
+                .await
+            {
+                tinker = tinker.decrement_level();
+                log::warn!(
+                    "User {} exceeded response rate limit (>5 in 30s), level decremented to {}",
+                    token, tinker.level()
+                );
+            }
+        }
 
         let _ = bbs_repo
             .update_authed_token_last_wrote(authed_token.id, created_at)

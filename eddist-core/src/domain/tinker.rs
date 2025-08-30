@@ -95,4 +95,36 @@ impl Tinker {
     pub fn last_created_thread_at(&self) -> Option<u64> {
         self.last_created_thread_at
     }
+
+    pub fn decrement_level(self) -> Self {
+        Self {
+            level: if self.level > 1 { self.level - 1 } else { 1 },
+            ..self
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn test_tinker_level_decrement() {
+        let tinker = Tinker::new("test_token".to_string(), Utc::now());
+        assert_eq!(tinker.level(), 1);
+
+        // Level 1 should not decrement below 1
+        let decremented = tinker.decrement_level();
+        assert_eq!(decremented.level(), 1);
+    }
+
+    #[test]
+    fn test_tinker_level_decrement_higher_level() {
+        let mut tinker = Tinker::new("test_token".to_string(), Utc::now());
+        tinker.level = 5; // Manually set to higher level for testing
+
+        let decremented = tinker.decrement_level();
+        assert_eq!(decremented.level(), 4);
+    }
 }
