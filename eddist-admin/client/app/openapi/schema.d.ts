@@ -501,7 +501,7 @@ export interface components {
             /** Format: date-time */
             expires_at?: string | null;
             name: string;
-            rule_type: string;
+            rule_type: components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value: string;
         };
         CreationCapInput: {
@@ -512,6 +512,9 @@ export interface components {
         CreationNgWordInput: {
             name: string;
             word: string;
+        };
+        DeleteAuthedTokenInput: {
+            using_origin_ip: boolean;
         };
         EditBoardInput: {
             base_response_creation_span_sec?: number | null;
@@ -561,7 +564,7 @@ export interface components {
             thread_id: string;
         };
         /** @enum {string} */
-        RestrictionRuleTypeSchema: "ASN" | "IP" | "IPCidr" | "UserAgent";
+        RestrictionRuleTypeSchema: "Asn" | "IP" | "IPCidr" | "UserAgent";
         Thread: {
             active: boolean;
             archived: boolean;
@@ -623,7 +626,7 @@ export interface components {
             /** Format: date-time */
             expires_at?: string | null;
             name?: string | null;
-            rule_type?: string | null;
+            rule_type?: null | components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value?: string | null;
         };
         User: {
@@ -654,6 +657,13 @@ export interface components {
             rule_value: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        UserSearchQuery: {
+            /** Format: uuid */
+            authed_token_id?: string | null;
+            /** Format: uuid */
+            user_id?: string | null;
+            user_name?: string | null;
         };
         UserStatusUpdateInput: {
             enabled: boolean;

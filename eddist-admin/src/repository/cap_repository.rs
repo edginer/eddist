@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::Cap;
+use crate::models::Cap;
 
 #[async_trait::async_trait]
 pub trait CapRepository: Send + Sync {

@@ -198,4 +198,23 @@ mod tests {
         let result = sanitize_ascii_numeric_character_reference(input);
         assert_eq!(expected, result);
     }
+
+    #[test]
+    fn test_sanitize_base() {
+        assert_eq!(sanitize_base("normal text", false), "normal text");
+        assert_eq!(sanitize_base("<script>", false), "&lt;script&gt;");
+        assert_eq!(sanitize_base("'\"", false), "&#39;&quot;");
+        assert_eq!(sanitize_base("line1\nline2", true), "line1<br>line2");
+        assert_eq!(sanitize_base("line1\nline2", false), "line1line2");
+        assert_eq!(sanitize_base("test\r\nend", false), "testend");
+    }
+
+    #[test]
+    fn test_sanitize_num_refs() {
+        assert_eq!(sanitize_num_refs("normal text"), "normal text");
+        assert_eq!(sanitize_num_refs("test&#xa;end"), "testend");
+        assert_eq!(sanitize_num_refs("test&#10;end"), "testend");
+        assert_eq!(sanitize_num_refs("test&#X0A;end"), "testend");
+        assert_eq!(sanitize_num_refs("keep&#41;this"), "keep)this"); // &#41; is ASCII ')'
+    }
 }

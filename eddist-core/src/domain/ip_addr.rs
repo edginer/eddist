@@ -63,3 +63,31 @@ impl Display for ReducedIpAddr {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reduced_ip_addr_v4() {
+        let ip = ReducedIpAddr::from("192.168.1.1".to_string());
+        assert!(ip.is_v4());
+        assert!(!ip.is_v6());
+        assert_eq!(ip.to_string(), "192.168.1.1");
+    }
+
+    #[test]
+    fn test_reduced_ip_addr_v6() {
+        let ip = ReducedIpAddr::from("2001:db8:85a3:0".to_string());
+        assert!(ip.is_v6());
+        assert!(!ip.is_v4());
+        assert_eq!(ip.to_string(), "2001:db8:85a3:0");
+    }
+
+    #[test]
+    fn test_ip_addr_conversion() {
+        let ip = IpAddr::new("10.0.0.1".to_string());
+        let reduced: ReducedIpAddr = ip.into();
+        assert!(reduced.is_v4());
+        assert_eq!(reduced.to_string(), "10.0.0.1");
+    }
+}

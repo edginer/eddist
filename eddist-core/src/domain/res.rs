@@ -102,3 +102,65 @@ impl ResView {
         )
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_get_sjis_bytes_normal_post() {
+        let res_view = ResViewRef {
+            author_name: "テストユーザー",
+            mail: "",
+            body: "テスト投稿です",
+            created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
+            author_id: "ABC123",
+            is_abone: false,
+        };
+        
+        let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
+        let output = result.to_string();
+        
+        assert!(output.contains("テストユーザー"));
+        assert!(output.contains("テスト投稿です"));
+        assert!(output.contains("ID:ABC123"));
+        assert!(output.contains("テストスレッド"));
+    }
+
+    #[test]
+    fn test_get_sjis_bytes_sage_post() {
+        let res_view = ResViewRef {
+            author_name: "sage投稿者",
+            mail: "sage",
+            body: "sage投稿",
+            created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
+            author_id: "DEF456",
+            is_abone: false,
+        };
+        
+        let result = get_sjis_bytes(res_view, "名無しさん", None);
+        let output = result.to_string();
+        
+        assert!(output.contains("sage投稿者<>sage<>"));
+        assert!(output.contains("sage投稿"));
+    }
+
+    #[test]
+    fn test_get_sjis_bytes_abone() {
+        let res_view = ResViewRef {
+            author_name: "荒らし",
+            mail: "",
+            body: "削除対象",
+            created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
+            author_id: "XYZ789",
+            is_abone: true,
+        };
+        
+        let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
+        let output = result.to_string();
+        
+        assert!(output.contains("あぼーん"));
+        assert!(!output.contains("荒らし"));
+        assert!(!output.contains("削除対象"));
+    }
+}

@@ -291,3 +291,16 @@ pub struct ThreadCreationServiceOutput {
 pub fn sanitize_thread_name(name: &str) -> String {
     sanitize_num_refs(&sanitize_base(name, false))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_thread_name() {
+        assert_eq!(sanitize_thread_name("normal title"), "normal title");
+        assert_eq!(sanitize_thread_name("<script>alert()</script>"), "&lt;script&gt;alert()&lt;/script&gt;");
+        assert_eq!(sanitize_thread_name("title with\nnewline"), "title withnewline");
+        assert_eq!(sanitize_thread_name("title&#10;test"), "titletest");
+    }
+}

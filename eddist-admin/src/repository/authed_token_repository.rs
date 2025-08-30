@@ -1,7 +1,7 @@
 use sqlx::{query, query_as};
 use uuid::Uuid;
 
-use crate::AuthedToken;
+use crate::models::AuthedToken;
 
 #[async_trait::async_trait]
 pub trait AuthedTokenRepository: Send + Sync {
@@ -75,14 +75,14 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
             SET
                 validity = 0
             WHERE
-                id IN (
-                    SELECT id FROM (
+                origin_ip IN (
+                    SELECT origin_ip FROM (
                         SELECT
-                            id
+                            origin_ip
                         FROM
                             authed_tokens
                         WHERE
-                            origin_ip = ?
+                            id = ?
                     ) tmp      
                 )
         "#,
