@@ -83,6 +83,9 @@ pub enum BbsCgiError {
     #[error("ユーザー登録の試行回数が多すぎます")]
     TooManyUserCreationAttempt,
 
+    #[error("このブラウザではメール欄にトークンを入力しての認証はできません")]
+    EmailAuthenticatedUnsupportedUserAgent,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -110,6 +113,7 @@ impl BbsCgiError {
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
             BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
+            BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -136,6 +140,9 @@ impl BbsCgiError {
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
             BbsCgiError::UserAlreadyRegistered => "UserAlreadyRegistered",
             BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
+            BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => {
+                "EmailAuthenticatedUnsupportedUserAgent"
+            }
             BbsCgiError::Other(_) => "InternalError",
         }
     }
