@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import ResponseList from "../components/ResponseList";
-import { Link, useParams } from "@remix-run/react";
+import { Link, useParams } from "react-router";
 import Breadcrumb from "../components/Breadcrumb";
 import clsx from "clsx";
 import { Button, Modal } from "flowbite-react";

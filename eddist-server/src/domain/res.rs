@@ -73,6 +73,10 @@ impl<T: ResState> Res<T> {
         self.mail == "sage"
     }
 
+    pub fn is_email_authed(&self) -> bool {
+        self.is_email_authed
+    }
+
     pub fn metadent_type(&self) -> MetadentType {
         self.metadent_type
     }

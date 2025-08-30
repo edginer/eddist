@@ -8,6 +8,9 @@ use redis::csrf_key;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
 
+pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] =
+    &["2chMate", "mae2c", "Geschar", "twinkle", "Ciisaa"];
+
 pub(crate) mod redis {
     pub fn csrf_key(key: &str) -> String {
         format!("csrf-token:{key}")
@@ -177,7 +180,7 @@ mod tests {
     fn test_get_origin_ip_cloudflare() {
         let mut headers = HeaderMap::new();
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
-        
+
         std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "203.0.113.1");
         std::env::remove_var("ENV");
@@ -187,7 +190,7 @@ mod tests {
     fn test_get_origin_ip_x_forwarded() {
         let mut headers = HeaderMap::new();
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
-        
+
         std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "198.51.100.1");
         std::env::remove_var("ENV");
