@@ -1,4 +1,4 @@
-import { useSearchParams } from "@remix-run/react";
+import { useSearchParams } from "react-router";
 import { Alert, Button, Label, Table, TextInput } from "flowbite-react";
 import { useCallback, useEffect, useState } from "react";
 import client from "~/openapi/client";
