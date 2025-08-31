@@ -9,7 +9,8 @@ use crate::{
     domain::captcha_like::CaptchaLikeConfig,
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
+        CaptchaClient, CaptchaLikeError, CaptchaLikeResult, HCaptchaClient, MonocleClient,
+        TurnstileClient,
     },
     repositories::bbs_repository::BbsRepository,
 };
@@ -122,6 +123,18 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             return Err(BbsPostAuthWithCodeError::ExpiredActivationCode.into());
         }
 
+        let assert_ip_equality = |token_reduced_ip: ReducedIpAddr, request_origin_ip: &str| {
+            let request_origin_reduced = ReducedIpAddr::from(request_origin_ip.to_string());
+
+            if token_reduced_ip != request_origin_reduced {
+                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
+                    .increment(1);
+                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken);
+            }
+
+            Ok(())
+        };
+
         let handles = clients_responses
             .iter()
             .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
@@ -129,6 +142,10 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         let results = join_all(handles).await;
         for r in results {
             match r {
+                // CaptchaLikeError::FailedToVerifyIpAddress is only used for spur.us (currently)
+                Ok(CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)) => {
+                    assert_ip_equality(token.reduced_ip.clone(), &input.origin_ip)?
+                }
                 Ok(CaptchaLikeResult::Failure(e)) => {
                     counter!("issue_authed_token", "state" => "failed", "reason" => "captcha")
                         .increment(1);
@@ -146,14 +163,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .any(|config| matches!(config, CaptchaLikeConfig::Monocle { .. }));
 
         if !has_monocle {
-            let token_origin_ip = token.reduced_ip.clone();
-            let request_origin_ip = ReducedIpAddr::from(input.origin_ip.clone());
-
-            if token_origin_ip != request_origin_ip {
-                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
-                    .increment(1);
-                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
-            }
+            assert_ip_equality(token.reduced_ip.clone(), &input.origin_ip)?;
         }
 
         self.0
