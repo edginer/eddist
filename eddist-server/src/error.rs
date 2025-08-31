@@ -83,7 +83,7 @@ pub enum BbsCgiError {
     #[error("ユーザー登録の試行回数が多すぎます")]
     TooManyUserCreationAttempt,
 
-    #[error("このブラウザではメール欄にトークンを入力しての認証はできません")]
+    #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
     EmailAuthenticatedUnsupportedUserAgent,
 
     #[error(transparent)]

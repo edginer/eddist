@@ -22,6 +22,7 @@ use crate::{
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
+            email_auth_restriction_service::EmailAuthRestrictionService,
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
         },
@@ -32,7 +33,7 @@ use crate::{
         bbs_repository::{BbsRepository, CreatingThread},
         user_repository::UserRepository,
     },
-    utils::{redis::thread_cache_key, EMAIL_AUTH_PROHIBITED_USER_AGENTS},
+    utils::redis::thread_cache_key,
 };
 
 use super::BbsCgiService;
@@ -110,27 +111,23 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             false,
         );
 
-        // Restrict thread creation when email authenticated and User-Agent is in blocked list
-        if res.is_email_authed()
-            && EMAIL_AUTH_PROHIBITED_USER_AGENTS
-                .iter()
-                .any(|blocked| input.user_agent.contains(blocked))
-        {
-            log::warn!(
-                "Blocked thread creation attempt with email authentication from prohibited User-Agent. User-Agent: {}, IP: {}",
-                input.user_agent,
-                input.ip_addr
-            );
-            return Err(BbsCgiError::EmailAuthenticatedUnsupportedUserAgent);
-        }
-
         let auth_service = BbsCgiAuthService::new(self.0.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
                 input.ip_addr.clone(),
-                input.user_agent,
+                input.user_agent.clone(),
                 created_at,
+            )
+            .await?;
+
+        let email_auth_service = EmailAuthRestrictionService::new(self.2.clone());
+        email_auth_service
+            .check_and_enforce_restriction(
+                res.is_email_authed(),
+                &input.user_agent,
+                &authed_token.token,
+                &input.ip_addr,
             )
             .await?;
 

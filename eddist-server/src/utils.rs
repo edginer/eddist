@@ -8,9 +8,6 @@ use redis::csrf_key;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
 
-pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] =
-    &["2chMate", "mae2c", "Geschar", "twinkle", "Ciisaa"];
-
 pub(crate) mod redis {
     pub fn csrf_key(key: &str) -> String {
         format!("csrf-token:{key}")
@@ -54,6 +51,10 @@ pub(crate) mod redis {
 
     pub fn user_login_oauth2_authreq_key(state_id: &str) -> String {
         format!("userlogin:oauth2:authreq:{state_id}")
+    }
+
+    pub fn email_auth_used_key(token: &str) -> String {
+        format!("resp:email_auth_used:{token}")
     }
 }
 
