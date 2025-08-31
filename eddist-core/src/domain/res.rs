@@ -117,10 +117,10 @@ mod tests {
             author_id: "ABC123",
             is_abone: false,
         };
-        
+
         let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
         let output = result.to_string();
-        
+
         assert!(output.contains("テストユーザー"));
         assert!(output.contains("テスト投稿です"));
         assert!(output.contains("ID:ABC123"));
@@ -137,10 +137,10 @@ mod tests {
             author_id: "DEF456",
             is_abone: false,
         };
-        
+
         let result = get_sjis_bytes(res_view, "名無しさん", None);
         let output = result.to_string();
-        
+
         assert!(output.contains("sage投稿者<>sage<>"));
         assert!(output.contains("sage投稿"));
     }
@@ -155,10 +155,10 @@ mod tests {
             author_id: "XYZ789",
             is_abone: true,
         };
-        
+
         let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
         let output = result.to_string();
-        
+
         assert!(output.contains("あぼーん"));
         assert!(!output.contains("荒らし"));
         assert!(!output.contains("削除対象"));

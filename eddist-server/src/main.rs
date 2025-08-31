@@ -67,6 +67,7 @@ mod domain {
         pub mod bbscgi_auth_service;
         pub mod bbscgi_user_reg_temp_url_service;
         pub mod board_info_service;
+        pub mod email_auth_restriction_service;
         pub mod ng_word_reading_service;
         pub mod oidc_client_service;
         pub mod res_creation_span_management_service;
