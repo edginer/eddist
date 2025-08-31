@@ -5,8 +5,10 @@ use axum::{
     response::{Html, IntoResponse},
     Form,
 };
+use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::HeaderMap;
 use serde_json::json;
+use time;
 
 use crate::{
     domain::captcha_like::CaptchaLikeConfig,
@@ -54,10 +56,14 @@ pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
 
 pub async fn post_auth_code(
     headers: HeaderMap,
+    jar: CookieJar,
     State(state): State<AppState>,
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let token = match state
+    let rate_limit_token = jar
+        .get("auth_rate_limit")
+        .map(|cookie| cookie.value().to_string());
+    let (token, rate_limit_token) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -66,10 +72,14 @@ pub async fn post_auth_code(
             user_agent: get_ua(&headers).to_string(),
             captcha_like_configs: state.captcha_like_configs.clone(),
             responses: form,
+            rate_limit_token,
         })
         .await
     {
-        Ok(AuthWithCodeServiceOutput { token }) => token,
+        Ok(AuthWithCodeServiceOutput {
+            token,
+            rate_limit_token,
+        }) => (token, rate_limit_token),
         Err(e) => {
             return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
                 Html(
@@ -78,6 +88,7 @@ pub async fn post_auth_code(
                         .render("auth-code.post.failed", &json!({ "reason": e.to_string() }))
                         .unwrap(),
                 )
+                .into_response()
             } else {
                 log::error!("Failed to issue authed token: {e:?}");
 
@@ -89,7 +100,7 @@ pub async fn post_auth_code(
                             &json!({ "reason": "不明な理由です（認証に失敗した可能性があります）" }),
                         )
                         .unwrap(),
-                )
+                ).into_response()
             };
         }
     };
@@ -99,5 +110,19 @@ pub async fn post_auth_code(
         .render("auth-code.post.success", &json!({ "token": token }))
         .unwrap();
 
-    Html(html)
+    // Set rate limiting cookie if provided by the service
+    let updated_jar = if let Some(token_value) = rate_limit_token {
+        jar.add(
+            Cookie::build(("auth_rate_limit", token_value))
+                .max_age(time::Duration::hours(1))
+                .http_only(true)
+                .same_site(SameSite::Lax)
+                .path("/")
+                .build(),
+        )
+    } else {
+        jar
+    };
+
+    (updated_jar, Html(html)).into_response()
 }

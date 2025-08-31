@@ -14,6 +14,7 @@ use crate::{
     repositories::bbs_repository::BbsRepository,
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
+use uuid::Uuid;
 
 use super::AppService;
 
@@ -23,6 +24,11 @@ pub struct AuthWithCodeService<T: BbsRepository>(T);
 impl<T: BbsRepository> AuthWithCodeService<T> {
     pub fn new(repo: T) -> Self {
         Self(repo)
+    }
+
+    /// Generate a new rate limiting token (browser handles expiration via Max-Age)
+    fn generate_rate_limit_token(&self) -> String {
+        Uuid::now_v7().to_string().replace("-", "")
     }
 }
 
@@ -34,6 +40,12 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         &self,
         input: AuthWithCodeServiceInput,
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
+        if input.rate_limit_token.is_some() {
+            // User is rate limited (cookie exists and browser hasn't expired it)
+            counter!("issue_authed_token", "state" => "failed", "reason" => "rate_limited")
+                .increment(1);
+            return Err(BbsPostAuthWithCodeError::RateLimited.into());
+        }
         let clients_responses = input
             .captcha_like_configs
             .iter()
@@ -149,7 +161,13 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .await?;
         counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
 
-        Ok(AuthWithCodeServiceOutput { token: token.token })
+        // Generate rate limiting token after successful authentication
+        let rate_limit_token = Some(self.generate_rate_limit_token());
+
+        Ok(AuthWithCodeServiceOutput {
+            token: token.token,
+            rate_limit_token,
+        })
     }
 }
 
@@ -159,8 +177,10 @@ pub struct AuthWithCodeServiceInput {
     pub user_agent: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub responses: HashMap<String, String>,
+    pub rate_limit_token: Option<String>,
 }
 
 pub struct AuthWithCodeServiceOutput {
     pub token: String,
+    pub rate_limit_token: Option<String>,
 }

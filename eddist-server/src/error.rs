@@ -325,6 +325,8 @@ pub enum BbsPostAuthWithCodeError {
     ExpiredActivationCode,
     #[error("認証に失敗しました。時間をおいてから再度認証してください")]
     AuthCodeCollision,
+    #[error("認証トークンの発行制限中です。1時間後に再度お試しください。")]
+    RateLimited,
     #[error(transparent)]
     CaptchaError(#[from] CaptchaLikeError),
 }
