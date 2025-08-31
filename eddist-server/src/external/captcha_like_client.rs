@@ -45,7 +45,7 @@ impl CaptchaClient for TurnstileClient {
         form_data.insert("response", response);
         form_data.insert("remoteip", ip_addr);
         // NOTE: disable remoteip_leniency for now
-        // form_data.insert("remoteip_leniency", "strict");
+        form_data.insert("remoteip_leniency", "relaxed");
         form_data.insert("secret", self.secret.get());
 
         let res = self
