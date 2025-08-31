@@ -52,6 +52,10 @@ pub(crate) mod redis {
     pub fn user_login_oauth2_authreq_key(state_id: &str) -> String {
         format!("userlogin:oauth2:authreq:{state_id}")
     }
+
+    pub fn email_auth_used_key(token: &str) -> String {
+        format!("resp:email_auth_used:{token}")
+    }
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
@@ -177,7 +181,7 @@ mod tests {
     fn test_get_origin_ip_cloudflare() {
         let mut headers = HeaderMap::new();
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
-        
+
         std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "203.0.113.1");
         std::env::remove_var("ENV");
@@ -187,7 +191,7 @@ mod tests {
     fn test_get_origin_ip_x_forwarded() {
         let mut headers = HeaderMap::new();
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
-        
+
         std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "198.51.100.1");
         std::env::remove_var("ENV");

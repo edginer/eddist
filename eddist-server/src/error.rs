@@ -83,6 +83,9 @@ pub enum BbsCgiError {
     #[error("ユーザー登録の試行回数が多すぎます")]
     TooManyUserCreationAttempt,
 
+    #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
+    EmailAuthenticatedUnsupportedUserAgent,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -110,6 +113,7 @@ impl BbsCgiError {
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
             BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
+            BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -136,6 +140,9 @@ impl BbsCgiError {
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
             BbsCgiError::UserAlreadyRegistered => "UserAlreadyRegistered",
             BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
+            BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => {
+                "EmailAuthenticatedUnsupportedUserAgent"
+            }
             BbsCgiError::Other(_) => "InternalError",
         }
     }
@@ -318,6 +325,8 @@ pub enum BbsPostAuthWithCodeError {
     ExpiredActivationCode,
     #[error("認証に失敗しました。時間をおいてから再度認証してください")]
     AuthCodeCollision,
+    #[error("認証トークンの発行制限中です。1時間後に再度お試しください。")]
+    RateLimited,
     #[error(transparent)]
     CaptchaError(#[from] CaptchaLikeError),
 }

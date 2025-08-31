@@ -44,7 +44,7 @@ impl CaptchaClient for TurnstileClient {
         let mut form_data = HashMap::new();
         form_data.insert("response", response);
         form_data.insert("remoteip", ip_addr);
-        form_data.insert("remoteip_leniency", "strict");
+        // form_data.insert("remoteip_leniency", "relaxed");
         form_data.insert("secret", self.secret.get());
 
         let res = self
@@ -55,10 +55,13 @@ impl CaptchaClient for TurnstileClient {
             .send()
             .await?;
 
-        let resp = match res.json::<TurnstileResponse>().await {
+        let response_text = res.text().await?;
+        let resp = match serde_json::from_str::<TurnstileResponse>(&response_text) {
             Ok(resp) => resp,
             Err(e) => {
-                log::error!("Failed to parse Turnstile response, {e}");
+                log::error!(
+                    "Failed to parse Turnstile response: {e}, response body: {response_text}"
+                );
                 return Ok(CaptchaLikeResult::Failure(
                     CaptchaLikeError::FailedToVerifyCaptcha,
                 ));

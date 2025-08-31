@@ -9,11 +9,13 @@ use crate::{
     domain::captcha_like::CaptchaLikeConfig,
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        CaptchaClient, CaptchaLikeResult, HCaptchaClient, MonocleClient, TurnstileClient,
+        CaptchaClient, CaptchaLikeError, CaptchaLikeResult, HCaptchaClient, MonocleClient,
+        TurnstileClient,
     },
     repositories::bbs_repository::BbsRepository,
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
+use uuid::Uuid;
 
 use super::AppService;
 
@@ -23,6 +25,11 @@ pub struct AuthWithCodeService<T: BbsRepository>(T);
 impl<T: BbsRepository> AuthWithCodeService<T> {
     pub fn new(repo: T) -> Self {
         Self(repo)
+    }
+
+    /// Generate a new rate limiting token (browser handles expiration via Max-Age)
+    fn generate_rate_limit_token(&self) -> String {
+        Uuid::now_v7().to_string().replace("-", "")
     }
 }
 
@@ -34,6 +41,12 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         &self,
         input: AuthWithCodeServiceInput,
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
+        if input.rate_limit_token.is_some() {
+            // User is rate limited (cookie exists and browser hasn't expired it)
+            counter!("issue_authed_token", "state" => "failed", "reason" => "rate_limited")
+                .increment(1);
+            return Err(BbsPostAuthWithCodeError::RateLimited.into());
+        }
         let clients_responses = input
             .captcha_like_configs
             .iter()
@@ -110,6 +123,18 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             return Err(BbsPostAuthWithCodeError::ExpiredActivationCode.into());
         }
 
+        let assert_ip_equality = |token_reduced_ip: ReducedIpAddr, request_origin_ip: &str| {
+            let request_origin_reduced = ReducedIpAddr::from(request_origin_ip.to_string());
+
+            if token_reduced_ip != request_origin_reduced {
+                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
+                    .increment(1);
+                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken);
+            }
+
+            Ok(())
+        };
+
         let handles = clients_responses
             .iter()
             .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
@@ -117,6 +142,10 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         let results = join_all(handles).await;
         for r in results {
             match r {
+                // CaptchaLikeError::FailedToVerifyIpAddress is only used for spur.us (currently)
+                Ok(CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)) => {
+                    assert_ip_equality(token.reduced_ip.clone(), &input.origin_ip)?
+                }
                 Ok(CaptchaLikeResult::Failure(e)) => {
                     counter!("issue_authed_token", "state" => "failed", "reason" => "captcha")
                         .increment(1);
@@ -134,14 +163,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .any(|config| matches!(config, CaptchaLikeConfig::Monocle { .. }));
 
         if !has_monocle {
-            let token_origin_ip = token.reduced_ip.clone();
-            let request_origin_ip = ReducedIpAddr::from(input.origin_ip.clone());
-
-            if token_origin_ip != request_origin_ip {
-                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
-                    .increment(1);
-                return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
-            }
+            assert_ip_equality(token.reduced_ip.clone(), &input.origin_ip)?;
         }
 
         self.0
@@ -149,7 +171,13 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             .await?;
         counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
 
-        Ok(AuthWithCodeServiceOutput { token: token.token })
+        // Generate rate limiting token after successful authentication
+        let rate_limit_token = Some(self.generate_rate_limit_token());
+
+        Ok(AuthWithCodeServiceOutput {
+            token: token.token,
+            rate_limit_token,
+        })
     }
 }
 
@@ -159,8 +187,10 @@ pub struct AuthWithCodeServiceInput {
     pub user_agent: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub responses: HashMap<String, String>,
+    pub rate_limit_token: Option<String>,
 }
 
 pub struct AuthWithCodeServiceOutput {
     pub token: String,
+    pub rate_limit_token: Option<String>,
 }

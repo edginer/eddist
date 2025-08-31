@@ -30,6 +30,7 @@ use crate::{
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
+            email_auth_restriction_service::EmailAuthRestrictionService,
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
         },
@@ -127,8 +128,18 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
                 input.ip_addr.clone(),
-                input.user_agent,
+                input.user_agent.clone(),
                 created_at,
+            )
+            .await?;
+
+        let email_auth_service = EmailAuthRestrictionService::new(redis_conn.clone());
+        email_auth_service
+            .check_and_enforce_restriction(
+                res.is_email_authed(),
+                &input.user_agent,
+                &authed_token.token,
+                &input.ip_addr,
             )
             .await?;
 
