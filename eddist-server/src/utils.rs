@@ -33,6 +33,14 @@ pub(crate) mod redis {
         format!("thread_creation_span_ip:{ip}")
     }
 
+    pub fn res_creation_penalty_key(authed_token: &str) -> String {
+        format!("res_creation_penalty:{authed_token}")
+    }
+
+    pub fn res_creation_long_restrict_key(authed_token: &str) -> String {
+        format!("res_creation_long_restrict:{authed_token}")
+    }
+
     pub fn user_session_key(user_sid: &str) -> String {
         format!("user:session:{user_sid}")
     }

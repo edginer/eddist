@@ -196,7 +196,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
 
         // Determine response creation span and tinker level based on tinker
         // Level 1 users: 30 seconds, Level 2+ users: 5 seconds (base_response_creation_span_sec)
-        let (tinker_level, response_span_sec) = if let Some(tinker) = &input.tinker {
+        let (_, response_span_sec) = if let Some(tinker) = &input.tinker {
             let level = tinker.level();
             let span = if level < 2 {
                 30_u64
@@ -222,9 +222,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             )
             .await
         {
-            return Err(BbsCgiError::TooManyCreatingRes {
-                tinker_level,
-                span_sec: response_span_sec as i32,
+            // Get the actual effective span (base + penalty) for better error messaging
+            let effective_span = res_span_svc
+                .get_effective_span_for_authed_token(&authed_token.reduced_ip.to_string())
+                .await;
+
+            return Err(BbsCgiError::ResCreationSpanRestriction {
+                wait_sec: effective_span as u32,
             });
         };
 
