@@ -188,20 +188,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
             board_info.base_response_creation_span_sec as u64,
             board_info.base_thread_creation_span_sec as u64,
         );
-        if res_span_svc
-            .is_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
-            .await
-        {
-            let tinker_level = if let Some(tinker) = &input.tinker {
-                tinker.level()
-            } else {
-                1 // No tinker means level 1 (not authenticated)
-            };
-            return Err(BbsCgiError::TooManyCreatingRes {
-                tinker_level,
-                span_sec: board_info.base_response_creation_span_sec,
-            });
-        };
+
         if res_span_svc
             .is_thread_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
             .await
