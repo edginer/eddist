@@ -33,15 +33,24 @@ impl ResCreationSpanManagementService {
             || self.is_within_creation_span_by_ip(ip_adr, timestamp).await
     }
 
-    /// Get the current effective span for the given authed token (base span + current penalty).
-    pub async fn get_effective_span_for_authed_token(&self, authed_token: &str) -> u64 {
+    /// Get the actual wait time for the given authed token considering all restrictions.
+    /// Returns the number of seconds the user needs to wait before their next post.
+    pub async fn get_actual_wait_time_for_authed_token(&self, authed_token: &str) -> u64 {
         if self.span == 0 {
             return 0;
         }
 
         let mut redis_conn = self.redis_conn.clone();
 
-        // Check if there's an active penalty
+        let long_restrict_exists = redis_conn
+            .exists::<_, bool>(&res_creation_long_restrict_key(authed_token))
+            .await
+            .unwrap_or(false);
+
+        if long_restrict_exists {
+            return self.span * 3;
+        }
+
         let penalty_seconds = redis_conn
             .get::<_, u64>(&res_creation_penalty_key(authed_token))
             .await

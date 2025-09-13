@@ -222,13 +222,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             )
             .await
         {
-            // Get the actual effective span (base + penalty) for better error messaging
-            let effective_span = res_span_svc
-                .get_effective_span_for_authed_token(&authed_token.reduced_ip.to_string())
+            // Get the actual wait time considering all restrictions (1-hour restriction, penalties, etc.)
+            let wait_time = res_span_svc
+                .get_actual_wait_time_for_authed_token(&authed_token.reduced_ip.to_string())
                 .await;
 
             return Err(BbsCgiError::ResCreationSpanRestriction {
-                wait_sec: effective_span as u32,
+                wait_sec: wait_time as u32,
             });
         };
 
