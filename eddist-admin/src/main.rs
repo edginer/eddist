@@ -1,11 +1,14 @@
-use auth::{auth_simple_header, get_check_auth, get_login, get_login_callback, get_logout};
+use auth::{
+    auth_simple_header, get_check_auth, get_login, get_login_callback, get_logout,
+    post_native_session,
+};
 use axum::{
     body::Body,
     extract::{MatchedPath, Request},
     http::{HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router, ServiceExt,
 };
 use eddist_core::{tracing::init_tracing, utils::is_prod};
@@ -130,7 +133,7 @@ async fn main() {
         return;
     }
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8083));
     if !is_prod() {
         dotenvy::dotenv().unwrap();
     }
@@ -221,6 +224,7 @@ async fn main() {
         .route("/auth/check", get(get_check_auth))
         .route("/auth/logout", get(get_logout))
         .route("/auth/callback", get(get_login_callback))
+        .route("/auth/native/session", post(post_native_session))
         .nest(
             "/api",
             api_routes.layer(axum::middleware::from_fn_with_state(
