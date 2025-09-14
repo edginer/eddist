@@ -155,8 +155,8 @@ impl CsrfState {
 
         let token = base64::engine::general_purpose::STANDARD.encode(
             [
-                Uuid::new_v4().as_bytes().as_slice(),
-                Uuid::new_v4().as_bytes(),
+                Uuid::now_v7().as_bytes().as_slice(),
+                Uuid::now_v7().as_bytes(),
             ]
             .concat(),
         );

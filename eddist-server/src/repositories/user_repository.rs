@@ -230,7 +230,7 @@ impl UserRepository for UserRepositoryImpl {
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool> {
         let is_binded = sqlx::query!(
             r#"
-            SELECT registered_user_id IS NOT NULL AS "is_binded: bool"
+            SELECT COALESCE(registered_user_id IS NOT NULL, false) AS "is_binded: bool"
             FROM authed_tokens
             WHERE id = ?
             "#,

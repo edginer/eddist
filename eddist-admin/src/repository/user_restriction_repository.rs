@@ -78,7 +78,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         &self,
         input: CreateUserRestrictionRuleInput,
     ) -> anyhow::Result<UserRestrictionRule> {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let now = chrono::Utc::now().naive_utc();
 
         sqlx::query!(
