@@ -133,7 +133,7 @@ async fn main() {
         return;
     }
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8083));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
     if !is_prod() {
         dotenvy::dotenv().unwrap();
     }
