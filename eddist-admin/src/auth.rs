@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use tracing::info_span;
 
-use crate::{AppState, DefaultAppState};
+use crate::{
+    models::auth::{NativeSessionRequest, NativeSessionResponse, NativeUserInfo},
+    AppState, DefaultAppState,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeycloakAccessToken {
@@ -53,9 +56,16 @@ fn get_http_client() -> &'static reqwest::Client {
     })
 }
 
-pub async fn verify_access_token(access_token: &str) -> Result<KeycloakAccessToken, ErrorKind> {
+pub async fn verify_access_token(
+    access_token: &str,
+    is_native: bool,
+) -> Result<KeycloakAccessToken, ErrorKind> {
     if let Ok(userinfo_url) = env::var("EDDIST_USER_INFO_URL") {
-        let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
+        let pub_key = if is_native {
+            std::env::var("EDDIST_ADMIN_NATIVE_JWT_PUB_KEY").unwrap()
+        } else {
+            std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap()
+        };
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&[env::var("EDDIST_AUDIENCE").unwrap().as_str()]);
         let token = jsonwebtoken::decode::<Auth0AccessToken>(
@@ -131,7 +141,16 @@ pub async fn auth_simple_header(
         req.extensions_mut().insert(admin_session.userinfo.unwrap());
         return next.run(req).await;
     } else if let Some(access_token) = &admin_session.access_token {
-        let access_token = verify_access_token(access_token).await;
+        let is_native = req
+            .headers()
+            .get("User-Agent")
+            .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
+            .to_str()
+            .unwrap()
+            .to_string()
+            .contains("eddist-manager");
+
+        let access_token = verify_access_token(access_token, is_native).await;
         let access_token = match access_token {
             Ok(token) => {
                 let new_session = AdminSession {
@@ -172,7 +191,7 @@ pub async fn auth_simple_header(
                 };
                 let access_token = token.access_token().secret();
 
-                match verify_access_token(access_token).await {
+                match verify_access_token(access_token, is_native).await {
                     Ok(userinfo) => {
                         let new_session = AdminSession {
                             access_token: Some(access_token.to_string()),
@@ -251,7 +270,7 @@ pub struct AdminSession {
 impl AdminSession {
     fn new(logged_ip: String, logged_ua: String) -> Self {
         Self {
-            id: *uuid::Uuid::new_v4().as_bytes(),
+            id: *uuid::Uuid::now_v7().as_bytes(),
             created_at: Utc::now(),
             logged_ip,
             logged_ua,
@@ -444,4 +463,103 @@ pub async fn get_check_auth(admin_session: AdminSession) -> impl IntoResponse {
 pub async fn get_logout(session: Session) -> impl IntoResponse {
     session.remove::<AdminSession>("data").await.unwrap();
     Redirect::to("/login").into_response()
+}
+
+/// Exchange OAuth2 access token for session token
+#[utoipa::path(
+    post,
+    path = "/auth/native/session",
+    request_body = NativeSessionRequest,
+    responses(
+        (status = 200, description = "Session token created successfully", body = NativeSessionResponse),
+        (status = 401, description = "Invalid access token")
+    ),
+    tag = "auth"
+)]
+pub async fn post_native_session(
+    State(_state): State<DefaultAppState>,
+    headers: http::HeaderMap,
+    session: Session,
+    axum::Json(req): axum::Json<NativeSessionRequest>,
+) -> impl IntoResponse {
+    // Validate the access token using existing function
+    let user_info = match verify_access_token(&req.access_token, true).await {
+        Ok(token) => token,
+        Err(e) => {
+            info_span!("failed to verify access token for native session", error = ?e);
+            return Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"error": "invalid_access_token"}"#))
+                .unwrap();
+        }
+    };
+
+    let ClientInfo {
+        client_ip,
+        client_ua,
+    } = get_client_info(&headers);
+
+    // Create AdminSession with the validated access token
+    let admin_session = AdminSession {
+        id: *uuid::Uuid::now_v7().as_bytes(),
+        created_at: Utc::now(),
+        logged_ip: client_ip,
+        logged_ua: client_ua,
+        user_id: None, // We don't have user_id mapping yet
+        access_token: Some(req.access_token),
+        refresh_token: None, // Native clients don't get refresh tokens in this flow
+        next_refresh_at: Utc::now()
+            .checked_add_signed(TimeDelta::minutes(5))
+            .unwrap(),
+        userinfo: Some(user_info.clone()),
+    };
+
+    // Store the session
+    let session_id = uuid::Uuid::from_bytes(admin_session.id).to_string();
+    session.insert("data", admin_session).await.unwrap();
+
+    let response = NativeSessionResponse {
+        session_token: session_id, // Return session ID instead of JWT token
+        expires_at: Utc::now() + chrono::TimeDelta::hours(24),
+        user_info: NativeUserInfo {
+            sub: user_info.sub,
+            email: user_info.email,
+            preferred_username: user_info.preferred_username,
+            email_verified: user_info.email_verified,
+        },
+    };
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(serde_json::to_string(&response).unwrap()))
+        .unwrap()
+}
+
+struct ClientInfo {
+    client_ip: String,
+    client_ua: String,
+}
+
+fn get_client_info(headers: &http::HeaderMap) -> ClientInfo {
+    let client_ip = headers
+        .get("Cf-Connecting-IP")
+        .or_else(|| headers.get("X-Real-IP"))
+        .or_else(|| headers.get("X-Forwarded-For"))
+        .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
+        .to_str()
+        .unwrap()
+        .to_string();
+    let client_ua = headers
+        .get("User-Agent")
+        .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    ClientInfo {
+        client_ip,
+        client_ua,
+    }
 }

@@ -1,6 +1,7 @@
 use utoipa::OpenApi;
 
 use crate::{
+    auth::__path_post_native_session,
     models::*,
     repository::admin_archive_repository::{
         ArchivedAdminRes, ArchivedAdminThread, ArchivedRes, ArchivedResUpdate, ArchivedThread,
@@ -57,6 +58,9 @@ use crate::{
         // User routes
         users::search_users,
         users::update_user_status,
+
+        // Auth routes
+        post_native_session,
     ),
     components(schemas(
         // Core models
@@ -81,6 +85,9 @@ use crate::{
         // Auth models
         AuthedToken,
         DeleteAuthedTokenInput,
+        NativeSessionRequest,
+        NativeSessionResponse,
+        NativeUserInfo,
 
         // Moderation models
         NgWord,
