@@ -65,6 +65,10 @@ async fn main() -> anyhow::Result<()> {
     let persistence_handle = tokio::spawn(async move {
         let mut ctrl_c_rx = ctrl_c_sub_persitence;
         let mut conn = conn;
+        let redis_url = env::var("REDIS_URL").unwrap();
+        let mut redis_error_count = 0u32;
+        let mut is_redis_connected = true;
+
         loop {
             select! {
                 _ = sleep(std::time::Duration::from_secs(10)) => {}
@@ -72,6 +76,42 @@ async fn main() -> anyhow::Result<()> {
                     break;
                 }
             };
+
+            // Check Redis connection health and attempt reconnection if needed
+            if !is_redis_connected {
+                error_span!("Redis connection lost, attempting to reconnect");
+                match redis::Client::open(redis_url.clone()) {
+                    Ok(client) => match client.get_connection_manager().await {
+                        Ok(new_conn) => {
+                            conn = new_conn;
+                            is_redis_connected = true;
+                            redis_error_count = 0;
+                            info_span!("Successfully reconnected to Redis");
+                        }
+                        Err(e) => {
+                            error_span!(
+                                "Failed to reconnect to Redis",
+                                error = e.to_string().as_str()
+                            );
+                            let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
+                            sleep(std::time::Duration::from_secs(backoff_secs)).await;
+                            redis_error_count = redis_error_count.saturating_add(1);
+                            continue;
+                        }
+                    },
+                    Err(e) => {
+                        error_span!(
+                            "Failed to create Redis client",
+                            error = e.to_string().as_str()
+                        );
+                        let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
+                        sleep(std::time::Duration::from_secs(backoff_secs)).await;
+                        redis_error_count = redis_error_count.saturating_add(1);
+                        continue;
+                    }
+                }
+            }
+
             let db_conn = sqlx::MySqlConnection::connect(&env::var("DATABASE_URL").unwrap()).await;
             let db_conn = match db_conn {
                 Ok(mut db_conn) => {
@@ -98,12 +138,31 @@ async fn main() -> anyhow::Result<()> {
                 None => continue,
             };
 
-            let Ok(res_list) = conn
+            let res_list_result = conn
                 .lrange::<'_, _, Vec<String>>("bbs:db_failed_cache:res", 0, -1)
-                .await
-            else {
-                // logging and continue
-                continue;
+                .await;
+
+            let res_list = match res_list_result {
+                Ok(list) => {
+                    // Reset error count on successful Redis operation
+                    redis_error_count = 0;
+                    is_redis_connected = true;
+                    list
+                }
+                Err(e) => {
+                    error_span!("Failed to read from Redis", error = e.to_string().as_str());
+                    is_redis_connected = false;
+                    redis_error_count = redis_error_count.saturating_add(1);
+
+                    // Apply exponential backoff to avoid tight loop
+                    let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
+                    error_span!(
+                        "Backing off for {} seconds before retry",
+                        seconds = backoff_secs
+                    );
+                    sleep(std::time::Duration::from_secs(backoff_secs)).await;
+                    continue;
+                }
             };
 
             if res_list.is_empty() {
@@ -116,13 +175,22 @@ async fn main() -> anyhow::Result<()> {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
 
-            if let Err(_e) = insert_multiple_res(&mut db_conn, &res_list).await {
-                // logging and continue
+            if let Err(e) = insert_multiple_res(&mut db_conn, &res_list).await {
+                error_span!(
+                    "Failed to insert responses to DB",
+                    error = e.to_string().as_str()
+                );
                 continue;
             }
 
             // remove all res from cache
-            let _ = conn.del::<'_, _, ()>("bbs:db_failed_cache:res").await;
+            if let Err(e) = conn.del::<'_, _, ()>("bbs:db_failed_cache:res").await {
+                error_span!(
+                    "Failed to clear Redis cache",
+                    error = e.to_string().as_str()
+                );
+                is_redis_connected = false;
+            }
         }
     });
 
@@ -239,45 +307,174 @@ trait SubRepository {
 
 impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
-        self.pubsub_conn.subscribe("bbs:pubsubitem").await?;
+        let mut error_count = 0u32;
+        let redis_url = env::var("REDIS_URL").unwrap();
 
-        log::info!("Application starts subscribing to pubsub channel");
+        loop {
+            // (Re)subscribe to the channel
+            if let Err(e) = self.pubsub_conn.subscribe("bbs:pubsubitem").await {
+                error_span!(
+                    "Failed to subscribe to Redis pubsub",
+                    error = e.to_string().as_str()
+                );
 
+                // Apply exponential backoff
+                let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
+                error_span!(
+                    "Backing off for {} seconds before retry",
+                    seconds = backoff_secs
+                );
+                sleep(std::time::Duration::from_secs(backoff_secs)).await;
+                error_count = error_count.saturating_add(1);
+
+                // Attempt to reconnect
+                match redis::Client::open(redis_url.clone()) {
+                    Ok(client) => match client.get_async_pubsub().await {
+                        Ok(new_pubsub) => {
+                            self.pubsub_conn = new_pubsub;
+                            info_span!("Successfully reconnected to Redis pubsub");
+                            continue;
+                        }
+                        Err(e) => {
+                            error_span!(
+                                "Failed to get pubsub connection",
+                                error = e.to_string().as_str()
+                            );
+                            continue;
+                        }
+                    },
+                    Err(e) => {
+                        error_span!(
+                            "Failed to create Redis client",
+                            error = e.to_string().as_str()
+                        );
+                        continue;
+                    }
+                }
+            }
+
+            log::info!("Application starts subscribing to pubsub channel");
+            error_count = 0; // Reset error count on successful subscription
+
+            let subscribe_result = self.handle_messages().await;
+
+            match subscribe_result {
+                Ok(true) => {
+                    // Normal shutdown requested
+                    break;
+                }
+                Ok(false) => {
+                    // Connection lost, will retry
+                    error_span!("Redis pubsub connection lost, attempting to reconnect");
+                    error_count = error_count.saturating_add(1);
+
+                    // Apply exponential backoff before reconnecting
+                    let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
+                    sleep(std::time::Duration::from_secs(backoff_secs)).await;
+
+                    // Recreate pubsub connection
+                    match redis::Client::open(redis_url.clone()) {
+                        Ok(client) => match client.get_async_pubsub().await {
+                            Ok(new_pubsub) => {
+                                self.pubsub_conn = new_pubsub;
+                                info_span!("Successfully reconnected to Redis pubsub");
+                            }
+                            Err(e) => {
+                                error_span!(
+                                    "Failed to get pubsub connection",
+                                    error = e.to_string().as_str()
+                                );
+                            }
+                        },
+                        Err(e) => {
+                            error_span!(
+                                "Failed to create Redis client",
+                                error = e.to_string().as_str()
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    error_span!("Error in message handling", error = e.to_string().as_str());
+                    error_count = error_count.saturating_add(1);
+
+                    let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
+                    sleep(std::time::Duration::from_secs(backoff_secs)).await;
+                }
+            }
+        }
+
+        let _ = self.pubsub_conn.unsubscribe("bbs:pubsubitem").await;
+
+        Ok(())
+    }
+}
+
+impl RedisSubRepository {
+    /// Handle incoming messages. Returns Ok(true) for shutdown, Ok(false) for connection lost.
+    async fn handle_messages(&mut self) -> Result<bool, anyhow::Error> {
         loop {
             let mut on_message = self.pubsub_conn.on_message();
             let msg = select! {
                 _ = self.cancel.recv() => {
-                    break;
+                    return Ok(true); // Shutdown requested
                 }
                 msg = on_message.next() => msg,
             };
 
             let Some(msg) = msg else {
-                continue;
+                // Stream ended, connection likely lost
+                error_span!("Pubsub message stream ended");
+                return Ok(false);
             };
 
             info_span!(
                 "received pubsub message",
-                payload = msg.get_payload::<String>().unwrap().as_str()
+                payload = msg.get_payload::<String>().unwrap_or_default().as_str()
             );
 
-            let payload = msg.get_payload::<String>()?;
-            let item = serde_json::from_str::<PubSubItem>(&payload)?;
+            let payload = match msg.get_payload::<String>() {
+                Ok(p) => p,
+                Err(e) => {
+                    error_span!(
+                        "Failed to get message payload",
+                        error = e.to_string().as_str()
+                    );
+                    continue;
+                }
+            };
+
+            let item = match serde_json::from_str::<PubSubItem>(&payload) {
+                Ok(i) => i,
+                Err(e) => {
+                    error_span!(
+                        "Failed to parse pubsub item",
+                        error = e.to_string().as_str()
+                    );
+                    continue;
+                }
+            };
+
             match item {
                 PubSubItem::CreatingRes(res) => {
                     let mut conn = self.conn.clone();
                     let res = serde_json::to_string(&res)?;
-                    conn.rpush::<'_, _, _, ()>("bbs:db_failed_cache:res", res)
-                        .await?;
+
+                    if let Err(e) = conn
+                        .rpush::<'_, _, _, ()>("bbs:db_failed_cache:res", res)
+                        .await
+                    {
+                        error_span!(
+                            "Failed to push to Redis cache",
+                            error = e.to_string().as_str()
+                        );
+                        return Ok(false); // Connection likely lost
+                    }
                 }
                 PubSubItem::Shutdown => {
-                    break;
+                    return Ok(true); // Shutdown requested
                 }
             }
         }
-
-        self.pubsub_conn.unsubscribe("bbs:pubsubitem").await?;
-
-        Ok(())
     }
 }
