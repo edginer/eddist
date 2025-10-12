@@ -21,6 +21,15 @@ jobs:
           image-tags: "!v*"
           cut-off: 1d
           keep-n-most-recent: 3
+      - name: Delete old images (eddist-client)
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "eddist-client"
+          image-tags: "!v*"
+          cut-off: 1d
+          keep-n-most-recent: 3
       - name: Delete old images (eddist-admin)
         uses: snok/container-retention-policy@v3.0.0
         with:

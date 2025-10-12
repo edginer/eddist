@@ -2,7 +2,7 @@ import { Alert, Button, Label, Table, TextInput, Modal } from "flowbite-react";
 import { useCallback, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";
-import { Link } from "@remix-run/react";
+import { Link } from "react-router";
 
 const UserSearchPage = () => {
   const [userId, setUserId] = useState("");

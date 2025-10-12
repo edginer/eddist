@@ -40,11 +40,14 @@ jobs:
           cache-dependency-path: |
             pnpm-lock.yaml
             eddist-server/client/pnpm-lock.yaml
+            eddist-server/client-v2/pnpm-lock.yaml
             eddist-admin/client/pnpm-lock.yaml
       - name: Install pnpm dependencies
         run: pnpm install
       - name: Build eddist-client
         run: pnpm -F eddist-client build
+      - name: Build eddist-client-v2
+        run: pnpm -F eddist-client-v2 build
       - name: Build eddist-admin-client
         run: pnpm -F eddist-admin-client build
       - name: Build
@@ -67,6 +70,15 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist:${{ github.sha }}
             ghcr.io/edginer/eddist:latest
+      - name: Build and push Docker image (eddist-client)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-client/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-client:${{ github.sha }}
+            ghcr.io/edginer/eddist-client:latest
       - name: Build and push Docker image (eddist-admin)
         uses: docker/build-push-action@v6
         with:

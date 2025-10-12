@@ -2,7 +2,7 @@ import React, { Suspense, useState } from "react";
 import { IoMdMenu } from "react-icons/io";
 import { twMerge } from "tailwind-merge";
 import { Spinner } from "flowbite-react";
-import { Link, Outlet, useLocation } from "@remix-run/react";
+import { Link, Outlet, useLocation } from "react-router";
 
 type NavBarSectionKind =
   | "boards"
