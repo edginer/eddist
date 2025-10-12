@@ -10,6 +10,7 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Suspense } from "react";
+import { ThemeInit } from ".flowbite-react/init";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -45,6 +46,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <div className="container p-4 lg:px-16 lg:pt-12 mx-auto">
+      <ThemeInit />
       <Suspense fallback={<div>Loading...</div>}>
         <Outlet />
       </Suspense>

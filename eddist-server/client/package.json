@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@react-router/node": "^7.0.0",
-    "@react-router/serve": "^7.0.0",
+    "@react-router/node": "^7.5.3",
+    "@react-router/serve": "^7.5.3",
     "@tanstack/react-query": "^5.52.2",
     "encoding-japanese": "^2.2.0",
     "flowbite-react": "^0.10.1",
@@ -22,12 +22,12 @@
     "tailwindcss": "^3.4.10"
   },
   "devDependencies": {
-    "@react-router/dev": "^7.0.0",
+    "@react-router/dev": "^7.5.3",
     "@types/encoding-japanese": "^2.2.1",
-    "@vitejs/plugin-react-swc": "^3.5.0",
+    "@vitejs/plugin-react-swc": "^3.7.2",
     "autoprefixer": "^10.4.20",
     "globals": "^15.9.0",
     "postcss": "^8.4.41",
-    "vite": "^5.4.1"
+    "vite": "^6.3.3"
   }
 }

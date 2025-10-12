@@ -6,7 +6,6 @@ import flowbiteReact from "flowbite-react/plugin/vite";
 
 export default defineConfig(
   ({ isSsrBuild }): UserConfig => ({
-    // @ts-expect-error
     plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), flowbiteReact()],
     build: {
       rollupOptions: {

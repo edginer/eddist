@@ -6,8 +6,7 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "node server.js",
-    "typecheck": "react-router typegen && tsc",
-    "postinstall": "flowbite-react patch"
+    "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
     "@react-router/express": "^7.6.0",
@@ -17,7 +16,7 @@
     "compression": "^1.8.0",
     "encoding-japanese": "^2.2.0",
     "express": "^5.1.0",
-    "flowbite-react": "^0.11.7",
+    "flowbite-react": "^0.12.9",
     "isbot": "^5.1.27",
     "morgan": "^1.10.0",
     "react": "^19.1.0",
