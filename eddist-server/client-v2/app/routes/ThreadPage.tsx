@@ -188,12 +188,12 @@ const ThreadPage = ({
   if (
     thread.redirected &&
     diffFromNow(lastResponseDate(posts?.responses || []) || new Date(0)) >
-      60 * 60 * 24 * 3
+      60 * 60 * 24 * 1
   ) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-gray-600">
-          このスレッドは3日以上前にdat落ちしたため、Webブラウザからは閲覧できません。
+          このスレッドはしばらく前にdat落ちしたため、Webブラウザからは閲覧できません。
         </p>
         <p className="text-gray-600">
           専用ブラウザなどを使用して閲覧してください。

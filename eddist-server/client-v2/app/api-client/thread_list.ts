@@ -57,7 +57,7 @@ export const fetchThreadList = async (
   const res = await fetch(
     `${
       (import.meta.env.SSR && options?.baseUrl) || ""
-    }/${boardKey}/subject.txt`,
+    }/${boardKey}/subject-metadent.txt`,
     {
       headers: {
         "Content-Type": "text/plain; charset=shift_jis",
