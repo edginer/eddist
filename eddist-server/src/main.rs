@@ -32,6 +32,7 @@ use routes::{
     dat_routing::{get_dat_txt, get_kako_dat_txt},
     subject_list::{get_subject_txt, get_subject_txt_with_metadent},
     user::user_routes,
+    websocket::ws_handler,
 };
 use services::{
     board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
@@ -104,6 +105,8 @@ mod routes {
     pub mod statics;
     pub mod subject_list;
     pub mod user;
+    pub mod websocket;
+    pub mod websocket_manager;
 }
 
 #[derive(Clone)]
@@ -118,6 +121,7 @@ struct AppState {
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
     template_engine: Handlebars<'static>,
+    ws_manager: routes::websocket_manager::WebSocketManager<BbsRepositoryImpl>,
 }
 
 impl AppState {
@@ -238,10 +242,12 @@ async fn main() -> anyhow::Result<()> {
     .unwrap();
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
+    let bbs_repo = BbsRepositoryImpl::new(pool.clone());
+    let ws_manager = routes::websocket_manager::WebSocketManager::new(bbs_repo.clone());
 
     let app_state = AppState {
         services: AppServiceContainer::new(
-            BbsRepositoryImpl::new(pool.clone()),
+            bbs_repo,
             UserRepositoryImpl::new(pool.clone()),
             IdpRepositoryImpl::new(pool.clone()),
             user_restriction_repo.clone(),
@@ -252,6 +258,7 @@ async fn main() -> anyhow::Result<()> {
         tinker_secret,
         captcha_like_configs,
         template_engine,
+        ws_manager,
     };
 
     // Start background task for user restriction cache refresh
@@ -271,6 +278,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health-check", get(health_check))
         .route("/robots.txt", get(get_robots_txt))
+        .route("/ws", get(ws_handler))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
         .route("/{boardKey}/subject.txt", get(get_subject_txt))

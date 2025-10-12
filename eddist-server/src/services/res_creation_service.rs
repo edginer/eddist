@@ -40,7 +40,7 @@ use crate::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         user_repository::UserRepository,
     },
-    utils::redis::thread_cache_key,
+    utils::redis::{thread_cache_key, thread_ws_updates_key},
 };
 
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
@@ -283,6 +283,8 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             is_sage: res.is_sage(),
         };
 
+        let board_key_for_ws = input.board_key.clone();
+        let thread_number_for_ws = input.thread_number;
         tokio::spawn(async move {
             if let Err(e) = bbs_repo.create_response(cres.clone()).await {
                 error_span!("failed to create response in database",
@@ -292,6 +294,17 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
                     .publish(PubSubItem::CreatingRes(Box::new(cres)))
                     .await
                     .unwrap();
+            } else {
+                // Publish WebSocket notification for real-time updates
+                use redis::AsyncCommands;
+                let redis_client = redis::Client::open(env::var("REDIS_URL").unwrap());
+                if let Ok(client) = redis_client {
+                    if let Ok(mut conn) = client.get_connection_manager().await {
+                        let channel = thread_ws_updates_key(&board_key_for_ws, thread_number_for_ws);
+                        // Send empty string - client already knows board_key and thread_number
+                        let _ = conn.publish::<_, _, ()>(channel, "").await;
+                    }
+                }
             }
             let _ = bbs_repo
                 .update_authed_token_last_wrote(authed_token.id, created_at)

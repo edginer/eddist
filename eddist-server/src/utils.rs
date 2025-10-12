@@ -17,6 +17,10 @@ pub(crate) mod redis {
         format!("thread:{board_key}:{thread_number}")
     }
 
+    pub fn thread_ws_updates_key(board_key: &str, thread_number: u64) -> String {
+        format!("bbs:ws:thread:{board_key}:{thread_number}")
+    }
+
     pub fn res_creation_span_key(authed_token: &str) -> String {
         format!("res_creation_span:{authed_token}")
     }

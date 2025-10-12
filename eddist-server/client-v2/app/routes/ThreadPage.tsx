@@ -9,6 +9,7 @@ import useSWR from "swr";
 import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchThread, type Response } from "~/api-client/thread";
 import React from "react";
+import { useThreadUpdates } from "~/hooks/useThreadUpdates";
 
 export const headers = (_: Route.HeadersArgs) => {
   return {
@@ -173,6 +174,20 @@ const ThreadPage = ({
       fallbackData: thread,
     }
   );
+
+  // Subscribe to real-time thread updates
+  useThreadUpdates(params.boardKey, params.threadKey, {
+    onUpdate: () => {
+      console.log("[ThreadPage] Received update notification, refetching thread data");
+      mutate(); // Refetch thread data when update is received
+    },
+    onOpen: () => {
+      console.log("[ThreadPage] WebSocket connection established");
+    },
+    onClose: () => {
+      console.log("[ThreadPage] WebSocket connection closed");
+    },
+  });
 
   // Find current board
   const currentBoard = boards?.find(
