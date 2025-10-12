@@ -4,6 +4,7 @@
 captcha-config.json
 node_modules/
 .idea/
+.pnpm-store/
 
 # Claude Code files
 .claude/

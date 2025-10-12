@@ -29,6 +29,28 @@ services:
       - "8082:80"
     depends_on:
       - mysql
+  client-v2:
+    image: node:22-bookworm-slim
+    container_name: client_v2_container
+    working_dir: /workspace
+    command: bash -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm -F eddist-client-v2 dev"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ..:/workspace
+      - pnpm_store:/root/.local/share/pnpm/store
+    environment:
+      NODE_ENV: development
+      PORT: 5173
+      CI: "true"
+      EDDIST_SERVER_URL: "http://host.docker.internal:8080"
+      VITE_PROXY_TARGET: "http://host.docker.internal:8080"
+    extra_hosts:
+      - "host.docker.internal:${HOST_GATEWAY_IP}"
+    depends_on:
+      - mysql
+      - redis
+
   nginx:
     image: nginx:latest
     container_name: nginx_container
@@ -36,7 +58,10 @@ services:
       - "8000:8000"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - client-v2
     extra_hosts:
-      - "host.docker.internal:${LINUX_HOST_IP}"
+      - "host.docker.internal:${HOST_GATEWAY_IP}"
 volumes:
   mysql_data:
+  pnpm_store:
