@@ -23,6 +23,16 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Error("Invalid parameters");
   }
 
+  const boardKeyRegex = /^[a-z0-9\-_]{1,63}$/;
+  if (!boardKeyRegex.test(params.boardKey)) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
+  const threadKeyRegex = /^\d{10}$/;
+  if (!threadKeyRegex.test(params.threadKey)) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
   const [thread, boards] = await Promise.all([
     fetchThread(params.boardKey!, params.threadKey!, {
       baseUrl:
