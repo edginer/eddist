@@ -3,9 +3,15 @@ export interface Response {
   mail: string;
   date: string;
   authorId: string;
-  body: string;
+  bodyParts: BodyAnchorPart[];
   id: number;
+  refs?: number[];
   authorIdAppearBeforeCount: number;
+}
+
+export interface BodyAnchorPart {
+  text: string;
+  isMatch: boolean;
 }
 
 export const fetchThread = async (
@@ -46,8 +52,9 @@ const convertThreadTextToResponseList = (text: string) => {
 
   const idMap = new Map<string, [Response, number][]>();
   const authorIdAppearBeforeCountMap = new Map<string, number>();
+  const referredMap = new Map<number, number[]>();
 
-  const responses = lines.map((line, idx) => {
+  const responses: Response[] = lines.map((line, idx) => {
     const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
     const match = line.match(lineRegex);
     if (match == null) {
@@ -67,7 +74,7 @@ const convertThreadTextToResponseList = (text: string) => {
         mail: "",
         date: "",
         authorId: "",
-        body: "あぼーん",
+        bodyParts: [{ text: "あぼーん", isMatch: false }],
         id: idx + 1,
         authorIdAppearBeforeCount: 0,
       };
@@ -88,14 +95,22 @@ const convertThreadTextToResponseList = (text: string) => {
       authorIdAppearBeforeCountMap.set(authorId, 1);
     }
 
+    const [bodyParts, refs] = buildAnchorPartedBody(body);
+    for (const ref of refs) {
+      if (!referredMap.has(ref)) {
+        referredMap.set(ref, []);
+      }
+      referredMap.get(ref)?.push(idx + 1);
+    }
+
     const response = {
       name,
       mail,
       date,
       authorId,
-      body,
       id: idx + 1,
       authorIdAppearBeforeCount: authorIdAppearBeforeCountMap.get(authorId)!,
+      bodyParts,
     };
 
     if (!idMap.has(authorId)) {
@@ -106,9 +121,42 @@ const convertThreadTextToResponseList = (text: string) => {
     return response;
   });
 
+  for (const [refId, referredIds] of referredMap) {
+    const response = responses[refId - 1];
+    if (response) {
+      response.refs = referredIds;
+    }
+  }
+
   return {
     threadName: threadTitle,
     responses: responses satisfies Response[],
     authorIdMap: idMap,
   };
+};
+
+const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
+  const refs = [];
+  const parts = [];
+  const regex = /&gt;&gt;(\d{1,4})/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(body)) !== null) {
+    const { index } = match;
+    if (index > lastIndex) {
+      parts.push({ text: body.slice(lastIndex, index), isMatch: false });
+    }
+
+    parts.push({ text: match[0].replaceAll("&gt;", ">"), isMatch: true });
+    lastIndex = index + match[0].length;
+
+    refs.push(parseInt(match[1]));
+  }
+
+  if (lastIndex < body.length) {
+    parts.push({ text: body.slice(lastIndex), isMatch: false });
+  }
+
+  return [parts, refs];
 };

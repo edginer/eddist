@@ -45,8 +45,9 @@ services:
       CI: "true"
       EDDIST_SERVER_URL: "http://host.docker.internal:8080"
       VITE_PROXY_TARGET: "http://host.docker.internal:8080"
+      TZ: "Asia/Tokyo"
     extra_hosts:
-      - "host.docker.internal:${HOST_GATEWAY_IP}"
+      - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
     depends_on:
       - mysql
       - redis
@@ -61,7 +62,7 @@ services:
     depends_on:
       - client-v2
     extra_hosts:
-      - "host.docker.internal:${HOST_GATEWAY_IP}"
+      - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
 volumes:
   mysql_data:
   pnpm_store:

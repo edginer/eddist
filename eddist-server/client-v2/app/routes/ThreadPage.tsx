@@ -7,7 +7,11 @@ import PostResponseModal from "../components/PostResponseModal";
 import type { Route } from "./+types/ThreadPage";
 import useSWR from "swr";
 import { fetchBoards, type Board } from "~/api-client/board";
-import { fetchThread, type Response } from "~/api-client/thread";
+import {
+  fetchThread,
+  type BodyAnchorPart,
+  type Response,
+} from "~/api-client/thread";
 import React from "react";
 
 export const headers = (_: Route.HeadersArgs) => {
@@ -153,7 +157,7 @@ const ThreadPage = ({
   const openPopup = (e: React.MouseEvent, indices: number[]) => {
     if (indices.length === 0) return;
 
-    let x, y;
+    let x: number, y: number;
     const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
 
     if (isMobile) {
@@ -181,6 +185,7 @@ const ThreadPage = ({
     () => fetchThread(params.boardKey!, params.threadKey!),
     {
       fallbackData: thread,
+      revalidateOnMount: false,
     }
   );
 
@@ -277,7 +282,9 @@ const ThreadPage = ({
             {posts?.responses.map((post) => (
               <div key={post.id} className="border-b border-gray-300 p-4">
                 <div className="text-sm text-gray-500">
-                  {post.id}. {processPostName(post.name)} {post.date}{" "}
+                  {post.id}{" "}
+                  {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                  {processPostName(post.name)} {post.date}{" "}
                   <span
                     onClick={(e) =>
                       openPopup(
@@ -307,7 +314,7 @@ const ThreadPage = ({
                   </span>
                 </div>
                 <div className="text-gray-800 mt-2 break-words">
-                  {processPostBody(post.body, openPopup)}
+                  {processPostBody(post.bodyParts, openPopup)}
                 </div>
               </div>
             ))}
@@ -376,7 +383,7 @@ const ThreadPage = ({
                   </span>
                 </div>
                 <div className="text-gray-800 mt-1 break-words">
-                  {processPostBody(p.body, openPopup)}
+                  {processPostBody(p.bodyParts, openPopup)}
                 </div>
               </div>
             ))}
@@ -417,47 +424,43 @@ const authorIdResponseCountToColor = (
   }
 };
 
-const processPostBody = (
-  body: string,
+const constructReferredNum = (
+  refs: number[],
   popup: (e: React.MouseEvent, indices: number[]) => void
-) => {
-  const parts = [];
-  const regex = /(&gt;&gt;\d{1,4})/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(body)) !== null) {
-    const { index } = match;
-    if (index > lastIndex) {
-      parts.push({ text: body.slice(lastIndex, index), isMatch: false });
+) => (
+  <span
+    onClick={(e) =>
+      popup(
+        e,
+        refs.map((x) => x - 1)
+      )
     }
+    className="text-blue-400 hover:text-blue-600 cursor-pointer"
+  >
+    (+{refs.length})
+  </span>
+);
 
-    parts.push({ text: match[0].replaceAll("&gt;", ">"), isMatch: true });
-    lastIndex = index + match[0].length;
-  }
-
-  if (lastIndex < body.length) {
-    parts.push({ text: body.slice(lastIndex), isMatch: false });
-  }
-
-  return (
-    <span>
-      {parts.map((part, i) =>
-        part.isMatch ? (
-          <span
-            key={i}
-            className="text-blue-400 hover:text-blue-600 cursor-pointer"
-            onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
-          >
-            {part.text}
-          </span>
-        ) : (
-          <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
-        )
-      )}
-    </span>
-  );
-};
+const processPostBody = (
+  bodyParts: BodyAnchorPart[],
+  popup: (e: React.MouseEvent, indices: number[]) => void
+) => (
+  <span>
+    {bodyParts.map((part, i) =>
+      part.isMatch ? (
+        <span
+          key={i}
+          className="text-blue-400 hover:text-blue-600 cursor-pointer"
+          onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
+        >
+          {part.text}
+        </span>
+      ) : (
+        <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
+      )
+    )}
+  </span>
+);
 
 const decodeNumericCharRefsStr = (str: string) =>
   str.replace(/&#(x?)([0-9a-fA-F]+);/g, (_, hex, code) => {
