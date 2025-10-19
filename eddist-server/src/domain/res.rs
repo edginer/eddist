@@ -4,9 +4,11 @@ use base64::Engine;
 use chrono::{DateTime, Datelike, Utc};
 use eddist_core::domain::{
     client_info::ClientInfo,
+    ip_addr::ReducedIpAddr,
     res::{ResView, ResViewRef},
     sjis_str::SJisStr,
 };
+use md5::Md5;
 use pwhash::unix;
 use sha1::{Digest, Sha1};
 
@@ -299,12 +301,13 @@ impl Res<AuthorIdUninitialized> {
         retrieved_cap_name: Option<String>,
     ) -> Res<AuthorIdInitialized> {
         let author_id = if retrieved_cap_name.is_none() {
-            get_author_id_by_seed(
+            get_author_id_with_device_info(
                 &self.board_key,
                 self.created_at,
                 &authed_token.author_id_seed,
-            )[..9]
-                .to_string()
+                authed_token.authed_ua.as_deref(),
+                &authed_token.reduced_ip,
+            )
         } else {
             "????".to_string()
         };
@@ -404,6 +407,48 @@ pub fn get_author_id_by_seed(board_key: &str, datetime: DateTime<Utc>, seed: &[u
     let datetime = datetime.add(chrono::Duration::hours(9)); // JST
     let (year, month, day) = (datetime.year(), datetime.month(), datetime.day());
     calculate_trip(&format!("{year}-{month}-{day}:{board_key}:{seed:?}"))
+}
+
+pub fn get_author_id_with_device_info(
+    board_key: &str,
+    datetime: DateTime<Utc>,
+    seed: &[u8],
+    authed_ua: Option<&str>,
+    reduced_ip: &ReducedIpAddr,
+) -> String {
+    let base_id = get_author_id_by_seed(board_key, datetime, seed);
+    let mut id_chars: Vec<char> = base_id.chars().collect();
+
+    // Ensure we have at least 9 characters
+    if id_chars.len() < 9 {
+        return base_id[..id_chars.len().min(9)].to_string();
+    }
+
+    // Character set for ID (from base64-like encoding)
+    const CHAR_SET: &[char] = &[
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
+        'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+        'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1',
+        '2', '3', '4', '5', '6', '7', '8', '9', '.', '/',
+    ];
+
+    if let Some(ua) = authed_ua {
+        let ua_hash = Md5::digest(ua.as_bytes());
+        let ua_idx = ua_hash[0] as usize % CHAR_SET.len();
+        id_chars[7] = CHAR_SET[ua_idx];
+    }
+
+    let ip_str = reduced_ip.to_string();
+    let ip_first_segment = ip_str
+        .split('.')
+        .next()
+        .or_else(|| ip_str.split(':').next())
+        .unwrap_or("");
+    let ip_hash = Md5::digest(ip_first_segment.as_bytes());
+    let ip_idx = ip_hash[0] as usize % CHAR_SET.len();
+    id_chars[8] = CHAR_SET[ip_idx];
+
+    id_chars[..9].iter().collect()
 }
 
 // &str is utf-8 bytes
