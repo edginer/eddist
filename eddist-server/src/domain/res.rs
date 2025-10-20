@@ -1,3 +1,4 @@
+use core::panic;
 use std::{borrow::Cow, ops::Add};
 
 use base64::Engine;
@@ -403,6 +404,77 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
+// Character set for ID generation (base64-like encoding)
+const ID_CHAR_SET: &[char] = &[
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
+    '5', '6', '7', '8', '9', '.', '/',
+];
+
+/// Generate device-specific suffix characters
+/// Returns (ua_char_opt, ip_char_opt) based on available data
+fn generate_device_suffix(
+    authed_ua: Option<&str>,
+    reduced_ip: Option<&ReducedIpAddr>,
+) -> (Option<char>, Option<char>) {
+    let ua_char = authed_ua.map(|ua| {
+        let ua_hash = Md5::digest(ua.as_bytes());
+        let ua_idx = ua_hash[0] as usize % ID_CHAR_SET.len();
+        ID_CHAR_SET[ua_idx]
+    });
+
+    let ip_char = reduced_ip.map(|ip| {
+        let ip_str = ip.to_string();
+        let ip_first_segment = ip_str
+            .split('.')
+            .next()
+            .or_else(|| ip_str.split(':').next())
+            .unwrap_or("");
+        let ip_hash = Md5::digest(ip_first_segment.as_bytes());
+        let ip_idx = ip_hash[0] as usize % ID_CHAR_SET.len();
+        ID_CHAR_SET[ip_idx]
+    });
+
+    (ua_char, ip_char)
+}
+
+/// Generate ID with seed and optional device-specific suffix
+pub fn generate_id_with_device_suffix(
+    seed_id: &str,
+    length: usize,
+    authed_ua: Option<&str>,
+    reduced_ip: Option<&ReducedIpAddr>,
+) -> String {
+    if length < 2 {
+        panic!("Length must be at least 2");
+    }
+    let mut id_chars: Vec<char> = seed_id.chars().collect();
+
+    // Ensure we have enough characters
+    if id_chars.len() < length {
+        return seed_id[..id_chars.len().min(length)].to_string();
+    }
+
+    let (ua_char, ip_char) = generate_device_suffix(authed_ua, reduced_ip);
+
+    match (ua_char, ip_char) {
+        (Some(ua), Some(ip)) => {
+            id_chars[length - 2] = ua;
+            id_chars[length - 1] = ip;
+        }
+        (None, Some(ip)) => {
+            id_chars[length - 1] = ip;
+        }
+        (Some(ua), None) => {
+            id_chars[length - 1] = ua;
+        }
+        _ => {}
+    }
+
+    id_chars[..length].iter().collect()
+}
+
 pub fn get_author_id_by_seed(board_key: &str, datetime: DateTime<Utc>, seed: &[u8]) -> String {
     let datetime = datetime.add(chrono::Duration::hours(9)); // JST
     let (year, month, day) = (datetime.year(), datetime.month(), datetime.day());
@@ -417,38 +489,7 @@ pub fn get_author_id_with_device_info(
     reduced_ip: &ReducedIpAddr,
 ) -> String {
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
-    let mut id_chars: Vec<char> = base_id.chars().collect();
-
-    // Ensure we have at least 9 characters
-    if id_chars.len() < 9 {
-        return base_id[..id_chars.len().min(9)].to_string();
-    }
-
-    // Character set for ID (from base64-like encoding)
-    const CHAR_SET: &[char] = &[
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
-        'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
-        'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1',
-        '2', '3', '4', '5', '6', '7', '8', '9', '.', '/',
-    ];
-
-    if let Some(ua) = authed_ua {
-        let ua_hash = Md5::digest(ua.as_bytes());
-        let ua_idx = ua_hash[0] as usize % CHAR_SET.len();
-        id_chars[7] = CHAR_SET[ua_idx];
-    }
-
-    let ip_str = reduced_ip.to_string();
-    let ip_first_segment = ip_str
-        .split('.')
-        .next()
-        .or_else(|| ip_str.split(':').next())
-        .unwrap_or("");
-    let ip_hash = Md5::digest(ip_first_segment.as_bytes());
-    let ip_idx = ip_hash[0] as usize % CHAR_SET.len();
-    id_chars[8] = CHAR_SET[ip_idx];
-
-    id_chars[..9].iter().collect()
+    generate_id_with_device_suffix(&base_id, 9, authed_ua, Some(reduced_ip))
 }
 
 // &str is utf-8 bytes

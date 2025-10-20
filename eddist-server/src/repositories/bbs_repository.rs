@@ -29,7 +29,7 @@ pub trait BbsRepository: Send + Sync + 'static {
     async fn get_threads_with_metadent(
         &self,
         board_id: Uuid,
-    ) -> anyhow::Result<Vec<(Thread, ClientInfo)>>;
+    ) -> anyhow::Result<Vec<(Thread, ClientInfo, AuthedToken)>>;
     async fn get_thread_by_board_key_and_thread_number(
         &self,
         board_key: &str,
@@ -229,11 +229,11 @@ impl BbsRepository for BbsRepositoryImpl {
     async fn get_threads_with_metadent(
         &self,
         board_id: Uuid,
-    ) -> anyhow::Result<Vec<(Thread, ClientInfo)>> {
+    ) -> anyhow::Result<Vec<(Thread, ClientInfo, AuthedToken)>> {
         let threads = query_as!(
             SelectionThreadWithMetadent,
-            r#" 
-                SELECT 
+            r#"
+                SELECT
                     t.id AS "id: Uuid",
                     t.board_id AS "board_id: Uuid",
                     t.thread_number AS thread_number,
@@ -248,17 +248,31 @@ impl BbsRepository for BbsRepositoryImpl {
                     t.archived AS "archived: bool",
                     t.archive_converted AS "archive_converted: bool",
                     (
-                        SELECT r.client_info 
+                        SELECT r.client_info
                         FROM responses r
-                        WHERE r.thread_id = t.id 
+                        WHERE r.thread_id = t.id
                         AND r.res_order = 1
-                    ) AS "client_info! : Json<ClientInfo>"
-                FROM 
+                    ) AS "client_info! : Json<ClientInfo>",
+                    at.token AS token,
+                    at.origin_ip AS origin_ip,
+                    at.reduced_origin_ip AS reduced_origin_ip,
+                    at.writing_ua AS writing_ua,
+                    at.authed_ua AS authed_ua,
+                    at.auth_code AS auth_code,
+                    at.created_at AS created_at,
+                    at.authed_at AS authed_at,
+                    at.validity AS "validity: bool",
+                    at.last_wrote_at AS last_wrote_at,
+                    at.author_id_seed AS author_id_seed,
+                    at.registered_user_id AS "registered_user_id?: Uuid"
+                FROM
                     threads AS t
-                WHERE 
+                INNER JOIN
+                    authed_tokens AS at ON t.authed_token_id = at.id
+                WHERE
                     t.board_id = ?
                     AND t.archived = 0
-                ORDER BY 
+                ORDER BY
                     t.sage_last_modified_at DESC
 "#,
             board_id
@@ -285,6 +299,21 @@ impl BbsRepository for BbsRepositoryImpl {
                         archived: x.archived,
                     },
                     x.client_info.0,
+                    AuthedToken {
+                        id: x.authed_token_id,
+                        token: x.token,
+                        origin_ip: IpAddr::new(x.origin_ip),
+                        reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+                        writing_ua: x.writing_ua,
+                        authed_ua: x.authed_ua,
+                        auth_code: x.auth_code,
+                        created_at: Utc.from_utc_datetime(&x.created_at),
+                        authed_at: x.authed_at.map(|dt| Utc.from_utc_datetime(&dt)),
+                        validity: x.validity,
+                        last_wrote_at: x.last_wrote_at.map(|dt| Utc.from_utc_datetime(&dt)),
+                        author_id_seed: x.author_id_seed,
+                        registered_user_id: x.registered_user_id,
+                    },
                 )
             })
             .collect())
@@ -887,6 +916,19 @@ struct SelectionThreadWithMetadent {
     archived: bool,          // TINYINT
     archive_converted: bool, // TINYINT
     client_info: Json<ClientInfo>,
+
+    token: String,
+    origin_ip: String,
+    reduced_origin_ip: String,
+    writing_ua: String,
+    authed_ua: Option<String>,
+    auth_code: String,
+    created_at: NaiveDateTime,
+    authed_at: Option<NaiveDateTime>,
+    validity: bool,
+    last_wrote_at: Option<NaiveDateTime>,
+    author_id_seed: Vec<u8>,
+    registered_user_id: Option<Uuid>,
 }
 
 #[derive(Debug)]

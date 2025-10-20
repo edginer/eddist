@@ -1,0 +1,274 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    t.id AS \"id: Uuid\",\n                    t.board_id AS \"board_id: Uuid\",\n                    t.thread_number AS thread_number,\n                    t.last_modified_at AS last_modified_at,\n                    t.sage_last_modified_at AS sage_last_modified_at,\n                    t.title AS title,\n                    t.authed_token_id AS \"authed_token_id: Uuid\",\n                    t.metadent AS metadent,\n                    t.response_count AS response_count,\n                    t.no_pool AS \"no_pool: bool\",\n                    t.active AS \"active: bool\",\n                    t.archived AS \"archived: bool\",\n                    t.archive_converted AS \"archive_converted: bool\",\n                    (\n                        SELECT r.client_info\n                        FROM responses r\n                        WHERE r.thread_id = t.id\n                        AND r.res_order = 1\n                    ) AS \"client_info! : Json<ClientInfo>\",\n                    at.token AS token,\n                    at.origin_ip AS origin_ip,\n                    at.reduced_origin_ip AS reduced_origin_ip,\n                    at.writing_ua AS writing_ua,\n                    at.authed_ua AS authed_ua,\n                    at.auth_code AS auth_code,\n                    at.created_at AS created_at,\n                    at.authed_at AS authed_at,\n                    at.validity AS \"validity: bool\",\n                    at.last_wrote_at AS last_wrote_at,\n                    at.author_id_seed AS author_id_seed,\n                    at.registered_user_id AS \"registered_user_id?: Uuid\"\n                FROM\n                    threads AS t\n                INNER JOIN\n                    authed_tokens AS at ON t.authed_token_id = at.id\n                WHERE\n                    t.board_id = ?\n                    AND t.archived = 0\n                ORDER BY\n                    t.sage_last_modified_at DESC\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "board_id: Uuid",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_number",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 20
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_modified_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "sage_last_modified_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "authed_token_id: Uuid",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "metadent",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "response_count",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "no_pool: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "active: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "archived: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "archive_converted: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "client_info! : Json<ClientInfo>",
+        "type_info": {
+          "type": "Json",
+          "flags": "BINARY",
+          "max_size": 4294967292
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "token",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "origin_ip",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "reduced_origin_ip",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "writing_ua",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "authed_ua",
+        "type_info": {
+          "type": "Blob",
+          "flags": "BLOB",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "auth_code",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 48
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "created_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "authed_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "validity: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "last_wrote_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "author_id_seed",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 64
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "registered_user_id?: Uuid",
+        "type_info": {
+          "type": "String",
+          "flags": "MULTIPLE_KEY | BINARY",
+          "max_size": 16
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "4c13eba54428e1475ba3474104efb116d63d70d2b7d4aa8f1e4fb3583ca8da56"
+}
