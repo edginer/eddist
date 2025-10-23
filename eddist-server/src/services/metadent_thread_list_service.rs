@@ -66,7 +66,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                 let last_4 = generate_id_with_device_suffix(
                     &author_id_base,
                     4,
-                    authed_token.authed_ua.as_deref(),
+                    Some(&authed_token.writing_ua),
                     Some(&authed_token.reduced_ip),
                 );
 

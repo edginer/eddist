@@ -306,7 +306,7 @@ impl Res<AuthorIdUninitialized> {
                 &self.board_key,
                 self.created_at,
                 &authed_token.author_id_seed,
-                authed_token.authed_ua.as_deref(),
+                Some(&authed_token.writing_ua),
                 &authed_token.reduced_ip,
             )
         } else {
@@ -412,14 +412,20 @@ const ID_CHAR_SET: &[char] = &[
     '5', '6', '7', '8', '9', '.', '/',
 ];
 
+/// Extract the UA part before the first parenthesis
+fn extract_ua_prefix(ua: &str) -> &str {
+    ua.split('(').next().unwrap_or(ua).trim()
+}
+
 /// Generate device-specific suffix characters
 /// Returns (ua_char_opt, ip_char_opt) based on available data
 fn generate_device_suffix(
-    authed_ua: Option<&str>,
+    ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
 ) -> (Option<char>, Option<char>) {
-    let ua_char = authed_ua.map(|ua| {
-        let ua_hash = Md5::digest(ua.as_bytes());
+    let ua_char = ua.map(|ua| {
+        let ua_prefix = extract_ua_prefix(ua);
+        let ua_hash = Md5::digest(ua_prefix.as_bytes());
         let ua_idx = ua_hash[0] as usize % ID_CHAR_SET.len();
         ID_CHAR_SET[ua_idx]
     });
@@ -443,7 +449,7 @@ fn generate_device_suffix(
 pub fn generate_id_with_device_suffix(
     seed_id: &str,
     length: usize,
-    authed_ua: Option<&str>,
+    ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
 ) -> String {
     if length < 2 {
@@ -456,7 +462,7 @@ pub fn generate_id_with_device_suffix(
         return seed_id[..id_chars.len().min(length)].to_string();
     }
 
-    let (ua_char, ip_char) = generate_device_suffix(authed_ua, reduced_ip);
+    let (ua_char, ip_char) = generate_device_suffix(ua, reduced_ip);
 
     match (ua_char, ip_char) {
         (Some(ua), Some(ip)) => {
@@ -485,11 +491,11 @@ pub fn get_author_id_with_device_info(
     board_key: &str,
     datetime: DateTime<Utc>,
     seed: &[u8],
-    authed_ua: Option<&str>,
+    ua: Option<&str>,
     reduced_ip: &ReducedIpAddr,
 ) -> String {
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
-    generate_id_with_device_suffix(&base_id, 9, authed_ua, Some(reduced_ip))
+    generate_id_with_device_suffix(&base_id, 9, ua, Some(reduced_ip))
 }
 
 // &str is utf-8 bytes
