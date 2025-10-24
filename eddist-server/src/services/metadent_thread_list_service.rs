@@ -5,6 +5,7 @@ use md5::Digest;
 use crate::{
     domain::{
         metadent::{generate_date_seed, generate_meta_ident},
+        res::{generate_id_with_device_suffix, get_author_id_by_seed},
         thread_list::ThreadListWithMetadent,
     },
     repositories::bbs_repository::BbsRepository,
@@ -35,26 +36,41 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
         let threads = self.0.get_threads_with_metadent(board.id).await?;
         let threads = threads
             .into_iter()
-            .map(|(thread, client_info)| {
+            .map(|(thread, client_info, authed_token)| {
                 let thread_number = thread.thread_number;
-                (thread, {
-                    let metadent = generate_meta_ident(
-                        client_info.asn_num,
-                        &client_info
-                            .tinker
-                            .map(|x| if x.level() < 3 { 0 } else { x.level() })
-                            .unwrap_or(0)
-                            .to_string(),
-                        &client_info.user_agent,
-                        generate_date_seed(chrono::Utc.timestamp_opt(thread_number, 0).unwrap()),
-                    );
-                    let mut hasher = md5::Md5::new();
-                    hasher.update(metadent.as_bytes());
-                    // from u8; 16 to base64
-                    let result = hasher.finalize();
+                let thread_datetime = chrono::Utc.timestamp_opt(thread_number, 0).unwrap();
 
-                    base64::engine::general_purpose::STANDARD.encode(result)[1..9].to_string()
-                })
+                // First 4 chars: based on writing info (current implementation)
+                let writing_metadent = generate_meta_ident(
+                    client_info.asn_num,
+                    &client_info
+                        .tinker
+                        .map(|x| if x.level() < 3 { 0 } else { x.level() })
+                        .unwrap_or(0)
+                        .to_string(),
+                    &client_info.user_agent,
+                    generate_date_seed(thread_datetime),
+                );
+                let mut hasher = md5::Md5::new();
+                hasher.update(writing_metadent.as_bytes());
+                let result = hasher.finalize();
+                let first_4 =
+                    base64::engine::general_purpose::STANDARD.encode(result)[1..5].to_string();
+
+                // Last 4 chars: based on authed token (first 2 from seed, last 2 device-specific)
+                let author_id_base = get_author_id_by_seed(
+                    &board.board_key,
+                    thread_datetime,
+                    &authed_token.author_id_seed,
+                );
+                let last_4 = generate_id_with_device_suffix(
+                    &author_id_base,
+                    4,
+                    Some(&authed_token.writing_ua),
+                    Some(&authed_token.reduced_ip),
+                );
+
+                (thread, format!("{first_4}{last_4}"))
             })
             .collect();
 
