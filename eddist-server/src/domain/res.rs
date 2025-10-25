@@ -496,14 +496,14 @@ pub fn get_author_id_with_device_info(
     board_key: &str,
     datetime: DateTime<Utc>,
     seed: &[u8],
-    ua: Option<&str>,
+    _ua: Option<&str>,
     reduced_ip: &ReducedIpAddr,
 ) -> String {
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
     generate_id_with_device_suffix(
         &base_id,
         9,
-        ua,
+        None,
         Some(reduced_ip),
         Some(generate_date_seed(
             datetime,

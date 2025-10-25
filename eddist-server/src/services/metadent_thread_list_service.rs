@@ -69,7 +69,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                 let last_4 = generate_id_with_device_suffix(
                     &author_id_base,
                     4,
-                    Some(&authed_token.writing_ua),
+                    None,
                     Some(&authed_token.reduced_ip),
                     Some(generate_date_seed(
                         thread_datetime,
