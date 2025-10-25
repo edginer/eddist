@@ -13,7 +13,7 @@ use md5::Md5;
 use pwhash::unix;
 use sha1::{Digest, Sha1};
 
-use crate::domain::metadent::Metadent;
+use crate::domain::metadent::{generate_date_seed, Metadent};
 
 use super::{
     authed_token::AuthedToken,
@@ -404,6 +404,8 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
+pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 3;
+
 // Character set for ID generation (base64-like encoding)
 const ID_CHAR_SET: &[char] = &[
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
@@ -422,11 +424,13 @@ fn extract_ua_prefix(ua: &str) -> &str {
 fn generate_device_suffix(
     ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
+    date_seed: Option<u32>,
 ) -> (Option<char>, Option<char>) {
     let ua_char = ua.map(|ua| {
         let ua_prefix = extract_ua_prefix(ua);
         let ua_hash = Md5::digest(ua_prefix.as_bytes());
-        let ua_idx = ua_hash[0] as usize % ID_CHAR_SET.len();
+        let ua_idx = ((ua_hash[0] as usize).wrapping_add(date_seed.unwrap_or(0) as usize))
+            % ID_CHAR_SET.len();
         ID_CHAR_SET[ua_idx]
     });
 
@@ -438,7 +442,8 @@ fn generate_device_suffix(
             .or_else(|| ip_str.split(':').next())
             .unwrap_or("");
         let ip_hash = Md5::digest(ip_first_segment.as_bytes());
-        let ip_idx = ip_hash[0] as usize % ID_CHAR_SET.len();
+        let ip_idx = ((ip_hash[0] as usize).wrapping_add(date_seed.unwrap_or(0) as usize))
+            % ID_CHAR_SET.len();
         ID_CHAR_SET[ip_idx]
     });
 
@@ -451,18 +456,18 @@ pub fn generate_id_with_device_suffix(
     length: usize,
     ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
+    date_seed: Option<u32>,
 ) -> String {
     if length < 2 {
         panic!("Length must be at least 2");
     }
-    let mut id_chars: Vec<char> = seed_id.chars().collect();
+    let mut id_chars = seed_id.chars().collect::<Vec<char>>();
 
-    // Ensure we have enough characters
     if id_chars.len() < length {
         return seed_id[..id_chars.len().min(length)].to_string();
     }
 
-    let (ua_char, ip_char) = generate_device_suffix(ua, reduced_ip);
+    let (ua_char, ip_char) = generate_device_suffix(ua, reduced_ip, date_seed);
 
     match (ua_char, ip_char) {
         (Some(ua), Some(ip)) => {
@@ -495,7 +500,16 @@ pub fn get_author_id_with_device_info(
     reduced_ip: &ReducedIpAddr,
 ) -> String {
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
-    generate_id_with_device_suffix(&base_id, 9, ua, Some(reduced_ip))
+    generate_id_with_device_suffix(
+        &base_id,
+        9,
+        ua,
+        Some(reduced_ip),
+        Some(generate_date_seed(
+            datetime,
+            AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
+        )),
+    )
 }
 
 // &str is utf-8 bytes
