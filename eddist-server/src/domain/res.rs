@@ -404,14 +404,14 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
-pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 3;
+pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 1;
 
 // Character set for ID generation (base64-like encoding)
 const ID_CHAR_SET: &[char] = &[
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
     'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '.', '/',
+    '5', '6', '7', '8', '9',
 ];
 
 /// Extract the UA part before the first parenthesis
@@ -506,7 +506,7 @@ pub fn get_author_id_with_device_info(
         None,
         Some(reduced_ip),
         Some(generate_date_seed(
-            datetime,
+            datetime.add(chrono::Duration::hours(9)), // to JST
             AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
         )),
     )

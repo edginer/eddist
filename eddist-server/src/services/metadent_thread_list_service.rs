@@ -1,6 +1,7 @@
 use base64::Engine;
 use chrono::TimeZone;
 use md5::Digest;
+use std::ops::Add;
 
 use crate::{
     domain::{
@@ -72,7 +73,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                     None,
                     Some(&authed_token.reduced_ip),
                     Some(generate_date_seed(
-                        thread_datetime,
+                        thread_datetime.add(chrono::Duration::hours(9)), // to JST,
                         AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
                     )),
                 );
