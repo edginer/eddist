@@ -1,11 +1,15 @@
 use base64::Engine;
 use chrono::TimeZone;
 use md5::Digest;
+use std::ops::Add;
 
 use crate::{
     domain::{
-        metadent::{generate_date_seed, generate_meta_ident},
-        res::{generate_id_with_device_suffix, get_author_id_by_seed},
+        metadent::{generate_date_seed, generate_meta_ident, METADENT_RESET_PERIOD_DAYS},
+        res::{
+            generate_id_with_device_suffix, get_author_id_by_seed,
+            AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
+        },
         thread_list::ThreadListWithMetadent,
     },
     repositories::bbs_repository::BbsRepository,
@@ -49,7 +53,7 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                         .unwrap_or(0)
                         .to_string(),
                     &client_info.user_agent,
-                    generate_date_seed(thread_datetime),
+                    generate_date_seed(thread_datetime, METADENT_RESET_PERIOD_DAYS),
                 );
                 let mut hasher = md5::Md5::new();
                 hasher.update(writing_metadent.as_bytes());
@@ -66,8 +70,12 @@ impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
                 let last_4 = generate_id_with_device_suffix(
                     &author_id_base,
                     4,
-                    Some(&authed_token.writing_ua),
+                    None,
                     Some(&authed_token.reduced_ip),
+                    Some(generate_date_seed(
+                        thread_datetime.add(chrono::Duration::hours(9)), // to JST,
+                        AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
+                    )),
                 );
 
                 (thread, format!("{first_4}{last_4}"))

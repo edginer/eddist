@@ -6,6 +6,8 @@ use md5::{Digest, Md5};
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
+pub const METADENT_RESET_PERIOD_DAYS: u64 = 7;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MetadentType {
     None,
@@ -76,7 +78,7 @@ impl Metadent {
         if metadent_type == MetadentType::None {
             Metadent::None
         } else {
-            let seed = generate_date_seed(datetime);
+            let seed = generate_date_seed(datetime, METADENT_RESET_PERIOD_DAYS);
             let ident_str = generate_meta_ident(
                 client_info.asn_num,
                 &client_info.ip_addr,
@@ -180,8 +182,8 @@ pub fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> Stri
     format!("{xx}{yy}-{z}{a}{bb}")
 }
 
-pub fn generate_date_seed(time: DateTime<Utc>) -> u32 {
+pub fn generate_date_seed(time: DateTime<Utc>, reset_period: u64) -> u32 {
     let n = time.timestamp() as u64;
-    let seed = (n / (60 * 60 * 24) / 7) % i32::MAX as u64;
+    let seed = (n / (60 * 60 * 24) / reset_period) % i32::MAX as u64;
     rand::rngs::StdRng::seed_from_u64(seed).random()
 }

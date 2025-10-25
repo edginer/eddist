@@ -13,7 +13,7 @@ use md5::Md5;
 use pwhash::unix;
 use sha1::{Digest, Sha1};
 
-use crate::domain::metadent::Metadent;
+use crate::domain::metadent::{generate_date_seed, Metadent};
 
 use super::{
     authed_token::AuthedToken,
@@ -404,12 +404,14 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
+pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 1;
+
 // Character set for ID generation (base64-like encoding)
 const ID_CHAR_SET: &[char] = &[
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
     'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '.', '/',
+    '5', '6', '7', '8', '9',
 ];
 
 /// Extract the UA part before the first parenthesis
@@ -422,11 +424,13 @@ fn extract_ua_prefix(ua: &str) -> &str {
 fn generate_device_suffix(
     ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
+    date_seed: Option<u32>,
 ) -> (Option<char>, Option<char>) {
     let ua_char = ua.map(|ua| {
         let ua_prefix = extract_ua_prefix(ua);
         let ua_hash = Md5::digest(ua_prefix.as_bytes());
-        let ua_idx = ua_hash[0] as usize % ID_CHAR_SET.len();
+        let ua_idx = ((ua_hash[0] as usize).wrapping_add(date_seed.unwrap_or(0) as usize))
+            % ID_CHAR_SET.len();
         ID_CHAR_SET[ua_idx]
     });
 
@@ -438,7 +442,8 @@ fn generate_device_suffix(
             .or_else(|| ip_str.split(':').next())
             .unwrap_or("");
         let ip_hash = Md5::digest(ip_first_segment.as_bytes());
-        let ip_idx = ip_hash[0] as usize % ID_CHAR_SET.len();
+        let ip_idx = ((ip_hash[0] as usize).wrapping_add(date_seed.unwrap_or(0) as usize))
+            % ID_CHAR_SET.len();
         ID_CHAR_SET[ip_idx]
     });
 
@@ -451,18 +456,18 @@ pub fn generate_id_with_device_suffix(
     length: usize,
     ua: Option<&str>,
     reduced_ip: Option<&ReducedIpAddr>,
+    date_seed: Option<u32>,
 ) -> String {
     if length < 2 {
         panic!("Length must be at least 2");
     }
-    let mut id_chars: Vec<char> = seed_id.chars().collect();
+    let mut id_chars = seed_id.chars().collect::<Vec<char>>();
 
-    // Ensure we have enough characters
     if id_chars.len() < length {
         return seed_id[..id_chars.len().min(length)].to_string();
     }
 
-    let (ua_char, ip_char) = generate_device_suffix(ua, reduced_ip);
+    let (ua_char, ip_char) = generate_device_suffix(ua, reduced_ip, date_seed);
 
     match (ua_char, ip_char) {
         (Some(ua), Some(ip)) => {
@@ -491,11 +496,20 @@ pub fn get_author_id_with_device_info(
     board_key: &str,
     datetime: DateTime<Utc>,
     seed: &[u8],
-    ua: Option<&str>,
+    _ua: Option<&str>,
     reduced_ip: &ReducedIpAddr,
 ) -> String {
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
-    generate_id_with_device_suffix(&base_id, 9, ua, Some(reduced_ip))
+    generate_id_with_device_suffix(
+        &base_id,
+        9,
+        None,
+        Some(reduced_ip),
+        Some(generate_date_seed(
+            datetime.add(chrono::Duration::hours(9)), // to JST
+            AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
+        )),
+    )
 }
 
 // &str is utf-8 bytes
@@ -641,5 +655,103 @@ plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
         let mut images_sorted = images.clone();
         images_sorted.sort();
         assert_eq!(expected, images_sorted);
+    }
+
+    #[test]
+    fn test_author_id_changes_on_day_change() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+
+        // Day 1: 2024-01-15 00:00:00 UTC (2024-01-15 09:00:00 JST)
+        let day1 = Utc.with_ymd_and_hms(2024, 1, 15, 0, 0, 0).unwrap();
+        let id_day1 = get_author_id_by_seed(board_key, day1, seed);
+
+        // Same day in JST: 2024-01-15 12:00:00 UTC (2024-01-15 21:00:00 JST)
+        let day1_later = Utc.with_ymd_and_hms(2024, 1, 15, 12, 0, 0).unwrap();
+        let id_day1_later = get_author_id_by_seed(board_key, day1_later, seed);
+
+        // Should be the same ID (same day in JST)
+        assert_eq!(id_day1, id_day1_later, "IDs should be same on the same day");
+
+        // Day 2 in JST: 2024-01-16 00:00:00 UTC (2024-01-16 09:00:00 JST)
+        let day2 = Utc.with_ymd_and_hms(2024, 1, 16, 0, 0, 0).unwrap();
+        let id_day2 = get_author_id_by_seed(board_key, day2, seed);
+
+        // Should be different ID (different day)
+        assert_ne!(id_day1, id_day2, "IDs should change on different days");
+    }
+
+    #[test]
+    fn test_author_id_suffix_changes_on_reset_period() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+        let reduced_ip = ReducedIpAddr::from("192.168.1.100".to_string());
+
+        // Day 1
+        let day1 = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let id_day1 = get_author_id_with_device_info(board_key, day1, seed, None, &reduced_ip);
+
+        // Day 2 (within same reset period of AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS = 1)
+        let day2 = Utc.with_ymd_and_hms(2024, 1, 2, 12, 0, 0).unwrap();
+        let id_day2 = get_author_id_with_device_info(board_key, day2, seed, None, &reduced_ip);
+
+        // Both base part (first 7 chars) and suffix (last 2 chars) should change
+        assert_ne!(id_day1, id_day2, "Full ID should change on day change");
+
+        // Base ID (without device suffix) should also change
+        let base_id_day1 = get_author_id_by_seed(board_key, day1, seed);
+        let base_id_day2 = get_author_id_by_seed(board_key, day2, seed);
+        assert_ne!(
+            base_id_day1, base_id_day2,
+            "Base ID should change on day change"
+        );
+
+        // Extract first 7 chars (base part) and last char (suffix)
+        let base_part_day1 = &id_day1[..7];
+        let suffix_part_day1 = &id_day1[7..];
+        let base_part_day2 = &id_day2[..7];
+        let suffix_part_day2 = &id_day2[7..];
+
+        // Base part should change (different day = different base ID)
+        assert_ne!(
+            base_part_day1, base_part_day2,
+            "Base part should change on day change"
+        );
+
+        // Suffix should also change (different date_seed)
+        assert_ne!(
+            suffix_part_day1, suffix_part_day2,
+            "Suffix should change on day change"
+        );
+    }
+
+    #[test]
+    fn test_author_id_all_parts_change_on_day_change() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+        let reduced_ip = ReducedIpAddr::from("192.168.1.100".to_string());
+
+        // Test multiple consecutive days
+        let days = [
+            Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 2, 12, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 3, 12, 0, 0).unwrap(),
+        ];
+
+        let ids: Vec<String> = days
+            .iter()
+            .map(|day| get_author_id_with_device_info(board_key, *day, seed, None, &reduced_ip))
+            .collect();
+
+        // All IDs should be different
+        assert_ne!(ids[0], ids[1], "Day 1 and Day 2 IDs should be different");
+        assert_ne!(ids[1], ids[2], "Day 2 and Day 3 IDs should be different");
+        assert_ne!(ids[0], ids[2], "Day 1 and Day 3 IDs should be different");
     }
 }
