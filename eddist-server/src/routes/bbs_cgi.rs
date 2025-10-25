@@ -97,15 +97,39 @@ pub async fn post_bbs_cgi(
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
         };
 
+        // Execute BeforePostThread plugin hook
+        let mut thread_data = serde_json::json!({
+            "board_key": &board_key,
+            "title": &title,
+            "name": &name,
+            "mail": &mail,
+            "body": &body,
+        });
+
+        if let Ok(modified_data) = state
+            .get_container()
+            .plugin_manager()
+            .execute_hook(crate::plugin::hooks::HookPoint::BeforePostThread, thread_data.clone())
+            .await
+        {
+            thread_data = modified_data;
+        }
+
+        // Extract potentially modified values
+        let body = thread_data["body"].as_str().unwrap_or(&body).to_string();
+        let title = thread_data["title"].as_str().unwrap_or(&title).to_string();
+        let name = thread_data["name"].as_str().unwrap_or(&name).to_string();
+        let mail = thread_data["mail"].as_str().unwrap_or(&mail).to_string();
+
         let svc = state.services.thread_creation();
         let tinker = match svc
             .execute(TheradCreationServiceInput {
-                board_key,
-                title,
-                authed_token: edge_token,
-                name,
-                mail,
-                body,
+                board_key: board_key.clone(),
+                title: title.clone(),
+                authed_token: edge_token.clone(),
+                name: name.clone(),
+                mail: mail.clone(),
+                body: body.clone(),
                 tinker,
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
@@ -113,7 +137,23 @@ pub async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(ThreadCreationServiceOutput { tinker }) => tinker,
+            Ok(ThreadCreationServiceOutput { tinker }) => {
+                // Execute AfterPostThread plugin hook
+                let after_data = serde_json::json!({
+                    "board_key": &board_key,
+                    "title": &title,
+                    "name": &name,
+                    "mail": &mail,
+                    "body": &body,
+                    "success": true,
+                });
+                let _ = state
+                    .get_container()
+                    .plugin_manager()
+                    .execute_hook(crate::plugin::hooks::HookPoint::AfterPostThread, after_data)
+                    .await;
+                tinker
+            }
             Err(e) => {
                 return on_error(e, true);
             }
@@ -127,15 +167,38 @@ pub async fn post_bbs_cgi(
             return BbsCgiError::from(InvalidParamType::Key).into_response();
         };
 
+        // Execute BeforePostResponse plugin hook
+        let mut response_data = serde_json::json!({
+            "board_key": &board_key,
+            "thread_number": thread_number,
+            "name": &name,
+            "mail": &mail,
+            "body": &body,
+        });
+
+        if let Ok(modified_data) = state
+            .get_container()
+            .plugin_manager()
+            .execute_hook(crate::plugin::hooks::HookPoint::BeforePostResponse, response_data.clone())
+            .await
+        {
+            response_data = modified_data;
+        }
+
+        // Extract potentially modified values
+        let body = response_data["body"].as_str().unwrap_or(&body).to_string();
+        let name = response_data["name"].as_str().unwrap_or(&name).to_string();
+        let mail = response_data["mail"].as_str().unwrap_or(&mail).to_string();
+
         let svc = state.services.res_creation();
         match svc
             .execute(ResCreationServiceInput {
-                board_key,
+                board_key: board_key.clone(),
                 thread_number,
-                authed_token_cookie: edge_token,
-                name,
-                mail,
-                body,
+                authed_token_cookie: edge_token.clone(),
+                name: name.clone(),
+                mail: mail.clone(),
+                body: body.clone(),
                 tinker,
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
@@ -143,7 +206,24 @@ pub async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(ResCreationServiceOutput { tinker, res_order }) => (tinker, res_order),
+            Ok(ResCreationServiceOutput { tinker, res_order }) => {
+                // Execute AfterPostResponse plugin hook
+                let after_data = serde_json::json!({
+                    "board_key": &board_key,
+                    "thread_number": thread_number,
+                    "name": &name,
+                    "mail": &mail,
+                    "body": &body,
+                    "success": true,
+                    "res_order": res_order,
+                });
+                let _ = state
+                    .get_container()
+                    .plugin_manager()
+                    .execute_hook(crate::plugin::hooks::HookPoint::AfterPostResponse, after_data)
+                    .await;
+                (tinker, res_order)
+            }
             Err(e) => {
                 return on_error(e, false);
             }

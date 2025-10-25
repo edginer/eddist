@@ -11,7 +11,8 @@ type NavBarSectionKind =
   | "global"
   | "authed-token"
   | "users"
-  | "restriction-rules";
+  | "restriction-rules"
+  | "plugins";
 
 const Hamburger = () => (
   <svg
@@ -58,6 +59,9 @@ const NavBarSection = ({
       break;
     case "restriction-rules":
       displayText = "Restriction Rules";
+      break;
+    case "plugins":
+      displayText = "Plugins";
       break;
   }
 
@@ -106,6 +110,7 @@ const Layout: React.FC = () => {
           />
           <NavBarSection selected={navBarSection === "users"} kind="users" />
           <NavBarSection selected={navBarSection === "restriction-rules"} kind="restriction-rules" />
+          <NavBarSection selected={navBarSection === "plugins"} kind="plugins" />
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -179,12 +184,20 @@ const Layout: React.FC = () => {
                   Users
                 </Link>
               </li>
-              <li className="pl-2 border-slate-400">
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
                 <Link
                   to="/dashboard/restriction-rules"
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Restriction Rules
+                </Link>
+              </li>
+              <li className="pl-2 border-slate-400">
+                <Link
+                  to="/dashboard/plugins"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
+                  Plugins
                 </Link>
               </li>
             </ul>

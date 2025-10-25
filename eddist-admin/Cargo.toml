@@ -44,3 +44,4 @@ rust-s3 = { version = "0.35.1", default-features = false, features = [
     "fail-on-err",
 ] }
 encoding_rs = "0.8.34"
+mlua = { version = "0.10.3", features = ["lua54", "async", "serialize", "send", "vendored"] }

@@ -18,6 +18,7 @@ use repository::{
     admin_bbs_repository::AdminBbsRepositoryImpl, admin_user_repository::AdminUserRepositoryImpl,
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
     ngword_repository::NgWordRepositoryImpl,
+    plugin_repository::PluginRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use s3::creds::Credentials;
@@ -45,6 +46,7 @@ mod repository {
     pub mod authed_token_repository;
     pub mod cap_repository;
     pub mod ngword_repository;
+    pub mod plugin_repository;
     pub mod user_restriction_repository;
 }
 mod role;
@@ -55,6 +57,7 @@ use repository::{
     admin_archive_repository::AdminArchiveRepository, admin_bbs_repository::AdminBbsRepository,
     admin_user_repository::AdminUserRepository, authed_token_repository::AuthedTokenRepository,
     cap_repository::CapRepository, ngword_repository::NgWordRepository,
+    plugin_repository::PluginRepository,
     user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
@@ -96,6 +99,7 @@ pub(crate) struct AppState<
     C: CapRepository + Clone,
     U: AdminUserRepository + Clone,
     UR: UserRestrictionRepository + Clone,
+    P: PluginRepository + Clone,
 > {
     pub oauth2_client: oauth2::basic::BasicClient<
         EndpointSet,
@@ -111,6 +115,7 @@ pub(crate) struct AppState<
     pub cap_repo: C,
     pub user_repo: U,
     pub user_restriction_repo: UR,
+    pub plugin_repo: P,
     pub redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -122,6 +127,7 @@ pub(crate) type DefaultAppState = AppState<
     CapRepositoryImpl,
     AdminUserRepositoryImpl,
     UserRestrictionRepositoryImpl,
+    PluginRepositoryImpl,
 >;
 
 #[tokio::main]
@@ -215,7 +221,8 @@ async fn main() {
         authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
         cap_repo: CapRepositoryImpl::new(pool.clone()),
         user_repo: AdminUserRepositoryImpl::new(pool.clone()),
-        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool),
+        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool.clone()),
+        plugin_repo: PluginRepositoryImpl::new(pool),
     };
 
     let app = Router::new()

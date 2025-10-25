@@ -89,6 +89,7 @@ mod domain {
 }
 mod error;
 mod middleware;
+mod plugin;
 mod services;
 mod template;
 
@@ -248,6 +249,7 @@ async fn main() -> anyhow::Result<()> {
             conn_mgr.clone(),
             pub_repo,
             *s3_client,
+            pool.clone(),
         ),
         tinker_secret,
         captcha_like_configs,

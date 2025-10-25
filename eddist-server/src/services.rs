@@ -22,6 +22,7 @@ use user_restriction_service::UserRestrictionService;
 
 use crate::{
     error::BbsCgiError,
+    plugin::PluginManager,
     repositories::{
         bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
         idp_repository::IdpRepository, user_repository::UserRepository,
@@ -87,6 +88,7 @@ pub struct AppServiceContainer<
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
     user_logout: UserLogoutService,
     user_restriction: UserRestrictionService<R>,
+    plugin_manager: PluginManager,
 }
 
 impl<
@@ -105,6 +107,7 @@ impl<
         redis_conn: ConnectionManager,
         pub_repo: P,
         bucket: Bucket,
+        pool: sqlx::MySqlPool,
     ) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
@@ -155,8 +158,9 @@ impl<
                 idp_repo,
                 redis_conn.clone(),
             ),
-            user_logout: UserLogoutService::new(redis_conn),
+            user_logout: UserLogoutService::new(redis_conn.clone()),
             user_restriction: UserRestrictionService::new(user_restriction_repo),
+            plugin_manager: PluginManager::new(pool, redis_conn),
         }
     }
 }
@@ -239,5 +243,9 @@ impl<
 
     pub fn user_restriction(&self) -> &UserRestrictionService<R> {
         &self.user_restriction
+    }
+
+    pub fn plugin_manager(&self) -> &PluginManager {
+        &self.plugin_manager
     }
 }
