@@ -656,4 +656,102 @@ plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
         images_sorted.sort();
         assert_eq!(expected, images_sorted);
     }
+
+    #[test]
+    fn test_author_id_changes_on_day_change() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+
+        // Day 1: 2024-01-15 00:00:00 UTC (2024-01-15 09:00:00 JST)
+        let day1 = Utc.with_ymd_and_hms(2024, 1, 15, 0, 0, 0).unwrap();
+        let id_day1 = get_author_id_by_seed(board_key, day1, seed);
+
+        // Same day in JST: 2024-01-15 12:00:00 UTC (2024-01-15 21:00:00 JST)
+        let day1_later = Utc.with_ymd_and_hms(2024, 1, 15, 12, 0, 0).unwrap();
+        let id_day1_later = get_author_id_by_seed(board_key, day1_later, seed);
+
+        // Should be the same ID (same day in JST)
+        assert_eq!(id_day1, id_day1_later, "IDs should be same on the same day");
+
+        // Day 2 in JST: 2024-01-16 00:00:00 UTC (2024-01-16 09:00:00 JST)
+        let day2 = Utc.with_ymd_and_hms(2024, 1, 16, 0, 0, 0).unwrap();
+        let id_day2 = get_author_id_by_seed(board_key, day2, seed);
+
+        // Should be different ID (different day)
+        assert_ne!(id_day1, id_day2, "IDs should change on different days");
+    }
+
+    #[test]
+    fn test_author_id_suffix_changes_on_reset_period() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+        let reduced_ip = ReducedIpAddr::from("192.168.1.100".to_string());
+
+        // Day 1
+        let day1 = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let id_day1 = get_author_id_with_device_info(board_key, day1, seed, None, &reduced_ip);
+
+        // Day 2 (within same reset period of AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS = 1)
+        let day2 = Utc.with_ymd_and_hms(2024, 1, 2, 12, 0, 0).unwrap();
+        let id_day2 = get_author_id_with_device_info(board_key, day2, seed, None, &reduced_ip);
+
+        // Both base part (first 7 chars) and suffix (last 2 chars) should change
+        assert_ne!(id_day1, id_day2, "Full ID should change on day change");
+
+        // Base ID (without device suffix) should also change
+        let base_id_day1 = get_author_id_by_seed(board_key, day1, seed);
+        let base_id_day2 = get_author_id_by_seed(board_key, day2, seed);
+        assert_ne!(
+            base_id_day1, base_id_day2,
+            "Base ID should change on day change"
+        );
+
+        // Extract first 7 chars (base part) and last char (suffix)
+        let base_part_day1 = &id_day1[..7];
+        let suffix_part_day1 = &id_day1[7..];
+        let base_part_day2 = &id_day2[..7];
+        let suffix_part_day2 = &id_day2[7..];
+
+        // Base part should change (different day = different base ID)
+        assert_ne!(
+            base_part_day1, base_part_day2,
+            "Base part should change on day change"
+        );
+
+        // Suffix should also change (different date_seed)
+        assert_ne!(
+            suffix_part_day1, suffix_part_day2,
+            "Suffix should change on day change"
+        );
+    }
+
+    #[test]
+    fn test_author_id_all_parts_change_on_day_change() {
+        use chrono::TimeZone;
+
+        let board_key = "test_board";
+        let seed = b"test_seed";
+        let reduced_ip = ReducedIpAddr::from("192.168.1.100".to_string());
+
+        // Test multiple consecutive days
+        let days = [
+            Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 2, 12, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 3, 12, 0, 0).unwrap(),
+        ];
+
+        let ids: Vec<String> = days
+            .iter()
+            .map(|day| get_author_id_with_device_info(board_key, *day, seed, None, &reduced_ip))
+            .collect();
+
+        // All IDs should be different
+        assert_ne!(ids[0], ids[1], "Day 1 and Day 2 IDs should be different");
+        assert_ne!(ids[1], ids[2], "Day 2 and Day 3 IDs should be different");
+        assert_ne!(ids[0], ids[2], "Day 1 and Day 3 IDs should be different");
+    }
 }
