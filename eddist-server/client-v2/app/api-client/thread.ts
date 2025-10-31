@@ -34,7 +34,9 @@ export const fetchThread = async (
       redirect:
         // in server side, follow redirect
         // in client side, do not follow redirect
-        import.meta.env.SSR ? "follow" : "manual",
+        // import.meta.env.SSR ? "follow" : "manual",
+        // TODO: for now, always manual
+        "manual",
     }
   );
   const sjisText = await res.blob();
