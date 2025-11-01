@@ -1,17 +1,19 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/TopPage";
 import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
+  const baseUrl =
+    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+
   return {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
     },
-    boards: await fetchBoards({
-      baseUrl:
-        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
-    }),
+    boards: await fetchBoards({ baseUrl }),
+    notices: await fetchLatestNotices({ baseUrl }).catch(() => []),
   };
 };
 
@@ -25,7 +27,9 @@ const Meta = ({ bbsName }: { bbsName: string }) => (
   </>
 );
 
-function TopPage({ loaderData: { eddistData, boards } }: Route.ComponentProps) {
+function TopPage({
+  loaderData: { eddistData, boards, notices },
+}: Route.ComponentProps) {
   return (
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
       <Meta bbsName={eddistData.bbsName} />
@@ -33,6 +37,28 @@ function TopPage({ loaderData: { eddistData, boards } }: Route.ComponentProps) {
         <header>
           <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
         </header>
+        {notices && notices.length > 0 && (
+          <section className="py-4 pt-8">
+            <h2 className="text-2xl lg:text-4xl">お知らせ</h2>
+            <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
+              {notices.map((notice: NoticeListItem) => (
+                <li key={notice.id}>
+                  <Link to={`/notices/${notice.id}`} className="text-blue-500">
+                    {notice.title}
+                  </Link>
+                  {notice.summary && (
+                    <span className="text-gray-600 ml-2 text-sm">
+                      - {notice.summary}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <Link to="/notices" className="text-blue-500 text-sm">
+              お知らせ一覧を見る →
+            </Link>
+          </section>
+        )}
         <section className="py-4 pt-8">
           <h2 className="text-2xl lg:text-4xl">板一覧</h2>
           <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">

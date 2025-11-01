@@ -23,7 +23,8 @@ use metrics::describe_counter;
 use middleware::user_restriction::user_restriction_middleware;
 use repositories::{
     bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+    idp_repository::IdpRepositoryImpl, notice_repository::NoticeRepositoryImpl,
+    user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use routes::{
@@ -59,6 +60,7 @@ mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
+    pub(crate) mod notice_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
 }
@@ -101,6 +103,7 @@ mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;
+    pub mod notice;
     pub mod statics;
     pub mod subject_list;
     pub mod user;
@@ -115,6 +118,7 @@ struct AppState {
         RedisPubRepository,
         UserRestrictionRepositoryImpl,
     >,
+    notice_repo: std::sync::Arc<NoticeRepositoryImpl>,
     tinker_secret: String,
     captcha_like_configs: Vec<CaptchaLikeConfig>,
     template_engine: Handlebars<'static>,
@@ -238,6 +242,7 @@ async fn main() -> anyhow::Result<()> {
     .unwrap();
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
+    let notice_repo = std::sync::Arc::new(NoticeRepositoryImpl::new(pool.clone()));
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -249,6 +254,7 @@ async fn main() -> anyhow::Result<()> {
             pub_repo,
             *s3_client,
         ),
+        notice_repo,
         tinker_secret,
         captcha_like_configs,
         template_engine,
@@ -288,6 +294,24 @@ async fn main() -> anyhow::Result<()> {
         .route("/terms", get(get_term_of_usage))
         .route("/api/terms", get(get_api_terms))
         .route("/api/boards", get(get_api_boards))
+        .route(
+            "/api/notices/latest",
+            get(|State(state): State<AppState>| async move {
+                routes::notice::get_latest_notices(State(state.notice_repo)).await
+            }),
+        )
+        .route(
+            "/api/notices",
+            get(|State(state): State<AppState>, query| async move {
+                routes::notice::get_notices_paginated(State(state.notice_repo), query).await
+            }),
+        )
+        .route(
+            "/api/notices/:id",
+            get(|State(state): State<AppState>, path| async move {
+                routes::notice::get_notice_by_id(State(state.notice_repo), path).await
+            }),
+        )
         .nest("/user", user_routes())
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .route(
