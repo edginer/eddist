@@ -206,7 +206,7 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
             Ok(())
         } else {
             if is_thread
-                && env::var("RESTRICT_THREAD_CREATION_ON_NO_TINKER").unwrap_or("true".to_string())
+                && env::var("RESTRICT_THREAD_CREATION_ON_NO_TINKER").unwrap_or("false".to_string())
                     == "true"
             {
                 return Err(BbsCgiError::TmpCanNotCreateThread);
