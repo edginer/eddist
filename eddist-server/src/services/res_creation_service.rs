@@ -34,6 +34,7 @@ use crate::{
             ng_word_reading_service::NgWordReadingService,
             res_creation_span_management_service::ResCreationSpanManagementService,
         },
+        utils::count_anchors,
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
@@ -185,6 +186,18 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
         } else if !res.get_all_images().is_empty() {
             // Does not allow image URL
             return Err(BbsCgiError::ImageUrlBelowLv2);
+        }
+
+        // Restrict the anchor count below level 2
+        const MAX_ANCHORS_BELOW_LV2: usize = 3;
+        let needs_anchor_check = if let Some(tinker) = &input.tinker {
+            tinker.level() < 2
+        } else {
+            true
+        };
+
+        if needs_anchor_check && count_anchors(&input.body) > MAX_ANCHORS_BELOW_LV2 {
+            return Err(BbsCgiError::NgWordDetected);
         }
 
         let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
