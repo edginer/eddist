@@ -26,8 +26,10 @@ use crate::{
     domain::captcha_like::CaptchaLikeConfig,
     middleware::user_restriction::user_restriction_middleware,
     repositories::{
-        bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
-        idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+        bbs_repository::BbsRepositoryImpl,
+        idp_repository::IdpRepositoryImpl,
+        user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     },
     routes::{
@@ -53,6 +55,7 @@ pub struct AppState {
         IdpRepositoryImpl,
         RedisPubRepository,
         UserRestrictionRepositoryImpl,
+        RedisCreationEventRepository,
     >,
     pub tinker_secret: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
@@ -68,6 +71,7 @@ impl AppState {
         IdpRepositoryImpl,
         RedisPubRepository,
         UserRestrictionRepositoryImpl,
+        RedisCreationEventRepository,
     > {
         &self.services
     }

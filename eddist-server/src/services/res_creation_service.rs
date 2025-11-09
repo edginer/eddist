@@ -11,7 +11,7 @@ use eddist_core::{
         tinker::Tinker,
     },
     simple_rate_limiter::RateLimiter,
-    utils::is_user_registration_enabled,
+    utils::{is_res_pub_enabled, is_user_registration_enabled},
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
@@ -38,7 +38,8 @@ use crate::{
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
-        bbs_pubsub_repository::PubRepository, bbs_repository::BbsRepository,
+        bbs_pubsub_repository::{CreationEventRepository, PubRepository},
+        bbs_repository::BbsRepository,
         user_repository::UserRepository,
     },
     utils::redis::thread_cache_key,
@@ -47,23 +48,35 @@ use crate::{
 use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
 
 #[derive(Clone)]
-pub struct ResCreationService<T: BbsRepository, U: UserRepository, P: PubRepository>(
-    T,
-    U,
-    ConnectionManager,
-    P,
-);
+pub struct ResCreationService<
+    T: BbsRepository,
+    U: UserRepository,
+    P: PubRepository,
+    E: CreationEventRepository,
+>(T, U, ConnectionManager, P, E);
 
-impl<T: BbsRepository, U: UserRepository, P: PubRepository> ResCreationService<T, U, P> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, pub_repo: P) -> Self {
-        Self(repo, user_repo, redis_conn, pub_repo)
+impl<T: BbsRepository, U: UserRepository, P: PubRepository, E: CreationEventRepository>
+    ResCreationService<T, U, P, E>
+{
+    pub fn new(
+        repo: T,
+        user_repo: U,
+        redis_conn: ConnectionManager,
+        pub_repo: P,
+        event_repo: E,
+    ) -> Self {
+        Self(repo, user_repo, redis_conn, pub_repo, event_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
-    BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
-    for ResCreationService<T, U, P>
+impl<
+        T: BbsRepository + Clone,
+        U: UserRepository + Clone,
+        P: PubRepository,
+        E: CreationEventRepository,
+    > BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
+    for ResCreationService<T, U, P, E>
 {
     async fn execute(
         &self,
@@ -296,16 +309,23 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, P: PubRepository>
             is_sage: res.is_sage(),
         };
 
+        let event_repo = self.4.clone();
+
         tokio::spawn(async move {
             if let Err(e) = bbs_repo.create_response(cres.clone()).await {
                 error_span!("failed to create response in database",
                     error = %e
                 );
                 pub_repo
-                    .publish(PubSubItem::CreatingRes(Box::new(cres)))
+                    .publish(PubSubItem::CreatingRes(Box::new(cres.clone())))
                     .await
                     .unwrap();
             }
+
+            if is_res_pub_enabled() {
+                let _ = event_repo.publish_res_created(cres).await;
+            }
+
             let _ = bbs_repo
                 .update_authed_token_last_wrote(authed_token.id, created_at)
                 .await;

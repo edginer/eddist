@@ -9,8 +9,10 @@ use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
 use repositories::{
-    bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+    bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+    bbs_repository::BbsRepositoryImpl,
+    idp_repository::IdpRepositoryImpl,
+    user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use services::{user_restriction_service::start_cache_refresh_task, AppServiceContainer};
@@ -89,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let conn_mgr = client.get_connection_manager().await?;
     let pub_repo = RedisPubRepository::new(conn_mgr.clone());
+    let event_repo = RedisCreationEventRepository::new(conn_mgr.clone());
 
     let pool = MySqlPoolOptions::new()
         .after_connect(|conn, _| {
@@ -129,7 +132,7 @@ async fn main() -> anyhow::Result<()> {
         "eddist-server/client/dist"
     };
 
-    let template_engine = load_template_engine(&format!("{serve_dir}/index.html"));
+    let template_engine = load_template_engine(format!("{serve_dir}/index.html"));
 
     let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
     let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file.clone());
@@ -160,6 +163,7 @@ async fn main() -> anyhow::Result<()> {
             user_restriction_repo.clone(),
             conn_mgr.clone(),
             pub_repo,
+            event_repo,
             *s3_client,
         ),
         tinker_secret,
