@@ -14,6 +14,14 @@ pub fn is_user_registration_enabled() -> bool {
     )
 }
 
+pub fn is_res_pub_enabled() -> bool {
+    !matches!(std::env::var("ENABLE_RES_PUB").as_deref(), Ok("false"))
+}
+
+pub fn is_thread_pub_enabled() -> bool {
+    !matches!(std::env::var("ENABLE_THREAD_PUB").as_deref(), Ok("false"))
+}
+
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {
     let datetime = datetime.checked_add_signed(TimeDelta::hours(9)).unwrap();
     let weekday = datetime.weekday();

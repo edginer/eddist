@@ -1,5 +1,7 @@
-use eddist_core::domain::pubsub_repository::PubSubItem;
+use eddist_core::domain::pubsub_repository::{CreatingRes, PubSubItem};
 use redis::{aio::ConnectionManager, AsyncCommands};
+
+use super::bbs_repository::CreatingThread;
 
 #[derive(Clone)]
 pub struct RedisPubRepository {
@@ -24,6 +26,44 @@ impl PubRepository for RedisPubRepository {
         let item = serde_json::to_string(&item)?;
         redis_conn
             .publish::<'_, _, _, ()>("bbs:pubsubitem", item.clone())
+            .await?;
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct RedisCreationEventRepository {
+    redis_conn: ConnectionManager,
+}
+
+impl RedisCreationEventRepository {
+    pub fn new(redis_conn: ConnectionManager) -> Self {
+        Self { redis_conn }
+    }
+}
+
+#[async_trait::async_trait]
+pub trait CreationEventRepository: Clone + 'static + Send + Sync {
+    async fn publish_res_created(&self, event: CreatingRes) -> Result<(), anyhow::Error>;
+    async fn publish_thread_created(&self, event: CreatingThread) -> Result<(), anyhow::Error>;
+}
+
+#[async_trait::async_trait]
+impl CreationEventRepository for RedisCreationEventRepository {
+    async fn publish_res_created(&self, event: CreatingRes) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let event = serde_json::to_string(&event)?;
+        redis_conn
+            .publish::<'_, _, _, ()>("bbs:event:res_created", event)
+            .await?;
+        Ok(())
+    }
+
+    async fn publish_thread_created(&self, event: CreatingThread) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let event = serde_json::to_string(&event)?;
+        redis_conn
+            .publish::<'_, _, _, ()>("bbs:event:thread_created", event)
             .await?;
         Ok(())
     }

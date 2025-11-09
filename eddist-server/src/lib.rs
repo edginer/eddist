@@ -69,8 +69,10 @@ pub fn create_test_app(
     redis_conn: redis::aio::ConnectionManager,
 ) -> axum::Router {
     use crate::repositories::{
-        bbs_pubsub_repository::RedisPubRepository, bbs_repository::BbsRepositoryImpl,
-        idp_repository::IdpRepositoryImpl, user_repository::UserRepositoryImpl,
+        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+        bbs_repository::BbsRepositoryImpl,
+        idp_repository::IdpRepositoryImpl,
+        user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
     use crate::services::AppServiceContainer;
@@ -88,13 +90,14 @@ pub fn create_test_app(
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
+    let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
 
     // Check existence of index.html for ServeFile
     let path = Path::new("client/dist/index.html");
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).unwrap();
     }
-    let _ = std::fs::metadata(path).or_else(|_| Err(std::fs::File::create(path).unwrap()));
+    let _ = std::fs::metadata(path).map_err(|_| std::fs::File::create(path).unwrap());
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -104,6 +107,7 @@ pub fn create_test_app(
             user_restriction_repo,
             redis_conn.clone(),
             pub_repo,
+            event_repo,
             *bucket,
         ),
         tinker_secret: base64::engine::general_purpose::STANDARD
