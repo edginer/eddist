@@ -154,6 +154,7 @@ impl<
                 &input.user_agent,
                 &authed_token.token,
                 &input.ip_addr,
+                input.tinker.is_some(),
             )
             .await?;
 
