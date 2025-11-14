@@ -8,6 +8,7 @@ type NavBarSectionKind =
   | "boards"
   | "caps"
   | "ngwords"
+  | "notices"
   | "global"
   | "authed-token"
   | "users"
@@ -46,6 +47,9 @@ const NavBarSection = ({
       break;
     case "ngwords":
       displayText = "Ng Words";
+      break;
+    case "notices":
+      displayText = "Notices";
       break;
     case "global":
       displayText = "Global";
@@ -99,6 +103,7 @@ const Layout: React.FC = () => {
             selected={navBarSection === "ngwords"}
             kind="ngwords"
           />
+          <NavBarSection selected={navBarSection === "notices"} kind="notices" />
           <NavBarSection selected={navBarSection === "global"} kind="global" />
           <NavBarSection
             selected={navBarSection === "authed-token"}
@@ -153,6 +158,14 @@ const Layout: React.FC = () => {
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Ng Words
+                </Link>
+              </li>
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
+                <Link
+                  to="/dashboard/notices"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
+                  Notices
                 </Link>
               </li>
               <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">

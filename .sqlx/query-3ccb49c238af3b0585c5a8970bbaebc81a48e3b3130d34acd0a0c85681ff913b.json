@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "3ccb49c238af3b0585c5a8970bbaebc81a48e3b3130d34acd0a0c85681ff913b"
+}

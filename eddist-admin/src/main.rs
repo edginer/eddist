@@ -17,7 +17,7 @@ use repository::{
     admin_archive_repository::AdminArchiveRepositoryImpl,
     admin_bbs_repository::AdminBbsRepositoryImpl, admin_user_repository::AdminUserRepositoryImpl,
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
-    ngword_repository::NgWordRepositoryImpl,
+    ngword_repository::NgWordRepositoryImpl, notice_repository::NoticeRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use s3::creds::Credentials;
@@ -45,6 +45,7 @@ mod repository {
     pub mod authed_token_repository;
     pub mod cap_repository;
     pub mod ngword_repository;
+    pub mod notice_repository;
     pub mod user_restriction_repository;
 }
 mod role;
@@ -55,7 +56,7 @@ use repository::{
     admin_archive_repository::AdminArchiveRepository, admin_bbs_repository::AdminBbsRepository,
     admin_user_repository::AdminUserRepository, authed_token_repository::AuthedTokenRepository,
     cap_repository::CapRepository, ngword_repository::NgWordRepository,
-    user_restriction_repository::UserRestrictionRepository,
+    notice_repository::NoticeRepository, user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
 
@@ -96,6 +97,7 @@ pub(crate) struct AppState<
     C: CapRepository + Clone,
     U: AdminUserRepository + Clone,
     UR: UserRestrictionRepository + Clone,
+    NO: NoticeRepository + Clone,
 > {
     pub oauth2_client: oauth2::basic::BasicClient<
         EndpointSet,
@@ -111,6 +113,7 @@ pub(crate) struct AppState<
     pub cap_repo: C,
     pub user_repo: U,
     pub user_restriction_repo: UR,
+    pub notice_repo: NO,
     pub redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -122,6 +125,7 @@ pub(crate) type DefaultAppState = AppState<
     CapRepositoryImpl,
     AdminUserRepositoryImpl,
     UserRestrictionRepositoryImpl,
+    NoticeRepositoryImpl,
 >;
 
 #[tokio::main]
@@ -215,7 +219,8 @@ async fn main() {
         authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
         cap_repo: CapRepositoryImpl::new(pool.clone()),
         user_repo: AdminUserRepositoryImpl::new(pool.clone()),
-        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool),
+        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool.clone()),
+        notice_repo: NoticeRepositoryImpl::new(pool),
     };
 
     let app = Router::new()
