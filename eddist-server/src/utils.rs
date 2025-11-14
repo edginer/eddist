@@ -64,6 +64,10 @@ pub(crate) mod redis {
     pub fn email_auth_used_key(token: &str) -> String {
         format!("resp:email_auth_used:{token}")
     }
+
+    pub fn email_auth_tinker_used_key(token: &str) -> String {
+        format!("resp:email_auth_tinker_used:{token}")
+    }
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
