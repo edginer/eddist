@@ -1,4 +1,3 @@
-use eddist_core::domain::notice::Notice;
 use utoipa::OpenApi;
 
 use crate::{

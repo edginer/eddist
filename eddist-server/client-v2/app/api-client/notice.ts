@@ -1,18 +1,13 @@
 export interface Notice {
-  id: string;
+  slug: string;
   title: string;
   content: string;
-  summary: string | null;
-  created_at: string;
-  updated_at: string;
   published_at: string;
-  author_id: string | null;
 }
 
 export interface NoticeListItem {
-  id: string;
+  slug: string;
   title: string;
-  summary: string | null;
   published_at: string;
 }
 
@@ -53,14 +48,14 @@ export async function fetchNotices({
   return response.json();
 }
 
-export async function fetchNoticeById({
+export async function fetchNoticeBySlug({
   baseUrl,
-  id,
+  slug,
 }: {
   baseUrl: string;
-  id: string;
+  slug: string;
 }): Promise<Notice> {
-  const response = await fetch(`${baseUrl}/api/notices/${id}`);
+  const response = await fetch(`${baseUrl}/api/notices/${slug}`);
   if (!response.ok) {
     throw new Error("Failed to fetch notice");
   }

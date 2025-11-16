@@ -3,11 +3,28 @@ use eddist_core::domain::notice::Notice;
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
+/// Generate a URL-safe slug from a title
+fn generate_slug(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | '0'..='9' => c,
+            ' ' | '-' | '_' => '-',
+            _ => '-',
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<&str>>()
+        .join("-")
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateNoticeInput {
     pub title: String,
+    pub slug: String,
     pub content: String,
-    pub summary: Option<String>,
     pub published_at: NaiveDateTime,
 }
 
@@ -15,23 +32,23 @@ pub struct CreateNoticeInput {
 pub struct UpdateNoticeInput {
     pub title: Option<String>,
     pub content: Option<String>,
-    pub summary: Option<String>,
     pub published_at: Option<NaiveDateTime>,
+    /// Optional custom slug. If not provided and title is updated, will be auto-generated from new title.
+    pub slug: Option<String>,
 }
 
 #[async_trait::async_trait]
 pub trait NoticeRepository: Send + Sync {
-    async fn get_all_notices(&self) -> anyhow::Result<Vec<Notice>>;
     async fn get_notices_paginated(&self, page: u32, limit: u32) -> anyhow::Result<Vec<Notice>>;
     async fn get_notice_by_id(&self, id: Uuid) -> anyhow::Result<Option<Notice>>;
+    async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>>;
     async fn create_notice(
         &self,
         input: CreateNoticeInput,
-        author_id: Option<Uuid>,
+        author_email: Option<String>,
     ) -> anyhow::Result<Notice>;
     async fn update_notice(&self, id: Uuid, input: UpdateNoticeInput) -> anyhow::Result<Notice>;
     async fn delete_notice(&self, id: Uuid) -> anyhow::Result<()>;
-    async fn count_notices(&self) -> anyhow::Result<i64>;
 }
 
 #[derive(Clone)]
@@ -45,29 +62,6 @@ impl NoticeRepositoryImpl {
 
 #[async_trait::async_trait]
 impl NoticeRepository for NoticeRepositoryImpl {
-    async fn get_all_notices(&self) -> anyhow::Result<Vec<Notice>> {
-        let notices = query_as!(
-            Notice,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                title,
-                content,
-                summary,
-                created_at,
-                updated_at,
-                published_at,
-                author_id AS "author_id: Uuid"
-            FROM notices
-            ORDER BY published_at DESC
-            "#
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        Ok(notices)
-    }
-
     async fn get_notices_paginated(&self, page: u32, limit: u32) -> anyhow::Result<Vec<Notice>> {
         let offset = page * limit;
         let notices = query_as!(
@@ -75,13 +69,13 @@ impl NoticeRepository for NoticeRepositoryImpl {
             r#"
             SELECT
                 id AS "id: Uuid",
+                slug,
                 title,
                 content,
-                summary,
                 created_at,
                 updated_at,
                 published_at,
-                author_id AS "author_id: Uuid"
+                author_email
             FROM notices
             ORDER BY published_at DESC
             LIMIT ? OFFSET ?
@@ -101,13 +95,13 @@ impl NoticeRepository for NoticeRepositoryImpl {
             r#"
             SELECT
                 id AS "id: Uuid",
+                slug,
                 title,
                 content,
-                summary,
                 created_at,
                 updated_at,
                 published_at,
-                author_id AS "author_id: Uuid"
+                author_email
             FROM notices
             WHERE id = ?
             "#,
@@ -119,40 +113,75 @@ impl NoticeRepository for NoticeRepositoryImpl {
         Ok(notice)
     }
 
+    async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>> {
+        let notice = query_as!(
+            Notice,
+            r#"
+            SELECT
+                id AS "id: Uuid",
+                slug,
+                title,
+                content,
+                created_at,
+                updated_at,
+                published_at,
+                author_email
+            FROM notices
+            WHERE slug = ?
+            "#,
+            slug
+        )
+        .fetch_optional(&self.0)
+        .await?;
+
+        Ok(notice)
+    }
+
     async fn create_notice(
         &self,
         input: CreateNoticeInput,
-        author_id: Option<Uuid>,
+        author_email: Option<String>,
     ) -> anyhow::Result<Notice> {
+        // Validate slug is non-empty
+        if input.slug.trim().is_empty() {
+            anyhow::bail!("Slug cannot be empty");
+        }
+
+        // Check if slug already exists
+        let existing = self.get_notice_by_slug(&input.slug).await?;
+        if existing.is_some() {
+            anyhow::bail!("Slug already exists");
+        }
+
         let id = Uuid::new_v4();
         let now = Utc::now().naive_utc();
 
         query!(
             r#"
-            INSERT INTO notices (id, title, content, summary, created_at, updated_at, published_at, author_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO notices (id, slug, title, content, summary, created_at, updated_at, published_at, author_email)
+            VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)
             "#,
             id,
+            input.slug,
             input.title,
             input.content,
-            input.summary,
             now,
             now,
             input.published_at,
-            author_id
+            author_email
         )
         .execute(&self.0)
         .await?;
 
         let notice = Notice {
             id,
+            slug: input.slug,
             title: input.title,
             content: input.content,
-            summary: input.summary,
             created_at: now,
             updated_at: now,
             published_at: input.published_at,
-            author_id,
+            author_email,
         };
 
         Ok(notice)
@@ -168,20 +197,36 @@ impl NoticeRepository for NoticeRepositoryImpl {
             .ok_or_else(|| anyhow::anyhow!("Notice not found"))?;
 
         // Update only provided fields
-        let title = input.title.unwrap_or(current.title);
+        let title = input.title.clone().unwrap_or_else(|| current.title.clone());
         let content = input.content.unwrap_or(current.content);
-        let summary = input.summary.or(current.summary);
         let published_at = input.published_at.unwrap_or(current.published_at);
+
+        // If slug is being updated, validate it
+        let new_slug = if let Some(custom_slug) = input.slug {
+            if custom_slug.trim().is_empty() {
+                anyhow::bail!("Slug cannot be empty");
+            }
+            // Check uniqueness if slug is changing
+            if custom_slug != current.slug {
+                let existing = self.get_notice_by_slug(&custom_slug).await?;
+                if existing.is_some() {
+                    anyhow::bail!("Slug already exists");
+                }
+            }
+            custom_slug
+        } else {
+            current.slug.clone()
+        };
 
         query!(
             r#"
             UPDATE notices
-            SET title = ?, content = ?, summary = ?, published_at = ?, updated_at = ?
+            SET slug = ?, title = ?, content = ?, published_at = ?, updated_at = ?
             WHERE id = ?
             "#,
+            new_slug,
             title,
             content,
-            summary,
             published_at,
             now,
             id
@@ -191,13 +236,13 @@ impl NoticeRepository for NoticeRepositoryImpl {
 
         let notice = Notice {
             id,
+            slug: new_slug,
             title,
             content,
-            summary,
             created_at: current.created_at,
             updated_at: now,
             published_at,
-            author_id: current.author_id,
+            author_email: current.author_email,
         };
 
         Ok(notice)
@@ -215,18 +260,5 @@ impl NoticeRepository for NoticeRepositoryImpl {
         .await?;
 
         Ok(())
-    }
-
-    async fn count_notices(&self) -> anyhow::Result<i64> {
-        let count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as count
-            FROM notices
-            "#
-        )
-        .fetch_one(&self.0)
-        .await?;
-
-        Ok(count)
     }
 }

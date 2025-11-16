@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod board;
 pub mod moderation;
+pub mod notice;
 pub mod response;
 pub mod thread;
 pub mod user;
@@ -9,6 +10,7 @@ pub mod user;
 pub use auth::*;
 pub use board::*;
 pub use moderation::*;
+pub use notice::*;
 pub use response::*;
 pub use thread::*;
 pub use user::*;

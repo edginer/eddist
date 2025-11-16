@@ -5,9 +5,8 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use crate::{repositories::notice_repository::NoticeRepository, AppState};
+use crate::repositories::notice_repository::NoticeRepository;
 
 #[derive(Debug, Deserialize)]
 pub struct NoticeListQuery {
@@ -21,9 +20,47 @@ fn default_limit() -> u32 {
     10
 }
 
+/// Public API response for a single notice (excludes internal fields)
+#[derive(Debug, Serialize)]
+pub struct NoticeResponse {
+    pub slug: String,
+    pub title: String,
+    pub content: String,
+    pub published_at: chrono::NaiveDateTime,
+}
+
+impl From<eddist_core::domain::notice::Notice> for NoticeResponse {
+    fn from(notice: eddist_core::domain::notice::Notice) -> Self {
+        NoticeResponse {
+            slug: notice.slug,
+            title: notice.title,
+            content: notice.content,
+            published_at: notice.published_at,
+        }
+    }
+}
+
+/// Public API response for notice list item (excludes internal fields)
+#[derive(Debug, Serialize)]
+pub struct NoticeListItemResponse {
+    pub slug: String,
+    pub title: String,
+    pub published_at: chrono::NaiveDateTime,
+}
+
+impl From<eddist_core::domain::notice::NoticeListItem> for NoticeListItemResponse {
+    fn from(item: eddist_core::domain::notice::NoticeListItem) -> Self {
+        NoticeListItemResponse {
+            slug: item.slug,
+            title: item.title,
+            published_at: item.published_at,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct NoticeListResponse {
-    pub notices: Vec<eddist_core::domain::notice::NoticeListItem>,
+    pub notices: Vec<NoticeListItemResponse>,
     pub total: i64,
     pub page: u32,
     pub limit: u32,
@@ -32,9 +69,11 @@ pub struct NoticeListResponse {
 pub async fn get_latest_notices<R: NoticeRepository>(
     State(notice_repo): State<std::sync::Arc<R>>,
 ) -> impl IntoResponse {
-    match notice_repo.get_latest_notices(3).await {
+    match notice_repo.get_notices_paginated(0, 3).await {
         Ok(notices) => {
-            let mut resp = Json(notices).into_response();
+            let response: Vec<NoticeListItemResponse> =
+                notices.into_iter().map(Into::into).collect();
+            let mut resp = Json(response).into_response();
             resp.headers_mut()
                 .insert("Cache-Control", "s-maxage=300".parse().unwrap());
             resp
@@ -58,7 +97,7 @@ pub async fn get_notices_paginated<R: NoticeRepository>(
     ) {
         Ok((notices, total)) => {
             let response = NoticeListResponse {
-                notices,
+                notices: notices.into_iter().map(Into::into).collect(),
                 total,
                 page: query.page,
                 limit,
@@ -75,13 +114,14 @@ pub async fn get_notices_paginated<R: NoticeRepository>(
     }
 }
 
-pub async fn get_notice_by_id<R: NoticeRepository>(
+pub async fn get_notice_by_slug<R: NoticeRepository>(
     State(notice_repo): State<std::sync::Arc<R>>,
-    Path(id): Path<Uuid>,
+    Path(slug): Path<String>,
 ) -> impl IntoResponse {
-    match notice_repo.get_notice_by_id(id).await {
+    match notice_repo.get_notice_by_slug(&slug).await {
         Ok(Some(notice)) => {
-            let mut resp = Json(notice).into_response();
+            let response: NoticeResponse = notice.into();
+            let mut resp = Json(response).into_response();
             resp.headers_mut()
                 .insert("Cache-Control", "s-maxage=300".parse().unwrap());
             resp

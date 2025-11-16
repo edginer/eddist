@@ -307,9 +307,9 @@ async fn main() -> anyhow::Result<()> {
             }),
         )
         .route(
-            "/api/notices/:id",
+            "/api/notices/{slug}",
             get(|State(state): State<AppState>, path| async move {
-                routes::notice::get_notice_by_id(State(state.notice_repo), path).await
+                routes::notice::get_notice_by_slug(State(state.notice_repo), path).await
             }),
         )
         .nest("/user", user_routes())

@@ -1,12 +1,12 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/NoticeDetailPage";
-import { fetchNoticeById } from "~/api-client/notice";
+import { fetchNoticeBySlug } from "~/api-client/notice";
 
 export const loader = async ({ context, params }: Route.LoaderArgs) => {
   const baseUrl =
     context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
-  const notice = await fetchNoticeById({ baseUrl, id: params.id });
+  const notice = await fetchNoticeBySlug({ baseUrl, slug: params.slug });
 
   return {
     eddistData: {

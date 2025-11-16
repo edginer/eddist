@@ -37,28 +37,6 @@ function TopPage({
         <header>
           <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
         </header>
-        {notices && notices.length > 0 && (
-          <section className="py-4 pt-8">
-            <h2 className="text-2xl lg:text-4xl">お知らせ</h2>
-            <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
-              {notices.map((notice: NoticeListItem) => (
-                <li key={notice.id}>
-                  <Link to={`/notices/${notice.id}`} className="text-blue-500">
-                    {notice.title}
-                  </Link>
-                  {notice.summary && (
-                    <span className="text-gray-600 ml-2 text-sm">
-                      - {notice.summary}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <Link to="/notices" className="text-blue-500 text-sm">
-              お知らせ一覧を見る →
-            </Link>
-          </section>
-        )}
         <section className="py-4 pt-8">
           <h2 className="text-2xl lg:text-4xl">板一覧</h2>
           <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
@@ -105,6 +83,26 @@ function TopPage({
             </a>
           </p>
         </section>
+        {notices && notices.length > 0 && (
+          <section className="py-4 pt-8">
+            <h2 className="text-2xl lg:text-4xl">お知らせ</h2>
+            <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
+              {notices.map((notice: NoticeListItem) => (
+                <li key={notice.slug}>
+                  <span className="text-gray-500 mr-2">
+                    {new Date(notice.published_at).toLocaleDateString()}
+                  </span>
+                  <Link to={`/notices/${notice.slug}`} className="text-blue-500">
+                    {notice.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link to="/notices" className="text-blue-500 text-sm">
+              もっと見る
+            </Link>
+          </section>
+        )}
       </article>
       <footer
         id="footer"

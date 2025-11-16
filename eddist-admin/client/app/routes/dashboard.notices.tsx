@@ -7,121 +7,113 @@ import {
   TextInput,
 } from "flowbite-react";
 import { useState } from "react";
-import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaSync } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getNotices,
+  createNotice,
+  updateNotice,
+  deleteNotice,
+} from "~/hooks/queries";
+import type { paths } from "~/openapi/schema";
 
-interface Notice {
-  id: string;
-  title: string;
-  content: string;
-  summary: string | null;
-  created_at: string;
-  updated_at: string;
-  published_at: string;
-  author_id: string | null;
+// Generate URL-safe slug from title
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
-interface NoticeFormData {
-  title: string;
-  content: string;
-  summary?: string;
-  published_at: string;
-}
+type Notice =
+  paths["/notices/"]["get"]["responses"]["200"]["content"]["application/json"][number];
+type NoticeFormData =
+  paths["/notices/"]["post"]["requestBody"]["content"]["application/json"];
 
 const Notices = () => {
   const queryClient = useQueryClient();
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState<Notice | undefined>();
-  const { register: registerCreate, handleSubmit: handleCreateSubmit, reset: resetCreate } = useForm<NoticeFormData>();
-  const { register: registerEdit, handleSubmit: handleEditSubmit, reset: resetEdit } = useForm<NoticeFormData>();
+
+  const {
+    register: registerCreate,
+    handleSubmit: handleCreateSubmit,
+    reset: resetCreate,
+    setValue: setValueCreate,
+    watch: watchCreate,
+  } = useForm<NoticeFormData>();
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEdit,
+    setValue: setValueEdit,
+    watch: watchEdit,
+  } = useForm<Partial<NoticeFormData>>();
 
   // Fetch notices
-  const { data: notices, refetch } = useQuery({
-    queryKey: ["notices"],
-    queryFn: async () => {
-      const response = await fetch("/api/notices");
-      if (!response.ok) throw new Error("Failed to fetch notices");
-      return response.json() as Promise<Notice[]>;
-    },
-  });
-
-  // Create notice mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: NoticeFormData) => {
-      const response = await fetch("/api/notices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to create notice");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notices"] });
-      toast.success("Notice created successfully");
-      setOpenCreateModal(false);
-      resetCreate();
-    },
-    onError: () => {
-      toast.error("Failed to create notice");
-    },
-  });
-
-  // Update notice mutation
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<NoticeFormData> }) => {
-      const response = await fetch(`/api/notices/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to update notice");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notices"] });
-      toast.success("Notice updated successfully");
-      setOpenEditModal(false);
-      resetEdit();
-    },
-    onError: () => {
-      toast.error("Failed to update notice");
-    },
-  });
-
-  // Delete notice mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/notices/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete notice");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notices"] });
-      toast.success("Notice deleted successfully");
-    },
-    onError: () => {
-      toast.error("Failed to delete notice");
-    },
-  });
+  const { data: notices } = getNotices({});
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this notice?")) {
-      deleteMutation.mutate(id);
+      try {
+        await deleteNotice({ params: { path: { id } } }).mutate();
+        await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
+        toast.success("Notice deleted successfully");
+      } catch {
+        toast.error("Failed to delete notice");
+      }
     }
   };
 
-  const onCreateSubmit = (data: NoticeFormData) => {
-    createMutation.mutate(data);
+  const onCreateSubmit = async (data: NoticeFormData) => {
+    try {
+      // Convert datetime-local to NaiveDateTime format (strip timezone from ISO string)
+      // toISOString() gives "2024-01-15T10:30:00.000Z", slice to get "2024-01-15T10:30:00"
+      const formattedData = {
+        ...data,
+        published_at: new Date(data.published_at).toISOString().slice(0, 19),
+      };
+      await createNotice({ body: formattedData }).mutate();
+      await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
+      toast.success("Notice created successfully");
+      setOpenCreateModal(false);
+      resetCreate();
+    } catch (error: any) {
+      const message = error?.message || "Failed to create notice";
+      toast.error(message);
+    }
   };
 
-  const onEditSubmit = (data: NoticeFormData) => {
+  const onEditSubmit = async (data: Partial<NoticeFormData>) => {
     if (selectedNotice) {
-      updateMutation.mutate({ id: selectedNotice.id, data });
+      try {
+        // Convert datetime-local to NaiveDateTime format if published_at is provided
+        const formattedData = {
+          ...data,
+          ...(data.published_at && {
+            published_at: new Date(data.published_at)
+              .toISOString()
+              .slice(0, 19),
+          }),
+        };
+        await updateNotice({
+          params: { path: { id: selectedNotice.id } },
+          body: formattedData,
+        }).mutate();
+        await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
+        toast.success("Notice updated successfully");
+        setOpenEditModal(false);
+        resetEdit();
+      } catch (error: any) {
+        const message = error?.message || "Failed to update notice";
+        toast.error(message);
+      }
     }
   };
 
@@ -139,6 +131,7 @@ const Notices = () => {
         <Table>
           <Table.Head>
             <Table.HeadCell>Title</Table.HeadCell>
+            <Table.HeadCell>Slug</Table.HeadCell>
             <Table.HeadCell>Published At</Table.HeadCell>
             <Table.HeadCell>Actions</Table.HeadCell>
           </Table.Head>
@@ -146,6 +139,9 @@ const Notices = () => {
             {notices?.map((notice) => (
               <Table.Row key={notice.id}>
                 <Table.Cell>{notice.title}</Table.Cell>
+                <Table.Cell>
+                  <code className="text-sm text-gray-600">{notice.slug}</code>
+                </Table.Cell>
                 <Table.Cell>
                   {new Date(notice.published_at).toLocaleString()}
                 </Table.Cell>
@@ -190,11 +186,29 @@ const Notices = () => {
                 />
               </div>
               <div>
-                <Label>Summary (optional)</Label>
-                <TextInput
-                  {...registerCreate("summary")}
-                  placeholder="Brief summary..."
-                />
+                <Label>Slug</Label>
+                <div className="flex gap-2">
+                  <TextInput
+                    {...registerCreate("slug", { required: true })}
+                    placeholder="url-friendly-slug"
+                    required
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    color="gray"
+                    size="sm"
+                    onClick={() => {
+                      const title = watchCreate("title");
+                      if (title) {
+                        setValueCreate("slug", generateSlug(title));
+                      }
+                    }}
+                  >
+                    <FaSync className="m-1 ml-0 mr-2" />
+                    <span>Generate</span>
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Content</Label>
@@ -234,12 +248,30 @@ const Notices = () => {
                 />
               </div>
               <div>
-                <Label>Summary (optional)</Label>
-                <TextInput
-                  {...registerEdit("summary")}
-                  defaultValue={selectedNotice?.summary || ""}
-                  placeholder="Brief summary..."
-                />
+                <Label>Slug</Label>
+                <div className="flex gap-2">
+                  <TextInput
+                    {...registerEdit("slug")}
+                    defaultValue={selectedNotice?.slug}
+                    placeholder="url-friendly-slug"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    color="gray"
+                    size="sm"
+                    className="items-center"
+                    onClick={() => {
+                      const title = watchEdit("title") || selectedNotice?.title;
+                      if (title) {
+                        setValueEdit("slug", generateSlug(title));
+                      }
+                    }}
+                  >
+                    <FaSync className="m-1 ml-0 mr-2" />
+                    <span>Generate</span>
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Content</Label>

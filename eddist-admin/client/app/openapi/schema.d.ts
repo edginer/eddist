@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/auth/native/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange OAuth2 access token for session token */
+        post: operations["post_native_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/authed_tokens/{authed_token_id}/": {
         parameters: {
             query?: never;
@@ -324,6 +341,38 @@ export interface paths {
         patch: operations["update_ng_word"];
         trace?: never;
     };
+    "/notices/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_notices"];
+        put?: never;
+        post: operations["create_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notices/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_notice"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_notice"];
+        options?: never;
+        head?: never;
+        patch: operations["update_notice"];
+        trace?: never;
+    };
     "/restriction_rules": {
         parameters: {
             query?: never;
@@ -497,6 +546,13 @@ export interface components {
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
         };
+        CreateNoticeInput: {
+            content: string;
+            /** Format: date-time */
+            published_at: string;
+            slug: string;
+            title: string;
+        };
         CreateRestrictionRuleRequest: {
             /** Format: date-time */
             expires_at?: string | null;
@@ -531,6 +587,21 @@ export interface components {
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
         };
+        NativeSessionRequest: {
+            access_token: string;
+        };
+        NativeSessionResponse: {
+            /** Format: date-time */
+            expires_at: string;
+            session_token: string;
+            user_info: components["schemas"]["NativeUserInfo"];
+        };
+        NativeUserInfo: {
+            email: string;
+            email_verified: boolean;
+            preferred_username: string;
+            sub: string;
+        };
         NgWord: {
             board_ids: string[];
             /** Format: date-time */
@@ -541,6 +612,21 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             word: string;
+        };
+        /** @description Notice model for API documentation */
+        Notice: {
+            author_email?: string | null;
+            content: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            published_at: string;
+            slug: string;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         Res: {
             /** Format: uuid */
@@ -616,6 +702,14 @@ export interface components {
             name?: string | null;
             word?: string | null;
         };
+        UpdateNoticeInput: {
+            content?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** @description Optional custom slug. If not provided and title is updated, will be auto-generated from new title. */
+            slug?: string | null;
+            title?: string | null;
+        };
         UpdateResInput: {
             author_name?: string | null;
             body?: string | null;
@@ -677,6 +771,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    post_native_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Session token created successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSessionResponse"];
+                };
+            };
+            /** @description Invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_authed_token: {
         parameters: {
             query?: never;
@@ -1395,6 +1520,191 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NgWord"];
                 };
+            };
+        };
+    };
+    get_notices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List notices successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notice"][];
+                };
+            };
+        };
+    };
+    create_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNoticeInput"];
+            };
+        };
+        responses: {
+            /** @description Notice created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notice"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notice ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get notice successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notice"];
+                };
+            };
+            /** @description Notice not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notice ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notice deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden - not the notice author */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Notice not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notice ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNoticeInput"];
+            };
+        };
+        responses: {
+            /** @description Notice updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notice"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden - not the notice author */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Notice not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

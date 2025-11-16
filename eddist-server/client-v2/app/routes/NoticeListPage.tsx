@@ -37,16 +37,16 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">お知らせ一覧</h1>
-          <Link to="/" className="text-blue-500 text-sm">
+          <Link to="/" className="text-blue-500 text-sm pt-2">
             ← トップページに戻る
           </Link>
         </header>
         <section className="py-4 pt-8">
           <ul className="space-y-4">
             {noticeData.notices.map((notice: NoticeListItem) => (
-              <li key={notice.id} className="border-b pb-4">
+              <li key={notice.slug} className="border-b pb-4">
                 <Link
-                  to={`/notices/${notice.id}`}
+                  to={`/notices/${notice.slug}`}
                   className="text-blue-500 text-xl hover:underline"
                 >
                   {notice.title}
@@ -54,9 +54,6 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
                 <p className="text-gray-600 text-sm mt-1">
                   {new Date(notice.published_at).toLocaleDateString("ja-JP")}
                 </p>
-                {notice.summary && (
-                  <p className="text-gray-700 mt-2">{notice.summary}</p>
-                )}
               </li>
             ))}
           </ul>
