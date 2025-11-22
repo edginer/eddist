@@ -3,7 +3,7 @@ use redis::{aio::ConnectionManager, AsyncCommands};
 use crate::{error::BbsCgiError, utils::redis::email_auth_used_key};
 
 pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] =
-    &["2chMate", "mae2c", "Geschar", "twinkle", "Ciisaa"];
+    &["2chMate", "mae2c", "Geschar", "twinkle", "Ciisaa", "Mozilla/5.0"];
 
 #[derive(Clone)]
 pub struct EmailAuthRestrictionService {

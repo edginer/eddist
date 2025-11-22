@@ -1,5 +1,7 @@
 use regex::Regex;
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug, sync::OnceLock};
+
+static ANCHOR_REGEX: OnceLock<Regex> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct SimpleSecret(String);
@@ -172,6 +174,82 @@ pub fn sanitize_ascii_numeric_character_reference(input: &str) -> String {
     sanitized.into_iter().collect::<String>()
 }
 
+/// Converts full-width digits (０-９) to ASCII digits (0-9)
+fn normalize_digits(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '０' => '0',
+            '１' => '1',
+            '２' => '2',
+            '３' => '3',
+            '４' => '4',
+            '５' => '5',
+            '６' => '6',
+            '７' => '7',
+            '８' => '8',
+            '９' => '9',
+            _ => c,
+        })
+        .collect()
+}
+
+/// Counts the total number of unique response references (anchors) in the text. (max 20)
+/// Anchors start with one or more `>` or `＞` followed by numbers, ranges, and comma-separated lists.
+/// Examples:
+/// - `>>1` references 1 response
+/// - `>>1,2,3` references 3 responses
+/// - `>>1-3` references 3 responses (1, 2, 3)
+/// - `>>1-2,4,6-8` references 5 responses (1, 2, 4, 6, 7, 8)
+pub fn count_anchors(text: &str) -> usize {
+    const MAX_ANCHORS_TO_COUNT: usize = 20;
+
+    let re = ANCHOR_REGEX.get_or_init(|| Regex::new(r"[>＞]+([0-9０-９,\-]+)").unwrap());
+
+    let mut all_refs = HashSet::new();
+
+    for cap in re.captures_iter(text) {
+        if let Some(number_part) = cap.get(1) {
+            // Normalize full-width digits to ASCII
+            let normalized = normalize_digits(number_part.as_str());
+
+            // Split by comma to get individual items or ranges
+            for item in normalized.split(',') {
+                let item = item.trim();
+                if item.is_empty() {
+                    continue;
+                }
+
+                // Check if it's a range (e.g., "1-3")
+                if let Some(dash_pos) = item.find('-') {
+                    let (start_str, end_str) = item.split_at(dash_pos);
+                    let end_str = &end_str[1..]; // Skip the dash
+
+                    if let (Ok(start), Ok(end)) = (start_str.parse::<u32>(), end_str.parse::<u32>())
+                    {
+                        // Add all numbers in the range, but stop if we reach the limit
+                        for n in start..=end {
+                            all_refs.insert(n);
+                            if all_refs.len() >= MAX_ANCHORS_TO_COUNT {
+                                return MAX_ANCHORS_TO_COUNT;
+                            }
+                        }
+                    }
+                } else {
+                    // Single number
+                    if let Ok(n) = item.parse::<u32>() {
+                        all_refs.insert(n);
+                        if all_refs.len() >= MAX_ANCHORS_TO_COUNT {
+                            return MAX_ANCHORS_TO_COUNT;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    all_refs.len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +294,68 @@ mod tests {
         assert_eq!(sanitize_num_refs("test&#10;end"), "testend");
         assert_eq!(sanitize_num_refs("test&#X0A;end"), "testend");
         assert_eq!(sanitize_num_refs("keep&#41;this"), "keep)this"); // &#41; is ASCII ')'
+    }
+
+    #[test]
+    fn test_count_anchors() {
+        // Single anchor
+        assert_eq!(count_anchors(">>1"), 1);
+        assert_eq!(count_anchors("＞＞１"), 1);
+
+        // Multiple anchors in comma-separated list
+        assert_eq!(count_anchors(">>1,2,3"), 3);
+        assert_eq!(count_anchors(">>1,2,3,4"), 4);
+
+        // Range
+        assert_eq!(count_anchors(">>1-3"), 3); // 1, 2, 3
+        assert_eq!(count_anchors(">>1-5"), 5); // 1, 2, 3, 4, 5
+
+        // Combined: ranges and individual numbers
+        assert_eq!(count_anchors(">>1-2,3,4,6-7,8"), 7); // 1, 2, 3, 4, 6, 7, 8
+        assert_eq!(count_anchors(">>1-2,4"), 3); // 1, 2, 4
+
+        // Full-width numbers with regular comma
+        assert_eq!(count_anchors("＞＞１,２,３"), 3); // １, ２, ３
+        assert_eq!(count_anchors("＞＞１-３"), 3); // 1-3
+
+        // Mixed full-width and half-width
+        assert_eq!(count_anchors(">>１,2,３"), 3);
+
+        // Multiple anchors in text
+        assert_eq!(count_anchors("text >>1 more text >>2,3"), 3); // 1, 2, 3
+
+        // Duplicate references (should count unique only)
+        assert_eq!(count_anchors(">>1,1,2,2,3"), 3); // 1, 2, 3 (unique)
+        assert_eq!(count_anchors(">>1-3,2-4"), 4); // 1, 2, 3, 4 (unique)
+
+        // No anchors
+        assert_eq!(count_anchors("normal text"), 0);
+
+        // Different arrow counts
+        assert_eq!(count_anchors(">1"), 1);
+        assert_eq!(count_anchors(">>>1"), 1);
+        assert_eq!(count_anchors(">>>>1,2,3"), 3);
+
+        // Real-world example
+        assert_eq!(count_anchors(">>1\ntest\n>>2-5,7"), 6); // 1, 2, 3, 4, 5, 7
+
+        // Protection against resource exhaustion
+        assert_eq!(count_anchors(">>1-1000000"), 20); // Stops at 20
+        assert_eq!(count_anchors(">>1-100"), 20); // Also stops at 20
+        assert_eq!(
+            count_anchors(">>1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22"),
+            20
+        ); // Stops at 20
+    }
+
+    #[test]
+    fn test_normalize_digits() {
+        assert_eq!(normalize_digits("１２３"), "123");
+        assert_eq!(normalize_digits("０"), "0");
+        assert_eq!(normalize_digits("９"), "9");
+        assert_eq!(
+            normalize_digits("mixed １２３ and 456"),
+            "mixed 123 and 456"
+        );
     }
 }

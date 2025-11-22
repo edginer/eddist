@@ -172,12 +172,17 @@ pub fn generate_meta_ident(asn: u32, ip_addr: &str, ua: &str, seed: u32) -> Stri
     hasher.update(ua);
     let bb = hasher.finalize();
 
-    let bb = bb
+    let mut bb = bb
         .iter()
         .map(|x| *x as char)
         .filter(|x| x.is_ascii_alphanumeric())
         .take(2)
         .collect::<String>();
+
+    // Ensure bb is always exactly 2 characters by padding with '0' if needed
+    while bb.len() < 2 {
+        bb.push('0');
+    }
 
     format!("{xx}{yy}-{z}{a}{bb}")
 }
@@ -186,4 +191,68 @@ pub fn generate_date_seed(time: DateTime<Utc>, reset_period: u64) -> u32 {
     let n = time.timestamp() as u64;
     let seed = (n / (60 * 60 * 24) / reset_period) % i32::MAX as u64;
     rand::rngs::StdRng::seed_from_u64(seed).random()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_ident_format() {
+        // Test with various user agents that might generate short MD5 hashes
+        let test_cases = vec![
+            ("Mozilla/5.0", "127.0.0.1", 12345),
+            ("", "192.168.1.1", 67890),          // Empty UA
+            ("Chrome", "::1", 11111),            // IPv6
+            ("1234567890", "10.0.0.1", 22222),   // Numeric UA
+            ("!@#$%^&*()", "172.16.0.1", 33333), // Special chars UA
+        ];
+
+        for (ua, ip, asn) in test_cases {
+            let seed = 12345u32; // Fixed seed for testing
+            let ident = generate_meta_ident(asn, ip, ua, seed);
+
+            // Check that format is always XXXX-XXXX (4-4 characters)
+            assert_eq!(
+                ident.len(),
+                9,
+                "Identifier '{}' should be 9 characters long",
+                ident
+            );
+            assert!(
+                ident.contains('-'),
+                "Identifier '{}' should contain hyphen",
+                ident
+            );
+
+            let parts: Vec<&str> = ident.split('-').collect();
+            assert_eq!(
+                parts.len(),
+                2,
+                "Identifier '{}' should have exactly 2 parts",
+                ident
+            );
+            assert_eq!(
+                parts[0].len(),
+                4,
+                "First part '{}' should be 4 characters",
+                parts[0]
+            );
+            assert_eq!(
+                parts[1].len(),
+                4,
+                "Second part '{}' should be 4 characters",
+                parts[1]
+            );
+
+            // Verify all characters are alphanumeric
+            for c in ident.chars() {
+                assert!(
+                    c.is_ascii_alphanumeric() || c == '-',
+                    "Character '{}' should be alphanumeric or hyphen",
+                    c
+                );
+            }
+        }
+    }
 }

@@ -4,7 +4,7 @@ use chrono::Utc;
 use eddist_core::{
     domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker},
     simple_rate_limiter::RateLimiter,
-    utils::is_user_registration_enabled,
+    utils::{is_thread_pub_enabled, is_user_registration_enabled},
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
@@ -30,6 +30,7 @@ use crate::{
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
+        bbs_pubsub_repository::CreationEventRepository,
         bbs_repository::{BbsRepository, CreatingThread},
         user_repository::UserRepository,
     },
@@ -41,18 +42,25 @@ use super::BbsCgiService;
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository, U: UserRepository>(T, U, ConnectionManager);
+pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
+    T,
+    U,
+    ConnectionManager,
+    E,
+);
 
-impl<T: BbsRepository, U: UserRepository> TheradCreationService<T, U> {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager) -> Self {
-        Self(repo, user_repo, redis_conn)
+impl<T: BbsRepository, U: UserRepository, E: CreationEventRepository>
+    TheradCreationService<T, U, E>
+{
+    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, event_repo: E) -> Self {
+        Self(repo, user_repo, redis_conn, event_repo)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone>
+impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventRepository>
     BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
-    for TheradCreationService<T, U>
+    for TheradCreationService<T, U, E>
 {
     async fn execute(
         &self,
@@ -204,7 +212,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone>
         }
 
         let authed_token_clone = authed_token.token.clone();
+        let event_repo = self.3.clone();
+        let creating_th_clone = creating_th.clone();
+
         let db_result = bbs_repo.create_thread(creating_th).await;
+        if db_result.is_ok() && is_thread_pub_enabled() {
+            let _ = event_repo.publish_thread_created(creating_th_clone).await;
+        }
         db_result.map_err(|e| {
             if e.to_string() == "Given thread number is already exists" {
                 BbsCgiError::SameTimeThreadCration

@@ -6,7 +6,8 @@ use hyper::StatusCode;
 use time::Duration;
 
 use crate::{
-    external::captcha_like_client::CaptchaLikeError, SJisResponseBuilder, SjisContentType,
+    external::captcha_like_client::CaptchaLikeError,
+    shiftjis::{SJisResponseBuilder, SjisContentType},
 };
 
 #[derive(thiserror::Error, Debug)]
