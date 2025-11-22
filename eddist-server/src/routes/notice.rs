@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::repositories::notice_repository::NoticeRepository;
+use crate::app::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct NoticeListQuery {
@@ -66,34 +66,33 @@ pub struct NoticeListResponse {
     pub limit: u32,
 }
 
-pub async fn get_latest_notices<R: NoticeRepository>(
-    State(notice_repo): State<std::sync::Arc<R>>,
-) -> impl IntoResponse {
-    match notice_repo.get_notices_paginated(0, 3).await {
+pub async fn get_latest_notices(State(state): State<AppState>) -> impl IntoResponse {
+    match state.notice_repo.get_notices_paginated(0, 3).await {
         Ok(notices) => {
-            let response: Vec<NoticeListItemResponse> =
-                notices.into_iter().map(Into::into).collect();
+            let response = notices
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<NoticeListItemResponse>>();
             let mut resp = Json(response).into_response();
             resp.headers_mut()
                 .insert("Cache-Control", "s-maxage=300".parse().unwrap());
             resp
         }
         Err(e) => {
-            tracing::error!("Failed to get latest notices: {:?}", e);
+            tracing::error!("Failed to get latest notices: {e:?}");
             (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
         }
     }
 }
 
-pub async fn get_notices_paginated<R: NoticeRepository>(
-    State(notice_repo): State<std::sync::Arc<R>>,
+pub async fn get_notices_paginated(
+    State(state): State<AppState>,
     Query(query): Query<NoticeListQuery>,
 ) -> impl IntoResponse {
-    let limit = query.limit.min(100); // Cap at 100
-
+    let limit = query.limit.min(100);
     match tokio::try_join!(
-        notice_repo.get_notices_paginated(query.page, limit),
-        notice_repo.count_notices()
+        state.notice_repo.get_notices_paginated(query.page, limit),
+        state.notice_repo.count_notices()
     ) {
         Ok((notices, total)) => {
             let response = NoticeListResponse {
@@ -108,27 +107,27 @@ pub async fn get_notices_paginated<R: NoticeRepository>(
             resp
         }
         Err(e) => {
-            tracing::error!("Failed to get notices: {:?}", e);
+            tracing::error!("Failed to get notices: {e:?}");
             (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
         }
     }
 }
 
-pub async fn get_notice_by_slug<R: NoticeRepository>(
-    State(notice_repo): State<std::sync::Arc<R>>,
+pub async fn get_notice_by_slug(
+    State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> impl IntoResponse {
-    match notice_repo.get_notice_by_slug(&slug).await {
+    match state.notice_repo.get_notice_by_slug(&slug).await {
         Ok(Some(notice)) => {
             let response: NoticeResponse = notice.into();
             let mut resp = Json(response).into_response();
             resp.headers_mut()
-                .insert("Cache-Control", "s-maxage=300".parse().unwrap());
+                .insert("Cache-Control", "s-maxage=3600".parse().unwrap());
             resp
         }
         Ok(None) => (StatusCode::NOT_FOUND, "Notice not found").into_response(),
         Err(e) => {
-            tracing::error!("Failed to get notice: {:?}", e);
+            tracing::error!("Failed to get notice: {e:?}");
             (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
         }
     }

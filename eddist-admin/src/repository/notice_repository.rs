@@ -3,23 +3,6 @@ use eddist_core::domain::notice::Notice;
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
-/// Generate a URL-safe slug from a title
-fn generate_slug(title: &str) -> String {
-    title
-        .to_lowercase()
-        .chars()
-        .map(|c| match c {
-            'a'..='z' | '0'..='9' => c,
-            ' ' | '-' | '_' => '-',
-            _ => '-',
-        })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<&str>>()
-        .join("-")
-}
-
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateNoticeInput {
     pub title: String,
