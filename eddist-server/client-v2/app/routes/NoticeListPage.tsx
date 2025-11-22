@@ -36,8 +36,8 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
-          <h1 className="text-3xl lg:text-5xl">お知らせ一覧</h1>
-          <Link to="/" className="text-blue-500 text-sm pt-2">
+          <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>
+          <Link to="/" className="text-blue-500 text-sm">
             ← トップページに戻る
           </Link>
         </header>

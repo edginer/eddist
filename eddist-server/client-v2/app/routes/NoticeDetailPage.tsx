@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
+import { parseMarkdown } from "~/utils/markdown";
 
 export const loader = async ({ context, params }: Route.LoaderArgs) => {
   const baseUrl =
@@ -51,9 +52,7 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
           </div>
         </header>
         <section className="py-4 pt-8">
-          <div className="prose lg:prose-lg max-w-none">
-            <div className="whitespace-pre-wrap">{notice.content}</div>
-          </div>
+          <div className="max-w-none">{parseMarkdown(notice.content)}</div>
         </section>
       </article>
       <footer
