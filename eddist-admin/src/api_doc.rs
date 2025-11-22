@@ -3,10 +3,13 @@ use utoipa::OpenApi;
 use crate::{
     auth::__path_post_native_session,
     models::*,
-    repository::admin_archive_repository::{
-        ArchivedAdminRes, ArchivedAdminThread, ArchivedRes, ArchivedResUpdate, ArchivedThread,
+    repository::{
+        admin_archive_repository::{
+            ArchivedAdminRes, ArchivedAdminThread, ArchivedRes, ArchivedResUpdate, ArchivedThread,
+        },
+        notice_repository::{CreateNoticeInput, UpdateNoticeInput},
     },
-    routes::{archives, auth_tokens, boards, moderation, threads, users},
+    routes::{archives, auth_tokens, boards, moderation, notices, threads, users},
 };
 
 #[derive(OpenApi)]
@@ -59,6 +62,13 @@ use crate::{
         users::search_users,
         users::update_user_status,
 
+        // Notice routes
+        notices::get_notices,
+        notices::get_notice,
+        notices::create_notice,
+        notices::update_notice,
+        notices::delete_notice,
+
         // Auth routes
         post_native_session,
     ),
@@ -106,6 +116,11 @@ use crate::{
         UserIdpBinding,
         UserStatusUpdateInput,
         UserSearchQuery,
+
+        // Notice models
+        Notice,
+        CreateNoticeInput,
+        UpdateNoticeInput,
     ))
 )]
 pub struct ApiDoc;

@@ -12,6 +12,7 @@ mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
+    pub(crate) mod notice_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
 }
@@ -50,6 +51,7 @@ mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;
+    pub mod notice;
     pub mod statics;
     pub mod subject_list;
     pub mod user;
@@ -72,6 +74,7 @@ pub fn create_test_app(
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
@@ -99,6 +102,8 @@ pub fn create_test_app(
     }
     let _ = std::fs::metadata(path).map_err(|_| std::fs::File::create(path).unwrap());
 
+    let notice_repo = std::sync::Arc::new(NoticeRepositoryImpl::new(pool.clone()));
+
     let app_state = AppState {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool.clone()),
@@ -110,6 +115,7 @@ pub fn create_test_app(
             event_repo,
             *bucket,
         ),
+        notice_repo,
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),

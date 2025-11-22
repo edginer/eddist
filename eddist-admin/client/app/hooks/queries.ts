@@ -618,3 +618,82 @@ export const deleteRestrictionRule = ({
   };
   return { mutate };
 };
+
+const GET_NOTICES = "/notices/";
+
+export const getNotices = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_NOTICES]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_NOTICES],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_NOTICES, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const GET_NOTICE = "/notices/{id}/";
+
+export const getNotice = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_NOTICE]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_NOTICE, params.path.id],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_NOTICE, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const CREATE_NOTICE = "/notices/";
+
+export const createNotice = ({
+  body,
+}: UseQueryOptions<paths[typeof CREATE_NOTICE]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(CREATE_NOTICE, {
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const UPDATE_NOTICE = "/notices/{id}/";
+
+export const updateNotice = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_NOTICE]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_NOTICE, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_NOTICE = "/notices/{id}/";
+
+export const deleteNotice = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_NOTICE]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_NOTICE, {
+      params,
+    });
+  };
+  return { mutate };
+};
