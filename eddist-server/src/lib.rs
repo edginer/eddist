@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 pub use axum;
 use base64::Engine;
@@ -55,6 +55,7 @@ mod routes {
     pub mod statics;
     pub mod subject_list;
     pub mod user;
+    pub mod ws;
 }
 
 pub mod app;
@@ -63,6 +64,9 @@ pub use app::AppState;
 use uuid::Uuid;
 
 use crate::repositories::notice_repository::NoticeRepositoryImpl;
+use crate::services::streaming::{
+    manager::StreamManager, redis_subscriber::spawn_redis_subscriber,
+};
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -95,6 +99,7 @@ pub fn create_test_app(
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
     let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
+    let bbs_repo = BbsRepositoryImpl::new(pool.clone());
 
     // Check existence of index.html for ServeFile
     let path = Path::new("client/dist/index.html");
@@ -103,24 +108,20 @@ pub fn create_test_app(
     }
     let _ = std::fs::metadata(path).map_err(|_| std::fs::File::create(path).unwrap());
 
-    let app_state = AppState {
-        services: AppServiceContainer::new(
-            BbsRepositoryImpl::new(pool.clone()),
-            UserRepositoryImpl::new(pool.clone()),
-            IdpRepositoryImpl::new(pool.clone()),
-            user_restriction_repo,
-            redis_conn.clone(),
-            pub_repo,
-            event_repo,
-            *bucket,
-        ),
-        notice_repo,
-        tinker_secret: base64::engine::general_purpose::STANDARD
-            .encode(Uuid::new_v4().as_bytes())
-            .to_string(),
-        captcha_like_configs: vec![],
-        template_engine: load_template_engine("client/dist/index.html"),
-    };
+    // Create streaming manager
+    let stream_manager = Arc::new(StreamManager::new());
+    spawn_redis_subscriber(stream_manager.clone());
+
+    let services = AppServiceContainer::new(
+        bbs_repo.clone(),
+        UserRepositoryImpl::new(pool.clone()),
+        IdpRepositoryImpl::new(pool.clone()),
+        user_restriction_repo,
+        redis_conn.clone(),
+        pub_repo,
+        event_repo,
+        *bucket,
+    );
 
     // Create minimal serve directory for tests
     let serve_file = ServeFile::new("client/dist/index.html");
@@ -128,7 +129,20 @@ pub fn create_test_app(
     let serve_dir_inner = serve_dir.clone();
 
     // Use the actual create_app from app module
-    app::create_app(app_state, redis_conn, serve_dir, serve_dir_inner)
+    app::create_app(
+        services,
+        notice_repo,
+        bbs_repo,
+        stream_manager,
+        base64::engine::general_purpose::STANDARD
+            .encode(Uuid::new_v4().as_bytes())
+            .to_string(),
+        vec![],
+        load_template_engine("client/dist/index.html"),
+        redis_conn,
+        serve_dir,
+        serve_dir_inner,
+    )
 }
 
 // Simple test helper that doesn't require exposing private types

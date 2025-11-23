@@ -64,6 +64,14 @@ pub(crate) mod redis {
     pub fn email_auth_used_key(token: &str) -> String {
         format!("resp:email_auth_used:{token}")
     }
+
+    pub const fn event_thread_created_channel() -> &'static str {
+        "bbs:event:thread_created"
+    }
+
+    pub const fn event_res_created_channel() -> &'static str {
+        "bbs:event:res_created"
+    }
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
@@ -190,9 +198,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
 
-        std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "203.0.113.1");
-        std::env::remove_var("ENV");
     }
 
     #[test]
@@ -200,9 +206,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
 
-        std::env::set_var("ENV", "production");
         assert_eq!(get_origin_ip(&headers), "198.51.100.1");
-        std::env::remove_var("ENV");
     }
 
     #[test]

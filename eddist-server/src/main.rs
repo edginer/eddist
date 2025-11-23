@@ -1,7 +1,7 @@
-use std::{convert::Infallible, env, time::Duration};
+use std::{convert::Infallible, env, sync::Arc, time::Duration};
 
 use axum::{
-    body::Body, extract::Request as AxumRequest, response::Response, ServiceExt as AxumServiceExt,
+    ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
 };
 use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
@@ -15,7 +15,7 @@ use repositories::{
     user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
-use services::{user_restriction_service::start_cache_refresh_task, AppServiceContainer};
+use services::{AppServiceContainer, user_restriction_service::start_cache_refresh_task};
 use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
 use tokio::net::TcpListener;
@@ -26,11 +26,13 @@ use tower_http::{
 };
 
 use crate::{
-    app::{create_app, AppState},
+    app::create_app,
     repositories::notice_repository::NoticeRepositoryImpl,
+    services::streaming::{manager::StreamManager, redis_subscriber::spawn_redis_subscriber},
 };
 
 pub mod app;
+pub use app::AppState;
 mod shiftjis;
 mod repositories {
     pub(crate) mod bbs_pubsub_repository;
@@ -83,6 +85,7 @@ mod routes {
     pub mod statics;
     pub mod subject_list;
     pub mod user;
+    pub mod ws;
 }
 
 #[tokio::main]
@@ -97,6 +100,9 @@ async fn main() -> anyhow::Result<()> {
     let conn_mgr = client.get_connection_manager().await?;
     let pub_repo = RedisPubRepository::new(conn_mgr.clone());
     let event_repo = RedisCreationEventRepository::new(conn_mgr.clone());
+
+    let stream_manager = Arc::new(StreamManager::new());
+    spawn_redis_subscriber(stream_manager.clone());
 
     let pool = MySqlPoolOptions::new()
         .after_connect(|conn, _| {
@@ -160,23 +166,18 @@ async fn main() -> anyhow::Result<()> {
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
+    let bbs_repo = BbsRepositoryImpl::new(pool.clone());
 
-    let app_state = AppState {
-        services: AppServiceContainer::new(
-            BbsRepositoryImpl::new(pool.clone()),
-            UserRepositoryImpl::new(pool.clone()),
-            IdpRepositoryImpl::new(pool.clone()),
-            user_restriction_repo.clone(),
-            conn_mgr.clone(),
-            pub_repo,
-            event_repo,
-            *s3_client,
-        ),
-        notice_repo,
-        tinker_secret,
-        captcha_like_configs,
-        template_engine,
-    };
+    let services = AppServiceContainer::new(
+        bbs_repo.clone(),
+        UserRepositoryImpl::new(pool.clone()),
+        IdpRepositoryImpl::new(pool.clone()),
+        user_restriction_repo.clone(),
+        conn_mgr.clone(),
+        pub_repo,
+        event_repo,
+        *s3_client,
+    );
 
     // Start background task for user restriction cache refresh
     start_cache_refresh_task(user_restriction_repo, Duration::from_secs(300));
@@ -192,7 +193,18 @@ async fn main() -> anyhow::Result<()> {
 
     let serve_dir_inner = serve_dir.clone();
 
-    let app = create_app(app_state, conn_mgr, serve_dir, serve_dir_inner);
+    let app = create_app(
+        services,
+        notice_repo,
+        bbs_repo,
+        stream_manager,
+        tinker_secret,
+        captcha_like_configs,
+        template_engine,
+        conn_mgr,
+        serve_dir,
+        serve_dir_inner,
+    );
 
     let listener = TcpListener::bind((
         "0.0.0.0",

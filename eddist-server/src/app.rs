@@ -1,14 +1,14 @@
 use std::{env, time::Duration};
 
 use axum::{
+    Extension, Json, Router,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, State},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Extension, Json, Router,
 };
 use axum_prometheus::PrometheusMetricLayer;
-use eddist_core::domain::board::{validate_board_key, BoardInfo};
+use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower::ServiceExt;
@@ -20,7 +20,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 
 use crate::{
     domain::captcha_like::CaptchaLikeConfig,
@@ -40,10 +40,12 @@ use crate::{
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         user::user_routes,
+        ws::ws_handler,
     },
     services::{
-        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         AppService, AppServiceContainer,
+        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
+        streaming::manager::StreamManager,
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
     utils::CsrfState,
@@ -59,7 +61,9 @@ pub struct AppState {
         UserRestrictionRepositoryImpl,
         RedisCreationEventRepository,
     >,
+    pub bbs_repo: BbsRepositoryImpl,
     pub notice_repo: NoticeRepositoryImpl,
+    pub stream_manager: std::sync::Arc<StreamManager>,
     pub tinker_secret: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub template_engine: Handlebars<'static>,
@@ -84,10 +88,10 @@ impl AppState {
     }
 }
 
-fn render_index_html(
+fn render_index_html<'a>(
     template_engine: &Handlebars<'static>,
     canonical: Option<String>,
-) -> impl IntoResponse {
+) -> impl IntoResponse + use<'a> {
     let mut resp = Html(
         template_engine
             .render(
@@ -319,11 +323,34 @@ async fn get_robots_txt() -> impl IntoResponse {
 }
 
 pub fn create_app(
-    app_state: AppState,
+    services: AppServiceContainer<
+        BbsRepositoryImpl,
+        UserRepositoryImpl,
+        IdpRepositoryImpl,
+        RedisPubRepository,
+        UserRestrictionRepositoryImpl,
+        RedisCreationEventRepository,
+    >,
+    notice_repo: NoticeRepositoryImpl,
+    bbs_repo: BbsRepositoryImpl,
+    stream_manager: std::sync::Arc<StreamManager>,
+    tinker_secret: String,
+    captcha_like_configs: Vec<CaptchaLikeConfig>,
+    template_engine: Handlebars<'static>,
     conn_mgr: redis::aio::ConnectionManager,
     serve_dir: ServeDir<SetStatus<ServeFile>>,
     serve_dir_inner: ServeDir<SetStatus<ServeFile>>,
 ) -> Router {
+    let app_state = AppState {
+        services,
+        bbs_repo,
+        notice_repo,
+        stream_manager,
+        tinker_secret,
+        captcha_like_configs,
+        template_engine,
+    };
+
     let enable_metrics = env::var("AXUM_METRICS") == Ok("true".to_string());
     let (prometheus_layer, metric_handle) = if enable_metrics {
         let (layer, handle) = PrometheusMetricLayer::pair();
@@ -355,6 +382,7 @@ pub fn create_app(
         .route("/api/notices/latest", get(get_latest_notices))
         .route("/api/notices", get(get_notices_paginated))
         .route("/api/notices/{slug}", get(get_notice_by_slug))
+        .route("/api/ws/{board_key}/{thread_number}", get(ws_handler))
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",
