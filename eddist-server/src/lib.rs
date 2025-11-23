@@ -12,6 +12,7 @@ mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
+    pub(crate) mod notice_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
 }
@@ -50,6 +51,7 @@ mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;
+    pub mod notice;
     pub mod statics;
     pub mod subject_list;
     pub mod user;
@@ -60,6 +62,7 @@ pub mod app;
 pub use app::AppState;
 use uuid::Uuid;
 
+use crate::repositories::notice_repository::NoticeRepositoryImpl;
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -91,6 +94,7 @@ pub fn create_test_app(
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
     let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
+    let notice_repo = NoticeRepositoryImpl::new(pool.clone());
 
     // Check existence of index.html for ServeFile
     let path = Path::new("client/dist/index.html");
@@ -110,6 +114,7 @@ pub fn create_test_app(
             event_repo,
             *bucket,
         ),
+        notice_repo,
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),

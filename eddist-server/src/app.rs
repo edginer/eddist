@@ -29,6 +29,7 @@ use crate::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     },
@@ -36,6 +37,7 @@ use crate::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
+        notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         user::user_routes,
     },
@@ -57,6 +59,7 @@ pub struct AppState {
         UserRestrictionRepositoryImpl,
         RedisCreationEventRepository,
     >,
+    pub notice_repo: NoticeRepositoryImpl,
     pub tinker_secret: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub template_engine: Handlebars<'static>,
@@ -349,6 +352,9 @@ pub fn create_app(
         .route("/terms", get(get_term_of_usage))
         .route("/api/terms", get(get_api_terms))
         .route("/api/boards", get(get_api_boards))
+        .route("/api/notices/latest", get(get_latest_notices))
+        .route("/api/notices", get(get_notices_paginated))
+        .route("/api/notices/{slug}", get(get_notice_by_slug))
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",
@@ -423,7 +429,8 @@ pub fn create_app(
         app
     };
 
-    let app = app.with_state(app_state.clone())
+    let app = app
+        .with_state(app_state.clone())
         .layer(CatchPanicLayer::custom(|e| {
             tracing::error!("Panic: {e:?}");
             Response::builder()

@@ -25,7 +25,10 @@ use tower_http::{
     services::{ServeDir, ServeFile},
 };
 
-use crate::app::{create_app, AppState};
+use crate::{
+    app::{create_app, AppState},
+    repositories::notice_repository::NoticeRepositoryImpl,
+};
 
 pub mod app;
 mod shiftjis;
@@ -33,6 +36,7 @@ mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
+    pub(crate) mod notice_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
 }
@@ -75,6 +79,7 @@ mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;
+    pub mod notice;
     pub mod statics;
     pub mod subject_list;
     pub mod user;
@@ -154,6 +159,7 @@ async fn main() -> anyhow::Result<()> {
     .unwrap();
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
+    let notice_repo = NoticeRepositoryImpl::new(pool.clone());
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -166,6 +172,7 @@ async fn main() -> anyhow::Result<()> {
             event_repo,
             *s3_client,
         ),
+        notice_repo,
         tinker_secret,
         captcha_like_configs,
         template_engine,
