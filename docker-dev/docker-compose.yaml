@@ -46,6 +46,7 @@ services:
       EDDIST_SERVER_URL: "http://host.docker.internal:8080"
       VITE_PROXY_TARGET: "http://host.docker.internal:8080"
       TZ: "Asia/Tokyo"
+      ENABLE_USER_REGISTRATION: "true"
     extra_hosts:
       - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
     depends_on:

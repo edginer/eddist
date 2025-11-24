@@ -1,17 +1,18 @@
 [package]
 name = "eddist"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.80"
-axum = "0.8.4"
+axum = { version = "0.8.4", features = ["ws"] }
 axum-extra = { version = "0.10.1", features = ["cookie"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
+dashmap = "6"
 dotenvy = "0.15.7"
 encoding_rs = { version = "0.8.34", features = ["fast-kanji-encode"] }
 env_logger = "0.11.3"

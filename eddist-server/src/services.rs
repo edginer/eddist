@@ -49,6 +49,10 @@ pub(crate) mod user_page_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
 pub(crate) mod user_restriction_service;
+pub(crate) mod streaming {
+    pub mod manager;
+    pub mod redis_subscriber;
+}
 
 #[mockall::automock]
 #[async_trait::async_trait]
@@ -93,13 +97,13 @@ pub struct AppServiceContainer<
 }
 
 impl<
-        B: BbsRepository + Clone,
-        U: UserRepository + Clone,
-        I: IdpRepository + Clone,
-        P: PubRepository,
-        R: UserRestrictionRepository + Clone,
-        E: CreationEventRepository + Clone,
-    > AppServiceContainer<B, U, I, P, R, E>
+    B: BbsRepository + Clone,
+    U: UserRepository + Clone,
+    I: IdpRepository + Clone,
+    P: PubRepository,
+    R: UserRestrictionRepository + Clone,
+    E: CreationEventRepository + Clone,
+> AppServiceContainer<B, U, I, P, R, E>
 {
     pub fn new(
         bbs_repo: B,
@@ -169,13 +173,13 @@ impl<
 }
 
 impl<
-        B: BbsRepository + 'static,
-        U: UserRepository + 'static,
-        I: IdpRepository + 'static,
-        P: PubRepository,
-        R: UserRestrictionRepository + 'static,
-        E: CreationEventRepository + 'static,
-    > AppServiceContainer<B, U, I, P, R, E>
+    B: BbsRepository + 'static,
+    U: UserRepository + 'static,
+    I: IdpRepository + 'static,
+    P: PubRepository,
+    R: UserRestrictionRepository + 'static,
+    E: CreationEventRepository + 'static,
+> AppServiceContainer<B, U, I, P, R, E>
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
         &self.auth_with_code

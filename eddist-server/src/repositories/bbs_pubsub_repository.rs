@@ -1,6 +1,8 @@
 use eddist_core::domain::pubsub_repository::{CreatingRes, PubSubItem};
 use redis::{aio::ConnectionManager, AsyncCommands};
 
+use crate::utils::redis::{event_res_created_channel, event_thread_created_channel};
+
 use super::bbs_repository::CreatingThread;
 
 #[derive(Clone)]
@@ -54,7 +56,7 @@ impl CreationEventRepository for RedisCreationEventRepository {
         let mut redis_conn = self.redis_conn.clone();
         let event = serde_json::to_string(&event)?;
         redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:res_created", event)
+            .publish::<'_, _, _, ()>(event_res_created_channel(), event)
             .await?;
         Ok(())
     }
@@ -63,7 +65,7 @@ impl CreationEventRepository for RedisCreationEventRepository {
         let mut redis_conn = self.redis_conn.clone();
         let event = serde_json::to_string(&event)?;
         redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:thread_created", event)
+            .publish::<'_, _, _, ()>(event_thread_created_channel(), event)
             .await?;
         Ok(())
     }

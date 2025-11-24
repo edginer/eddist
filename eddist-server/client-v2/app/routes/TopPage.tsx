@@ -92,7 +92,10 @@ function TopPage({
                   <span className="text-gray-500 mr-2">
                     {new Date(notice.published_at).toLocaleDateString()}
                   </span>
-                  <Link to={`/notices/${notice.slug}`} className="text-blue-500">
+                  <Link
+                    to={`/notices/${notice.slug}`}
+                    className="text-blue-500"
+                  >
                     {notice.title}
                   </Link>
                 </li>
