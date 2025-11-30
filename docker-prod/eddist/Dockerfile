@@ -3,7 +3,8 @@ FROM debian:bookworm-slim
 RUN apt update && apt install -y --no-install-recommends ca-certificates libc6
 
 COPY ./target/release/eddist .
-COPY ./eddist-server/client/dist ./dist
+# Comment out the line below if you want to use old (deprecated) eddist client
+# COPY ./eddist-server/client/dist ./dist
 COPY ./eddist-server/resources ./resources
 
 ENV RUST_ENV=prod
