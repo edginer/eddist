@@ -35,7 +35,7 @@ const ThreadList: React.FC<ThreadListProps> = ({
             }/${thread.threadNumber}`}
             className="text-blue-500 hover:underline cursor-pointer"
           >
-            <span className="flex-grow">{thread.title}</span>
+            <span className="grow">{thread.title}</span>
           </Link>
           <span className="ml-auto mr-4">{thread.responseCount} responses</span>
         </div>

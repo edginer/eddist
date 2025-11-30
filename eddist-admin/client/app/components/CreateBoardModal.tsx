@@ -154,7 +154,7 @@ const CreateBoardModal = ({
               <Accordion.Content>
                 <div className="flex flex-col">
                   <div className="flex flex-row content-between space-x-4">
-                    <div className="flex flex-col flex-grow">
+                    <div className="flex flex-col grow">
                       <Label>Base Thread Creation Span (sec)</Label>
                       <TextInput
                         type="number"
@@ -174,7 +174,7 @@ const CreateBoardModal = ({
                         }
                       />
                     </div>
-                    <div className="flex flex-col flex-grow">
+                    <div className="flex flex-col grow">
                       <Label>Base Response Creation Span (sec)</Label>
                       <TextInput
                         type="number"
@@ -198,7 +198,7 @@ const CreateBoardModal = ({
                     </div>
                   </div>
                   <div className="flex flex-row content-between space-x-4 mt-4">
-                    <div className="flex flex-col flex-grow">
+                    <div className="flex flex-col grow">
                       <Label>Max Thread Name Byte Length</Label>
                       <TextInput
                         type="number"
@@ -216,7 +216,7 @@ const CreateBoardModal = ({
                         }
                       />
                     </div>
-                    <div className="flex flex-col flex-grow">
+                    <div className="flex flex-col grow">
                       <Label>Max Author Name Byte Length</Label>
                       <TextInput
                         type="number"
@@ -237,7 +237,7 @@ const CreateBoardModal = ({
                   </div>
                 </div>
                 <div className="flex flex-row content-between space-x-4 mt-4">
-                  <div className="flex flex-col flex-grow">
+                  <div className="flex flex-col grow">
                     <Label>Max Email Byte Length</Label>
                     <TextInput
                       type="number"
@@ -253,7 +253,7 @@ const CreateBoardModal = ({
                       }
                     />
                   </div>
-                  <div className="flex flex-col flex-grow">
+                  <div className="flex flex-col grow">
                     <Label>Max Response Body Byte Length</Label>
                     <TextInput
                       type="number"
@@ -289,7 +289,7 @@ const CreateBoardModal = ({
                   />
                 </div>
                 <div className="flex flex-row content-between space-x-4 mt-4">
-                  <div className="flex flex-col flex-grow">
+                  <div className="flex flex-col grow">
                     <Label>Threads Archive Cron String</Label>
                     <TextInput
                       placeholder="Threads Archive Cron String..."
@@ -302,7 +302,7 @@ const CreateBoardModal = ({
                       }
                     />
                   </div>
-                  <div className="flex flex-col flex-grow">
+                  <div className="flex flex-col grow">
                     <Label>Threads Archive Trigger Thread Count</Label>
                     <TextInput
                       type="number"

@@ -44,7 +44,7 @@ const Page = () => {
   return (
     <div className="p-4">
       <div className="flex">
-        <h1 className="text-3xl font-bold flex-grow">Authed Token</h1>
+        <h1 className="text-3xl font-bold grow">Authed Token</h1>
       </div>
       <div className="flex flex-col items-center p-2 sm:p-8 md:border m-4 xl:m-8 border-gray-700 h-[calc(100vh-140px)]">
         <Label htmlFor="search-authed-token-input" className="pb-2">

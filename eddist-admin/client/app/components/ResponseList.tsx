@@ -55,7 +55,7 @@ const ResponseList = ({
         <span className="mr-2">{response.author_name}</span>
         <span className="text-gray-500 mr-2">{response.mail}</span>
         <span className="text-gray-500 mr-2">{response.created_at}</span>
-        <span className="text-gray-500 flex-grow">ID:{response.author_id}</span>
+        <span className="text-gray-500 grow">ID:{response.author_id}</span>
         <div>
           <Dropdown
             arrowIcon={false}

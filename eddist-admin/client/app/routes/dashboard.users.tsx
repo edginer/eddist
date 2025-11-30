@@ -111,7 +111,7 @@ const UserSearchPage = () => {
   return (
     <div className="p-4">
       <div className="flex">
-        <h1 className="text-3xl font-bold flex-grow">User Search</h1>
+        <h1 className="text-3xl font-bold grow">User Search</h1>
       </div>
       <div className="flex flex-col p-2 sm:p-8 m-4 xl:m-8 h-[calc(100vh-140px)] items-center">
         <div className="flex w-full flex-col xl:flex-row mb-8 xl:items-end">

@@ -313,7 +313,7 @@ const RestrictionRules = () => {
 
       <div className="p-2 lg:p-8">
         <div className="flex">
-          <h1 className="text-3xl font-bold flex-grow">Restriction Rules</h1>
+          <h1 className="text-3xl font-bold grow">Restriction Rules</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateModal(true)}

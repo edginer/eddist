@@ -50,9 +50,7 @@ const DatArchiveResponseList = ({
           <span className="mr-2">{response.name}</span>
           <span className="text-gray-500 mr-2">{response.mail}</span>
           <span className="text-gray-500 mr-2">{response.date}</span>
-          <span className="text-gray-500 flex-grow">
-            ID:{response.author_id}
-          </span>
+          <span className="text-gray-500 grow">ID:{response.author_id}</span>
           {responses && responses[idx] && responses[idx].is_abone && (
             <div>
               <hr className="mr-2" />
@@ -110,12 +108,12 @@ const DatArchiveResponseList = ({
             responses[idx].name !== response.name ||
             responses[idx].mail !== response.mail) && (
             <div>
-              <hr className="bg-gray-800 border-1 border-black" />
+              <hr className="bg-gray-800 border border-black" />
               <div className="text-gray-500 mr-2">(Edited response)</div>
               <span className="text-gray-500 mr-2">{responses[idx].name}</span>
               <span className="text-gray-500 mr-2">{responses[idx].mail}</span>
               <span className="text-gray-500 mr-2">{responses[idx].date}</span>
-              <span className="text-gray-500 flex-grow">
+              <span className="text-gray-500 grow">
                 ID:{responses[idx].author_id}
               </span>
               <div className="p-2">{responses[idx].body}</div>
