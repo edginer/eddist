@@ -1,4 +1,19 @@
-import { Alert, Button, Label, Table, TextInput, Modal } from "flowbite-react";
+import {
+  Alert,
+  Button,
+  Label,
+  Table,
+  TextInput,
+  Modal,
+  ModalHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHeadCell,
+  TableHead,
+  ModalBody,
+  ModalFooter,
+} from "flowbite-react";
 import { useCallback, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";
@@ -186,18 +201,18 @@ const UserSearchPage = () => {
               <div>
                 <h2 className="text-xl font-semibold mb-2">User Information</h2>
                 <Table>
-                  <Table.Body className="divide-y">
-                    <Table.Row>
-                      <Table.Cell className="font-medium">User ID</Table.Cell>
-                      <Table.Cell>{userData?.id ?? "N/A"}</Table.Cell>
-                    </Table.Row>
-                    <Table.Row>
-                      <Table.Cell className="font-medium">Username</Table.Cell>
-                      <Table.Cell>{userData?.user_name ?? "N/A"}</Table.Cell>
-                    </Table.Row>
-                    <Table.Row>
-                      <Table.Cell className="font-medium">Enabled</Table.Cell>
-                      <Table.Cell className="flex items-center gap-3">
+                  <TableBody className="divide-y">
+                    <TableRow>
+                      <TableCell className="font-medium">User ID</TableCell>
+                      <TableCell>{userData?.id ?? "N/A"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Username</TableCell>
+                      <TableCell>{userData?.user_name ?? "N/A"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Enabled</TableCell>
+                      <TableCell className="flex items-center gap-3">
                         <span className="mr-2">
                           {userData?.enabled === true ? "Yes" : "No"}
                         </span>
@@ -210,12 +225,12 @@ const UserSearchPage = () => {
                               onChange={handleToggleEnabledRequest}
                               disabled={isUpdating}
                             />
-                            <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                            <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                           </label>
                         </div>
-                      </Table.Cell>
-                    </Table.Row>
-                  </Table.Body>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
                 </Table>
               </div>
 
@@ -225,18 +240,18 @@ const UserSearchPage = () => {
                     Identity Provider Bindings
                   </h2>
                   <Table>
-                    <Table.Head>
-                      <Table.HeadCell>IDP Name</Table.HeadCell>
-                      <Table.HeadCell>IDP Sub</Table.HeadCell>
-                    </Table.Head>
-                    <Table.Body className="divide-y">
+                    <TableHead>
+                      <TableHeadCell>IDP Name</TableHeadCell>
+                      <TableHeadCell>IDP Sub</TableHeadCell>
+                    </TableHead>
+                    <TableBody className="divide-y">
                       {userIdpBindings.map((binding) => (
-                        <Table.Row key={binding.id}>
-                          <Table.Cell>{binding.idp_name}</Table.Cell>
-                          <Table.Cell>{binding.idp_sub}</Table.Cell>
-                        </Table.Row>
+                        <TableRow key={binding.id}>
+                          <TableCell>{binding.idp_name}</TableCell>
+                          <TableCell>{binding.idp_sub}</TableCell>
+                        </TableRow>
                       ))}
-                    </Table.Body>
+                    </TableBody>
                   </Table>
                 </div>
               )}
@@ -248,25 +263,25 @@ const UserSearchPage = () => {
                       Authed Tokens
                     </h2>
                     <Table>
-                      <Table.Head>
-                        <Table.HeadCell>Token ID</Table.HeadCell>
-                        <Table.HeadCell>Actions</Table.HeadCell>
-                      </Table.Head>
-                      <Table.Body className="divide-y">
+                      <TableHead>
+                        <TableHeadCell>Token ID</TableHeadCell>
+                        <TableHeadCell>Actions</TableHeadCell>
+                      </TableHead>
+                      <TableBody className="divide-y">
                         {userData.authed_token_ids.map((token) => (
-                          <Table.Row key={token}>
-                            <Table.Cell>{token}</Table.Cell>
-                            <Table.Cell>
+                          <TableRow key={token}>
+                            <TableCell>{token}</TableCell>
+                            <TableCell>
                               <Link
                                 to={`/dashboard/authed-token/?token=${token}`}
                                 className="text-blue-600 hover:underline"
                               >
                                 View Details
                               </Link>
-                            </Table.Cell>
-                          </Table.Row>
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </Table.Body>
+                      </TableBody>
                     </Table>
                   </div>
                 )}
@@ -277,10 +292,10 @@ const UserSearchPage = () => {
 
       {/* Confirmation Modal */}
       <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
-        <Modal.Header>
+        <ModalHeader>
           {newEnabledStatus ? "Enable User" : "Disable User"}
-        </Modal.Header>
-        <Modal.Body>
+        </ModalHeader>
+        <ModalBody>
           {newEnabledStatus ? (
             <p>
               Enabling this user will re-enable all authed tokens associated
@@ -292,15 +307,15 @@ const UserSearchPage = () => {
               the user.
             </p>
           )}
-        </Modal.Body>
-        <Modal.Footer>
+        </ModalBody>
+        <ModalFooter>
           <Button onClick={handleToggleEnabled} disabled={isUpdating}>
             {isUpdating ? "Processing..." : "Confirm"}
           </Button>
           <Button color="gray" onClick={() => setShowConfirmModal(false)}>
             Cancel
           </Button>
-        </Modal.Footer>
+        </ModalFooter>
       </Modal>
     </div>
   );

@@ -2,7 +2,14 @@ import {
   Button,
   Label,
   Modal,
+  ModalBody,
+  ModalHeader,
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
   Textarea,
   TextInput,
 } from "flowbite-react";
@@ -129,23 +136,23 @@ const Notices = () => {
         </div>
 
         <Table>
-          <Table.Head>
-            <Table.HeadCell>Title</Table.HeadCell>
-            <Table.HeadCell>Slug</Table.HeadCell>
-            <Table.HeadCell>Published At</Table.HeadCell>
-            <Table.HeadCell>Actions</Table.HeadCell>
-          </Table.Head>
-          <Table.Body>
+          <TableHead>
+            <TableHeadCell>Title</TableHeadCell>
+            <TableHeadCell>Slug</TableHeadCell>
+            <TableHeadCell>Published At</TableHeadCell>
+            <TableHeadCell>Actions</TableHeadCell>
+          </TableHead>
+          <TableBody>
             {notices?.map((notice) => (
-              <Table.Row key={notice.id}>
-                <Table.Cell>{notice.title}</Table.Cell>
-                <Table.Cell>
+              <TableRow key={notice.id}>
+                <TableCell>{notice.title}</TableCell>
+                <TableCell>
                   <code className="text-sm text-gray-600">{notice.slug}</code>
-                </Table.Cell>
-                <Table.Cell>
+                </TableCell>
+                <TableCell>
                   {new Date(notice.published_at).toLocaleString()}
-                </Table.Cell>
-                <Table.Cell>
+                </TableCell>
+                <TableCell>
                   <div className="flex gap-2">
                     <Button
                       size="xs"
@@ -164,17 +171,17 @@ const Notices = () => {
                       <FaTrash />
                     </Button>
                   </div>
-                </Table.Cell>
-              </Table.Row>
+                </TableCell>
+              </TableRow>
             ))}
-          </Table.Body>
+          </TableBody>
         </Table>
       </div>
 
       {/* Create Modal */}
       <Modal show={openCreateModal} onClose={() => setOpenCreateModal(false)}>
-        <Modal.Header>Create Notice</Modal.Header>
-        <Modal.Body>
+        <ModalHeader>Create Notice</ModalHeader>
+        <ModalBody>
           <form onSubmit={handleCreateSubmit(onCreateSubmit)}>
             <div className="flex flex-col gap-4">
               <div>
@@ -230,13 +237,13 @@ const Notices = () => {
               <Button type="submit">Create</Button>
             </div>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
 
       {/* Edit Modal */}
       <Modal show={openEditModal} onClose={() => setOpenEditModal(false)}>
-        <Modal.Header>Edit Notice</Modal.Header>
-        <Modal.Body>
+        <ModalHeader>Edit Notice</ModalHeader>
+        <ModalBody>
           <form onSubmit={handleEditSubmit(onEditSubmit)}>
             <div className="flex flex-col gap-4">
               <div>
@@ -299,7 +306,7 @@ const Notices = () => {
               <Button type="submit">Update</Button>
             </div>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
     </>
   );

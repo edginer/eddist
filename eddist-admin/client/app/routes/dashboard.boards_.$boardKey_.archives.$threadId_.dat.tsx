@@ -1,5 +1,11 @@
 import { Link, useParams } from "react-router";
-import { Button, Modal } from "flowbite-react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+} from "flowbite-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import Breadcrumb from "~/components/Breadcrumb";
@@ -96,8 +102,8 @@ const Page = () => {
         show={onEditResponseOrder != null}
         onClose={() => setOnEditResponseOrder(undefined)}
       >
-        <Modal.Header>Edit Response</Modal.Header>
-        <Modal.Body>
+        <ModalHeader>Edit Response</ModalHeader>
+        <ModalBody>
           <div className="flex flex-row">
             <div className="flex flex-col">
               <label htmlFor="name">Name</label>
@@ -151,8 +157,8 @@ const Page = () => {
               }}
             />
           </div>
-        </Modal.Body>
-        <Modal.Footer>
+        </ModalBody>
+        <ModalFooter>
           <Button
             onClick={() => {
               setOnEditResponseOrder(undefined);
@@ -180,7 +186,7 @@ const Page = () => {
           >
             Save
           </Button>
-        </Modal.Footer>
+        </ModalFooter>
       </Modal>
 
       <div className="p-4">

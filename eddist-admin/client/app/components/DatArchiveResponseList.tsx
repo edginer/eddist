@@ -1,4 +1,4 @@
-import { Dropdown } from "flowbite-react";
+import { Dropdown, DropdownItem } from "flowbite-react";
 import React from "react";
 import { components } from "~/openapi/schema";
 
@@ -75,20 +75,20 @@ const DatArchiveResponseList = ({
               }
               inline
             >
-              <Dropdown.Item onClick={() => onClickEditResponse(idx)}>
+              <DropdownItem onClick={() => onClickEditResponse(idx)}>
                 Edit
-              </Dropdown.Item>
-              <Dropdown.Item onClick={() => onClieckAbon(idx)}>
+              </DropdownItem>
+              <DropdownItem onClick={() => onClieckAbon(idx)}>
                 Abon
-              </Dropdown.Item>
-              <Dropdown.Item
+              </DropdownItem>
+              <DropdownItem
                 onClick={() =>
                   onClickDeleteAuthedToken(response.authed_token_id)
                 }
               >
                 Delete Authed Token
-              </Dropdown.Item>
-              <Dropdown.Item
+              </DropdownItem>
+              <DropdownItem
                 onClick={() =>
                   onClickDeleteAuthedTokensAssociatedWithIp(
                     response.authed_token_id
@@ -96,7 +96,7 @@ const DatArchiveResponseList = ({
                 }
               >
                 Delete Authed Tokens Associated With IP
-              </Dropdown.Item>
+              </DropdownItem>
             </Dropdown>
           </div>
         </div>

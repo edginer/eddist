@@ -1,4 +1,11 @@
-import { Button, Label, Modal, TextInput } from "flowbite-react";
+import {
+  Button,
+  Label,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  TextInput,
+} from "flowbite-react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { createNgWord } from "~/hooks/queries";
@@ -19,8 +26,8 @@ const CreateNgWordModal = ({
   return (
     <div>
       <Modal show={open} onClose={() => setOpen(false)}>
-        <Modal.Header>Create NG Word</Modal.Header>
-        <Modal.Body>
+        <ModalHeader>Create NG Word</ModalHeader>
+        <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {
               try {
@@ -63,7 +70,7 @@ const CreateNgWordModal = ({
               Create
             </Button>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
     </div>
   );

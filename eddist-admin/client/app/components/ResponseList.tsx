@@ -1,4 +1,4 @@
-import { Dropdown } from "flowbite-react";
+import { Dropdown, DropdownItem } from "flowbite-react";
 import React from "react";
 import {
   Res,
@@ -73,23 +73,23 @@ const ResponseList = ({
             inline
           >
             {onClickAbon && (
-              <Dropdown.Item
+              <DropdownItem
                 onClick={() => {
                   onClickAbon(response.id);
                 }}
               >
                 Delete Response (Abon)
-              </Dropdown.Item>
+              </DropdownItem>
             )}
-            <Dropdown.Item
+            <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
                 onClickDeleteAuthedToken(response.authed_token_id!!);
               }}
             >
               Delete authed token
-            </Dropdown.Item>
-            <Dropdown.Item
+            </DropdownItem>
+            <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
                 onClickDeleteAuthedTokensAssociatedWithIp(
@@ -99,9 +99,9 @@ const ResponseList = ({
             >
               Delete authed token associated with writing origin ip of authed
               token
-            </Dropdown.Item>
+            </DropdownItem>
             {onClickEditResponse && (
-              <Dropdown.Item
+              <DropdownItem
                 onClick={() => {
                   onClickEditResponse({
                     author_name: response.author_name ?? undefined,
@@ -112,7 +112,7 @@ const ResponseList = ({
                 }}
               >
                 Edit response
-              </Dropdown.Item>
+              </DropdownItem>
             )}
           </Dropdown>
         </div>

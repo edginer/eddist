@@ -1,4 +1,11 @@
-import { Button, Label, Modal, TextInput } from "flowbite-react";
+import {
+  Button,
+  Label,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  TextInput,
+} from "flowbite-react";
 import React, { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { getBoards, updateCap } from "~/hooks/queries";
@@ -45,8 +52,8 @@ const EditCapModal = ({
         reset();
       }}
     >
-      <Modal.Header>Edit Cap</Modal.Header>
-      <Modal.Body>
+      <ModalHeader>Edit Cap</ModalHeader>
+      <ModalBody>
         <form
           onSubmit={handleSubmit(async (data) => {
             try {
@@ -149,7 +156,7 @@ const EditCapModal = ({
             <Button type="submit">Submit</Button>
           </div>
         </form>
-      </Modal.Body>
+      </ModalBody>
     </Modal>
   );
 };

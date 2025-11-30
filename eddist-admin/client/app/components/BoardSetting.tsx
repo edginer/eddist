@@ -1,5 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Checkbox, Label, Textarea, TextInput } from "flowbite-react";
+import {
+  Button,
+  Checkbox,
+  HelperText,
+  Label,
+  Textarea,
+  TextInput,
+} from "flowbite-react";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -102,9 +109,9 @@ const GeneralSetting: React.FC<{
           {...register("name")}
           defaultValue={board!.name}
           color={errors.name ? "red" : undefined}
-          helperText={errors.name && errors.name?.message}
           className="mt-1"
         />
+        <HelperText>{errors.name && errors.name?.message}</HelperText>
       </SettingField>
       <SettingField>
         <Label>Default Name</Label>
@@ -112,9 +119,11 @@ const GeneralSetting: React.FC<{
           {...register("default_name")}
           defaultValue={board!.default_name}
           color={errors.default_name ? "red" : undefined}
-          helperText={errors.default_name && errors.default_name.message}
           className="mt-1"
         />
+        <HelperText>
+          {errors.default_name && errors.default_name.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Read Only</Label>
@@ -131,9 +140,11 @@ const GeneralSetting: React.FC<{
           defaultValue={boardInfo!.local_rules}
           className="mt-1"
           color={errors.local_rule ? "red" : undefined}
-          helperText={errors.local_rule && errors.local_rule.message}
           rows={7}
         />
+        <HelperText>
+          {errors.local_rule && errors.local_rule.message}
+        </HelperText>
       </SettingField>
       <Button type="submit">Update</Button>
     </form>
@@ -187,11 +198,11 @@ const PostRestrictionSetting: React.FC<{
           })}
           defaultValue={boardInfo!.base_thread_creation_span_sec}
           color={errors.base_thread_creation_span_sec ? "red" : undefined}
-          helperText={
-            errors.base_thread_creation_span_sec &&
-            errors.base_thread_creation_span_sec.message
-          }
         />
+        <HelperText>
+          {errors.base_thread_creation_span_sec &&
+            errors.base_thread_creation_span_sec.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Base Response Creation Span (sec)</Label>
@@ -203,11 +214,11 @@ const PostRestrictionSetting: React.FC<{
           })}
           defaultValue={boardInfo!.base_response_creation_span_sec}
           color={errors.base_response_creation_span_sec ? "red" : undefined}
-          helperText={
-            errors.base_response_creation_span_sec &&
-            errors.base_response_creation_span_sec.message
-          }
         />
+        <HelperText>
+          {errors.base_response_creation_span_sec &&
+            errors.base_response_creation_span_sec.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Max Thread Name Byte Length</Label>
@@ -217,11 +228,11 @@ const PostRestrictionSetting: React.FC<{
           {...register("max_thread_name_byte_length", { valueAsNumber: true })}
           defaultValue={boardInfo!.max_thread_name_byte_length}
           color={errors.max_thread_name_byte_length ? "red" : undefined}
-          helperText={
-            errors.max_thread_name_byte_length &&
-            errors.max_thread_name_byte_length.message
-          }
         />
+        <HelperText>
+          {errors.max_thread_name_byte_length &&
+            errors.max_thread_name_byte_length.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Max Author Name Byte Length</Label>
@@ -231,11 +242,11 @@ const PostRestrictionSetting: React.FC<{
           {...register("max_author_name_byte_length", { valueAsNumber: true })}
           defaultValue={boardInfo!.max_author_name_byte_length}
           color={errors.max_author_name_byte_length ? "red" : undefined}
-          helperText={
-            errors.max_author_name_byte_length &&
-            errors.max_author_name_byte_length.message
-          }
         />
+        <HelperText>
+          {errors.max_author_name_byte_length &&
+            errors.max_author_name_byte_length.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Max Email Byte Length</Label>
@@ -245,10 +256,10 @@ const PostRestrictionSetting: React.FC<{
           {...register("max_email_byte_length", { valueAsNumber: true })}
           defaultValue={boardInfo!.max_email_byte_length}
           color={errors.max_email_byte_length ? "red" : undefined}
-          helperText={
-            errors.max_email_byte_length && errors.max_email_byte_length.message
-          }
         />
+        <HelperText>
+          {errors.max_email_byte_length && errors.max_email_byte_length.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Max Response Body Byte Length</Label>
@@ -260,11 +271,11 @@ const PostRestrictionSetting: React.FC<{
           })}
           defaultValue={boardInfo!.max_response_body_byte_length}
           color={errors.max_response_body_byte_length ? "red" : undefined}
-          helperText={
-            errors.max_response_body_byte_length &&
-            errors.max_response_body_byte_length.message
-          }
         />
+        <HelperText>
+          {errors.max_response_body_byte_length &&
+            errors.max_response_body_byte_length.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Max Response Body Lines</Label>
@@ -274,11 +285,11 @@ const PostRestrictionSetting: React.FC<{
           {...register("max_response_body_lines", { valueAsNumber: true })}
           defaultValue={boardInfo!.max_response_body_lines}
           color={errors.max_response_body_lines ? "red" : undefined}
-          helperText={
-            errors.max_response_body_lines &&
-            errors.max_response_body_lines.message
-          }
         />
+        <HelperText>
+          {errors.max_response_body_lines &&
+            errors.max_response_body_lines.message}
+        </HelperText>
       </SettingField>
       <Button type="submit">Update</Button>
     </form>
@@ -329,10 +340,10 @@ const ThreadsArchiveSetting: React.FC<{
           {...register("threads_archive_cron")}
           defaultValue={boardInfo!.threads_archive_cron || ""}
           color={errors.threads_archive_cron ? "red" : undefined}
-          helperText={
-            errors.threads_archive_cron && errors.threads_archive_cron.message
-          }
         />
+        <HelperText>
+          {errors.threads_archive_cron && errors.threads_archive_cron.message}
+        </HelperText>
       </SettingField>
       <SettingField>
         <Label>Threads Archive Trigger Thread Count</Label>
@@ -346,11 +357,11 @@ const ThreadsArchiveSetting: React.FC<{
           color={
             errors.threads_archive_trigger_thread_count ? "red" : undefined
           }
-          helperText={
-            errors.threads_archive_trigger_thread_count &&
-            errors.threads_archive_trigger_thread_count.message
-          }
         />
+        <HelperText>
+          {errors.threads_archive_trigger_thread_count &&
+            errors.threads_archive_trigger_thread_count.message}
+        </HelperText>
       </SettingField>
       <Button type="submit">Update</Button>
     </form>
