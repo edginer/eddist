@@ -36,13 +36,10 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: |
             pnpm-lock.yaml
-            eddist-server/client/pnpm-lock.yaml
             eddist-server/client-v2/pnpm-lock.yaml
             eddist-admin/client/pnpm-lock.yaml
       - name: Install pnpm dependencies
         run: pnpm install
-      - name: Build eddist-client
-        run: pnpm -F eddist-client build
       - name: Build eddist-client-v2
         run: pnpm -F eddist-client-v2 build
       - name: Build eddist-admin-client

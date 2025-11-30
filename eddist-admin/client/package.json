@@ -16,9 +16,12 @@
     "@react-router/serve": "^7.9.6",
     "@tanstack/react-query": "^5.90.10",
     "clsx": "^2.1.1",
-    "flowbite-react": "^0.10.2",
-    "isbot": "^4.4.0",
+    "flowbite": "^4.0.1",
+    "flowbite-react": "^0.12.10",
+    "isbot": "^5.1.32",
     "openapi-fetch": "^0.12.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-error-boundary": "^4.1.2",
     "react-hook-form": "^7.66.1",
     "react-icons": "^5.5.0",
@@ -30,6 +33,9 @@
   },
   "devDependencies": {
     "@react-router/dev": "^7.9.6",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.22",
     "eslint-import-resolver-typescript": "^3.10.1",
     "eslint-plugin-import": "^2.32.0",
@@ -38,8 +44,9 @@
     "openapi-typescript": "^7.10.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
-    "vite": "^5.4.21",
-    "vite-tsconfig-paths": "^4.3.2"
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "vite-tsconfig-paths": "^5.1.4"
   },
   "engines": {
     "node": ">=20.0.0"
