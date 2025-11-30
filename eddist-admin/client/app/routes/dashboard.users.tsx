@@ -202,15 +202,15 @@ const UserSearchPage = () => {
                 <h2 className="text-xl font-semibold mb-2">User Information</h2>
                 <Table>
                   <TableBody className="divide-y">
-                    <TableRow>
+                    <TableRow className="border-gray-200">
                       <TableCell className="font-medium">User ID</TableCell>
                       <TableCell>{userData?.id ?? "N/A"}</TableCell>
                     </TableRow>
-                    <TableRow>
+                    <TableRow className="border-gray-200">
                       <TableCell className="font-medium">Username</TableCell>
                       <TableCell>{userData?.user_name ?? "N/A"}</TableCell>
                     </TableRow>
-                    <TableRow>
+                    <TableRow className="border-gray-200">
                       <TableCell className="font-medium">Enabled</TableCell>
                       <TableCell className="flex items-center gap-3">
                         <span className="mr-2">
@@ -246,7 +246,7 @@ const UserSearchPage = () => {
                     </TableHead>
                     <TableBody className="divide-y">
                       {userIdpBindings.map((binding) => (
-                        <TableRow key={binding.id}>
+                        <TableRow className="border-gray-200" key={binding.id}>
                           <TableCell>{binding.idp_name}</TableCell>
                           <TableCell>{binding.idp_sub}</TableCell>
                         </TableRow>
@@ -269,7 +269,7 @@ const UserSearchPage = () => {
                       </TableHead>
                       <TableBody className="divide-y">
                         {userData.authed_token_ids.map((token) => (
-                          <TableRow key={token}>
+                          <TableRow className="border-gray-200" key={token}>
                             <TableCell>{token}</TableCell>
                             <TableCell>
                               <Link

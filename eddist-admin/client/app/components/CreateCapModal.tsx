@@ -29,7 +29,7 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
           reset();
         }}
       >
-        <ModalHeader>Create Cap</ModalHeader>
+        <ModalHeader className="border-gray-200">Create Cap</ModalHeader>
         <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {

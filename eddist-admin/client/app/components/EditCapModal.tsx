@@ -52,7 +52,7 @@ const EditCapModal = ({
         reset();
       }}
     >
-      <ModalHeader>Edit Cap</ModalHeader>
+      <ModalHeader className="border-gray-200">Edit Cap</ModalHeader>
       <ModalBody>
         <form
           onSubmit={handleSubmit(async (data) => {

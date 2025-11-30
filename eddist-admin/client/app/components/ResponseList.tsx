@@ -26,7 +26,7 @@ const ResponseList = ({
 }: Props) => {
   return responses.map((response, idx) => (
     <div key={response.id} className="bg-gray-200 p-4 rounded-lg mb-4">
-      <div className="flex items-center mb-2 border-b">
+      <div className="flex items-center mb-2 border-b border-gray-200">
         {selectedResponses && setSelectedResponses && (
           <input
             type="checkbox"

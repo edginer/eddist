@@ -80,45 +80,45 @@ const Page = () => {
             <div className="p-2">
               <Table>
                 <TableBody className="divide-y">
-                  <TableRow className="">
+                  <TableRow className="border-gray-200">
                     <TableCell>Authed Token ID</TableCell>
                     <TableCell>{authedTokenData?.id ?? "N/A"}</TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Token</TableCell>
                     <TableCell>{authedTokenData?.token ?? "N/A"}</TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Origin IP</TableCell>
                     <TableCell>{authedTokenData?.origin_ip ?? "N/A"}</TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Writing UA</TableCell>
                     <TableCell>
                       {authedTokenData?.writing_ua ?? "N/A"}
                     </TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Authed UA</TableCell>
                     <TableCell>{authedTokenData?.authed_ua ?? "N/A"}</TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Created At</TableCell>
                     <TableCell>
                       {authedTokenData?.created_at ?? "N/A"}
                     </TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Authed At</TableCell>
                     <TableCell>{authedTokenData?.authed_at ?? "N/A"}</TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Validaity</TableCell>
                     <TableCell>
                       {authedTokenData?.validity === true ? "true" : "false"}
                     </TableCell>
                   </TableRow>
-                  <TableRow>
+                  <TableRow className="border-gray-200">
                     <TableCell>Last wrote at</TableCell>
                     <TableCell>
                       {authedTokenData?.last_wrote_at ?? "N/A"}

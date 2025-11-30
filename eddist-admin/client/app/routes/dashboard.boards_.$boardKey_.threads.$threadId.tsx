@@ -281,7 +281,7 @@ const Page = () => {
           </button>
         </div>
         <button
-          className="rounded-full shadow-xl border-2 bg-blue-500 hover:bg-blue-700 w-14 h-14 items-center flex justify-center"
+          className="rounded-full shadow-xl border-2 border-gray-200 bg-blue-500 hover:bg-blue-700 w-14 h-14 items-center flex justify-center"
           onClick={() => setShowingFloatingDetail(!showingFloatingDetail)}
         >
           {showingFloatingDetail ? (

@@ -88,7 +88,7 @@ const CreateBoardModal = ({
 
   return (
     <Modal show={open} onClose={() => setOpen(false)}>
-      <ModalHeader>Create Board</ModalHeader>
+      <ModalHeader className="border-gray-200">Create Board</ModalHeader>
 
       <ModalBody>
         <form

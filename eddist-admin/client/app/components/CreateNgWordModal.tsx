@@ -26,7 +26,7 @@ const CreateNgWordModal = ({
   return (
     <div>
       <Modal show={open} onClose={() => setOpen(false)}>
-        <ModalHeader>Create NG Word</ModalHeader>
+        <ModalHeader className="border-gray-200">Create NG Word</ModalHeader>
         <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {

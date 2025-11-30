@@ -74,7 +74,7 @@ const NgWords = () => {
           setOpenEditNgModal(false);
         }}
       >
-        <ModalHeader>Edit NG Word</ModalHeader>
+        <ModalHeader className="border-gray-200">Edit NG Word</ModalHeader>
         <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {
@@ -197,7 +197,7 @@ const NgWords = () => {
           </TableHead>
           <TableBody className="divide-y">
             {ngWords!.map((ngWord) => (
-              <TableRow key={ngWord.id}>
+              <TableRow className="border-gray-200" key={ngWord.id}>
                 <TableCell>{ngWord.id}</TableCell>
                 <TableCell>{ngWord.name}</TableCell>
                 <TableCell>{ngWord.word}</TableCell>

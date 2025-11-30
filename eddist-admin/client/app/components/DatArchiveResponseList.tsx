@@ -29,7 +29,7 @@ const DatArchiveResponseList = ({
         key={`${response.date}:${response.authed_token_id}`}
         className="bg-gray-200 p-4 rounded-lg mb-4"
       >
-        <div className="flex items-center mb-2 border-b">
+        <div className="flex items-center mb-2 border-b border-gray-200">
           <input
             type="checkbox"
             className="mr-2"

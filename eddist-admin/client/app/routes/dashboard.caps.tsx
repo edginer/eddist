@@ -68,7 +68,7 @@ const CapPage = () => {
           </TableHead>
           <TableBody className="divide-y">
             {caps?.map((cap) => (
-              <TableRow key={cap.id}>
+              <TableRow className="border-gray-200" key={cap.id}>
                 <TableCell>{cap.id}</TableCell>
                 <TableCell>{cap.name}</TableCell>
                 <TableCell>{cap.created_at}</TableCell>

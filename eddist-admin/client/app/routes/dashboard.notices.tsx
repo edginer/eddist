@@ -144,7 +144,7 @@ const Notices = () => {
           </TableHead>
           <TableBody>
             {notices?.map((notice) => (
-              <TableRow key={notice.id}>
+              <TableRow className="border-gray-200" key={notice.id}>
                 <TableCell>{notice.title}</TableCell>
                 <TableCell>
                   <code className="text-sm text-gray-600">{notice.slug}</code>
@@ -165,7 +165,7 @@ const Notices = () => {
                     </Button>
                     <Button
                       size="xs"
-                      color="failure"
+                      color="alternative"
                       onClick={() => handleDelete(notice.id)}
                     >
                       <FaTrash />
@@ -180,7 +180,7 @@ const Notices = () => {
 
       {/* Create Modal */}
       <Modal show={openCreateModal} onClose={() => setOpenCreateModal(false)}>
-        <ModalHeader>Create Notice</ModalHeader>
+        <ModalHeader className="border-gray-200">Create Notice</ModalHeader>
         <ModalBody>
           <form onSubmit={handleCreateSubmit(onCreateSubmit)}>
             <div className="flex flex-col gap-4">
@@ -242,7 +242,7 @@ const Notices = () => {
 
       {/* Edit Modal */}
       <Modal show={openEditModal} onClose={() => setOpenEditModal(false)}>
-        <ModalHeader>Edit Notice</ModalHeader>
+        <ModalHeader className="border-gray-200">Edit Notice</ModalHeader>
         <ModalBody>
           <form onSubmit={handleEditSubmit(onEditSubmit)}>
             <div className="flex flex-col gap-4">

@@ -105,7 +105,9 @@ const RestrictionRules = () => {
           setOpenCreateModal(false);
         }}
       >
-        <ModalHeader>Create Restriction Rule</ModalHeader>
+        <ModalHeader className="border-gray-200">
+          Create Restriction Rule
+        </ModalHeader>
         <ModalBody>
           <form
             onSubmit={handleSubmitCreate(async (data) => {
@@ -206,7 +208,9 @@ const RestrictionRules = () => {
           setOpenEditModal(false);
         }}
       >
-        <ModalHeader>Edit Restriction Rule</ModalHeader>
+        <ModalHeader className="border-gray-200">
+          Edit Restriction Rule
+        </ModalHeader>
         <ModalBody>
           <form
             onSubmit={handleSubmitEdit(async (data) => {
@@ -341,7 +345,7 @@ const RestrictionRules = () => {
           </TableHead>
           <TableBody className="divide-y">
             {restrictionRules?.map((rule) => (
-              <TableRow key={rule.id}>
+              <TableRow className="border-gray-200" key={rule.id}>
                 <TableCell className="font-medium">{rule.name}</TableCell>
                 <TableCell>
                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
