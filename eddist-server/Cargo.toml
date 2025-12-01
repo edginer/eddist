@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+old-client = []
+
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.80"
