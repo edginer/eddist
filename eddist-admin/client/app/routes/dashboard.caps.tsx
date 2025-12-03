@@ -1,4 +1,13 @@
-import { Dropdown, Table } from "flowbite-react";
+import {
+  Dropdown,
+  DropdownItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+} from "flowbite-react";
 import { useState } from "react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
@@ -41,7 +50,7 @@ const CapPage = () => {
 
       <div className="p-2 lg:p-8">
         <div className="flex">
-          <h1 className="text-3xl font-bold flex-grow">Caps</h1>
+          <h1 className="text-3xl font-bold grow">Caps</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateCapModal(true)}
@@ -50,24 +59,24 @@ const CapPage = () => {
           </button>
         </div>
         <Table className="mt-4">
-          <Table.Head>
-            <Table.HeadCell>Id</Table.HeadCell>
-            <Table.HeadCell>Cap</Table.HeadCell>
-            <Table.HeadCell>Created At</Table.HeadCell>
-            <Table.HeadCell>Updated At</Table.HeadCell>
-            <Table.HeadCell></Table.HeadCell>
-          </Table.Head>
-          <Table.Body className="divide-y">
+          <TableHead>
+            <TableHeadCell>Id</TableHeadCell>
+            <TableHeadCell>Cap</TableHeadCell>
+            <TableHeadCell>Created At</TableHeadCell>
+            <TableHeadCell>Updated At</TableHeadCell>
+            <TableHeadCell></TableHeadCell>
+          </TableHead>
+          <TableBody className="divide-y">
             {caps?.map((cap) => (
-              <Table.Row key={cap.id}>
-                <Table.Cell>{cap.id}</Table.Cell>
-                <Table.Cell>{cap.name}</Table.Cell>
-                <Table.Cell>{cap.created_at}</Table.Cell>
-                <Table.Cell>{cap.updated_at}</Table.Cell>
-                <Table.Cell>
+              <TableRow className="border-gray-200" key={cap.id}>
+                <TableCell>{cap.id}</TableCell>
+                <TableCell>{cap.name}</TableCell>
+                <TableCell>{cap.created_at}</TableCell>
+                <TableCell>{cap.updated_at}</TableCell>
+                <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
-                      <Dropdown.Item
+                      <DropdownItem
                         onClick={() => {
                           setOpenEditCapModal(true);
                           setSelectedCap({
@@ -77,8 +86,8 @@ const CapPage = () => {
                         }}
                       >
                         Edit
-                      </Dropdown.Item>
-                      <Dropdown.Item
+                      </DropdownItem>
+                      <DropdownItem
                         className="text-red-500"
                         onClick={async () => {
                           const { mutate } = deleteCap({
@@ -99,13 +108,13 @@ const CapPage = () => {
                         }}
                       >
                         Delete
-                      </Dropdown.Item>
+                      </DropdownItem>
                     </Dropdown>
                   </div>
-                </Table.Cell>
-              </Table.Row>
+                </TableCell>
+              </TableRow>
             ))}
-          </Table.Body>
+          </TableBody>
         </Table>
       </div>
     </>

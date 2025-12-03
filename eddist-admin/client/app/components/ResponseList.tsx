@@ -1,4 +1,4 @@
-import { Dropdown } from "flowbite-react";
+import { Dropdown, DropdownItem } from "flowbite-react";
 import React from "react";
 import {
   Res,
@@ -26,7 +26,7 @@ const ResponseList = ({
 }: Props) => {
   return responses.map((response, idx) => (
     <div key={response.id} className="bg-gray-200 p-4 rounded-lg mb-4">
-      <div className="flex items-center mb-2 border-b">
+      <div className="flex items-center mb-2 border-b border-gray-200">
         {selectedResponses && setSelectedResponses && (
           <input
             type="checkbox"
@@ -55,7 +55,7 @@ const ResponseList = ({
         <span className="mr-2">{response.author_name}</span>
         <span className="text-gray-500 mr-2">{response.mail}</span>
         <span className="text-gray-500 mr-2">{response.created_at}</span>
-        <span className="text-gray-500 flex-grow">ID:{response.author_id}</span>
+        <span className="text-gray-500 grow">ID:{response.author_id}</span>
         <div>
           <Dropdown
             arrowIcon={false}
@@ -73,23 +73,23 @@ const ResponseList = ({
             inline
           >
             {onClickAbon && (
-              <Dropdown.Item
+              <DropdownItem
                 onClick={() => {
                   onClickAbon(response.id);
                 }}
               >
                 Delete Response (Abon)
-              </Dropdown.Item>
+              </DropdownItem>
             )}
-            <Dropdown.Item
+            <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
                 onClickDeleteAuthedToken(response.authed_token_id!!);
               }}
             >
               Delete authed token
-            </Dropdown.Item>
-            <Dropdown.Item
+            </DropdownItem>
+            <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
                 onClickDeleteAuthedTokensAssociatedWithIp(
@@ -99,9 +99,9 @@ const ResponseList = ({
             >
               Delete authed token associated with writing origin ip of authed
               token
-            </Dropdown.Item>
+            </DropdownItem>
             {onClickEditResponse && (
-              <Dropdown.Item
+              <DropdownItem
                 onClick={() => {
                   onClickEditResponse({
                     author_name: response.author_name ?? undefined,
@@ -112,7 +112,7 @@ const ResponseList = ({
                 }}
               >
                 Edit response
-              </Dropdown.Item>
+              </DropdownItem>
             )}
           </Dropdown>
         </div>

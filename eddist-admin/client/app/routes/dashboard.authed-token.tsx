@@ -1,5 +1,14 @@
 import { useSearchParams } from "react-router";
-import { Alert, Button, Label, Table, TextInput } from "flowbite-react";
+import {
+  Alert,
+  Button,
+  Label,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  TextInput,
+} from "flowbite-react";
 import { useCallback, useEffect, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";
@@ -44,7 +53,7 @@ const Page = () => {
   return (
     <div className="p-4">
       <div className="flex">
-        <h1 className="text-3xl font-bold flex-grow">Authed Token</h1>
+        <h1 className="text-3xl font-bold grow">Authed Token</h1>
       </div>
       <div className="flex flex-col items-center p-2 sm:p-8 md:border m-4 xl:m-8 border-gray-700 h-[calc(100vh-140px)]">
         <Label htmlFor="search-authed-token-input" className="pb-2">
@@ -70,58 +79,52 @@ const Page = () => {
           {authedTokenData && (
             <div className="p-2">
               <Table>
-                <Table.Body className="divide-y">
-                  <Table.Row className="">
-                    <Table.Cell>Authed Token ID</Table.Cell>
-                    <Table.Cell>{authedTokenData?.id ?? "N/A"}</Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Token</Table.Cell>
-                    <Table.Cell>{authedTokenData?.token ?? "N/A"}</Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Origin IP</Table.Cell>
-                    <Table.Cell>
-                      {authedTokenData?.origin_ip ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Writing UA</Table.Cell>
-                    <Table.Cell>
+                <TableBody className="divide-y">
+                  <TableRow className="border-gray-200">
+                    <TableCell>Authed Token ID</TableCell>
+                    <TableCell>{authedTokenData?.id ?? "N/A"}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Token</TableCell>
+                    <TableCell>{authedTokenData?.token ?? "N/A"}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Origin IP</TableCell>
+                    <TableCell>{authedTokenData?.origin_ip ?? "N/A"}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Writing UA</TableCell>
+                    <TableCell>
                       {authedTokenData?.writing_ua ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Authed UA</Table.Cell>
-                    <Table.Cell>
-                      {authedTokenData?.authed_ua ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Created At</Table.Cell>
-                    <Table.Cell>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Authed UA</TableCell>
+                    <TableCell>{authedTokenData?.authed_ua ?? "N/A"}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Created At</TableCell>
+                    <TableCell>
                       {authedTokenData?.created_at ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Authed At</Table.Cell>
-                    <Table.Cell>
-                      {authedTokenData?.authed_at ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Validaity</Table.Cell>
-                    <Table.Cell>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Authed At</TableCell>
+                    <TableCell>{authedTokenData?.authed_at ?? "N/A"}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Validaity</TableCell>
+                    <TableCell>
                       {authedTokenData?.validity === true ? "true" : "false"}
-                    </Table.Cell>
-                  </Table.Row>
-                  <Table.Row>
-                    <Table.Cell>Last wrote at</Table.Cell>
-                    <Table.Cell>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow className="border-gray-200">
+                    <TableCell>Last wrote at</TableCell>
+                    <TableCell>
                       {authedTokenData?.last_wrote_at ?? "N/A"}
-                    </Table.Cell>
-                  </Table.Row>
-                </Table.Body>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
               </Table>
             </div>
           )}

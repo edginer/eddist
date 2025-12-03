@@ -1,9 +1,17 @@
 import {
   Button,
   Dropdown,
+  DropdownItem,
   Label,
   Modal,
+  ModalBody,
+  ModalHeader,
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
   TextInput,
 } from "flowbite-react";
 import { useMemo, useState } from "react";
@@ -66,8 +74,8 @@ const NgWords = () => {
           setOpenEditNgModal(false);
         }}
       >
-        <Modal.Header>Edit NG Word</Modal.Header>
-        <Modal.Body>
+        <ModalHeader className="border-gray-200">Edit NG Word</ModalHeader>
+        <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {
               try {
@@ -168,11 +176,11 @@ const NgWords = () => {
               Submit
             </Button>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
       <div className="p-2 lg:p-8">
         <div className="flex">
-          <h1 className="text-3xl font-bold flex-grow">NG words</h1>
+          <h1 className="text-3xl font-bold grow">NG words</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateNgModal(true)}
@@ -181,22 +189,22 @@ const NgWords = () => {
           </button>
         </div>
         <Table className="mt-4">
-          <Table.Head>
-            <Table.HeadCell>Id</Table.HeadCell>
-            <Table.HeadCell>Name</Table.HeadCell>
-            <Table.HeadCell>Word</Table.HeadCell>
-            <Table.HeadCell></Table.HeadCell>
-          </Table.Head>
-          <Table.Body className="divide-y">
+          <TableHead>
+            <TableHeadCell>Id</TableHeadCell>
+            <TableHeadCell>Name</TableHeadCell>
+            <TableHeadCell>Word</TableHeadCell>
+            <TableHeadCell></TableHeadCell>
+          </TableHead>
+          <TableBody className="divide-y">
             {ngWords!.map((ngWord) => (
-              <Table.Row key={ngWord.id}>
-                <Table.Cell>{ngWord.id}</Table.Cell>
-                <Table.Cell>{ngWord.name}</Table.Cell>
-                <Table.Cell>{ngWord.word}</Table.Cell>
-                <Table.Cell>
+              <TableRow className="border-gray-200" key={ngWord.id}>
+                <TableCell>{ngWord.id}</TableCell>
+                <TableCell>{ngWord.name}</TableCell>
+                <TableCell>{ngWord.word}</TableCell>
+                <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
-                      <Dropdown.Item
+                      <DropdownItem
                         onClick={() => {
                           setOpenEditNgModal(true);
                           setSelectedNgWord({
@@ -206,8 +214,8 @@ const NgWords = () => {
                         }}
                       >
                         Edit
-                      </Dropdown.Item>
-                      <Dropdown.Item
+                      </DropdownItem>
+                      <DropdownItem
                         className="text-red-500"
                         onClick={async () => {
                           try {
@@ -227,13 +235,13 @@ const NgWords = () => {
                         }}
                       >
                         Delete
-                      </Dropdown.Item>
+                      </DropdownItem>
                     </Dropdown>
                   </div>
-                </Table.Cell>
-              </Table.Row>
+                </TableCell>
+              </TableRow>
             ))}
-          </Table.Body>
+          </TableBody>
         </Table>
       </div>
     </>

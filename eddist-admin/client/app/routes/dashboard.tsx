@@ -116,7 +116,7 @@ const Layout: React.FC = () => {
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
         <nav className="flex flex-col w-full">
           <div className="flex flex-row">
-            <div className="flex-grow p-2 text-xl">Dashboard</div>
+            <div className="grow p-2 text-xl">Dashboard</div>
             <button
               data-collapse-toggle="navbar-dropdown"
               type="button"

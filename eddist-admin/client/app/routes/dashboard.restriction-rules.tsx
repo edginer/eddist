@@ -7,6 +7,14 @@ import {
   TextInput,
   Select,
   Checkbox,
+  ModalHeader,
+  ModalBody,
+  TableHeadCell,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableRow,
+  DropdownItem,
 } from "flowbite-react";
 import { useState } from "react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
@@ -97,8 +105,10 @@ const RestrictionRules = () => {
           setOpenCreateModal(false);
         }}
       >
-        <Modal.Header>Create Restriction Rule</Modal.Header>
-        <Modal.Body>
+        <ModalHeader className="border-gray-200">
+          Create Restriction Rule
+        </ModalHeader>
+        <ModalBody>
           <form
             onSubmit={handleSubmitCreate(async (data) => {
               try {
@@ -187,7 +197,7 @@ const RestrictionRules = () => {
               Create Rule
             </Button>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
 
       <Modal
@@ -198,8 +208,10 @@ const RestrictionRules = () => {
           setOpenEditModal(false);
         }}
       >
-        <Modal.Header>Edit Restriction Rule</Modal.Header>
-        <Modal.Body>
+        <ModalHeader className="border-gray-200">
+          Edit Restriction Rule
+        </ModalHeader>
+        <ModalBody>
           <form
             onSubmit={handleSubmitEdit(async (data) => {
               try {
@@ -308,12 +320,12 @@ const RestrictionRules = () => {
               Update Rule
             </Button>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
 
       <div className="p-2 lg:p-8">
         <div className="flex">
-          <h1 className="text-3xl font-bold flex-grow">Restriction Rules</h1>
+          <h1 className="text-3xl font-bold grow">Restriction Rules</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateModal(true)}
@@ -322,28 +334,28 @@ const RestrictionRules = () => {
           </button>
         </div>
         <Table className="mt-4">
-          <Table.Head>
-            <Table.HeadCell>Name</Table.HeadCell>
-            <Table.HeadCell>Type</Table.HeadCell>
-            <Table.HeadCell>Value</Table.HeadCell>
-            <Table.HeadCell>Expires</Table.HeadCell>
-            <Table.HeadCell>Created By</Table.HeadCell>
-            <Table.HeadCell>Created At</Table.HeadCell>
-            <Table.HeadCell></Table.HeadCell>
-          </Table.Head>
-          <Table.Body className="divide-y">
+          <TableHead>
+            <TableHeadCell>Name</TableHeadCell>
+            <TableHeadCell>Type</TableHeadCell>
+            <TableHeadCell>Value</TableHeadCell>
+            <TableHeadCell>Expires</TableHeadCell>
+            <TableHeadCell>Created By</TableHeadCell>
+            <TableHeadCell>Created At</TableHeadCell>
+            <TableHeadCell></TableHeadCell>
+          </TableHead>
+          <TableBody className="divide-y">
             {restrictionRules?.map((rule) => (
-              <Table.Row key={rule.id}>
-                <Table.Cell className="font-medium">{rule.name}</Table.Cell>
-                <Table.Cell>
+              <TableRow className="border-gray-200" key={rule.id}>
+                <TableCell className="font-medium">{rule.name}</TableCell>
+                <TableCell>
                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                     {rule.rule_type}
                   </span>
-                </Table.Cell>
-                <Table.Cell className="font-mono text-sm">
+                </TableCell>
+                <TableCell className="font-mono text-sm">
                   {rule.rule_value}
-                </Table.Cell>
-                <Table.Cell>
+                </TableCell>
+                <TableCell>
                   <span
                     className={`px-2 py-1 text-xs font-semibold rounded-full ${
                       rule.expires_at
@@ -355,13 +367,13 @@ const RestrictionRules = () => {
                   >
                     {formatExpiry(rule.expires_at)}
                   </span>
-                </Table.Cell>
-                <Table.Cell>{rule.created_by_email}</Table.Cell>
-                <Table.Cell>{formatDate(rule.created_at)}</Table.Cell>
-                <Table.Cell>
+                </TableCell>
+                <TableCell>{rule.created_by_email}</TableCell>
+                <TableCell>{formatDate(rule.created_at)}</TableCell>
+                <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
-                      <Dropdown.Item
+                      <DropdownItem
                         onClick={() => {
                           setOpenEditModal(true);
                           setSelectedRule(rule);
@@ -369,8 +381,8 @@ const RestrictionRules = () => {
                         }}
                       >
                         Edit
-                      </Dropdown.Item>
-                      <Dropdown.Item
+                      </DropdownItem>
+                      <DropdownItem
                         className="text-red-500"
                         onClick={async () => {
                           try {
@@ -392,13 +404,13 @@ const RestrictionRules = () => {
                         }}
                       >
                         Delete
-                      </Dropdown.Item>
+                      </DropdownItem>
                     </Dropdown>
                   </div>
-                </Table.Cell>
-              </Table.Row>
+                </TableCell>
+              </TableRow>
             ))}
-          </Table.Body>
+          </TableBody>
         </Table>
       </div>
     </>

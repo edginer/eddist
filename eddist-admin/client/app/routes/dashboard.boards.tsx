@@ -17,7 +17,7 @@ function Page() {
       />
       <div className="p-4">
         <div className="flex">
-          <h1 className="text-3xl font-bold flex-grow">Boards</h1>
+          <h1 className="text-3xl font-bold grow">Boards</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateBoardModal(true)}

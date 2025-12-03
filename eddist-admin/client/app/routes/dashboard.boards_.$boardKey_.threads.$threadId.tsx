@@ -3,7 +3,13 @@ import ResponseList from "../components/ResponseList";
 import { Link, useParams } from "react-router";
 import Breadcrumb from "../components/Breadcrumb";
 import clsx from "clsx";
-import { Button, Modal } from "flowbite-react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+} from "flowbite-react";
 import { toast } from "react-toastify";
 import {
   deleteAuthedToken,
@@ -104,8 +110,8 @@ const Page = () => {
         show={selectedEditingRes != null}
         onClose={() => setSelectedEditingRes(undefined)}
       >
-        <Modal.Header>Edit Response</Modal.Header>
-        <Modal.Body>
+        <ModalHeader>Edit Response</ModalHeader>
+        <ModalBody>
           <div className="flex flex-row">
             <div className="flex flex-col">
               <label htmlFor="name">Name</label>
@@ -159,8 +165,8 @@ const Page = () => {
               }}
             />
           </div>
-        </Modal.Body>
-        <Modal.Footer>
+        </ModalBody>
+        <ModalFooter>
           <Button
             onClick={() => {
               setSelectedEditingRes(undefined);
@@ -176,7 +182,7 @@ const Page = () => {
           >
             Save
           </Button>
-        </Modal.Footer>
+        </ModalFooter>
       </Modal>
       <div className="p-4">
         <h1 className="text-3xl font-bold">
@@ -275,7 +281,7 @@ const Page = () => {
           </button>
         </div>
         <button
-          className="rounded-full shadow-xl border-2 bg-blue-500 hover:bg-blue-700 w-14 h-14 items-center flex justify-center"
+          className="rounded-full shadow-xl border-2 border-gray-200 bg-blue-500 hover:bg-blue-700 w-14 h-14 items-center flex justify-center"
           onClick={() => setShowingFloatingDetail(!showingFloatingDetail)}
         >
           {showingFloatingDetail ? (

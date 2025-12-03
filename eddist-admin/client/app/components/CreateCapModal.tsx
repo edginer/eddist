@@ -1,4 +1,11 @@
-import { Button, Label, Modal, TextInput } from "flowbite-react";
+import {
+  Button,
+  Label,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  TextInput,
+} from "flowbite-react";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -22,8 +29,8 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
           reset();
         }}
       >
-        <Modal.Header>Create Cap</Modal.Header>
-        <Modal.Body>
+        <ModalHeader className="border-gray-200">Create Cap</ModalHeader>
+        <ModalBody>
           <form
             onSubmit={handleSubmit(async (data) => {
               try {
@@ -78,7 +85,7 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
               Create
             </Button>
           </form>
-        </Modal.Body>
+        </ModalBody>
       </Modal>
     </div>
   );

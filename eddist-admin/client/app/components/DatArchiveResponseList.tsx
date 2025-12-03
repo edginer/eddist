@@ -1,4 +1,4 @@
-import { Dropdown } from "flowbite-react";
+import { Dropdown, DropdownItem } from "flowbite-react";
 import React from "react";
 import { components } from "~/openapi/schema";
 
@@ -29,7 +29,7 @@ const DatArchiveResponseList = ({
         key={`${response.date}:${response.authed_token_id}`}
         className="bg-gray-200 p-4 rounded-lg mb-4"
       >
-        <div className="flex items-center mb-2 border-b">
+        <div className="flex items-center mb-2 border-b border-gray-200">
           <input
             type="checkbox"
             className="mr-2"
@@ -50,9 +50,7 @@ const DatArchiveResponseList = ({
           <span className="mr-2">{response.name}</span>
           <span className="text-gray-500 mr-2">{response.mail}</span>
           <span className="text-gray-500 mr-2">{response.date}</span>
-          <span className="text-gray-500 flex-grow">
-            ID:{response.author_id}
-          </span>
+          <span className="text-gray-500 grow">ID:{response.author_id}</span>
           {responses && responses[idx] && responses[idx].is_abone && (
             <div>
               <hr className="mr-2" />
@@ -77,20 +75,20 @@ const DatArchiveResponseList = ({
               }
               inline
             >
-              <Dropdown.Item onClick={() => onClickEditResponse(idx)}>
+              <DropdownItem onClick={() => onClickEditResponse(idx)}>
                 Edit
-              </Dropdown.Item>
-              <Dropdown.Item onClick={() => onClieckAbon(idx)}>
+              </DropdownItem>
+              <DropdownItem onClick={() => onClieckAbon(idx)}>
                 Abon
-              </Dropdown.Item>
-              <Dropdown.Item
+              </DropdownItem>
+              <DropdownItem
                 onClick={() =>
                   onClickDeleteAuthedToken(response.authed_token_id)
                 }
               >
                 Delete Authed Token
-              </Dropdown.Item>
-              <Dropdown.Item
+              </DropdownItem>
+              <DropdownItem
                 onClick={() =>
                   onClickDeleteAuthedTokensAssociatedWithIp(
                     response.authed_token_id
@@ -98,7 +96,7 @@ const DatArchiveResponseList = ({
                 }
               >
                 Delete Authed Tokens Associated With IP
-              </Dropdown.Item>
+              </DropdownItem>
             </Dropdown>
           </div>
         </div>
@@ -110,12 +108,12 @@ const DatArchiveResponseList = ({
             responses[idx].name !== response.name ||
             responses[idx].mail !== response.mail) && (
             <div>
-              <hr className="bg-gray-800 border-1 border-black" />
+              <hr className="bg-gray-800 border border-black" />
               <div className="text-gray-500 mr-2">(Edited response)</div>
               <span className="text-gray-500 mr-2">{responses[idx].name}</span>
               <span className="text-gray-500 mr-2">{responses[idx].mail}</span>
               <span className="text-gray-500 mr-2">{responses[idx].date}</span>
-              <span className="text-gray-500 flex-grow">
+              <span className="text-gray-500 grow">
                 ID:{responses[idx].author_id}
               </span>
               <div className="p-2">{responses[idx].body}</div>

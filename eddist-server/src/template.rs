@@ -33,6 +33,7 @@ pub fn load_template_engine<P: AsRef<Path>>(index_html_path: P) -> Handlebars<'s
     .expect("Failed to parse templates.toml");
 
     let mut handlebars = Handlebars::new();
+    #[cfg(feature = "old-client")]
     handlebars
         .register_template_file("dist-index_html", index_html_path)
         .expect("Failed to register index.html template");

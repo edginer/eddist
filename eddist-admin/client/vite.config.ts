@@ -1,9 +1,11 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import flowbiteReact from "flowbite-react/plugin/vite";
 
 export default defineConfig({
-  plugins: [reactRouter(), tsconfigPaths()],
+  plugins: [reactRouter(), tsconfigPaths(), tailwindcss(), flowbiteReact()],
   server: {
     proxy: {
       "/api": {

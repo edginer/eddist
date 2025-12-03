@@ -6,6 +6,7 @@ import { Suspense, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeInit } from ".flowbite-react/init";
 
 const reactQueryClient = new QueryClient({});
 
@@ -59,6 +60,7 @@ export default function App() {
       <ErrorBoundary
         fallbackRender={(p) => <div>Error: {p.error.message}</div>}
       >
+        <ThemeInit />
         <Suspense
           fallback={<Spinner size="xl" className="fixed inset-0 m-auto" />}
         >

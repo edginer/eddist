@@ -84,6 +84,7 @@ impl AppState {
     }
 }
 
+#[cfg(feature = "old-client")]
 fn render_index_html(
     template_engine: &Handlebars<'static>,
     canonical: Option<String>,
@@ -360,19 +361,29 @@ pub fn create_app(
             "/{boardKey}",
             get(
                 |State(state): State<AppState>, Path(board_key): Path<String>| async move {
-                    render_index_html(
+                    #[cfg(feature = "old-client")]
+                    return render_index_html(
                         &state.template_engine,
                         env::var("BASE_URL")
                             .ok()
                             .map(|base_url| format!("{base_url}/{board_key}")),
-                    )
+                    );
+
+                    // Not found for new client
+                    #[cfg(not(feature = "old-client"))]
+                    Response::builder().status(404).body(Body::empty()).unwrap()
                 },
             ),
         )
         .route(
             "/",
             get(|State(state): State<AppState>| async move {
-                render_index_html(&state.template_engine, env::var("BASE_URL").ok())
+                #[cfg(feature = "old-client")]
+                return render_index_html(&state.template_engine, env::var("BASE_URL").ok());
+
+                // Not found for new client
+                #[cfg(not(feature = "old-client"))]
+                Response::builder().status(404).body(Body::empty()).unwrap()
             }),
         )
         .route_service(
@@ -394,12 +405,17 @@ pub fn create_app(
             get(
                 |State(app_state): State<AppState>,
                  Path((board_key, thread_id)): Path<(String, String)>| async move {
-                    render_index_html(
+                    #[cfg(feature = "old-client")]
+                    return render_index_html(
                         &app_state.template_engine,
                         env::var("BASE_URL")
                             .ok()
                             .map(|base_url| format!("{base_url}/{board_key}/{thread_id}")),
-                    )
+                    );
+
+                    // Not found for new client
+                    #[cfg(not(feature = "old-client"))]
+                    Response::builder().status(404).body(Body::empty()).unwrap()
                 },
             ),
         )

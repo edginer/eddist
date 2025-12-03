@@ -13,10 +13,6 @@ interface Props<TKey extends string> {
   onSelectedTabChange?: (tabKey: TKey) => void;
 }
 
-const selectedTabClassNames = "border-blue-600";
-const unselectedTabClassNames =
-  "hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300";
-
 const Tab = <TKey extends string>({
   tabItems,
   onSelectedTabChange,
@@ -49,8 +45,8 @@ const Tab = <TKey extends string>({
                   className={twJoin(
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     selectedTabKey === tabItem.tabKey
-                      ? selectedTabClassNames
-                      : unselectedTabClassNames
+                      ? "border-blue-600"
+                      : "border-gray-200 hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
                   )}
                   id={tabItem.id ?? tabItem.tabKey}
                   type="button"
