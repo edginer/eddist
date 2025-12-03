@@ -9,11 +9,6 @@ export default defineConfig(
     plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), flowbiteReact()],
     build: {
       rollupOptions: {
-        output: {
-          entryFileNames: `assets/[name].js`,
-          chunkFileNames: `assets/[name].js`,
-          assetFileNames: `assets/[name].[ext]`,
-        },
         input: isSsrBuild
           ? {
               input: "./server/app.ts",

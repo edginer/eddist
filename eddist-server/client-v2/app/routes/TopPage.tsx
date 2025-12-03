@@ -90,7 +90,11 @@ function TopPage({
               {notices.map((notice: NoticeListItem) => (
                 <li key={notice.slug}>
                   <span className="text-gray-500 mr-2">
-                    {new Date(notice.published_at).toLocaleDateString()}
+                    {new Date(notice.published_at).toLocaleDateString("ja-JP", {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    })}
                   </span>
                   <Link to={`/notices/${notice.slug}`} className="text-blue-500">
                     {notice.title}

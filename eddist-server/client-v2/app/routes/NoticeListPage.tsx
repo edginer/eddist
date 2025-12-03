@@ -52,7 +52,11 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
                   {notice.title}
                 </Link>
                 <p className="text-gray-600 text-sm mt-1">
-                  {new Date(notice.published_at).toLocaleDateString("ja-JP")}
+                  {new Date(notice.published_at).toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                  })}
                 </p>
               </li>
             ))}
