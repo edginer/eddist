@@ -20,10 +20,7 @@ use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
 use tokio::net::TcpListener;
 use tower::Layer;
-use tower_http::{
-    normalize_path::NormalizePathLayer,
-    services::{ServeDir, ServeFile},
-};
+use tower_http::normalize_path::NormalizePathLayer;
 
 use crate::{
     app::{create_app, AppState},
@@ -131,16 +128,7 @@ async fn main() -> anyhow::Result<()> {
     let captcha_like_configs =
         serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
 
-    let serve_dir = if is_prod() {
-        "dist"
-    } else {
-        "eddist-server/client/dist"
-    };
-
-    let template_engine = load_template_engine(format!("{serve_dir}/index.html"));
-
-    let serve_file = ServeFile::new(format!("{serve_dir}/index.html"));
-    let serve_dir = ServeDir::new(serve_dir).not_found_service(serve_file.clone());
+    let template_engine = load_template_engine();
 
     let s3_client = s3::bucket::Bucket::new(
         env::var("S3_BUCKET_NAME").unwrap().trim(),
@@ -190,9 +178,7 @@ async fn main() -> anyhow::Result<()> {
     describe_counter!("response_creation", "response creation count if success");
     describe_counter!("thread_creation", "thread creation count if success");
 
-    let serve_dir_inner = serve_dir.clone();
-
-    let app = create_app(app_state, conn_mgr, serve_dir, serve_dir_inner);
+    let app = create_app(app_state, conn_mgr);
 
     let listener = TcpListener::bind((
         "0.0.0.0",

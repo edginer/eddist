@@ -11,13 +11,8 @@ use axum_prometheus::PrometheusMetricLayer;
 use eddist_core::domain::board::{validate_board_key, BoardInfo};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
-use tower::ServiceExt;
 use tower_http::{
-    catch_panic::CatchPanicLayer,
-    classify::ServerErrorsFailureClass,
-    services::{ServeDir, ServeFile},
-    set_status::SetStatus,
-    timeout::TimeoutLayer,
+    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
     trace::TraceLayer,
 };
 use tracing::{info_span, Span};
@@ -82,34 +77,6 @@ impl AppState {
     pub fn tinker_secret(&self) -> &str {
         &self.tinker_secret
     }
-}
-
-#[cfg(feature = "old-client")]
-fn render_index_html(
-    template_engine: &Handlebars<'static>,
-    canonical: Option<String>,
-) -> impl IntoResponse {
-    let mut resp = Html(
-        template_engine
-            .render(
-                "dist-index_html",
-                &serde_json::json!({
-                    "bbs_name": env::var("BBS_NAME").unwrap_or("エッヂ掲示板".to_string()),
-                    "canonical": canonical,
-                    "available_user_registration": env::var("ENABLE_USER_REGISTRATION")
-                        .ok()
-                        .map(|v| v == "true")
-                        .unwrap_or(false)
-                        .to_string(),
-                }),
-            )
-            .unwrap(),
-    )
-    .into_response();
-
-    resp.headers_mut()
-        .insert("Cache-Control", "s-maxage=300".parse().unwrap());
-    resp
 }
 
 async fn health_check() -> StatusCode {
@@ -319,12 +286,7 @@ async fn get_robots_txt() -> impl IntoResponse {
         .into_response()
 }
 
-pub fn create_app(
-    app_state: AppState,
-    conn_mgr: redis::aio::ConnectionManager,
-    serve_dir: ServeDir<SetStatus<ServeFile>>,
-    serve_dir_inner: ServeDir<SetStatus<ServeFile>>,
-) -> Router {
+pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) -> Router {
     let enable_metrics = env::var("AXUM_METRICS") == Ok("true".to_string());
     let (prometheus_layer, metric_handle) = if enable_metrics {
         let (layer, handle) = PrometheusMetricLayer::pair();
@@ -359,65 +321,15 @@ pub fn create_app(
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",
-            get(
-                |State(state): State<AppState>, Path(board_key): Path<String>| async move {
-                    #[cfg(feature = "old-client")]
-                    return render_index_html(
-                        &state.template_engine,
-                        env::var("BASE_URL")
-                            .ok()
-                            .map(|base_url| format!("{base_url}/{board_key}")),
-                    );
-
-                    // Not found for new client
-                    #[cfg(not(feature = "old-client"))]
-                    Response::builder().status(404).body(Body::empty()).unwrap()
-                },
-            ),
+            get(|| async move { Response::builder().status(404).body(Body::empty()).unwrap() }),
         )
         .route(
             "/",
-            get(|State(state): State<AppState>| async move {
-                #[cfg(feature = "old-client")]
-                return render_index_html(&state.template_engine, env::var("BASE_URL").ok());
-
-                // Not found for new client
-                #[cfg(not(feature = "old-client"))]
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            }),
-        )
-        .route_service(
-            "/assets/{item}",
-            get(|Path(item): Path<String>| async move {
-                serve_dir_inner
-                    .clone()
-                    .oneshot(
-                        Request::builder()
-                            .uri(format!("/assets/{}", item))
-                            .body(Body::empty())
-                            .unwrap(),
-                    )
-                    .await
-            }),
+            get(|| async move { Response::builder().status(404).body(Body::empty()).unwrap() }),
         )
         .route(
             "/{boardKey}/{threadId}",
-            get(
-                |State(app_state): State<AppState>,
-                 Path((board_key, thread_id)): Path<(String, String)>| async move {
-                    #[cfg(feature = "old-client")]
-                    return render_index_html(
-                        &app_state.template_engine,
-                        env::var("BASE_URL")
-                            .ok()
-                            .map(|base_url| format!("{base_url}/{board_key}/{thread_id}")),
-                    );
-
-                    // Not found for new client
-                    #[cfg(not(feature = "old-client"))]
-                    Response::builder().status(404).body(Body::empty()).unwrap()
-                },
-            ),
+            get(|| async move { Response::builder().status(404).body(Body::empty()).unwrap() }),
         )
         .route(
             "/test/read.cgi/{boardKey}/{threadId}",
@@ -434,9 +346,7 @@ pub fn create_app(
                     Redirect::permanent(&format!("/{}/{}", board_key, thread_id))
                 },
             ),
-        )
-        .nest_service("/dist", serve_dir.clone())
-        .fallback_service(serve_dir);
+        );
 
     // Add metrics route if enabled
     let app = if let Some(handle) = metric_handle {

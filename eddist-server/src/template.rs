@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use eddist_core::utils::is_prod;
 use handlebars::Handlebars;
 use serde::Deserialize;
@@ -21,7 +19,7 @@ pub struct Template {
     pub path: String,
 }
 
-pub fn load_template_engine<P: AsRef<Path>>(index_html_path: P) -> Handlebars<'static> {
+pub fn load_template_engine() -> Handlebars<'static> {
     let template_config = toml::from_str::<Config>(
         &std::fs::read_to_string(if is_prod() {
             "resources/templates.prod.toml"
@@ -33,10 +31,6 @@ pub fn load_template_engine<P: AsRef<Path>>(index_html_path: P) -> Handlebars<'s
     .expect("Failed to parse templates.toml");
 
     let mut handlebars = Handlebars::new();
-    #[cfg(feature = "old-client")]
-    handlebars
-        .register_template_file("dist-index_html", index_html_path)
-        .expect("Failed to register index.html template");
 
     if template_config.template.engine != "handlebars" {
         panic!(
