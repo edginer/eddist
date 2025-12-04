@@ -7,7 +7,6 @@ edition = "2021"
 
 [features]
 default = []
-old-client = []
 
 [dependencies]
 anyhow = "1.0.86"

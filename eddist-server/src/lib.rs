@@ -1,5 +1,3 @@
-use std::path::Path;
-
 pub use axum;
 use base64::Engine;
 pub use chrono;
@@ -79,7 +77,6 @@ pub fn create_test_app(
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
     use crate::services::AppServiceContainer;
-    use tower_http::services::{ServeDir, ServeFile};
 
     // Create test S3 bucket (stub for testing)
     let bucket = s3::Bucket::new(
@@ -95,13 +92,6 @@ pub fn create_test_app(
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
     let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
-
-    // Check existence of index.html for ServeFile
-    let path = Path::new("client/dist/index.html");
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).unwrap();
-    }
-    let _ = std::fs::metadata(path).map_err(|_| std::fs::File::create(path).unwrap());
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -119,16 +109,11 @@ pub fn create_test_app(
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),
         captcha_like_configs: vec![],
-        template_engine: load_template_engine("client/dist/index.html"),
+        template_engine: load_template_engine(),
     };
 
-    // Create minimal serve directory for tests
-    let serve_file = ServeFile::new("client/dist/index.html");
-    let serve_dir = ServeDir::new("client/dist").not_found_service(serve_file.clone());
-    let serve_dir_inner = serve_dir.clone();
-
     // Use the actual create_app from app module
-    app::create_app(app_state, redis_conn, serve_dir, serve_dir_inner)
+    app::create_app(app_state, redis_conn)
 }
 
 // Simple test helper that doesn't require exposing private types
