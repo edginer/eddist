@@ -3,6 +3,7 @@ pub mod board;
 pub mod moderation;
 pub mod notice;
 pub mod response;
+pub mod terms;
 pub mod thread;
 pub mod user;
 
@@ -12,5 +13,6 @@ pub use board::*;
 pub use moderation::*;
 pub use notice::*;
 pub use response::*;
+pub use terms::*;
 pub use thread::*;
 pub use user::*;

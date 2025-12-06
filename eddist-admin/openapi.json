@@ -1440,6 +1440,66 @@
         }
       }
     },
+    "/terms/": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "operationId": "get_terms",
+        "responses": {
+          "200": {
+            "description": "Get terms successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Terms"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Terms not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "terms"
+        ],
+        "operationId": "update_terms",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTermsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Terms updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Terms"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Terms not found"
+          }
+        }
+      }
+    },
     "/users/search/": {
       "get": {
         "tags": [
@@ -2387,6 +2447,39 @@
           "UserAgent"
         ]
       },
+      "Terms": {
+        "type": "object",
+        "description": "Terms model for API documentation",
+        "required": [
+          "id",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "Thread": {
         "type": "object",
         "required": [
@@ -2664,6 +2757,17 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "UpdateTermsInput": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
           }
         }
       },
