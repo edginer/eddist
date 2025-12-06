@@ -11,6 +11,7 @@ mod repositories {
     pub(crate) mod bbs_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod notice_repository;
+    pub(crate) mod terms_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
 }
@@ -52,6 +53,7 @@ mod routes {
     pub mod notice;
     pub mod statics;
     pub mod subject_list;
+    pub mod terms;
     pub mod user;
 }
 
@@ -92,6 +94,7 @@ pub fn create_test_app(
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
     let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
+    let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -105,6 +108,7 @@ pub fn create_test_app(
             *bucket,
         ),
         notice_repo,
+        terms_repo,
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),

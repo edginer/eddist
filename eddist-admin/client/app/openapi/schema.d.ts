@@ -405,6 +405,22 @@ export interface paths {
         patch: operations["update_restriction_rule"];
         trace?: never;
     };
+    "/terms/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_terms"];
+        put: operations["update_terms"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/search/": {
         parameters: {
             query?: never;
@@ -651,6 +667,17 @@ export interface components {
         };
         /** @enum {string} */
         RestrictionRuleTypeSchema: "Asn" | "IP" | "IPCidr" | "UserAgent";
+        /** @description Terms model for API documentation */
+        Terms: {
+            content: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            updated_at: string;
+            updated_by?: string | null;
+        };
         Thread: {
             active: boolean;
             archived: boolean;
@@ -722,6 +749,9 @@ export interface components {
             name?: string | null;
             rule_type?: null | components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value?: string | null;
+        };
+        UpdateTermsInput: {
+            content: string;
         };
         User: {
             authed_token_ids: string[];
@@ -1814,6 +1844,78 @@ export interface operations {
         responses: {
             /** @description Update restriction rule */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_terms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get terms successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Terms"];
+                };
+            };
+            /** @description Terms not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_terms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTermsInput"];
+            };
+        };
+        responses: {
+            /** @description Terms updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Terms"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Terms not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

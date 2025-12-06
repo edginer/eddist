@@ -697,3 +697,30 @@ export const deleteNotice = ({
   };
   return { mutate };
 };
+
+const GET_TERMS = "/terms/";
+
+export const getTerms = () => {
+  return useSuspenseQuery({
+    queryKey: [GET_TERMS],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_TERMS, {
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const UPDATE_TERMS = "/terms/";
+
+export const updateTerms = ({
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_TERMS]["put"]>) => {
+  const mutate = async () => {
+    await client.PUT(UPDATE_TERMS, {
+      body,
+    });
+  };
+  return { mutate };
+};

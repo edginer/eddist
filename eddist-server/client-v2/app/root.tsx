@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -43,14 +44,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+const FULL_WIDTH_ROUTES = ["/terms"];
+
 export default function App() {
-  return (
-    <div className="container p-4 lg:px-16 lg:pt-12 mx-auto">
+  const location = useLocation();
+  const isFullWidthRoute = FULL_WIDTH_ROUTES.includes(location.pathname);
+
+  const content = (
+    <>
       <ThemeInit />
       <Suspense fallback={<div>Loading...</div>}>
         <Outlet />
       </Suspense>
-    </div>
+    </>
+  );
+
+  if (isFullWidthRoute) {
+    return content;
+  }
+
+  return (
+    <div className="container p-4 lg:px-16 lg:pt-12 mx-auto">{content}</div>
   );
 }
 

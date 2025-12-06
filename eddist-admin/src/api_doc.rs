@@ -8,8 +8,9 @@ use crate::{
             ArchivedAdminRes, ArchivedAdminThread, ArchivedRes, ArchivedResUpdate, ArchivedThread,
         },
         notice_repository::{CreateNoticeInput, UpdateNoticeInput},
+        terms_repository::UpdateTermsInput,
     },
-    routes::{archives, auth_tokens, boards, moderation, notices, threads, users},
+    routes::{archives, auth_tokens, boards, moderation, notices, terms, threads, users},
 };
 
 #[derive(OpenApi)]
@@ -69,6 +70,10 @@ use crate::{
         notices::update_notice,
         notices::delete_notice,
 
+        // Terms routes
+        terms::get_terms,
+        terms::update_terms,
+
         // Auth routes
         post_native_session,
     ),
@@ -121,6 +126,10 @@ use crate::{
         Notice,
         CreateNoticeInput,
         UpdateNoticeInput,
+
+        // Terms models
+        Terms,
+        UpdateTermsInput,
     ))
 )]
 pub struct ApiDoc;

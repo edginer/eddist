@@ -7,6 +7,7 @@ pub mod auth_tokens;
 pub mod boards;
 pub mod moderation;
 pub mod notices;
+pub mod terms;
 pub mod threads;
 pub mod users;
 
@@ -18,5 +19,6 @@ pub fn create_api_routes() -> Router<DefaultAppState> {
         .merge(auth_tokens::routes())
         .merge(moderation::routes())
         .merge(notices::routes())
+        .merge(terms::routes())
         .merge(users::routes())
 }
