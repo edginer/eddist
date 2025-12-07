@@ -5,6 +5,7 @@ import React from "react";
  * - Headers (h1-h6)
  * - Unordered lists (-, *, +)
  * - Ordered lists (1., 2., etc.)
+ * - Horizontal rules (---, ***, ___)
  * - Links: [text](url) and plain URLs
  * - Bold: **text** or __text__
  */
@@ -110,6 +111,14 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       listStack[listStack.length - 1].items.push(
         <li key={`li-${key++}`}>{parseInline(olMatch[1])}</li>
       );
+      continue;
+    }
+
+    // Horizontal rule (---, ***, or ___)
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line.trim())) {
+      flushParagraph();
+      flushList();
+      elements.push(<hr key={`hr-${key++}`} className="my-8" />);
       continue;
     }
 

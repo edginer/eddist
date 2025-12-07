@@ -171,7 +171,7 @@ const ThreadListPage = ({
         <Link to="/">
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
-        <h1 className="text-2xl lg:text-4xl flex-grow truncate">
+        <h1 className="text-2xl lg:text-4xl grow truncate">
           {
             boards?.find(
               (board: { board_key: string }) =>
@@ -298,7 +298,7 @@ const ThreadListPage = ({
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-grow">
+      <div className="flex flex-col lg:grow">
         {sortedThreadList.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (

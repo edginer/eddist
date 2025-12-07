@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE terms\n            SET content = ?, updated_at = ?, updated_by = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "cd792a9623d0036221eca0d8712fa2d3a6dcd0248a1c039c7d152e02d8ecc6d5"
+}

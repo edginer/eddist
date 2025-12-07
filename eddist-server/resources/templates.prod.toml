@@ -6,10 +6,6 @@ name = "auth-code.get"
 path = "./resources/templates/auth-code.get.hbs"
 
 [[template.templates]]
-name = "term-of-usage.get"
-path = "./resources/templates/term-of-usage.get.hbs"
-
-[[template.templates]]
 name = "auth-code.post.success"
 path = "./resources/templates/auth-code.post.success.hbs"
 

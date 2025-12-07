@@ -6,10 +6,6 @@ name = "auth-code.get"
 path = "eddist-server/resources/templates/auth-code.get.hbs"
 
 [[template.templates]]
-name = "term-of-usage.get"
-path = "eddist-server/resources/templates/term-of-usage.get.hbs"
-
-[[template.templates]]
 name = "auth-code.post.success"
 path = "eddist-server/resources/templates/auth-code.post.success.hbs"
 
