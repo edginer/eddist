@@ -22,7 +22,7 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
 
 const Meta = ({ bbsName }: { bbsName: string }) => (
   <>
-    <title>利用規約 - {bbsName}</title>
+    <title>{`利用規約 - ${bbsName}`}</title>
     <meta property="og:title" content={`利用規約 - ${bbsName}`} />
   </>
 );

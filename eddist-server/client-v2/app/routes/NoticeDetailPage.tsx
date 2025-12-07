@@ -19,9 +19,7 @@ export const loader = async ({ context, params }: Route.LoaderArgs) => {
 
 const Meta = ({ title, bbsName }: { title: string; bbsName: string }) => (
   <>
-    <title>
-      {title} - {bbsName}
-    </title>
+    <title>{`${title} - ${bbsName}`}</title>
     <meta property="og:title" content={`${title} - ${bbsName}`} />
   </>
 );

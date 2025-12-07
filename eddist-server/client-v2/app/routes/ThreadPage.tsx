@@ -230,7 +230,7 @@ const ThreadPage = ({
         <>
           <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
           {/* Mobile header - Board name above thread name */}
-          <div className="flex-grow md:hidden">
+          <div className="grow md:hidden">
             <p className="text-xs text-gray-600 truncate">{boardName}</p>
             <h1
               className="text-sm line-clamp-2 font-medium break-all"
@@ -240,7 +240,7 @@ const ThreadPage = ({
           </div>
 
           {/* Desktop header - Board name and thread name on same line */}
-          <div className="hidden md:flex items-center flex-grow">
+          <div className="hidden md:flex items-center grow">
             <h1 className="text-2xl whitespace-nowrap" title={boardName}>
               {boardName}
             </h1>
@@ -276,8 +276,8 @@ const ThreadPage = ({
         refetchThread={mutate}
       />
 
-      <main className={twMerge("flex-grow pt-18 lg:pt-16", "overflow-y-auto")}>
-        <div className="max-w-screen-xl mx-auto">
+      <main className={twMerge("grow pt-18 lg:pt-16", "overflow-y-auto")}>
+        <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
             {posts?.responses.map((post) => (
               <div key={post.id} className="border-b border-gray-300 p-4">
@@ -313,7 +313,7 @@ const ThreadPage = ({
                     )}
                   </span>
                 </div>
-                <div className="text-gray-800 mt-2 break-words">
+                <div className="text-gray-800 mt-2 wrap-break-word">
                   {processPostBody(post.bodyParts, openPopup)}
                 </div>
               </div>
@@ -382,7 +382,7 @@ const ThreadPage = ({
                     )}
                   </span>
                 </div>
-                <div className="text-gray-800 mt-1 break-words">
+                <div className="text-gray-800 mt-1 wrap-break-word">
                   {processPostBody(p.bodyParts, openPopup)}
                 </div>
               </div>
