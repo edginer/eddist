@@ -3,12 +3,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
-import { FaSave, FaExternalLinkAlt } from "react-icons/fa";
+import { FaSave } from "react-icons/fa";
 import { getTerms, updateTerms } from "~/hooks/queries";
 import type { paths } from "~/openapi/schema";
 
-type Terms =
-  paths["/terms/"]["get"]["responses"]["200"]["content"]["application/json"];
 type UpdateTermsInput =
   paths["/terms/"]["put"]["requestBody"]["content"]["application/json"];
 
