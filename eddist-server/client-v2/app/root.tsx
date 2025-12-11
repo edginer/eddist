@@ -12,6 +12,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Suspense } from "react";
 import { ThemeInit } from ".flowbite-react/init";
+import { NGWordsProvider } from "~/contexts/NGWordsContext";
+import { ToastProvider } from "~/contexts/ToastContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -51,12 +53,14 @@ export default function App() {
   const isFullWidthRoute = FULL_WIDTH_ROUTES.includes(location.pathname);
 
   const content = (
-    <>
-      <ThemeInit />
-      <Suspense fallback={<div>Loading...</div>}>
-        <Outlet />
-      </Suspense>
-    </>
+    <ToastProvider>
+      <NGWordsProvider>
+        <ThemeInit />
+        <Suspense fallback={<div>Loading...</div>}>
+          <Outlet />
+        </Suspense>
+      </NGWordsProvider>
+    </ToastProvider>
   );
 
   if (isFullWidthRoute) {

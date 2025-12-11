@@ -1,9 +1,12 @@
 import { Button } from "flowbite-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router";
-import { FaArrowLeft, FaPen } from "react-icons/fa";
+import { FaArrowLeft, FaCog, FaPen } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
 import PostResponseModal from "../components/PostResponseModal";
+import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
+import { NGContextMenu } from "../components/NGContextMenu";
+import { FloatingNGButton } from "../components/FloatingNGButton";
 import type { Route } from "./+types/ThreadPage";
 import useSWR from "swr";
 import { fetchBoards, type Board } from "~/api-client/board";
@@ -12,6 +15,8 @@ import {
   type BodyAnchorPart,
   type Response,
 } from "~/api-client/thread";
+import { useNGWords } from "~/contexts/NGWordsContext";
+import { useContextMenu } from "~/hooks/useContextMenu";
 import React from "react";
 
 export const headers = (_: Route.HeadersArgs) => {
@@ -179,6 +184,18 @@ const ThreadPage = ({
   };
 
   const [creatingResponse, setCreatingResponse] = useState(false);
+  const [showNGSettings, setShowNGSettings] = useState(false);
+  const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(
+    new Set()
+  );
+
+  const { shouldFilterResponse } = useNGWords();
+  const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
+  const [contextMenuResponse, setContextMenuResponse] =
+    useState<Response | null>(null);
+  const [contextMenuType, setContextMenuType] = useState<
+    "authorId" | "name" | null
+  >(null);
 
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
@@ -256,6 +273,14 @@ const ThreadPage = ({
             )}
           </div>
         </>
+        <button
+          type="button"
+          onClick={() => setShowNGSettings(true)}
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
+          title="NG設定"
+        >
+          <FaCog className="w-4 h-4" />
+        </button>
         <Button
           onClick={() => setCreatingResponse(true)}
           className={twMerge(
@@ -266,6 +291,11 @@ const ThreadPage = ({
           <FaPen className="lg:mr-3" />
           <span className="lg:block hidden">書き込み</span>
         </Button>
+
+        <NGWordsSettingsModal
+          open={showNGSettings}
+          setOpen={setShowNGSettings}
+        />
       </header>
 
       <PostResponseModal
@@ -279,45 +309,126 @@ const ThreadPage = ({
       <main className={twMerge("grow pt-18 lg:pt-16", "overflow-y-auto")}>
         <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
-            {posts?.responses.map((post) => (
-              <div key={post.id} className="border-b border-gray-300 p-4">
-                <div className="text-sm text-gray-500">
-                  {post.id}{" "}
-                  {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
-                  {processPostName(post.name)} {post.date}{" "}
-                  <span
-                    onClick={(e) =>
-                      openPopup(
-                        e,
-                        posts.responses.reduce(
-                          (acc, cur, i) =>
-                            cur.authorId === post.authorId
-                              ? acc.concat(i)
-                              : acc,
-                          [] as number[]
-                        )
-                      )
-                    }
-                    style={{ cursor: "pointer" }}
-                    className={authorIdResponseCountToColor(
-                      posts.authorIdMap.get(post.authorId)?.length ?? 0
-                    )}
+            {posts?.responses.map((post) => {
+              const filterResult = shouldFilterResponse(post);
+              const isExpanded = expandedNGPosts.has(post.id);
+
+              // Completely hidden
+              if (filterResult.filtered && filterResult.hideMode === "hidden") {
+                return null;
+              }
+
+              // Collapsed with expand option
+              if (
+                filterResult.filtered &&
+                filterResult.hideMode === "collapsed" &&
+                !isExpanded
+              ) {
+                return (
+                  <div
+                    key={post.id}
+                    className="border-b border-gray-300 p-4 bg-gray-50"
                   >
-                    ID:{post.authorId}{" "}
-                    {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
-                      1 && (
-                      <span>
-                        ({post.authorIdAppearBeforeCount}/
-                        {posts.authorIdMap.get(post.authorId)?.length})
-                      </span>
-                    )}
-                  </span>
+                    <div className="text-sm text-gray-400 flex justify-between items-center">
+                      <span>{post.id}. このレスはNG設定により非表示</span>
+                      <button
+                        onClick={() =>
+                          setExpandedNGPosts((prev) => {
+                            const newSet = new Set(prev);
+                            newSet.add(post.id);
+                            return newSet;
+                          })
+                        }
+                        className="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                        type="button"
+                      >
+                        表示
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Normal rendering (not filtered or expanded)
+              return (
+                <div key={post.id} className="border-b border-gray-300 p-4">
+                  <div className="text-sm text-gray-500">
+                    {post.id}{" "}
+                    {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    <span
+                      className="select-none md:select-auto"
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenuResponse(post);
+                        setContextMenuType("name");
+                        contextMenuHandlers.onContextMenu(e);
+                      }}
+                      onTouchStart={(e) => {
+                        setContextMenuResponse(post);
+                        setContextMenuType("name");
+                        contextMenuHandlers.onTouchStart(e);
+                      }}
+                      onTouchMove={contextMenuHandlers.onTouchMove}
+                      onTouchEnd={contextMenuHandlers.onTouchEnd}
+                      onTouchCancel={contextMenuHandlers.onTouchCancel}
+                    >
+                      {processPostName(post.name)}
+                    </span>{" "}
+                    {post.date}{" "}
+                    <span
+                      onClick={(e) =>
+                        openPopup(
+                          e,
+                          posts.responses.reduce(
+                            (acc, cur, i) =>
+                              cur.authorId === post.authorId
+                                ? acc.concat(i)
+                                : acc,
+                            [] as number[]
+                          )
+                        )
+                      }
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenuResponse(post);
+                        setContextMenuType("authorId");
+                        contextMenuHandlers.onContextMenu(e);
+                      }}
+                      onTouchStart={(e) => {
+                        setContextMenuResponse(post);
+                        setContextMenuType("authorId");
+                        contextMenuHandlers.onTouchStart(e);
+                      }}
+                      onTouchMove={contextMenuHandlers.onTouchMove}
+                      onTouchEnd={contextMenuHandlers.onTouchEnd}
+                      onTouchCancel={contextMenuHandlers.onTouchCancel}
+                      style={{ cursor: "pointer" }}
+                      className={`select-none md:select-auto ${authorIdResponseCountToColor(
+                        posts.authorIdMap.get(post.authorId)?.length ?? 0
+                      )}`}
+                    >
+                      ID:{post.authorId}{" "}
+                      {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
+                        1 && (
+                        <span>
+                          ({post.authorIdAppearBeforeCount}/
+                          {posts.authorIdMap.get(post.authorId)?.length})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div
+                    className="text-gray-800 mt-2 wrap-break-word"
+                    data-ng-target="body"
+                    data-ng-response-id={post.id}
+                  >
+                    {processPostBody(post.bodyParts, openPopup)}
+                  </div>
                 </div>
-                <div className="text-gray-800 mt-2 wrap-break-word">
-                  {processPostBody(post.bodyParts, openPopup)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
@@ -390,6 +501,42 @@ const ThreadPage = ({
           </div>
         );
       })}
+
+      {menuState.isOpen && contextMenuResponse && contextMenuType && (
+        <NGContextMenu
+          x={menuState.x}
+          y={menuState.y}
+          onClose={closeMenu}
+          options={(() => {
+            const bodyText = contextMenuResponse.bodyParts
+              .map((part) => part.text)
+              .join("");
+
+            if (contextMenuType === "authorId") {
+              return [
+                {
+                  label: "投稿者ID",
+                  value: contextMenuResponse.authorId,
+                  category: "response.authorIds" as const,
+                  isResponse: true,
+                },
+              ];
+            } else if (contextMenuType === "name") {
+              return [
+                {
+                  label: "投稿者名",
+                  value: contextMenuResponse.name,
+                  category: "response.names" as const,
+                  isResponse: true,
+                },
+              ];
+            }
+            return [];
+          })()}
+        />
+      )}
+
+      <FloatingNGButton />
     </div>
   );
 };
