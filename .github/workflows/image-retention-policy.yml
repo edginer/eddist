@@ -20,7 +20,7 @@ jobs:
           image-names: "eddist"
           image-tags: "!v*"
           cut-off: 1d
-          keep-n-most-recent: 3
+          keep-n-most-recent: 10
       - name: Delete old images (eddist-client)
         uses: snok/container-retention-policy@v3.0.0
         with:
@@ -29,7 +29,7 @@ jobs:
           image-names: "eddist-client"
           image-tags: "!v*"
           cut-off: 1d
-          keep-n-most-recent: 3
+          keep-n-most-recent: 10
       - name: Delete old images (eddist-admin)
         uses: snok/container-retention-policy@v3.0.0
         with:
@@ -38,7 +38,7 @@ jobs:
           image-names: "eddist-admin"
           image-tags: "!v*"
           cut-off: 1d
-          keep-n-most-recent: 3
+          keep-n-most-recent: 10
       - name: Delete old images (eddist-cron)
         uses: snok/container-retention-policy@v3.0.0
         with:
@@ -47,7 +47,7 @@ jobs:
           image-names: "eddist-cron"
           image-tags: "!v*"
           cut-off: 1d
-          keep-n-most-recent: 3
+          keep-n-most-recent: 10
       - name: Delete old images (eddist-persistence)
         uses: snok/container-retention-policy@v3.0.0
         with:
@@ -56,4 +56,4 @@ jobs:
           image-names: "eddist-persistence"
           image-tags: "!v*"
           cut-off: 1d
-          keep-n-most-recent: 3
+          keep-n-most-recent: 10
