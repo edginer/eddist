@@ -83,7 +83,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
         >
           <div className="space-y-6">
             <div className="flex justify-between">
-              <div className="flex-grow mr-2">
+              <div className="grow mr-2">
                 <div className="mb-2 block">
                   <Label htmlFor="modal-name">名前</Label>
                 </div>
@@ -93,7 +93,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
                   {...register("name")}
                 />
               </div>
-              <div className="flex-grow ml-2">
+              <div className="grow ml-2">
                 <div className="mb-2 block">
                   <Label htmlFor="modal-email">メール</Label>
                 </div>

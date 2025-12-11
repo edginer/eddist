@@ -1,13 +1,25 @@
 import { Button } from "flowbite-react";
-import { useMemo, useState } from "react";
-import { FaArrowLeft, FaSort, FaSortDown, FaSortUp } from "react-icons/fa";
+import { useMemo, useState, useRef } from "react";
+import {
+  FaArrowLeft,
+  FaCog,
+  FaPen,
+  FaSort,
+  FaSortDown,
+  FaSortUp,
+} from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
 import useSWR from "swr";
 import PostThreadModal from "../components/PostThreadModal";
+import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
+import { NGContextMenu } from "../components/NGContextMenu";
 import type { Route } from "./+types/ThreadListPage";
 import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
+import { useNGWords } from "~/contexts/NGWordsContext";
+import { useContextMenu } from "~/hooks/useContextMenu";
+import { getSelectedTextInElement } from "~/utils/selection";
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
 type SortOrder = "asc" | "desc";
@@ -113,6 +125,17 @@ const ThreadListPage = ({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [showSortControls, setShowSortControls] = useState(false);
+  const [showNGSettings, setShowNGSettings] = useState(false);
+
+  const { shouldFilterThread } = useNGWords();
+  const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
+  const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(
+    null
+  );
+  const [selectedTitleText, setSelectedTitleText] = useState<string | null>(
+    null
+  );
+  const capturedSelectionRef = useRef<string | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -152,6 +175,10 @@ const ThreadListPage = ({
     return sorted;
   }, [threadList, sortKey, sortOrder, currentTime]);
 
+  const filteredThreadList = useMemo(() => {
+    return sortedThreadList.filter((thread) => !shouldFilterThread(thread));
+  }, [sortedThreadList, shouldFilterThread]);
+
   return (
     <div className="relative pt-16">
       <header
@@ -179,6 +206,14 @@ const ThreadListPage = ({
             )?.name
           }
         </h1>
+        <button
+          type="button"
+          onClick={() => setShowNGSettings(true)}
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-1.5"
+          title="NG設定"
+        >
+          <FaCog className="w-4 h-4" />
+        </button>
         <button
           type="button"
           onClick={() => setShowSortControls(!showSortControls)}
@@ -211,8 +246,14 @@ const ThreadListPage = ({
             params.boardKey || "hidden"
           )}
         >
-          スレッド作成
+          <FaPen className="lg:mr-3" />
+          <span className="lg:block hidden">スレッド作成</span>
         </Button>
+
+        <NGWordsSettingsModal
+          open={showNGSettings}
+          setOpen={setShowNGSettings}
+        />
       </header>
 
       <PostThreadModal
@@ -299,7 +340,7 @@ const ThreadListPage = ({
       )}
 
       <div className="flex flex-col lg:grow">
-        {sortedThreadList.map((thread, i) => (
+        {filteredThreadList.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (
               <div className="border-b border-gray-400 lg:border-none lg:pt-2"></div>
@@ -307,9 +348,35 @@ const ThreadListPage = ({
             <button
               type="button"
               key={thread.id}
-              className="hover:bg-gray-200 cursor-default text-left block w-full bg-gray-100 p-2 lg:p-3"
+              className="hover:bg-gray-200 cursor-default text-left block w-full bg-gray-100 p-2 lg:p-3 select-none md:select-auto"
+              data-ng-target="title"
+              data-ng-thread-id={thread.id}
               onClick={() => {
                 navigate(`/${params.boardKey}/${thread.id}`);
+              }}
+              {...contextMenuHandlers}
+              onMouseDown={(e) => {
+                // Capture selection before it gets cleared by right-click
+                if (e.button === 2) {
+                  // Right mouse button
+                  capturedSelectionRef.current = getSelectedTextInElement(
+                    e.currentTarget
+                  );
+                }
+              }}
+              onContextMenu={(e) => {
+                // Use captured selection from mousedown
+                const selectedText = capturedSelectionRef.current;
+                capturedSelectionRef.current = null; // Clear after use
+                contextMenuHandlers.onContextMenu(e);
+                setContextMenuThread(thread);
+                setSelectedTitleText(selectedText);
+              }}
+              onTouchStart={(e) => {
+                const selectedText = getSelectedTextInElement(e.currentTarget);
+                contextMenuHandlers.onTouchStart(e);
+                setContextMenuThread(thread);
+                setSelectedTitleText(selectedText);
               }}
             >
               <div>
@@ -337,6 +404,33 @@ const ThreadListPage = ({
           </div>
         ))}
       </div>
+
+      {menuState.isOpen && contextMenuThread && (
+        <NGContextMenu
+          x={menuState.x}
+          y={menuState.y}
+          onClose={closeMenu}
+          options={[
+            {
+              label: selectedTitleText
+                ? "選択したテキスト"
+                : "スレッドタイトル",
+              value:
+                selectedTitleText || contextMenuThread.title,
+              category: "thread.titles",
+            },
+            ...(contextMenuThread.authorId
+              ? [
+                  {
+                    label: "スレ投稿者ID",
+                    value: contextMenuThread.authorId,
+                    category: "thread.authorIds" as const,
+                  },
+                ]
+              : []),
+          ]}
+        />
+      )}
     </div>
   );
 };
