@@ -108,7 +108,7 @@
     </div>
 
     <!-- Terms of Use Modal -->
-    <div id="tou-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div id="tou-modal" class="fixed inset-0 bg-black/50 bg-opacity-50 hidden z-50">
         <div class="flex items-start justify-center min-h-screen p-2 sm:p-4 pt-4 sm:pt-8 pb-4 sm:pb-8">
             <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] sm:max-h-[85vh] flex flex-col mb-4 sm:mb-0">
                 <div class="p-4 sm:p-6 border-b border-gray-200">
@@ -151,10 +151,105 @@
             const submitBtn = document.getElementById('submit-btn');
             const touStatus = document.getElementById('tou-status');
             const touContent = document.getElementById('tou-content');
-            
+
             let hasScrolledToBottom = false;
             let hasAgreed = false;
             let contentLoaded = false;
+
+            // Parse markdown to HTML elements
+            function parseMarkdown(markdown) {
+                const lines = markdown.split('\n');
+                const container = document.createElement('div');
+                container.className = 'space-y-4';
+
+                let currentList = null;
+                let listType = null;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // Skip empty lines
+                    if (!line) {
+                        if (currentList) {
+                            container.appendChild(currentList);
+                            currentList = null;
+                        }
+                        continue;
+                    }
+
+                    // Horizontal rule (for footnotes separator)
+                    if (line.match(/^---+$/)) {
+                        if (currentList) {
+                            container.appendChild(currentList);
+                            currentList = null;
+                        }
+                        const hr = document.createElement('hr');
+                        hr.className = 'my-6';
+                        container.appendChild(hr);
+                        continue;
+                    }
+
+                    // Headers (## Title)
+                    const headerMatch = line.match(/^(#{2,6})\s+(.+)$/);
+                    if (headerMatch) {
+                        if (currentList) {
+                            container.appendChild(currentList);
+                            currentList = null;
+                        }
+                        const level = headerMatch[1].length;
+                        const header = document.createElement('h' + level);
+                        header.className = level === 2 ? 'text-lg font-semibold text-gray-900 mb-2' : 'text-base font-semibold text-gray-800 mb-1';
+                        header.textContent = headerMatch[2];
+                        container.appendChild(header);
+                        continue;
+                    }
+
+                    // Unordered list (- item)
+                    if (line.match(/^[-*+]\s+/)) {
+                        if (!currentList || listType !== 'ul') {
+                            if (currentList) container.appendChild(currentList);
+                            currentList = document.createElement('ul');
+                            currentList.className = 'list-disc list-inside text-gray-700 space-y-1 ml-4';
+                            listType = 'ul';
+                        }
+                        const li = document.createElement('li');
+                        li.textContent = line.replace(/^[-*+]\s+/, '');
+                        currentList.appendChild(li);
+                        continue;
+                    }
+
+                    // Ordered list (1. item)
+                    if (line.match(/^\d+\.\s+/)) {
+                        if (!currentList || listType !== 'ol') {
+                            if (currentList) container.appendChild(currentList);
+                            currentList = document.createElement('ol');
+                            currentList.className = 'list-decimal list-inside text-gray-700 space-y-1 ml-4';
+                            listType = 'ol';
+                        }
+                        const li = document.createElement('li');
+                        li.textContent = line.replace(/^\d+\.\s+/, '');
+                        currentList.appendChild(li);
+                        continue;
+                    }
+
+                    // Regular paragraph
+                    if (currentList) {
+                        container.appendChild(currentList);
+                        currentList = null;
+                    }
+                    const p = document.createElement('p');
+                    p.className = 'text-gray-700 leading-relaxed';
+                    p.textContent = line;
+                    container.appendChild(p);
+                }
+
+                // Append any remaining list
+                if (currentList) {
+                    container.appendChild(currentList);
+                }
+
+                return container;
+            }
 
             // Show modal when "利用規約を確認して同意する" is clicked
             showTouBtn.addEventListener('click', function() {
@@ -207,122 +302,22 @@
                     if (!response.ok) {
                         throw new Error('Failed to load terms');
                     }
-                    
+
                     const data = await response.json();
-                    
+
                     // Clear loading message
                     document.getElementById('loading-content').remove();
-                    
-                    // Create content container
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = 'space-y-4';
-                    
-                    // Render sections
-                    data.sections.forEach(section => {
-                        const sectionEl = document.createElement('div');
-                        sectionEl.className = 'mb-4';
-                        
-                        // Section title
-                        const titleEl = document.createElement('h3');
-                        titleEl.className = 'text-lg font-semibold text-gray-900 mb-2';
-                        titleEl.textContent = section.title;
-                        sectionEl.appendChild(titleEl);
-                        
-                        // Section content
-                        if (section.content) {
-                            const contentP = document.createElement('p');
-                            contentP.className = 'text-gray-700 leading-relaxed mb-2';
-                            contentP.textContent = section.content;
-                            sectionEl.appendChild(contentP);
-                        }
-                        
-                        // Lists
-                        if (section.list) {
-                            const ol = document.createElement('ol');
-                            ol.className = 'list-decimal list-inside text-gray-700 mb-2 space-y-1';
-                            section.list.forEach(item => {
-                                const li = document.createElement('li');
-                                li.textContent = item;
-                                ol.appendChild(li);
-                            });
-                            sectionEl.appendChild(ol);
-                        }
-                        
-                        // Additional content
-                        if (section.additional) {
-                            const additionalP = document.createElement('p');
-                            additionalP.className = 'text-gray-700 leading-relaxed mb-2';
-                            additionalP.textContent = section.additional;
-                            sectionEl.appendChild(additionalP);
-                        }
-                        
-                        // Additional lists
-                        if (section.additional_list) {
-                            const ol = document.createElement('ol');
-                            ol.className = 'list-decimal list-inside text-gray-700 mb-2';
-                            section.additional_list.forEach(item => {
-                                const li = document.createElement('li');
-                                li.textContent = item;
-                                ol.appendChild(li);
-                            });
-                            sectionEl.appendChild(ol);
-                        }
-                        
-                        // Subsections (for 第4条)
-                        if (section.sections) {
-                            const mainOl = document.createElement('ol');
-                            mainOl.className = 'list-decimal list-inside text-gray-700 space-y-2';
-                            
-                            section.sections.forEach(subsection => {
-                                const li = document.createElement('li');
-                                li.className = 'space-y-1';
-                                
-                                const subtitle = document.createElement('strong');
-                                subtitle.textContent = subsection.subtitle;
-                                li.appendChild(subtitle);
-                                
-                                const ul = document.createElement('ul');
-                                ul.className = 'list-disc list-inside ml-4 mt-1 space-y-1';
-                                subsection.items.forEach(item => {
-                                    const subLi = document.createElement('li');
-                                    subLi.textContent = item;
-                                    ul.appendChild(subLi);
-                                });
-                                li.appendChild(ul);
-                                mainOl.appendChild(li);
-                            });
-                            sectionEl.appendChild(mainOl);
-                        }
-                        
-                        contentDiv.appendChild(sectionEl);
-                    });
-                    
-                    // Add separator
-                    const hr = document.createElement('hr');
-                    hr.className = 'my-6';
-                    contentDiv.appendChild(hr);
-                    
-                    // Footnotes
-                    if (data.footnotes) {
-                        const footnotesOl = document.createElement('ol');
-                        footnotesOl.className = 'list-decimal list-inside text-sm text-gray-600 space-y-1 mb-4';
-                        data.footnotes.forEach(footnote => {
-                            const li = document.createElement('li');
-                            li.textContent = footnote;
-                            footnotesOl.appendChild(li);
-                        });
-                        contentDiv.appendChild(footnotesOl);
-                    }
-                    
-                    // Add content to modal
+
+                    // Parse markdown and render
+                    const contentDiv = parseMarkdown(data.content);
                     touContent.appendChild(contentDiv);
-                    
+
                     contentLoaded = true;
                     checkScrollPosition();
-                    
+
                 } catch (error) {
                     console.error('Error loading ToU:', error);
-                    document.getElementById('loading-content').innerHTML = 
+                    document.getElementById('loading-content').innerHTML =
                         '<p class="text-red-600">利用規約の読み込みに失敗しました。<a href="/terms" target="_blank" class="underline">こちらから確認してください</a></p>';
                 }
             }
