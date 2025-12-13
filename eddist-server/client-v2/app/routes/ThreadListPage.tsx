@@ -7,6 +7,7 @@ import {
   FaSort,
   FaSortDown,
   FaSortUp,
+  FaSync,
 } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
@@ -19,6 +20,7 @@ import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
+import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
@@ -126,6 +128,7 @@ const ThreadListPage = ({
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [showSortControls, setShowSortControls] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { shouldFilterThread } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
@@ -136,6 +139,27 @@ const ThreadListPage = ({
     null
   );
   const capturedSelectionRef = useRef<string | null>(null);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await mutate();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const {
+    isPulling,
+    pullDistance,
+    isRefreshing: isPullRefreshing,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    direction: "down",
+    enabled: true,
+    scrollTarget: "window",
+  });
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -181,6 +205,33 @@ const ThreadListPage = ({
 
   return (
     <div className="relative pt-16">
+      {/* Pull-to-refresh indicator */}
+      {(isPulling || isPullRefreshing) && (
+        <div
+          className="fixed top-16 left-0 right-0 z-40 flex justify-center items-center transition-all duration-200"
+          style={{
+            paddingTop: isPullRefreshing ? "16px" : `${Math.min(pullDistance / 2, 40)}px`,
+          }}
+        >
+          <div
+            className="bg-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+            style={{
+              width: "40px",
+              height: "40px",
+              transform: `scale(${isPullRefreshing ? 1 : Math.min(pullDistance / 80, 1)})`,
+              opacity: isPullRefreshing ? 1 : Math.min(pullDistance / 80, 0.8),
+            }}
+          >
+            <FaSync
+              className={twMerge(
+                "text-blue-600 text-lg",
+                isPullRefreshing && "animate-spin"
+              )}
+            />
+          </div>
+        </div>
+      )}
+
       <header
         className={
           "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
@@ -206,6 +257,20 @@ const ThreadListPage = ({
             )?.name
           }
         </h1>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={isRefreshing || isPullRefreshing}
+          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="更新"
+        >
+          <FaSync
+            className={twMerge(
+              "w-4 h-4",
+              (isRefreshing || isPullRefreshing) && "animate-spin"
+            )}
+          />
+        </button>
         <button
           type="button"
           onClick={() => setShowNGSettings(true)}
@@ -415,8 +480,7 @@ const ThreadListPage = ({
               label: selectedTitleText
                 ? "選択したテキスト"
                 : "スレッドタイトル",
-              value:
-                selectedTitleText || contextMenuThread.title,
+              value: selectedTitleText || contextMenuThread.title,
               category: "thread.titles",
             },
             ...(contextMenuThread.authorId
