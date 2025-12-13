@@ -7,14 +7,12 @@ use crate::{app::AppState, repositories::terms_repository::TermsRepository};
 #[derive(Debug, Serialize)]
 pub struct TermsResponse {
     pub content: String,
-    pub updated_at: chrono::NaiveDateTime,
 }
 
 impl From<eddist_core::domain::terms::Terms> for TermsResponse {
     fn from(terms: eddist_core::domain::terms::Terms) -> Self {
         TermsResponse {
             content: terms.content,
-            updated_at: terms.updated_at,
         }
     }
 }
