@@ -1,7 +1,7 @@
 import { Button } from "flowbite-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router";
-import { FaArrowLeft, FaCog, FaPen } from "react-icons/fa";
+import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
 import PostResponseModal from "../components/PostResponseModal";
 import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
@@ -17,6 +17,7 @@ import {
 } from "~/api-client/thread";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
+import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import React from "react";
 
 export const headers = (_: Route.HeadersArgs) => {
@@ -188,6 +189,7 @@ const ThreadPage = ({
   const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(
     new Set()
   );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { shouldFilterResponse } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
@@ -196,6 +198,27 @@ const ThreadPage = ({
   const [contextMenuType, setContextMenuType] = useState<
     "authorId" | "name" | null
   >(null);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await mutate();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const {
+    isPulling,
+    pullDistance,
+    isRefreshing: isPullRefreshing,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    direction: "up",
+    enabled: true,
+    scrollTarget: "window",
+  });
 
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
@@ -239,6 +262,35 @@ const ThreadPage = ({
 
   return (
     <div className={twMerge("flex flex-col")}>
+      {/* Pull-to-refresh indicator at bottom */}
+      {(isPulling || isPullRefreshing) && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 flex justify-center items-center transition-all duration-200"
+          style={{
+            paddingBottom: isPullRefreshing
+              ? "16px"
+              : `${Math.min(pullDistance / 2, 40)}px`,
+          }}
+        >
+          <div
+            className="bg-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+            style={{
+              width: "40px",
+              height: "40px",
+              transform: `scale(${isPullRefreshing ? 1 : Math.min(pullDistance / 80, 1)})`,
+              opacity: isPullRefreshing ? 1 : Math.min(pullDistance / 80, 0.8),
+            }}
+          >
+            <FaSync
+              className={twMerge(
+                "text-blue-600 text-lg",
+                isPullRefreshing && "animate-spin"
+              )}
+            />
+          </div>
+        </div>
+      )}
+
       <header className="fixed top-0 left-0 right-0 z-5 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
@@ -275,6 +327,20 @@ const ThreadPage = ({
         </>
         <button
           type="button"
+          onClick={handleRefresh}
+          disabled={isRefreshing || isPullRefreshing}
+          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors items-center disabled:opacity-50 disabled:cursor-not-allowed"
+          title="更新"
+        >
+          <FaSync
+            className={twMerge(
+              "w-4 h-4",
+              (isRefreshing || isPullRefreshing) && "animate-spin"
+            )}
+          />
+        </button>
+        <button
+          type="button"
           onClick={() => setShowNGSettings(true)}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
           title="NG設定"
@@ -306,7 +372,7 @@ const ThreadPage = ({
         refetchThread={mutate}
       />
 
-      <main className={twMerge("grow pt-18 lg:pt-16", "overflow-y-auto")}>
+      <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
             {posts?.responses.map((post) => {
