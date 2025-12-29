@@ -24,7 +24,7 @@ interface PostResponseSuccess {
 
 interface PostResponseFailure {
   success: false;
-  error: PostResponseFailureAuthCode | PostResponseFailureUnknown;
+  error: PostResponseFailureAuthCode | PostResponseFailureRevokedToken | PostResponseFailureUnknown;
 }
 
 interface PostResponseFailureAuthCode {
@@ -34,6 +34,11 @@ interface PostResponseFailureAuthCode {
 
 interface PostResponseFailureUnknown {
   kind: "unknown";
+  errorHtml: string;
+}
+
+interface PostResponseFailureRevokedToken {
+  kind: "revoked-token";
   errorHtml: string;
 }
 
@@ -89,6 +94,10 @@ const extractAuthCodeWhenUnauthenticated = (text: string): string => {
     throw new Error("Unknown response from the server");
   }
   return authCode;
+};
+
+const deleteEdgeTokenCookie = (): void => {
+  document.cookie = "edge-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 };
 
 export const postResponse = async ({
@@ -191,6 +200,17 @@ const afterPost = async (res: Response): Promise<PostResponseResult> => {
     if (text.includes("E-Unauthenticated")) {
       const authCode = extractAuthCodeWhenUnauthenticated(text);
       return { success: false, error: { kind: "auth-code", authCode } };
+    } else if (text.includes("E-RevokedAuthedToken")) {
+      // Token was revoked by admin - delete from browser
+      deleteEdgeTokenCookie();
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      return {
+        success: false,
+        error: {
+          kind: "revoked-token",
+          errorHtml: doc.body.innerHTML,
+        },
+      };
     } else {
       const doc = new DOMParser().parseFromString(text, "text/html");
       return {
