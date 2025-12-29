@@ -60,6 +60,10 @@ const PostResponseModal = (props: PostResponseModalProps) => {
                   setAuthCode(result.error.authCode);
                   setOpenAuthCodeModal(true);
                   return;
+                case "revoked-token":
+                  serErrorModal(true);
+                  setErrorMessage(result.error.errorHtml);
+                  return;
                 case "unknown":
                   serErrorModal(true);
                   setErrorMessage(result.error.errorHtml);
