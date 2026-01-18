@@ -103,7 +103,7 @@ fn sanitize_non_semi_closing_num_char_refs(target: &str) -> String {
             sanitized.push(c);
             if c == '&' {
                 ampersand_used = i as isize;
-            } else if ampersand_used == (i as isize - 1) && c == '#' {
+            } else if ampersand_used >= 0 && ampersand_used == (i as isize - 1) && c == '#' {
                 in_num_ref = Some(NumRefKind::Undef);
             }
         }
@@ -294,6 +294,14 @@ mod tests {
         assert_eq!(sanitize_num_refs("test&#10;end"), "testend");
         assert_eq!(sanitize_num_refs("test&#X0A;end"), "testend");
         assert_eq!(sanitize_num_refs("keep&#41;this"), "keep)this"); // &#41; is ASCII ')'
+        assert_eq!(sanitize_num_refs("keep&#12354;this"), "keep&#12354;this"); // &#12354; is non-ASCII
+
+        // Edge cases: standalone # should not cause panic
+        assert_eq!(sanitize_num_refs("#"), "#");
+        assert_eq!(sanitize_num_refs("##"), "##");
+        assert_eq!(sanitize_num_refs("test#"), "test#");
+        assert_eq!(sanitize_num_refs("#test"), "#test");
+        assert_eq!(sanitize_num_refs("a#b#c"), "a#b#c");
     }
 
     #[test]
