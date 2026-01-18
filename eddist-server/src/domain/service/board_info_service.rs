@@ -19,6 +19,9 @@ use crate::{
     repositories::bbs_repository::BbsRepository,
 };
 
+/// Maximum characters allowed per line in body content
+const MAX_CHARS_PER_LINE: usize = 250;
+
 struct BoardInfoLocalCacheItem {
     board_info: BoardInfo,
     expired_at: u64,
@@ -122,10 +125,21 @@ impl BoardInfoResRestrictable for ResCore<'_> {
                 ContentLengthExceededParamType::Mail,
             ));
         }
-        let l_count = self.body.lines().count();
+
+        let lines = self.body.lines().collect::<Vec<_>>();
+        let l_count = lines.len();
         if l_count > board_info.max_response_body_lines as usize {
             return Err(BbsCgiError::ContentLengthExceeded(
                 ContentLengthExceededParamType::BodyLines,
+            ));
+        }
+
+        if lines
+            .iter()
+            .any(|line| line.chars().count() > MAX_CHARS_PER_LINE)
+        {
+            return Err(BbsCgiError::ContentLengthExceeded(
+                ContentLengthExceededParamType::BodyLineLength,
             ));
         }
 
@@ -175,14 +189,30 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
         is_thread: bool,
     ) -> Result<(), BbsCgiError> {
         if let Some(tinker) = &self.tinker {
-            if chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at()
-                < board_info.base_response_creation_span_sec as u64
+            // Response creation span is scaled per tinker level by multiplying
+            // `base_response_creation_span_sec` with the following factors:
+            //   level 0 -> *3, level 1 -> *3, level 2 -> *2, level >= 3 -> *1.
+            // Higher tinker levels (>= 3) are clamped to index 3, meaning they use
+            // the base span without any additional multiplier.
+            let res_span_sec = [
+                (board_info.base_response_creation_span_sec * 3) as usize,
+                (board_info.base_response_creation_span_sec * 3) as usize,
+                (board_info.base_response_creation_span_sec * 2) as usize,
+                board_info.base_response_creation_span_sec as usize,
+            ][if tinker.level() > 3 {
+                3
+            } else {
+                tinker.level()
+            } as usize];
+
+            if chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at() < res_span_sec as u64
             {
                 return Err(BbsCgiError::TooManyCreatingRes {
                     tinker_level: tinker.level(),
-                    span_sec: board_info.base_response_creation_span_sec,
+                    span_sec: res_span_sec as i32,
                 });
             }
+
             if is_thread {
                 if let Some(last_created_thread_at) = tinker.last_created_thread_at() {
                     let span = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;

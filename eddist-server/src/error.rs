@@ -288,6 +288,7 @@ pub enum ContentLengthExceededParamType {
     Body,
     ThreadName,
     BodyLines,
+    BodyLineLength,
 }
 
 impl Display for ContentLengthExceededParamType {
@@ -301,6 +302,7 @@ impl Display for ContentLengthExceededParamType {
                 ContentLengthExceededParamType::Body => "本文",
                 ContentLengthExceededParamType::ThreadName => "スレッド名",
                 ContentLengthExceededParamType::BodyLines => "本文の行数",
+                ContentLengthExceededParamType::BodyLineLength => "1行の文字数",
             }
         )
     }
