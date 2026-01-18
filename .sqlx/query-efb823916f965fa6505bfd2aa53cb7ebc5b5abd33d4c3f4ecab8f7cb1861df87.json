@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT \n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at,\n                author_id_seed,\n                registered_user_id\n            FROM authed_tokens WHERE token = ?",
+  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id\n            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
   "describe": {
     "columns": [
       {
@@ -113,6 +113,15 @@
       },
       {
         "ordinal": 12,
+        "name": "require_user_registration",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 13,
         "name": "registered_user_id",
         "type_info": {
           "type": "String",
@@ -122,7 +131,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -137,8 +146,9 @@
       false,
       true,
       false,
+      false,
       true
     ]
   },
-  "hash": "ad3649040cad9b12b8a6e3a4b07fff7168bb047cdd650137035dffe4330c1db5"
+  "hash": "efb823916f965fa6505bfd2aa53cb7ebc5b5abd33d4c3f4ecab8f7cb1861df87"
 }
