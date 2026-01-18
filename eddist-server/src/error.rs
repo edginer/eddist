@@ -90,6 +90,9 @@ pub enum BbsCgiError {
     #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
     EmailAuthenticatedUnsupportedUserAgent,
 
+    #[error("書き込むには外部アカウントとの連携が必要です。{base_url}/user/link?token={token} から連携を行ってください")]
+    UserRegistrationRequired { base_url: String, token: String },
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -119,6 +122,7 @@ impl BbsCgiError {
             BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
+            BbsCgiError::UserRegistrationRequired { .. } => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -149,6 +153,7 @@ impl BbsCgiError {
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => {
                 "EmailAuthenticatedUnsupportedUserAgent"
             }
+            BbsCgiError::UserRegistrationRequired { .. } => "UserRegistrationRequired",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

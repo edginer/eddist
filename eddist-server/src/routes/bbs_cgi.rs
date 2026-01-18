@@ -110,6 +110,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
+                require_user_registration: state.require_user_registration,
             })
             .await
         {
@@ -140,6 +141,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
+                require_user_registration: state.require_user_registration,
             })
             .await
         {

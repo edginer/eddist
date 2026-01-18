@@ -61,6 +61,14 @@ pub(crate) mod redis {
         format!("userlogin:oauth2:authreq:{state_id}")
     }
 
+    pub fn user_link_oauth2_state_key(state_id: &str) -> String {
+        format!("userlink:oauth2:state:{state_id}")
+    }
+
+    pub fn user_link_oauth2_authreq_key(state_id: &str) -> String {
+        format!("userlink:oauth2:authreq:{state_id}")
+    }
+
     pub fn email_auth_used_key(token: &str) -> String {
         format!("resp:email_auth_used:{token}")
     }
