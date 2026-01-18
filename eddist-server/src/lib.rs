@@ -117,6 +117,7 @@ pub fn create_test_app(
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),
         template_engine: load_template_engine(),
+        require_user_registration: false,
     };
 
     // Use the actual create_app from app module

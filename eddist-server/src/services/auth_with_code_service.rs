@@ -206,6 +206,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         Ok(AuthWithCodeServiceOutput {
             token: token.token,
+            authed_token_id: token.id,
             rate_limit_token,
         })
     }
@@ -222,5 +223,6 @@ pub struct AuthWithCodeServiceInput {
 
 pub struct AuthWithCodeServiceOutput {
     pub token: String,
+    pub authed_token_id: Uuid,
     pub rate_limit_token: Option<String>,
 }

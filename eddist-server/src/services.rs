@@ -1,5 +1,5 @@
 use auth_with_code_service::AuthWithCodeService;
-use auth_with_code_user_page_service::AuthWithCodeUserPageService;
+use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
@@ -12,6 +12,8 @@ use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
 use user_authz_idp_callback_service::UserAuthzIdpCallbackService;
+use user_link_idp_redirection_service::UserLinkIdpRedirectionService;
+use user_link_idp_selection_service::UserLinkIdpSelectionService;
 use user_login_idp_redirection_service::UserLoginIdpRedirectionService;
 use user_login_page_service::UserLoginPageService;
 use user_logout_service::UserLogoutService;
@@ -32,7 +34,7 @@ use crate::{
 };
 
 pub(crate) mod auth_with_code_service;
-pub(crate) mod auth_with_code_user_page_service;
+pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
 pub(crate) mod captcha_config_cache;
 pub(crate) mod kako_thread_retrieval_service;
@@ -43,6 +45,8 @@ pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;
 pub(crate) mod user_authz_idp_callback_service;
+pub(crate) mod user_link_idp_redirection_service;
+pub(crate) mod user_link_idp_selection_service;
 pub(crate) mod user_login_idp_redirection_service;
 pub(crate) mod user_login_page_service;
 pub(crate) mod user_logout_service;
@@ -87,10 +91,12 @@ pub struct AppServiceContainer<
     user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
     user_page: UserPageService<U>,
     user_login_page: UserLoginPageService<U, I>,
-    auth_with_code_user_page: AuthWithCodeUserPageService<U, B>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
+    user_link_idp_selection: UserLinkIdpSelectionService<I, B>,
+    user_link_idp_redirection: UserLinkIdpRedirectionService<I>,
     user_logout: UserLogoutService,
     user_restriction: UserRestrictionService<R>,
+    bind_token_to_user: BindTokenToUserService<U>,
 }
 
 impl<
@@ -154,17 +160,22 @@ impl<
                 idp_repo.clone(),
                 redis_conn.clone(),
             ),
-            auth_with_code_user_page: AuthWithCodeUserPageService::new(
-                user_repo,
+            user_login_idp_redirection: UserLoginIdpRedirectionService::new(
+                idp_repo.clone(),
+                redis_conn.clone(),
+            ),
+            user_link_idp_selection: UserLinkIdpSelectionService::new(
+                idp_repo.clone(),
                 bbs_repo,
                 redis_conn.clone(),
             ),
-            user_login_idp_redirection: UserLoginIdpRedirectionService::new(
+            user_link_idp_redirection: UserLinkIdpRedirectionService::new(
                 idp_repo,
                 redis_conn.clone(),
             ),
-            user_logout: UserLogoutService::new(redis_conn),
+            user_logout: UserLogoutService::new(redis_conn.clone()),
             user_restriction: UserRestrictionService::new(user_restriction_repo),
+            bind_token_to_user: BindTokenToUserService::new(user_repo, redis_conn),
         }
     }
 }
@@ -234,10 +245,6 @@ impl<
         &self.user_login_page
     }
 
-    pub fn auth_with_code_user_page(&self) -> &AuthWithCodeUserPageService<U, B> {
-        &self.auth_with_code_user_page
-    }
-
     pub fn user_logout(&self) -> &UserLogoutService {
         &self.user_logout
     }
@@ -246,7 +253,19 @@ impl<
         &self.user_login_idp_redirection
     }
 
+    pub fn user_link_idp_selection(&self) -> &UserLinkIdpSelectionService<I, B> {
+        &self.user_link_idp_selection
+    }
+
+    pub fn user_link_idp_redirection(&self) -> &UserLinkIdpRedirectionService<I> {
+        &self.user_link_idp_redirection
+    }
+
     pub fn user_restriction(&self) -> &UserRestrictionService<R> {
         &self.user_restriction
+    }
+
+    pub fn bind_token_to_user(&self) -> &BindTokenToUserService<U> {
+        &self.bind_token_to_user
     }
 }

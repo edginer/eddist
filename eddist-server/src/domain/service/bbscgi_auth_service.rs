@@ -23,6 +23,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
         user_agent: String,
         asn_num: i32,
         created_at: chrono::DateTime<chrono::Utc>,
+        require_user_registration: bool,
     ) -> Result<AuthedToken, BbsCgiError> {
         let Some(authed_token) = token else {
             let authed_token = AuthedToken::new(ip_addr, user_agent, asn_num);
@@ -36,6 +37,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                     author_id_seed: authed_token.author_id_seed,
                     auth_code: authed_token.auth_code.clone(),
                     id: authed_token.id,
+                    require_user_registration,
                 })
                 .await?;
 
@@ -68,6 +70,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                         author_id_seed: authed_token.author_id_seed,
                         auth_code: authed_token.auth_code.clone(),
                         id: authed_token.id,
+                        require_user_registration,
                     })
                     .await?;
 
@@ -83,6 +86,14 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                     auth_token: authed_token.token,
                 })
             };
+        }
+
+        // Check if user registration is required but not linked
+        if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
+            return Err(BbsCgiError::UserRegistrationRequired {
+                base_url: env::var("BASE_URL").unwrap(),
+                token: authed_token.token.clone(),
+            });
         }
 
         Ok(authed_token)

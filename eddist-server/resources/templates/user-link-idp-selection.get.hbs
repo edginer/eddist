@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アカウント連携</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .idp-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .idp-button {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s, transform 0.2s;
+        }
+        .idp-button:hover {
+            background: #e9e9e9;
+            transform: scale(1.05);
+        }
+        .idp-button img {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>アカウント連携</h1>
+    <p class="description">
+        外部アカウントと連携すると、異なるデバイスでも同じIDで書き込めます。<br>
+        連携に使用するサービスを選択してください。
+    </p>
+    <div class="idp-container">
+        {{#each available_idps}}
+            <button class="idp-button" onclick="redirectToIdP('{{idp_name}}')">
+                <img src="data:image/svg+xml;base64,{{idp_logo_svg}}" alt="{{idp_display_name}} Logo" width="24" height="24">
+                {{idp_display_name}} で連携
+            </button>
+        {{/each}}
+    </div>
+
+    <script>
+        function redirectToIdP(idpName) {
+            window.location.href = `/user/link/authz/idp/${idpName}`;
+        }
+    </script>
+</body>
+</html>
