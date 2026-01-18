@@ -558,7 +558,7 @@ fn sanitize_email(email: &str) -> String {
 }
 
 fn sanitize_body(body: &str) -> String {
-    sanitize_num_refs(&sanitize_base(body, true))
+    sanitize_base(&sanitize_num_refs(body), true)
 }
 
 #[cfg(test)]
@@ -568,6 +568,32 @@ mod tests {
 
     struct Dummy;
     impl ResState for Dummy {}
+
+    #[test]
+    fn test_sanitize_body_xss_prevention() {
+        // XSS prevention: numeric character references for < and > must be escaped
+        // &#60; = '<', &#62; = '>', &#x3C; = '<', &#x3E; = '>'
+        assert_eq!(
+            sanitize_body("&#60;script&#62;alert()&#60;/script&#62;"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        assert_eq!(
+            sanitize_body("&#x3C;script&#x3E;alert()&#x3C;/script&#x3E;"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        // Literal < and > are also escaped
+        assert_eq!(
+            sanitize_body("<script>alert()</script>"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        // Newlines still become <br> (intended behavior)
+        assert_eq!(sanitize_body("line1\nline2"), "line1<br>line2");
+        // Mixed: XSS attempt with newlines
+        assert_eq!(
+            sanitize_body("normal\n&#60;script&#62;alert()&#60;/script&#62;"),
+            "normal<br>&lt;script&gt;alert()&lt;/script&gt;"
+        );
+    }
 
     #[test]
     fn test_get_all_urls() {

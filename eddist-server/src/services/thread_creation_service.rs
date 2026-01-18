@@ -301,7 +301,7 @@ pub struct ThreadCreationServiceOutput {
 }
 
 pub fn sanitize_thread_name(name: &str) -> String {
-    sanitize_num_refs(&sanitize_base(name, false))
+    sanitize_base(&sanitize_num_refs(name), false)
 }
 
 #[cfg(test)]
@@ -320,5 +320,26 @@ mod tests {
             "title withnewline"
         );
         assert_eq!(sanitize_thread_name("title&#10;test"), "titletest");
+        // Ensure <br> is escaped (becomes &lt;br&gt;) and never appears raw in title
+        assert_eq!(sanitize_thread_name("some<br>text"), "some&lt;br&gt;text");
+        // Ensure title never contains raw <br>
+        assert!(!sanitize_thread_name("title\ntest").contains("<br>"));
+        assert!(!sanitize_thread_name("title<br>test").contains("<br>"));
+
+        // XSS prevention: numeric character references for < and > must be escaped
+        // &#60; = '<', &#62; = '>', &#x3C; = '<', &#x3E; = '>'
+        assert_eq!(
+            sanitize_thread_name("&#60;script&#62;alert()&#60;/script&#62;"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        assert_eq!(
+            sanitize_thread_name("&#x3C;script&#x3E;alert()&#x3C;/script&#x3E;"),
+            "&lt;script&gt;alert()&lt;/script&gt;"
+        );
+        // Mixed: some literal, some numeric refs
+        assert_eq!(
+            sanitize_thread_name("<img src=x onerror=&#34;alert()&#34;>"),
+            "&lt;img src=x onerror=&quot;alert()&quot;&gt;"
+        );
     }
 }
