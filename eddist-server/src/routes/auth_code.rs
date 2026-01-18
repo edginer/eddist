@@ -11,12 +11,15 @@ use serde::Serialize;
 use serde_json::json;
 use time;
 
+use eddist_core::utils::is_user_registration_enabled;
+
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         captcha_config_cache::get_cached_captcha_configs,
+        bind_token_to_user_service::BindTokenToUserServiceInput,
         AppService,
     },
     utils::{get_origin_ip, get_ua},
@@ -117,7 +120,7 @@ pub async fn post_auth_code(
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
     let captcha_configs = get_cached_captcha_configs().await;
-    let (token, rate_limit_token) = match state
+    let (token, authed_token_id, rate_limit_token) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -132,8 +135,9 @@ pub async fn post_auth_code(
     {
         Ok(AuthWithCodeServiceOutput {
             token,
+            authed_token_id,
             rate_limit_token,
-        }) => (token, rate_limit_token),
+        }) => (token, authed_token_id, rate_limit_token),
         Err(e) => {
             return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
                 Html(
@@ -159,9 +163,30 @@ pub async fn post_auth_code(
         }
     };
 
+    // Auto-bind token to user if logged in
+    if let Some(user_sid) = jar.get("user-sid").map(|c| c.value().to_string()) {
+        if let Err(e) = state
+            .services
+            .bind_token_to_user()
+            .execute(BindTokenToUserServiceInput {
+                user_sid,
+                authed_token_id,
+            })
+            .await
+        {
+            log::warn!("Failed to auto-bind token to user: {e}");
+        }
+    }
+
     let html = state
         .template_engine
-        .render("auth-code.post.success", &json!({ "token": token }))
+        .render(
+            "auth-code.post.success",
+            &json!({
+                "token": token,
+                "enable_user_registration": is_user_registration_enabled()
+            }),
+        )
         .unwrap();
 
     // Set rate limiting cookie if provided by the service

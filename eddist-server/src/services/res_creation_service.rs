@@ -145,6 +145,7 @@ impl<
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
+                input.require_user_registration,
             )
             .await?;
 
@@ -362,6 +363,7 @@ pub struct ResCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
+    pub require_user_registration: bool,
 }
 
 pub struct ResCreationServiceOutput {
