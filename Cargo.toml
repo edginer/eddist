@@ -7,3 +7,109 @@ members = [
     "eddist-server",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+# Core utilities
+anyhow = "1.0.86"
+thiserror = "2.0.12"
+log = "0.4.22"
+dotenvy = "0.15.7"
+
+# Async runtime
+tokio = { version = "1.44.2", features = ["full"] }
+futures = "0.3.30"
+async-trait = "0.1.81"
+
+# Serialization
+serde = { version = "1.0.205", features = ["derive"] }
+serde_json = "1.0.122"
+toml = "0.8.20"
+
+# Web framework
+axum = "0.8.4"
+axum-extra = { version = "0.10.1", features = ["cookie"] }
+tower = "0.5.1"
+tower-http = { version = "0.6.2" }
+tower-layer = "0.3.3"
+hyper = "1.4.0"
+hyper-util = "0.1.6"
+http = "1.1.0"
+
+# Database
+sqlx = { version = "0.8.5", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",
+    "macros",
+    "chrono",
+    "json",
+    "uuid",
+] }
+redis = { version = "0.30.0", features = ["tokio-comp"] }
+
+# HTTP client
+reqwest = { version = "0.12.15", default-features = false, features = [
+    "rustls-tls",
+    "json",
+] }
+
+# Date/time
+chrono = { version = "0.4.38", features = ["serde"] }
+time = "0.3.36"
+
+# UUID
+uuid = { version = "1.10.0", features = ["v4", "v7", "serde"] }
+
+# Encoding
+encoding_rs = "0.8.34"
+base64 = "0.22.1"
+
+# Cryptography
+sha3 = "0.10.8"
+sha2 = "0.10.8"
+sha1 = { version = "0.10.6", default-features = false }
+md-5 = "0.10.6"
+jsonwebtoken = "9.3.0"
+chacha20poly1305 = "0.10.1"
+pwhash = "1.0.0"
+
+# Cloud storage
+rust-s3 = { version = "0.35.1", default-features = false, features = [
+    "tokio-rustls-tls",
+    "tags",
+    "fail-on-err",
+] }
+
+# Observability
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+metrics = "0.24.2"
+metrics-exporter-prometheus = "0.17.0"
+axum-prometheus = "0.8.0"
+
+# Misc
+regex = "1.10.6"
+url = "2.5.4"
+rand = "0.9.1"
+ipnet = "2.9"
+handlebars = "6.1.0"
+cron = "0.15.0"
+
+# Auth
+openidconnect = "4.0.0"
+oauth2 = { version = "5.0.0", features = ["reqwest"] }
+
+# Testing
+mockall = "0.13.1"
+testcontainers = "0.25"
+testcontainers-modules = { version = "0.13", features = ["mysql", "redis"] }
+axum-test = "18.2"
+
+# Admin specific
+utoipa = { version = "5.3.1", features = ["uuid", "axum_extras", "chrono"] }
+tower-sessions = "0.14.0"
+env_logger = "0.11.3"
+tokio-util = "0.7.11"
+
+# Internal
+eddist-core = { path = "eddist-core" }

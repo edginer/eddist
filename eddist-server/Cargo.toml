@@ -9,41 +9,32 @@ edition = "2021"
 default = []
 
 [dependencies]
-anyhow = "1.0.86"
-async-trait = "0.1.80"
-axum = "0.8.4"
-axum-extra = { version = "0.10.1", features = ["cookie"] }
-base64 = "0.22.1"
-chrono = { version = "0.4.38", features = ["serde"] }
-dotenvy = "0.15.7"
-encoding_rs = { version = "0.8.34", features = ["fast-kanji-encode"] }
-env_logger = "0.11.3"
-hyper = "1.4.0"
-hyper-util = "0.1.6"
-jsonwebtoken = "9.3.0"
-log = "0.4.22"
-md-5 = "0.10.6"
-mockall = "0.13.1"
-pwhash = "1.0.0"
-rand = "0.9.1"
-redis = { version = "0.30.0", features = ["tokio-comp", "connection-manager"] }
-serde = { version = "1.0.205", features = ["derive"] }
-serde_json = { version = "1.0.118" }
-sqlx = { version = "0.8.5", default-features = false, features = [
-    "runtime-tokio",
-    "tls-rustls",
-    "mysql",
-    "macros",
-    "chrono",
-    "json",
-    "uuid",
-    "migrate",
-] }
-thiserror = "2.0.12"
-time = "0.3.36"
-tokio = { version = "1.44.2", features = ["full"] }
-tokio-util = "0.7.11"
-tower-http = { version = "0.6.2", features = [
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+base64.workspace = true
+chrono.workspace = true
+dotenvy.workspace = true
+encoding_rs = { workspace = true, features = ["fast-kanji-encode"] }
+env_logger.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+jsonwebtoken.workspace = true
+log.workspace = true
+md-5.workspace = true
+mockall.workspace = true
+pwhash.workspace = true
+rand.workspace = true
+redis = { workspace = true, features = ["connection-manager"] }
+serde.workspace = true
+serde_json.workspace = true
+sqlx = { workspace = true, features = ["migrate"] }
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower-http = { workspace = true, features = [
     "compression-br",
     "compression-gzip",
     "trace",
@@ -52,36 +43,28 @@ tower-http = { version = "0.6.2", features = [
     "normalize-path",
     "catch-panic",
 ] }
-tracing = "0.1.40"
-uuid = { version = "1.9.1", features = ["v4", "v7", "serde"] }
-regex = "1.10.6"
-reqwest = { version = "0.12.15", default-features = false, features = [
-    "rustls-tls",
-    "json",
-    "charset",
-] }
-eddist-core = { path = "../eddist-core" }
-sha3 = "0.10.8"
-sha2 = "0.10.8"
-futures = "0.3.30"
-handlebars = "6.1.0"
-metrics = "0.24.2"
-metrics-exporter-prometheus = "0.17.0"
-axum-prometheus = "0.8.0"
-sha1 = { version = "0.10.6", default-features = false }
-rust-s3 = { version = "0.35.1", default-features = false, features = [
-    "tokio-rustls-tls",
-    "tags",
-    "fail-on-err",
-] }
-http = "1.1.0"
-tower = "0.5.1"
-openidconnect = "4.0.0"
-url = "2.5.4"
-chacha20poly1305 = "0.10.1"
-toml = "0.8.20"
+tracing.workspace = true
+uuid.workspace = true
+regex.workspace = true
+reqwest = { workspace = true, features = ["charset"] }
+eddist-core.workspace = true
+sha3.workspace = true
+sha2.workspace = true
+futures.workspace = true
+handlebars.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+axum-prometheus.workspace = true
+sha1.workspace = true
+rust-s3.workspace = true
+http.workspace = true
+tower.workspace = true
+openidconnect.workspace = true
+url.workspace = true
+chacha20poly1305.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
-testcontainers = "0.25"
-testcontainers-modules = { version = "0.13", features = ["mysql", "redis"] }
-axum-test = "18.2"
+testcontainers.workspace = true
+testcontainers-modules.workspace = true
+axum-test.workspace = true
