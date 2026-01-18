@@ -189,24 +189,17 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
         is_thread: bool,
     ) -> Result<(), BbsCgiError> {
         if let Some(tinker) = &self.tinker {
-            // Response creation span is scaled per tinker level by multiplying
-            // `base_response_creation_span_sec` with the following factors:
-            //   level 0 -> *3, level 1 -> *3, level 2 -> *2, level >= 3 -> *1.
-            // Higher tinker levels (>= 3) are clamped to index 3, meaning they use
-            // the base span without any additional multiplier.
-            let res_span_sec = [
-                (board_info.base_response_creation_span_sec * 3) as usize,
-                (board_info.base_response_creation_span_sec * 3) as usize,
-                (board_info.base_response_creation_span_sec * 2) as usize,
-                board_info.base_response_creation_span_sec as usize,
-            ][if tinker.level() > 3 {
-                3
-            } else {
-                tinker.level()
-            } as usize];
+            // Response creation span multiplier based on tinker level
+            let span_multiplier = match tinker.level() {
+                0 | 1 => 3,
+                2 => 2,
+                _ => 1, // level >= 3
+            };
+            let res_span_sec =
+                (board_info.base_response_creation_span_sec * span_multiplier) as u64;
 
-            if chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at() < res_span_sec as u64
-            {
+            let elapsed = chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at();
+            if elapsed < res_span_sec {
                 return Err(BbsCgiError::TooManyCreatingRes {
                     tinker_level: tinker.level(),
                     span_sec: res_span_sec as i32,
@@ -215,16 +208,20 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
 
             if is_thread {
                 if let Some(last_created_thread_at) = tinker.last_created_thread_at() {
-                    let span = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;
-                    let level_map = [60 * 60, 60 * 30, 60 * 15, 60 * 8, 60 * 4, 60 * 2];
-                    let span_limit = level_map[if tinker.level() > 5 {
-                        5
-                    } else {
-                        tinker.level()
-                    } as usize]
-                        * 2;
+                    let elapsed = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;
+                    // Thread creation span limit (in seconds) based on tinker level
+                    // Base values are doubled for the final limit
+                    let base_span = match tinker.level() {
+                        0 => 60 * 60, // 1 hour
+                        1 => 60 * 30, // 30 min
+                        2 => 60 * 15, // 15 min
+                        3 => 60 * 8,  // 8 min
+                        4 => 60 * 4,  // 4 min
+                        _ => 60 * 2,  // 2 min (level >= 5)
+                    };
+                    let span_limit = base_span * 2;
 
-                    if span < span_limit {
+                    if elapsed < span_limit {
                         return Err(BbsCgiError::TooManyCreatingThread {
                             tinker_level: tinker.level(),
                             span_sec: span_limit as i32,
