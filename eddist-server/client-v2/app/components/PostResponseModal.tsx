@@ -48,7 +48,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
         errorMessage={errorMessage}
       />
       <ModalHeader className="border-gray-200 dark:border-gray-600">
-        <h3 className="lg:text-2xl">書き込み</h3>
+        <span className="lg:text-2xl">書き込み</span>
       </ModalHeader>
       <ModalBody>
         <form
