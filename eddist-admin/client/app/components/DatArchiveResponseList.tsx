@@ -1,5 +1,6 @@
 import { Dropdown, DropdownItem } from "flowbite-react";
 import React from "react";
+import { Link } from "react-router";
 import { components } from "~/openapi/schema";
 
 interface Props {
@@ -38,7 +39,7 @@ const DatArchiveResponseList = ({
                 selectedResponsesOrder.find((order) => order === idx) != null
               ) {
                 setSelectedResponsesOrder((s) =>
-                  s.filter((order) => order !== idx)
+                  s.filter((order) => order !== idx),
                 );
               } else {
                 setSelectedResponsesOrder((s) => [...s, idx]);
@@ -91,7 +92,7 @@ const DatArchiveResponseList = ({
               <DropdownItem
                 onClick={() =>
                   onClickDeleteAuthedTokensAssociatedWithIp(
-                    response.authed_token_id
+                    response.authed_token_id,
                   )
                 }
               >
@@ -121,7 +122,19 @@ const DatArchiveResponseList = ({
           )}
         <div className="text-gray-500 text-sm mt-2">
           <p>IP: {response.ip_addr}</p>
-          <p>Authed Token ID: {response.authed_token_id}</p>
+          <p>
+            Authed Token ID:{" "}
+            {response.authed_token_id ? (
+              <Link
+                to={`/dashboard/authed-token?token=${response.authed_token_id}`}
+                className="text-blue-600 hover:underline"
+              >
+                {response.authed_token_id}
+              </Link>
+            ) : (
+              "N/A"
+            )}
+          </p>
         </div>
       </div>
     );
