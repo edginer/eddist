@@ -9,8 +9,8 @@ use crate::{
     domain::captcha_like::CaptchaLikeConfig,
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        CaptchaClient, CaptchaLikeError, CaptchaLikeResult, HCaptchaClient, MonocleClient,
-        TurnstileClient,
+        CapClient, CaptchaClient, CaptchaLikeError, CaptchaLikeResult, HCaptchaClient,
+        MonocleClient, TurnstileClient,
     },
     repositories::bbs_repository::BbsRepository,
 };
@@ -61,6 +61,15 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     CaptchaLikeConfig::Monocle { token, .. } => {
                         Box::new(MonocleClient::new(token.clone()))
                     }
+                    CaptchaLikeConfig::Cap {
+                        base_url,
+                        site_key,
+                        secret,
+                    } => Box::new(CapClient::new(
+                        base_url.clone(),
+                        site_key.clone(),
+                        secret.clone(),
+                    )),
                     _ => {
                         error_span!("unsupported captcha like config, ignored", config = ?config);
                         return None;
@@ -77,6 +86,10 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     ),
                     CaptchaLikeConfig::Monocle { .. } => (
                         input.responses["monocle"].to_string(),
+                        input.origin_ip.clone(),
+                    ),
+                    CaptchaLikeConfig::Cap { .. } => (
+                        input.responses["cap-token"].to_string(),
                         input.origin_ip.clone(),
                     ),
                     _ => unreachable!(),

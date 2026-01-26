@@ -98,14 +98,47 @@ pub struct MonocleResponse {
     pub sid: Option<String>,
 }
 
+/// Response from Cap (tiagozip/cap) siteverify endpoint
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CapResponse {
+    pub success: bool,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum CaptchaLikeConfig {
-    GrecaptchaV2 { site_key: String, secret: String },
-    GrecaptchaV3 { site_key: String, secret: String },
-    GrecaptchaEnterprise { site_key: String, secret: String },
-    Turnstile { site_key: String, secret: String },
-    Hcaptcha { site_key: String, secret: String },
-    Monocle { site_key: String, token: String },
+    GrecaptchaV2 {
+        site_key: String,
+        secret: String,
+    },
+    GrecaptchaV3 {
+        site_key: String,
+        secret: String,
+    },
+    GrecaptchaEnterprise {
+        site_key: String,
+        secret: String,
+    },
+    Turnstile {
+        site_key: String,
+        secret: String,
+    },
+    Hcaptcha {
+        site_key: String,
+        secret: String,
+    },
+    Monocle {
+        site_key: String,
+        token: String,
+    },
+    /// Cap (tiagozip/cap) - self-hosted proof-of-work captcha
+    /// base_url: The base URL of the Cap instance (e.g., "https://cap.example.com")
+    /// site_key: The site key from the Cap dashboard
+    /// secret: The secret key for the site from the Cap dashboard
+    Cap {
+        base_url: String,
+        site_key: String,
+        secret: String,
+    },
 }
 
 impl Debug for CaptchaLikeConfig {
@@ -140,6 +173,14 @@ impl Debug for CaptchaLikeConfig {
                 .debug_struct("Monocle")
                 .field("site_key", site_key)
                 .field("token", &"[REDACTED]")
+                .finish(),
+            CaptchaLikeConfig::Cap {
+                base_url, site_key, ..
+            } => f
+                .debug_struct("Cap")
+                .field("base_url", base_url)
+                .field("site_key", site_key)
+                .field("secret", &"[REDACTED]")
                 .finish(),
         }
     }

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        HCaptchaResponse, MonocleResponse, TurnstileResponse, HCAPTCHA_URL, MONOCLE_URL,
-        TURNSTILE_URL,
+        CapResponse, HCaptchaResponse, MonocleResponse, TurnstileResponse, HCAPTCHA_URL,
+        MONOCLE_URL, TURNSTILE_URL,
     },
     utils::SimpleSecret,
 };
@@ -195,6 +195,81 @@ impl CaptchaClient for MonocleClient {
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)
         } else {
             CaptchaLikeResult::Success
+        })
+    }
+}
+
+/// Client for Cap (tiagozip/cap) - self-hosted proof-of-work captcha
+/// API: POST {base_url}/{site_key}/siteverify
+/// Request body: { "secret": "...", "response": "..." }
+/// Response: { "success": true/false }
+pub struct CapClient {
+    client: reqwest::Client,
+    base_url: String,
+    site_key: String,
+    secret: SimpleSecret,
+}
+
+impl CapClient {
+    pub fn new(base_url: String, site_key: String, secret: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            base_url,
+            site_key,
+            secret: SimpleSecret::new(&secret),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CapRequest<'a> {
+    secret: &'a str,
+    response: &'a str,
+}
+
+#[async_trait::async_trait]
+impl CaptchaClient for CapClient {
+    async fn verify_captcha(
+        &self,
+        response: &str,
+        _ip_addr: &str,
+    ) -> Result<CaptchaLikeResult, reqwest::Error> {
+        // Cap API endpoint: {base_url}/{site_key}/siteverify
+        let url = format!(
+            "{}/{}/siteverify",
+            self.base_url.trim_end_matches('/'),
+            self.site_key
+        );
+
+        let request_body = CapRequest {
+            secret: self.secret.get(),
+            response,
+        };
+
+        let res = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+            .send()
+            .await?;
+
+        let response_text = res.text().await?;
+        let resp = match serde_json::from_str::<CapResponse>(&response_text) {
+            Ok(resp) => resp,
+            Err(e) => {
+                log::error!("Failed to parse Cap response: {e}, response body: {response_text}");
+                return Ok(CaptchaLikeResult::Failure(
+                    CaptchaLikeError::FailedToVerifyCaptcha,
+                ));
+            }
+        };
+
+        Ok(if resp.success {
+            CaptchaLikeResult::Success
+        } else {
+            log::info!("Cap response: {resp:?}");
+            CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         })
     }
 }

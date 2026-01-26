@@ -23,7 +23,7 @@ use crate::{
 
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let site_keys =
+    let mut site_keys =
         state
             .captcha_like_configs
             .iter()
@@ -33,6 +33,7 @@ pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
                     Some(("hcaptcha_site_key", site_key))
                 }
                 CaptchaLikeConfig::Monocle { site_key, .. } => Some(("monocle_site_key", site_key)),
+                CaptchaLikeConfig::Cap { site_key, .. } => Some(("cap_site_key", site_key)),
                 _ => {
                     tracing::warn!(
                         "not implemented yet such captcha like config, ignored: {config:?}",
@@ -41,6 +42,18 @@ pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
                 }
             })
             .collect::<HashMap<_, _>>();
+
+    // Add cap_base_url separately since we need to collect multiple values from Cap config
+    let cap_base_url = state
+        .captcha_like_configs
+        .iter()
+        .find_map(|config| match config {
+            CaptchaLikeConfig::Cap { base_url, .. } => Some(base_url),
+            _ => None,
+        });
+    if let Some(base_url) = cap_base_url {
+        site_keys.insert("cap_base_url", base_url);
+    }
 
     let html = state
         .template_engine
