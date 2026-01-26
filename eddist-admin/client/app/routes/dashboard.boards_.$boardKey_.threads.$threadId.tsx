@@ -11,12 +11,7 @@ import {
   ModalHeader,
 } from "flowbite-react";
 import { toast } from "react-toastify";
-import {
-  deleteAuthedToken,
-  getResponses,
-  getThread,
-  updateResponse,
-} from "~/hooks/queries";
+import { getResponses, getThread, updateResponse } from "~/hooks/queries";
 import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
 
 export interface ResInput {
@@ -40,9 +35,21 @@ export interface Res {
   client_info: ClientInfo;
 }
 
+export interface Tinker {
+  authed_token: string;
+  wrote_count: number;
+  created_thread_count: number;
+  level: number;
+  last_level_up_at: number;
+  last_wrote_at: number;
+  last_created_thread_at?: number | null;
+}
+
 export interface ClientInfo {
   user_agent: string;
   asn_num: number;
+  ip_addr: string;
+  tinker?: Tinker | null;
 }
 
 const Page = () => {
@@ -100,7 +107,7 @@ const Page = () => {
         return error;
       }
     },
-    [refetch, params.boardKey, params.threadId]
+    [refetch, params.boardKey, params.threadId],
   );
   const deleteAuthedCookie = useDeleteAuthedToken();
 

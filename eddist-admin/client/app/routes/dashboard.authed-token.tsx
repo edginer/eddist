@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import client from "~/openapi/client";
 import { components } from "~/openapi/schema";
+import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
 
 const Page = () => {
   const [searchParams] = useSearchParams();
@@ -20,6 +21,7 @@ const Page = () => {
   const [authedTokenData, setAuthedTokenData] =
     useState<components["schemas"]["AuthedToken"]>();
   const [setsearchError, setSetsearchError] = useState("");
+  const deleteAuthedToken = useDeleteAuthedToken();
 
   const handleAuthedTokenSearch = useCallback(async () => {
     if (!authedToken) {
@@ -40,6 +42,32 @@ const Page = () => {
       setSetsearchError(error.message);
     }
   }, [authedToken, setAuthedTokenData]);
+
+  const handleRevokeToken = useCallback(async () => {
+    if (!authedTokenData?.id) return;
+    if (!confirm("Are you sure you want to revoke this token?")) return;
+    await deleteAuthedToken(authedTokenData.id, false);
+    // Refresh the token data to show updated validity
+    await handleAuthedTokenSearch();
+  }, [authedTokenData?.id, deleteAuthedToken, handleAuthedTokenSearch]);
+
+  const handleRevokeAllFromOriginIp = useCallback(async () => {
+    if (!authedTokenData?.id) return;
+    if (
+      !confirm(
+        `Are you sure you want to revoke ALL tokens from origin IP: ${authedTokenData.origin_ip}?`,
+      )
+    )
+      return;
+    await deleteAuthedToken(authedTokenData.id, true);
+    // Refresh the token data to show updated validity
+    await handleAuthedTokenSearch();
+  }, [
+    authedTokenData?.id,
+    authedTokenData?.origin_ip,
+    deleteAuthedToken,
+    handleAuthedTokenSearch,
+  ]);
 
   useEffect(() => {
     if (searchParams.has("token")) {
@@ -126,6 +154,22 @@ const Page = () => {
                   </TableRow>
                 </TableBody>
               </Table>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  color="failure"
+                  onClick={handleRevokeToken}
+                  disabled={authedTokenData?.validity === false}
+                >
+                  Revoke Token
+                </Button>
+                <Button
+                  color="failure"
+                  onClick={handleRevokeAllFromOriginIp}
+                  disabled={authedTokenData?.validity === false}
+                >
+                  Revoke All Tokens from Origin IP
+                </Button>
+              </div>
             </div>
           )}
         </div>
