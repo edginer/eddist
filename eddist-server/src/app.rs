@@ -61,6 +61,7 @@ pub struct AppState {
     pub tinker_secret: String,
     pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub template_engine: Handlebars<'static>,
+    pub require_user_registration: bool,
 }
 
 impl AppState {

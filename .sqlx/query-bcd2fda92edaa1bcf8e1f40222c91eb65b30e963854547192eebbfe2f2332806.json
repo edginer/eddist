@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT at.token AS token\n            FROM authed_tokens at\n            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id\n            WHERE uat.user_id = ? AND at.validity = true\n            ORDER BY at.authed_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bcd2fda92edaa1bcf8e1f40222c91eb65b30e963854547192eebbfe2f2332806"
+}

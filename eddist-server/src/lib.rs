@@ -114,6 +114,7 @@ pub fn create_test_app(
             .to_string(),
         captcha_like_configs: vec![],
         template_engine: load_template_engine(),
+        require_user_registration: false,
     };
 
     // Use the actual create_app from app module
