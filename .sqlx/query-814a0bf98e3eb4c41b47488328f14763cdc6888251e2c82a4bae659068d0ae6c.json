@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at,\n                author_id_seed,\n                registered_user_id\n            FROM authed_tokens WHERE auth_code = ? AND validity = false",
+  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                registered_user_id\n            FROM authed_tokens WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -41,6 +41,15 @@
       },
       {
         "ordinal": 4,
+        "name": "asn_num",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 5,
         "name": "writing_ua",
         "type_info": {
           "type": "Blob",
@@ -49,7 +58,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "authed_ua",
         "type_info": {
           "type": "Blob",
@@ -58,7 +67,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "auth_code",
         "type_info": {
           "type": "VarString",
@@ -67,7 +76,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "created_at",
         "type_info": {
           "type": "Datetime",
@@ -76,7 +85,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "authed_at",
         "type_info": {
           "type": "Datetime",
@@ -85,7 +94,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "validity",
         "type_info": {
           "type": "Tiny",
@@ -94,7 +103,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "last_wrote_at",
         "type_info": {
           "type": "Datetime",
@@ -103,7 +112,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "author_id_seed",
         "type_info": {
           "type": "String",
@@ -112,7 +121,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "registered_user_id",
         "type_info": {
           "type": "String",
@@ -130,6 +139,7 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
@@ -140,5 +150,5 @@
       true
     ]
   },
-  "hash": "63aaa16cdf2777011c634d34ef0aa7e47e88971aab7ab171fd83a25487cabd7e"
+  "hash": "814a0bf98e3eb4c41b47488328f14763cdc6888251e2c82a4bae659068d0ae6c"
 }

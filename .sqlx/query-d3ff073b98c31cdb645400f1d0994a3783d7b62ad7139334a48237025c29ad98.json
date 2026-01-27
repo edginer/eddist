@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT \n                id, \n                token, \n                origin_ip, \n                reduced_origin_ip, \n                writing_ua, \n                authed_ua, \n                auth_code, \n                created_at, \n                authed_at, \n                validity, \n                last_wrote_at,\n                author_id_seed,\n                registered_user_id\n            FROM authed_tokens WHERE token = ?",
+  "query": "\n            SELECT\n                id AS \"id!: Uuid\",\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                created_at,\n                authed_at,\n                validity AS \"validity!: bool\",\n                last_wrote_at,\n                additional_info AS \"additional_info: serde_json::Value\"\n            FROM\n                authed_tokens\n            WHERE\n                id = ?\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "id!: Uuid",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
@@ -41,6 +41,15 @@
       },
       {
         "ordinal": 4,
+        "name": "asn_num",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 5,
         "name": "writing_ua",
         "type_info": {
           "type": "Blob",
@@ -49,21 +58,12 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "authed_ua",
         "type_info": {
           "type": "Blob",
           "flags": "BLOB",
           "max_size": 262140
-        }
-      },
-      {
-        "ordinal": 6,
-        "name": "auth_code",
-        "type_info": {
-          "type": "VarString",
-          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
-          "max_size": 48
         }
       },
       {
@@ -86,7 +86,7 @@
       },
       {
         "ordinal": 9,
-        "name": "validity",
+        "name": "validity!: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
@@ -104,20 +104,11 @@
       },
       {
         "ordinal": 11,
-        "name": "author_id_seed",
+        "name": "additional_info: serde_json::Value",
         "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | BINARY",
-          "max_size": 64
-        }
-      },
-      {
-        "ordinal": 12,
-        "name": "registered_user_id",
-        "type_info": {
-          "type": "String",
-          "flags": "MULTIPLE_KEY | BINARY",
-          "max_size": 16
+          "type": "Json",
+          "flags": "BLOB | BINARY",
+          "max_size": 4294967295
         }
       }
     ],
@@ -130,15 +121,14 @@
       false,
       false,
       false,
-      true,
-      false,
       false,
       true,
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "ad3649040cad9b12b8a6e3a4b07fff7168bb047cdd650137035dffe4330c1db5"
+  "hash": "d3ff073b98c31cdb645400f1d0994a3783d7b62ad7139334a48237025c29ad98"
 }

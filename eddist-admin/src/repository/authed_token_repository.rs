@@ -30,12 +30,14 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
                 token,
                 origin_ip,
                 reduced_origin_ip,
+                asn_num,
                 writing_ua,
                 authed_ua,
                 created_at,
                 authed_at,
                 validity AS "validity!: bool",
-                last_wrote_at
+                last_wrote_at,
+                additional_info AS "additional_info: serde_json::Value"
             FROM
                 authed_tokens
             WHERE

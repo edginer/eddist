@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO authed_tokens\n                (\n                    id,\n                    token,\n                    origin_ip,\n                    reduced_origin_ip,\n                    asn_num,\n                    writing_ua,\n                    auth_code,\n                    created_at,\n                    validity,\n                    author_id_seed\n                )\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "57a196da18d2c8f85cd4d6c128c7b533c7dba5ce57eb183fc54cee55cca07b61"
+}

@@ -1749,11 +1749,17 @@
           "token",
           "origin_ip",
           "reduced_origin_ip",
+          "asn_num",
           "writing_ua",
           "created_at",
           "validity"
         ],
         "properties": {
+          "additional_info": {},
+          "asn_num": {
+            "type": "integer",
+            "format": "int32"
+          },
           "authed_at": {
             "type": [
               "string",

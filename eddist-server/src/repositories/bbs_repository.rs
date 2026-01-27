@@ -304,6 +304,7 @@ impl BbsRepository for BbsRepositoryImpl {
                         token: x.token,
                         origin_ip: IpAddr::new(x.origin_ip),
                         reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+                        asn_num: 0,
                         writing_ua: x.writing_ua,
                         authed_ua: x.authed_ua,
                         auth_code: x.auth_code,
@@ -387,21 +388,22 @@ impl BbsRepository for BbsRepositoryImpl {
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT 
-                id, 
-                token, 
-                origin_ip, 
-                reduced_origin_ip, 
-                writing_ua, 
-                authed_ua, 
-                auth_code, 
-                created_at, 
-                authed_at, 
-                validity, 
+            r#"SELECT
+                id,
+                token,
+                origin_ip,
+                reduced_origin_ip,
+                asn_num,
+                writing_ua,
+                authed_ua,
+                auth_code,
+                created_at,
+                authed_at,
+                validity,
                 last_wrote_at,
                 author_id_seed,
                 registered_user_id
-            FROM authed_tokens WHERE token = ?",
+            FROM authed_tokens WHERE token = ?"#,
             token
         );
 
@@ -412,6 +414,7 @@ impl BbsRepository for BbsRepositoryImpl {
             token: x.token,
             origin_ip: IpAddr::new(x.origin_ip.clone()),
             reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+            asn_num: x.asn_num,
             writing_ua: x.writing_ua,
             authed_ua: x.authed_ua,
             auth_code: x.auth_code,
@@ -427,21 +430,22 @@ impl BbsRepository for BbsRepositoryImpl {
     async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>> {
         let query = query_as!(
             SelectionAuthedToken,
-            "SELECT 
-                id, 
-                token, 
-                origin_ip, 
-                reduced_origin_ip, 
-                writing_ua, 
-                authed_ua, 
-                auth_code, 
-                created_at, 
-                authed_at, 
-                validity, 
+            r#"SELECT
+                id,
+                token,
+                origin_ip,
+                reduced_origin_ip,
+                asn_num,
+                writing_ua,
+                authed_ua,
+                auth_code,
+                created_at,
+                authed_at,
+                validity,
                 last_wrote_at,
                 author_id_seed,
                 registered_user_id
-            FROM authed_tokens WHERE id = ?",
+            FROM authed_tokens WHERE id = ?"#,
             id.as_bytes().to_vec()
         );
 
@@ -452,6 +456,7 @@ impl BbsRepository for BbsRepositoryImpl {
             token: x.token,
             origin_ip: IpAddr::new(x.origin_ip.clone()),
             reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+            asn_num: x.asn_num,
             writing_ua: x.writing_ua,
             authed_ua: x.authed_ua,
             auth_code: x.auth_code,
@@ -472,16 +477,17 @@ impl BbsRepository for BbsRepositoryImpl {
         let query = query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id, 
-                token, 
-                origin_ip, 
-                reduced_origin_ip, 
-                writing_ua, 
-                authed_ua, 
-                auth_code, 
-                created_at, 
-                authed_at, 
-                validity, 
+                id,
+                token,
+                origin_ip,
+                reduced_origin_ip,
+                asn_num,
+                writing_ua,
+                authed_ua,
+                auth_code,
+                created_at,
+                authed_at,
+                validity,
                 last_wrote_at,
                 author_id_seed,
                 registered_user_id
@@ -497,6 +503,7 @@ impl BbsRepository for BbsRepositoryImpl {
             token: x.token,
             origin_ip: IpAddr::new(x.origin_ip.clone()),
             reduced_ip: ReducedIpAddr::from(x.origin_ip),
+            asn_num: x.asn_num,
             writing_ua: x.writing_ua,
             authed_ua: x.authed_ua,
             auth_code: x.auth_code,
@@ -516,16 +523,17 @@ impl BbsRepository for BbsRepositoryImpl {
         let query = query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id, 
-                token, 
-                origin_ip, 
-                reduced_origin_ip, 
-                writing_ua, 
-                authed_ua, 
-                auth_code, 
-                created_at, 
-                authed_at, 
-                validity, 
+                id,
+                token,
+                origin_ip,
+                reduced_origin_ip,
+                asn_num,
+                writing_ua,
+                authed_ua,
+                auth_code,
+                created_at,
+                authed_at,
+                validity,
                 last_wrote_at,
                 author_id_seed,
                 registered_user_id
@@ -542,6 +550,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 token: x.token,
                 origin_ip: IpAddr::new(x.origin_ip.clone()),
                 reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+                asn_num: x.asn_num,
                 writing_ua: x.writing_ua,
                 authed_ua: x.authed_ua,
                 auth_code: x.auth_code,
@@ -727,23 +736,25 @@ impl BbsRepository for BbsRepositoryImpl {
         let reduced_ip = ReducedIpAddr::from(authed_token.origin_ip).to_string();
 
         let query = query!(
-            "INSERT INTO authed_tokens 
+            "INSERT INTO authed_tokens
                 (
                     id,
-                    token, 
+                    token,
                     origin_ip,
                     reduced_origin_ip,
-                    writing_ua, 
-                    auth_code, 
-                    created_at, 
+                    asn_num,
+                    writing_ua,
+                    auth_code,
+                    created_at,
                     validity,
                     author_id_seed
-                ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             authed_token.id.as_bytes().to_vec(),
             authed_token.token,
             ip_addr,
             reduced_ip,
+            authed_token.asn_num,
             authed_token.writing_ua,
             authed_token.auth_code,
             authed_token.created_at,
@@ -947,6 +958,7 @@ struct SelectionAuthedToken {
     token: String,
     origin_ip: String,
     reduced_origin_ip: String,
+    asn_num: i32,
     writing_ua: String,
     authed_ua: Option<String>,
     auth_code: String,
@@ -993,6 +1005,7 @@ pub struct CreatingAuthedToken {
     pub id: Uuid,
     pub token: String,
     pub origin_ip: IpAddr,
+    pub asn_num: i32,
     pub writing_ua: String,
     pub auth_code: String,
     pub created_at: DateTime<Utc>,

@@ -143,6 +143,7 @@ impl<
                 res.authed_token().map(|x| x.as_str()),
                 input.ip_addr.clone(),
                 input.user_agent.clone(),
+                input.asn_num as i32,
                 created_at,
             )
             .await?;
