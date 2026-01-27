@@ -172,14 +172,15 @@ pub mod test_helpers {
         sqlx::query(
             r#"
             INSERT INTO authed_tokens
-            (id, token, origin_ip, reduced_origin_ip, writing_ua, authed_ua, auth_code, created_at, authed_at, validity, last_wrote_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, auth_code, created_at, authed_at, validity, last_wrote_at, additional_info)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(token_id)
         .bind(&token)
         .bind(origin_ip)
         .bind(origin_ip)
+        .bind(0i32)
         .bind("Test User Agent")
         .bind("Test User Agent")
         .bind(auth_code)
@@ -187,6 +188,7 @@ pub mod test_helpers {
         .bind(Utc::now())
         .bind(true)
         .bind(Option::<chrono::DateTime<Utc>>::None)
+        .bind(Option::<serde_json::Value>::None)
         .execute(pool)
         .await
         .expect("Failed to create authed token");

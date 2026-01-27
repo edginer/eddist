@@ -10,6 +10,7 @@ pub struct AuthedToken {
     pub token: String,
     pub origin_ip: IpAddr,
     pub reduced_ip: ReducedIpAddr,
+    pub asn_num: i32,
     pub writing_ua: String,
     pub authed_ua: Option<String>,
     pub auth_code: String,
@@ -22,7 +23,7 @@ pub struct AuthedToken {
 }
 
 impl AuthedToken {
-    pub fn new(origin_ip: String, writing_ua: String) -> Self {
+    pub fn new(origin_ip: String, writing_ua: String, asn_num: i32) -> Self {
         let id = Uuid::now_v7();
         let token = md5::Md5::new()
             .chain_update(id.as_bytes())
@@ -40,6 +41,7 @@ impl AuthedToken {
             token,
             origin_ip: ip_addr,
             reduced_ip: reduced_ip.clone(),
+            asn_num,
             writing_ua,
             authed_ua: None,
             auth_code,

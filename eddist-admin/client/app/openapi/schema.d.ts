@@ -492,6 +492,9 @@ export interface components {
             title: string;
         };
         AuthedToken: {
+            additional_info?: unknown;
+            /** Format: int32 */
+            asn_num: number;
             /** Format: date-time */
             authed_at?: string | null;
             authed_ua?: string | null;

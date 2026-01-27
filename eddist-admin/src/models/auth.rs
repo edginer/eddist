@@ -9,12 +9,14 @@ pub struct AuthedToken {
     pub token: String,
     pub origin_ip: String,
     pub reduced_origin_ip: String,
+    pub asn_num: i32,
     pub writing_ua: String,
     pub authed_ua: Option<String>,
     pub created_at: NaiveDateTime,
     pub authed_at: Option<NaiveDateTime>,
     pub validity: bool,
     pub last_wrote_at: Option<NaiveDateTime>,
+    pub additional_info: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, ToSchema, IntoParams, Serialize, Deserialize)]
