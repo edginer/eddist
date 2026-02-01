@@ -55,6 +55,7 @@ pub trait BbsRepository: Send + Sync + 'static {
         token: &str,
         authed_ua: &str,
         authed_time: DateTime<Utc>,
+        additional_info: Option<serde_json::Value>,
     ) -> anyhow::Result<()>;
     async fn update_authed_token_last_wrote(
         &self,
@@ -772,12 +773,18 @@ impl BbsRepository for BbsRepositoryImpl {
         token: &str,
         authed_ua: &str,
         authed_time: DateTime<Utc>,
+        additional_info: Option<serde_json::Value>,
     ) -> anyhow::Result<()> {
+        let additional_info_json = additional_info
+            .map(|v| serde_json::to_string(&v).ok())
+            .flatten();
+
         let query = query!(
-            "UPDATE authed_tokens SET validity = ?, authed_ua = ?, authed_at = ? WHERE token = ?",
+            "UPDATE authed_tokens SET validity = ?, authed_ua = ?, authed_at = ?, additional_info = ? WHERE token = ?",
             true,
             authed_ua,
             authed_time,
+            additional_info_json,
             token,
         );
 

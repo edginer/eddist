@@ -1,33 +1,12 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
 
-pub const GRECAPTCHA_URL: &str = "https://www.google.com/recaptcha/api/siteverify";
 pub const GRECAPTCHA_ENTERPRISE_URL: &str =
     "https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments";
 pub const TURNSTILE_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const HCAPTCHA_URL: &str = "https://api.hcaptcha.com/siteverify";
 pub const MONOCLE_URL: &str = "https://decrypt.mcl.spur.us/api/v1/assessment";
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GrecaptchaV2Response {
-    pub success: bool,
-    #[serde(rename = "error-codes")]
-    pub error_codes: Option<Vec<String>>,
-    pub challenge_ts: String,
-    pub hostname: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GrecaptchaV3Response {
-    pub success: bool,
-    pub score: f64,
-    pub action: String,
-    #[serde(rename = "error-codes")]
-    pub error_codes: Option<Vec<String>>,
-    pub challenge_ts: String,
-    pub hostname: String,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,90 +77,135 @@ pub struct MonocleResponse {
     pub sid: Option<String>,
 }
 
-/// Response from Cap (tiagozip/cap) siteverify endpoint
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CapResponse {
-    pub success: bool,
-}
-
+/// Configuration for a captcha provider
 #[derive(Clone, Serialize, Deserialize)]
-pub enum CaptchaLikeConfig {
-    GrecaptchaV2 {
-        site_key: String,
-        secret: String,
-    },
-    GrecaptchaV3 {
-        site_key: String,
-        secret: String,
-    },
-    GrecaptchaEnterprise {
-        site_key: String,
-        secret: String,
-    },
-    Turnstile {
-        site_key: String,
-        secret: String,
-    },
-    Hcaptcha {
-        site_key: String,
-        secret: String,
-    },
-    Monocle {
-        site_key: String,
-        token: String,
-    },
-    /// Cap (tiagozip/cap) - self-hosted proof-of-work captcha
-    /// base_url: The base URL of the Cap instance (e.g., "https://cap.example.com")
-    /// site_key: The site key from the Cap dashboard
-    /// secret: The secret key for the site from the Cap dashboard
-    Cap {
-        base_url: String,
-        site_key: String,
-        secret: String,
-    },
+pub struct CaptchaProviderConfig {
+    /// Provider name (e.g., "turnstile", "hcaptcha", "monocle", "cap")
+    pub provider: String,
+    /// Site key for the captcha widget
+    pub site_key: String,
+    /// Secret key for verification API
+    pub secret: String,
+    /// Base URL for self-hosted providers (e.g., Cap)
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// Widget configuration for frontend rendering
+    pub widget: CaptchaWidgetMetadata,
+    /// Fields to capture from the response and store in additional_info
+    #[serde(default)]
+    pub capture_fields: Vec<String>,
+    /// Verification API configuration (only for custom/generic providers)
+    #[serde(default)]
+    pub verification: Option<CaptchaVerificationConfig>,
 }
 
-impl Debug for CaptchaLikeConfig {
+impl Debug for CaptchaProviderConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CaptchaLikeConfig::GrecaptchaV2 { site_key, .. } => f
-                .debug_struct("GrecaptchaV2")
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::GrecaptchaV3 { site_key, .. } => f
-                .debug_struct("GrecaptchaV3")
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::GrecaptchaEnterprise { site_key, .. } => f
-                .debug_struct("GrecaptchaEnterprise")
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::Turnstile { site_key, .. } => f
-                .debug_struct("Turnstile")
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::Hcaptcha { site_key, .. } => f
-                .debug_struct("Hcaptcha")
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::Monocle { site_key, .. } => f
-                .debug_struct("Monocle")
-                .field("site_key", site_key)
-                .field("token", &"[REDACTED]")
-                .finish(),
-            CaptchaLikeConfig::Cap {
-                base_url, site_key, ..
-            } => f
-                .debug_struct("Cap")
-                .field("base_url", base_url)
-                .field("site_key", site_key)
-                .field("secret", &"[REDACTED]")
-                .finish(),
-        }
+        f.debug_struct("CaptchaProviderConfig")
+            .field("provider", &self.provider)
+            .field("site_key", &self.site_key)
+            .field("secret", &"[REDACTED]")
+            .field("base_url", &self.base_url)
+            .field("widget", &self.widget)
+            .field("capture_fields", &self.capture_fields)
+            .field("verification", &self.verification)
+            .finish()
+    }
+}
+
+/// Metadata for rendering the captcha widget in the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaptchaWidgetMetadata {
+    /// Form field name for the captcha response (e.g., "cf-turnstile-response")
+    pub form_field_name: String,
+    /// Script URL for loading the captcha widget (supports {{site_key}} placeholder)
+    pub script_url: String,
+    /// HTML for rendering the widget (supports {{site_key}}, {{base_url}} placeholders)
+    pub widget_html: String,
+    /// Optional JavaScript code for event handling (e.g., Cap widget solve event)
+    #[serde(default)]
+    pub script_handler: Option<String>,
+}
+
+/// Configuration for the captcha verification API (only for custom/generic providers)
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CaptchaVerificationConfig {
+    /// Verification API URL (supports {{base_url}}, {{site_key}} placeholders)
+    pub url: String,
+    /// HTTP method (defaults to POST)
+    #[serde(default)]
+    pub method: HttpMethod,
+    /// Request body format
+    #[serde(default)]
+    pub request_format: RequestFormat,
+    /// Custom headers (supports {{secret}}, {{site_key}} placeholders)
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+    /// Body template for PlainText format (supports {{response}} placeholder)
+    #[serde(default)]
+    pub body_template: Option<String>,
+    /// JSONPath to the success field in the response (default: "success")
+    #[serde(default = "default_success_path")]
+    pub success_path: String,
+    /// Whether to include the client IP address in the request
+    #[serde(default)]
+    pub include_ip: bool,
+    /// Whether the success condition is negated
+    #[serde(default)]
+    pub negate_success: bool,
+}
+
+fn default_success_path() -> String {
+    "success".to_string()
+}
+
+impl Debug for CaptchaVerificationConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CaptchaVerificationConfig")
+            .field("url", &self.url)
+            .field("method", &self.method)
+            .field("request_format", &self.request_format)
+            .field("headers", &"[REDACTED]")
+            .field("body_template", &self.body_template)
+            .field("success_path", &self.success_path)
+            .field("include_ip", &self.include_ip)
+            .field("negate_success", &self.negate_success)
+            .finish()
+    }
+}
+
+/// HTTP method for the verification request
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum HttpMethod {
+    #[default]
+    Post,
+    Get,
+}
+
+/// Request body format for the verification API
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum RequestFormat {
+    /// application/x-www-form-urlencoded
+    #[default]
+    Form,
+    /// application/json
+    Json,
+    /// text/plain (for Monocle-style raw body)
+    PlainText,
+}
+
+/// Helper trait to resolve placeholders in configuration strings
+pub trait PlaceholderResolver {
+    fn resolve_placeholders(&self, template: &str, response: &str, ip_addr: &str) -> String;
+}
+
+impl PlaceholderResolver for CaptchaProviderConfig {
+    fn resolve_placeholders(&self, template: &str, response: &str, ip_addr: &str) -> String {
+        template
+            .replace("{{base_url}}", self.base_url.as_deref().unwrap_or(""))
+            .replace("{{site_key}}", &self.site_key)
+            .replace("{{secret}}", &self.secret)
+            .replace("{{response}}", response)
+            .replace("{{ip}}", ip_addr)
     }
 }

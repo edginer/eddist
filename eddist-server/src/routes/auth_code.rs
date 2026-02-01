@@ -7,11 +7,12 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::HeaderMap;
+use serde::Serialize;
 use serde_json::json;
 use time;
 
 use crate::{
-    domain::captcha_like::CaptchaLikeConfig,
+    domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
@@ -21,43 +22,80 @@ use crate::{
     AppState,
 };
 
+/// Script to be loaded for a captcha widget
+#[derive(Debug, Serialize)]
+struct CaptchaScript {
+    url: String,
+}
+
+/// Widget HTML to be rendered
+#[derive(Debug, Serialize)]
+struct CaptchaWidget {
+    html: String,
+}
+
+/// JavaScript event handler code
+#[derive(Debug, Serialize)]
+struct CaptchaHandler {
+    code: String,
+}
+
+/// Resolve placeholders in a template string
+fn resolve_placeholders(template: &str, site_key: &str, base_url: Option<&str>) -> String {
+    template
+        .replace("{{site_key}}", site_key)
+        .replace("{{base_url}}", base_url.unwrap_or(""))
+}
+
+/// Build template variables from captcha provider configs
+fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Value {
+    let mut scripts = Vec::<CaptchaScript>::new();
+    let mut widgets = Vec::<CaptchaWidget>::new();
+    let mut handlers = Vec::<CaptchaHandler>::new();
+
+    for config in configs {
+        // Resolve script URL
+        let script_url = resolve_placeholders(
+            &config.widget.script_url,
+            &config.site_key,
+            config.base_url.as_deref(),
+        );
+        scripts.push(CaptchaScript { url: script_url });
+
+        // Resolve widget HTML
+        let widget_html = resolve_placeholders(
+            &config.widget.widget_html,
+            &config.site_key,
+            config.base_url.as_deref(),
+        );
+        if !widget_html.is_empty() {
+            widgets.push(CaptchaWidget { html: widget_html });
+        }
+
+        // Add script handler if present
+        if let Some(handler) = &config.widget.script_handler {
+            let resolved_handler =
+                resolve_placeholders(handler, &config.site_key, config.base_url.as_deref());
+            handlers.push(CaptchaHandler {
+                code: resolved_handler,
+            });
+        }
+    }
+
+    json!({
+        "captcha_scripts": scripts,
+        "captcha_widgets": widgets,
+        "captcha_handlers": handlers,
+    })
+}
+
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let mut site_keys =
-        state
-            .captcha_like_configs
-            .iter()
-            .filter_map(|config| match config {
-                CaptchaLikeConfig::Turnstile { site_key, .. } => Some(("cf_site_key", site_key)),
-                CaptchaLikeConfig::Hcaptcha { site_key, .. } => {
-                    Some(("hcaptcha_site_key", site_key))
-                }
-                CaptchaLikeConfig::Monocle { site_key, .. } => Some(("monocle_site_key", site_key)),
-                CaptchaLikeConfig::Cap { site_key, .. } => Some(("cap_site_key", site_key)),
-                _ => {
-                    tracing::warn!(
-                        "not implemented yet such captcha like config, ignored: {config:?}",
-                    );
-                    None
-                }
-            })
-            .collect::<HashMap<_, _>>();
-
-    // Add cap_base_url separately since we need to collect multiple values from Cap config
-    let cap_base_url = state
-        .captcha_like_configs
-        .iter()
-        .find_map(|config| match config {
-            CaptchaLikeConfig::Cap { base_url, .. } => Some(base_url),
-            _ => None,
-        });
-    if let Some(base_url) = cap_base_url {
-        site_keys.insert("cap_base_url", base_url);
-    }
+    let template_vars = build_template_variables(&state.captcha_like_configs);
 
     let html = state
         .template_engine
-        .render("auth-code.get", &serde_json::json!(site_keys))
+        .render("auth-code.get", &template_vars)
         .unwrap();
 
     let mut resp = Html(html).into_response();

@@ -3,7 +3,7 @@ use std::{convert::Infallible, env, time::Duration};
 use axum::{
     body::Body, extract::Request as AxumRequest, response::Response, ServiceExt as AxumServiceExt,
 };
-use domain::captcha_like::CaptchaLikeConfig;
+use domain::captcha_like::CaptchaProviderConfig;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -130,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
         env::var("CAPTCHA_CONFIG_PATH").unwrap_or("./captcha-config.json".to_string());
     let captcha_like_configs = std::fs::read_to_string(captcha_like_configs_path)?;
     let captcha_like_configs =
-        serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
+        serde_json::from_str::<Vec<CaptchaProviderConfig>>(&captcha_like_configs)?;
 
     let template_engine = load_template_engine();
 

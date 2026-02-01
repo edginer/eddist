@@ -1,0 +1,53 @@
+[
+    {
+        "provider": "turnstile",
+        "site_key": "YOUR_SITE_KEY",
+        "secret": "YOUR_SECRET",
+        "widget": {
+            "form_field_name": "cf-turnstile-response",
+            "script_url": "https://challenges.cloudflare.com/turnstile/v0/api.js",
+            "widget_html": "<div class=\"cf-turnstile\" data-sitekey=\"{{site_key}}\" data-theme=\"light\"></div>"
+        }
+    },
+    {
+        "provider": "hcaptcha",
+        "site_key": "YOUR_SITE_KEY",
+        "secret": "YOUR_SECRET",
+        "capture_fields": ["score", "score_reason"],
+        "widget": {
+            "form_field_name": "h-captcha-response",
+            "script_url": "https://js.hcaptcha.com/1/api.js",
+            "widget_html": "<div class=\"h-captcha\" data-sitekey=\"{{site_key}}\"></div>"
+        }
+    },
+    {
+        "provider": "monocle",
+        "site_key": "YOUR_SITE_KEY",
+        "secret": "YOUR_TOKEN",
+        "capture_fields": ["ip", "ipv6", "vpn", "proxied"],
+        "widget": {
+            "form_field_name": "monocle",
+            "script_url": "https://mcl.spur.us/d/mcl.js?tk={{site_key}}",
+            "widget_html": ""
+        }
+    },
+    {
+        "provider": "cap",
+        "site_key": "YOUR_SITE_KEY",
+        "secret": "YOUR_SECRET",
+        "base_url": "https://your-cap-instance.example.com",
+        "widget": {
+            "form_field_name": "cap-token",
+            "script_url": "{{base_url}}/widget.js",
+            "widget_html": "<div id=\"cap-widget\" data-cap-api-endpoint=\"{{base_url}}\"></div>",
+            "script_handler": "window.cap.on('solve', (token) => { document.querySelector('input[name=\"cap-token\"]').value = token; });"
+        },
+        "verification": {
+            "url": "{{base_url}}/api/siteverify",
+            "method": "Post",
+            "request_format": "Form",
+            "success_path": "success",
+            "include_ip": false
+        }
+    }
+]
