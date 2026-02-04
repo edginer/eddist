@@ -487,7 +487,10 @@ const CaptchaConfigs = () => {
           Edit Captcha Config
         </ModalHeader>
         <ModalBody>
-          <form onSubmit={handleEditSubmit(onEditSubmit)}>
+          <form onSubmit={handleEditSubmit((data) => onEditSubmit({
+            ...data,
+            capture_fields: data.capture_fields ?? undefined,
+          }))}>
             <div className="flex flex-col gap-4">
               <div>
                 <Label>Name</Label>
@@ -723,7 +726,7 @@ const CaptchaConfigs = () => {
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="is_active_edit"
-                      checked={field.value}
+                      checked={field.value ?? undefined}
                       onChange={field.onChange}
                     />
                     <Label htmlFor="is_active_edit">Active</Label>
