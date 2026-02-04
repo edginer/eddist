@@ -10,6 +10,7 @@ type NavBarSectionKind =
   | "ngwords"
   | "notices"
   | "terms"
+  | "captcha-configs"
   | "global"
   | "authed-token"
   | "users"
@@ -54,6 +55,9 @@ const NavBarSection = ({
       break;
     case "terms":
       displayText = "Terms";
+      break;
+    case "captcha-configs":
+      displayText = "Captcha Configs";
       break;
     case "global":
       displayText = "Global";
@@ -112,6 +116,10 @@ const Layout: React.FC = () => {
             kind="notices"
           />
           <NavBarSection selected={navBarSection === "terms"} kind="terms" />
+          <NavBarSection
+            selected={navBarSection === "captcha-configs"}
+            kind="captcha-configs"
+          />
           <NavBarSection selected={navBarSection === "global"} kind="global" />
           <NavBarSection
             selected={navBarSection === "authed-token"}
@@ -185,6 +193,14 @@ const Layout: React.FC = () => {
                   onClick={() => setIsNavbarOpen((x) => !x)}
                 >
                   Terms
+                </Link>
+              </li>
+              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
+                <Link
+                  to="/dashboard/captcha-configs"
+                  onClick={() => setIsNavbarOpen((x) => !x)}
+                >
+                  Captcha Configs
                 </Link>
               </li>
               <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">

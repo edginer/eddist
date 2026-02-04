@@ -279,11 +279,22 @@ impl CaptchaClient for MonocleClient {
             .await
             .map_err(CaptchaVerificationError::Request)?;
 
-        let resp = match res.json::<MonocleResponse>().await {
+        let response_text = res
+            .text()
+            .await
+            .map_err(CaptchaVerificationError::Request)?;
+
+        let resp = match serde_json::from_str::<MonocleResponse>(&response_text) {
             Ok(resp) => resp,
             Err(e) => {
-                log::error!("Failed to parse Monocle response: {e}");
-                return Err(CaptchaVerificationError::Request(e));
+                log::error!(
+                    "Failed to parse Monocle response: {e}, response body: {response_text}"
+                );
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data: None,
+                    provider: "monocle".to_string(),
+                });
             }
         };
 
@@ -418,6 +429,13 @@ impl CaptchaClient for GenericCaptchaClient {
                 if cfg.include_ip {
                     json["remoteip"] = ip_addr.into();
                 }
+
+                log::info!(
+                    "Sending JSON verification request to {}: {}",
+                    self.config.provider,
+                    json
+                );
+
                 req.json(&json)
             }
             RequestFormat::PlainText => {
@@ -443,6 +461,12 @@ impl CaptchaClient for GenericCaptchaClient {
             .text()
             .await
             .map_err(CaptchaVerificationError::Request)?;
+
+        log::info!(
+            "{} verification response body: {}",
+            self.config.provider,
+            response_text
+        );
 
         let resp: serde_json::Value = match serde_json::from_str(&response_text) {
             Ok(v) => v,

@@ -10,7 +10,7 @@ use crate::{
         notice_repository::{CreateNoticeInput, UpdateNoticeInput},
         terms_repository::UpdateTermsInput,
     },
-    routes::{archives, auth_tokens, boards, moderation, notices, terms, threads, users},
+    routes::{archives, auth_tokens, boards, captcha, moderation, notices, terms, threads, users},
 };
 
 #[derive(OpenApi)]
@@ -74,6 +74,13 @@ use crate::{
         terms::get_terms,
         terms::update_terms,
 
+        // Captcha config routes
+        captcha::list_captcha_configs,
+        captcha::get_captcha_config,
+        captcha::create_captcha_config,
+        captcha::update_captcha_config,
+        captcha::delete_captcha_config,
+
         // Auth routes
         post_native_session,
     ),
@@ -130,6 +137,15 @@ use crate::{
         // Terms models
         Terms,
         UpdateTermsInput,
+
+        // Captcha config models
+        CaptchaConfig,
+        CaptchaWidgetConfig,
+        CaptchaVerificationConfig,
+        HttpMethod,
+        RequestFormat,
+        CreateCaptchaConfigInput,
+        UpdateCaptchaConfigInput,
     ))
 )]
 pub struct ApiDoc;

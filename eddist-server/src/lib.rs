@@ -9,6 +9,7 @@ mod shiftjis;
 mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
+    pub(crate) mod captcha_config_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod notice_repository;
     pub(crate) mod terms_repository;
@@ -63,6 +64,7 @@ pub use app::AppState;
 use uuid::Uuid;
 
 use crate::repositories::notice_repository::NoticeRepositoryImpl;
+use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -96,6 +98,8 @@ pub fn create_test_app(
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
 
+    start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
+
     let app_state = AppState {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool.clone()),
@@ -112,7 +116,6 @@ pub fn create_test_app(
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),
-        captcha_like_configs: vec![],
         template_engine: load_template_engine(),
     };
 

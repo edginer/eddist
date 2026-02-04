@@ -16,6 +16,7 @@ use crate::{
     error::BbsPostAuthWithCodeError,
     services::{
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
+        captcha_config_cache::get_cached_captcha_configs,
         AppService,
     },
     utils::{get_origin_ip, get_ua},
@@ -91,7 +92,8 @@ fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Va
 
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let template_vars = build_template_variables(&state.captcha_like_configs);
+    let captcha_configs = get_cached_captcha_configs().await;
+    let template_vars = build_template_variables(&captcha_configs);
 
     let html = state
         .template_engine
@@ -114,6 +116,7 @@ pub async fn post_auth_code(
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
+    let captcha_configs = get_cached_captcha_configs().await;
     let (token, rate_limit_token) = match state
         .services
         .auth_with_code()
@@ -121,7 +124,7 @@ pub async fn post_auth_code(
             code: form["auth-code"].to_string(),
             origin_ip: get_origin_ip(&headers).to_string(),
             user_agent: get_ua(&headers).to_string(),
-            captcha_like_configs: state.captcha_like_configs.clone(),
+            captcha_like_configs: captcha_configs,
             responses: form,
             rate_limit_token,
         })

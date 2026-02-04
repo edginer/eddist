@@ -724,3 +724,78 @@ export const updateTerms = ({
   };
   return { mutate };
 };
+
+// Captcha config queries
+const GET_CAPTCHA_CONFIGS = "/captcha-configs/";
+
+export const getCaptchaConfigs = () => {
+  return useSuspenseQuery({
+    queryKey: [GET_CAPTCHA_CONFIGS],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_CAPTCHA_CONFIGS, {
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const GET_CAPTCHA_CONFIG = "/captcha-configs/{id}/";
+
+export const getCaptchaConfig = ({
+  params,
+  reactQuery,
+}: UseQueryOptions<paths[typeof GET_CAPTCHA_CONFIG]["get"]>) => {
+  return useSuspenseQuery({
+    ...reactQuery,
+    queryKey: [GET_CAPTCHA_CONFIG, params.path.id],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(GET_CAPTCHA_CONFIG, {
+        params,
+        signal,
+      });
+      return data;
+    },
+  });
+};
+
+const CREATE_CAPTCHA_CONFIG = "/captcha-configs/";
+
+export const createCaptchaConfig = ({
+  body,
+}: UseQueryOptions<paths[typeof CREATE_CAPTCHA_CONFIG]["post"]>) => {
+  const mutate = async () => {
+    await client.POST(CREATE_CAPTCHA_CONFIG, {
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const UPDATE_CAPTCHA_CONFIG = "/captcha-configs/{id}/";
+
+export const updateCaptchaConfig = ({
+  params,
+  body,
+}: UseQueryOptions<paths[typeof UPDATE_CAPTCHA_CONFIG]["patch"]>) => {
+  const mutate = async () => {
+    await client.PATCH(UPDATE_CAPTCHA_CONFIG, {
+      params,
+      body,
+    });
+  };
+  return { mutate };
+};
+
+const DELETE_CAPTCHA_CONFIG = "/captcha-configs/{id}/";
+
+export const deleteCaptchaConfig = ({
+  params,
+}: UseQueryOptions<paths[typeof DELETE_CAPTCHA_CONFIG]["delete"]>) => {
+  const mutate = async () => {
+    await client.DELETE(DELETE_CAPTCHA_CONFIG, {
+      params,
+    });
+  };
+  return { mutate };
+};

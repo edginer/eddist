@@ -34,6 +34,7 @@ use crate::{
 pub(crate) mod auth_with_code_service;
 pub(crate) mod auth_with_code_user_page_service;
 pub(crate) mod board_info_service;
+pub(crate) mod captcha_config_cache;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod metadent_thread_list_service;

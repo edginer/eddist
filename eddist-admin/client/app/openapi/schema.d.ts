@@ -309,6 +309,38 @@ export interface paths {
         patch: operations["update_cap"];
         trace?: never;
     };
+    "/captcha-configs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_captcha_configs"];
+        put?: never;
+        post: operations["create_captcha_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/captcha-configs/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_captcha_config"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_captcha_config"];
+        options?: never;
+        head?: never;
+        patch: operations["update_captcha_config"];
+        trace?: never;
+    };
     "/ng_words/": {
         parameters: {
             query?: never;
@@ -543,6 +575,46 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** @description Captcha configuration for API responses */
+        CaptchaConfig: {
+            base_url?: string | null;
+            capture_fields: string[];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            display_order: number;
+            /** Format: uuid */
+            id: string;
+            is_active: boolean;
+            name: string;
+            provider: string;
+            site_key: string;
+            /** Format: date-time */
+            updated_at: string;
+            updated_by?: string | null;
+            verification?: null | components["schemas"]["CaptchaVerificationConfig"];
+            widget?: null | components["schemas"]["CaptchaWidgetConfig"];
+        };
+        /** @description Verification API configuration for custom providers */
+        CaptchaVerificationConfig: {
+            body_template?: string | null;
+            headers?: {
+                [key: string]: string;
+            };
+            include_ip?: boolean;
+            method?: components["schemas"]["HttpMethod"];
+            negate_success?: boolean;
+            request_format?: components["schemas"]["RequestFormat"];
+            success_path?: string;
+            url: string;
+        };
+        /** @description Widget configuration for frontend rendering */
+        CaptchaWidgetConfig: {
+            form_field_name: string;
+            script_handler?: string | null;
+            script_url: string;
+            widget_html: string;
+        };
         ClientInfo: {
             /** Format: int32 */
             asn_num: number;
@@ -564,6 +636,20 @@ export interface components {
             name: string;
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
+        };
+        /** @description Input for creating a new captcha config */
+        CreateCaptchaConfigInput: {
+            base_url?: string | null;
+            capture_fields?: string[];
+            /** Format: int32 */
+            display_order?: number;
+            is_active?: boolean;
+            name: string;
+            provider: string;
+            secret: string;
+            site_key: string;
+            verification?: null | components["schemas"]["CaptchaVerificationConfig"];
+            widget?: null | components["schemas"]["CaptchaWidgetConfig"];
         };
         CreateNoticeInput: {
             content: string;
@@ -606,6 +692,11 @@ export interface components {
             threads_archive_cron?: string | null;
             threads_archive_trigger_thread_count?: number | null;
         };
+        /**
+         * @description HTTP method for verification requests
+         * @enum {string}
+         */
+        HttpMethod: "Post" | "Get";
         NativeSessionRequest: {
             access_token: string;
         };
@@ -647,6 +738,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /**
+         * @description Request body format for verification API
+         * @enum {string}
+         */
+        RequestFormat: "Form" | "Json" | "PlainText";
         Res: {
             /** Format: uuid */
             authed_token_id: string;
@@ -726,6 +822,20 @@ export interface components {
             description?: string | null;
             name?: string | null;
             password?: string | null;
+        };
+        /** @description Input for updating an existing captcha config */
+        UpdateCaptchaConfigInput: {
+            base_url?: string | null;
+            capture_fields?: string[] | null;
+            /** Format: int32 */
+            display_order?: number | null;
+            is_active?: boolean | null;
+            name?: string | null;
+            provider?: string | null;
+            secret?: string | null;
+            site_key?: string | null;
+            verification?: null | components["schemas"]["CaptchaVerificationConfig"];
+            widget?: null | components["schemas"]["CaptchaWidgetConfig"];
         };
         UpdateNgWordInput: {
             board_ids?: string[] | null;
@@ -1461,6 +1571,177 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Cap"];
                 };
+            };
+        };
+    };
+    list_captcha_configs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all captcha configs successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptchaConfig"][];
+                };
+            };
+        };
+    };
+    create_captcha_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCaptchaConfigInput"];
+            };
+        };
+        responses: {
+            /** @description Captcha config created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptchaConfig"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_captcha_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Captcha config ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get captcha config successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptchaConfig"];
+                };
+            };
+            /** @description Captcha config not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_captcha_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Captcha config ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Captcha config deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Captcha config not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_captcha_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Captcha config ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCaptchaConfigInput"];
+            };
+        };
+        responses: {
+            /** @description Captcha config updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptchaConfig"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Captcha config not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
