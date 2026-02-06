@@ -227,16 +227,16 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             .map(|v| serde_json::to_value(v))
             .transpose()?;
 
-        let (form_field_name, script_url, widget_html, script_handler) =
-            match input.widget.as_ref() {
-                Some(w) => (
-                    empty_to_none(w.form_field_name.clone()),
-                    empty_to_none(w.script_url.clone()),
-                    empty_to_none(w.widget_html.clone()),
-                    w.script_handler.clone().and_then(empty_to_none),
-                ),
-                None => (None, None, None, None),
-            };
+        let (form_field_name, script_url, widget_html, script_handler) = match input.widget.as_ref()
+        {
+            Some(w) => (
+                empty_to_none(w.form_field_name.clone()),
+                empty_to_none(w.script_url.clone()),
+                empty_to_none(w.widget_html.clone()),
+                w.script_handler.clone().and_then(empty_to_none),
+            ),
+            None => (None, None, None, None),
+        };
 
         query!(
             r#"
@@ -303,7 +303,10 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         let name = input.name.unwrap_or(current.name);
         let provider = input.provider.unwrap_or(current.provider);
         let site_key = input.site_key.unwrap_or(current.site_key);
-        let secret = input.secret.unwrap_or(current.secret);
+        let secret = input
+            .secret
+            .filter(|s| !s.is_empty())
+            .unwrap_or(current.secret);
         let base_url = input.base_url.or(current.base_url);
         let widget = input.widget.or(current.widget);
         let capture_fields = input.capture_fields.unwrap_or(current.capture_fields);

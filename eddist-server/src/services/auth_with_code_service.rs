@@ -66,9 +66,11 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     }
                 };
 
+                let provider_type = config.provider.to_lowercase();
                 Some((
                     create_captcha_client(config),
                     (response, input.origin_ip.clone()),
+                    provider_type,
                 ))
             })
             .collect::<Vec<_>>();
@@ -123,6 +125,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             Ok(())
         };
 
+        let provider_types: Vec<String> = clients_responses.iter().map(|x| x.2.clone()).collect();
         let handles = clients_responses
             .iter()
             .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
@@ -133,7 +136,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         let mut captured_data_map = HashMap::<String, serde_json::Value>::new();
         let mut has_monocle_style_ip_validation = false;
 
-        for r in results {
+        for (r, provider_type) in results.into_iter().zip(provider_types.iter()) {
             match r {
                 Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress),
@@ -170,7 +173,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                         captured_data_map.insert(provider.clone(), data);
                     }
                     // Track if provider has built-in IP validation (Monocle)
-                    if provider == "monocle" {
+                    if provider_type == "monocle" {
                         has_monocle_style_ip_validation = true;
                     }
                 }

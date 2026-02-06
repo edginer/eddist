@@ -130,8 +130,17 @@ const CaptchaConfigs = () => {
           ? data.widget
           : undefined;
 
+        // Convert empty strings to undefined so backend keeps existing values
+        const emptyToUndefined = (v: string | undefined | null) =>
+          v?.trim() ? v : undefined;
+
         const transformedData = {
           ...data,
+          name: emptyToUndefined(data.name),
+          provider: emptyToUndefined(data.provider),
+          site_key: emptyToUndefined(data.site_key),
+          secret: emptyToUndefined(data.secret),
+          base_url: emptyToUndefined(data.base_url),
           capture_fields: typeof captureFieldsStr === "string"
             ? captureFieldsStr.trim()
               ? captureFieldsStr.split(",").map((s) => s.trim()).filter(Boolean)

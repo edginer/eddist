@@ -80,7 +80,9 @@ pub struct MonocleResponse {
 /// Configuration for a captcha provider
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CaptchaProviderConfig {
-    /// Provider name (e.g., "turnstile", "hcaptcha", "monocle", "cap")
+    /// Display name for this config (used as key in additional_info)
+    pub name: String,
+    /// Provider type (e.g., "turnstile", "hcaptcha", "monocle", "custom")
     pub provider: String,
     /// Site key for the captcha widget
     pub site_key: String,
@@ -102,6 +104,7 @@ pub struct CaptchaProviderConfig {
 impl Debug for CaptchaProviderConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CaptchaProviderConfig")
+            .field("name", &self.name)
             .field("provider", &self.provider)
             .field("site_key", &self.site_key)
             .field("secret", &"[REDACTED]")

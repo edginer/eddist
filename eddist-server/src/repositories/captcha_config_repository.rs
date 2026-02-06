@@ -41,7 +41,10 @@ fn get_default_widget_config(provider: &str, site_key: &str) -> Option<CaptchaWi
         "hcaptcha" => Some(CaptchaWidgetMetadata {
             form_field_name: "h-captcha-response".to_string(),
             script_url: "https://js.hcaptcha.com/1/api.js".to_string(),
-            widget_html: format!(r#"<div class="h-captcha" data-sitekey="{}"></div>"#, site_key),
+            widget_html: format!(
+                r#"<div class="h-captcha" data-sitekey="{}"></div>"#,
+                site_key
+            ),
             script_handler: None,
         }),
         "monocle" => Some(CaptchaWidgetMetadata {
@@ -150,16 +153,18 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
                 widget_html,
                 script_handler: row.widget_script_handler,
             },
-            _ => get_default_widget_config(&row.provider, &row.site_key)
-                .unwrap_or_else(|| CaptchaWidgetMetadata {
+            _ => get_default_widget_config(&row.provider, &row.site_key).unwrap_or_else(|| {
+                CaptchaWidgetMetadata {
                     form_field_name: "captcha-response".to_string(),
                     script_url: String::new(),
                     widget_html: String::new(),
                     script_handler: None,
-                }),
+                }
+            }),
         };
 
         CaptchaProviderConfig {
+            name: row.name,
             provider: row.provider,
             site_key: row.site_key,
             secret: row.secret,

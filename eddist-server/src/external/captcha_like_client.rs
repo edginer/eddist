@@ -34,13 +34,16 @@ pub struct CaptchaVerificationOutput {
 
 /// Factory function to create the appropriate captcha client based on provider config
 pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaClient> {
+    let name = config.name.clone();
     match config.provider.to_lowercase().as_str() {
-        "turnstile" => Box::new(TurnstileClient::new(config.secret.clone())),
+        "turnstile" => Box::new(TurnstileClient::new(name, config.secret.clone())),
         "hcaptcha" => Box::new(HCaptchaClient::new(
+            name,
             config.secret.clone(),
             config.capture_fields.clone(),
         )),
         "monocle" => Box::new(MonocleClient::new(
+            name,
             config.secret.clone(),
             config.capture_fields.clone(),
         )),
@@ -50,13 +53,15 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
 }
 
 pub struct TurnstileClient {
+    name: String,
     client: reqwest::Client,
     secret: SimpleSecret,
 }
 
 impl TurnstileClient {
-    pub fn new(secret: String) -> Self {
+    pub fn new(name: String, secret: String) -> Self {
         Self {
+            name,
             client: reqwest::Client::new(),
             secret: SimpleSecret::new(&secret),
         }
@@ -99,7 +104,7 @@ impl CaptchaClient for TurnstileClient {
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
-                    provider: "turnstile".to_string(),
+                    provider: self.name.clone(),
                 });
             }
         };
@@ -120,14 +125,16 @@ impl CaptchaClient for TurnstileClient {
 }
 
 pub struct HCaptchaClient {
+    name: String,
     client: reqwest::Client,
     secret: SimpleSecret,
     capture_fields: Vec<String>,
 }
 
 impl HCaptchaClient {
-    pub fn new(secret: String, capture_fields: Vec<String>) -> Self {
+    pub fn new(name: String, secret: String, capture_fields: Vec<String>) -> Self {
         Self {
+            name,
             client: reqwest::Client::new(),
             secret: SimpleSecret::new(&secret),
             capture_fields,
@@ -197,20 +204,22 @@ impl CaptchaClient for HCaptchaClient {
         Ok(CaptchaVerificationOutput {
             result,
             captured_data,
-            provider: "hcaptcha".to_string(),
+            provider: self.name.clone(),
         })
     }
 }
 
 pub struct MonocleClient {
+    name: String,
     client: reqwest::Client,
     token: SimpleSecret,
     capture_fields: Vec<String>,
 }
 
 impl MonocleClient {
-    pub fn new(token: String, capture_fields: Vec<String>) -> Self {
+    pub fn new(name: String, token: String, capture_fields: Vec<String>) -> Self {
         Self {
+            name,
             client: reqwest::Client::new(),
             token: SimpleSecret::new(&token),
             capture_fields,
@@ -293,7 +302,7 @@ impl CaptchaClient for MonocleClient {
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
-                    provider: "monocle".to_string(),
+                    provider: self.name.clone(),
                 });
             }
         };
@@ -478,7 +487,7 @@ impl CaptchaClient for GenericCaptchaClient {
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
-                    provider: self.config.provider.clone(),
+                    provider: self.config.name.clone(),
                 });
             }
         };
