@@ -119,7 +119,7 @@ impl CaptchaClient for TurnstileClient {
         Ok(CaptchaVerificationOutput {
             result,
             captured_data: None,
-            provider: "turnstile".to_string(),
+            provider: self.name.clone(),
         })
     }
 }
@@ -322,7 +322,7 @@ impl CaptchaClient for MonocleClient {
         Ok(CaptchaVerificationOutput {
             result,
             captured_data,
-            provider: "monocle".to_string(),
+            provider: self.name.clone(),
         })
     }
 }
@@ -508,7 +508,7 @@ impl CaptchaClient for GenericCaptchaClient {
         Ok(CaptchaVerificationOutput {
             result,
             captured_data,
-            provider: self.config.provider.clone(),
+            provider: self.config.name.clone(),
         })
     }
 }
