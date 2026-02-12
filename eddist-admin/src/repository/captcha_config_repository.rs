@@ -224,7 +224,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         let verification_json = input
             .verification
             .as_ref()
-            .map(|v| serde_json::to_value(v))
+            .map(serde_json::to_value)
             .transpose()?;
 
         let (form_field_name, script_url, widget_html, script_handler) = match input.widget.as_ref()
@@ -317,7 +317,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         let capture_fields_json = serde_json::to_value(&capture_fields)?;
         let verification_json = verification
             .as_ref()
-            .map(|v| serde_json::to_value(v))
+            .map(serde_json::to_value)
             .transpose()?;
 
         let (form_field_name, script_url, widget_html_val, script_handler) = match widget.as_ref() {

@@ -8,7 +8,7 @@ use crate::domain::captcha_like::{
     RequestFormat,
 };
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 struct CaptchaConfigRow {
     id: Uuid,
     name: String,

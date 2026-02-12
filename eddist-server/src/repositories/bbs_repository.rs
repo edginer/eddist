@@ -776,8 +776,7 @@ impl BbsRepository for BbsRepositoryImpl {
         additional_info: Option<serde_json::Value>,
     ) -> anyhow::Result<()> {
         let additional_info_json = additional_info
-            .map(|v| serde_json::to_string(&v).ok())
-            .flatten();
+            .and_then(|v| serde_json::to_string(&v).ok());
 
         let query = query!(
             "UPDATE authed_tokens SET validity = ?, authed_ua = ?, authed_at = ?, additional_info = ? WHERE token = ?",
