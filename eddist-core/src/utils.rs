@@ -42,3 +42,18 @@ pub fn convert_weekday_to_ja(weekday: Weekday) -> &'static str {
         Weekday::Sun => "日",
     }
 }
+
+/// Slugify a string for use in HTML attributes and form field names.
+/// Converts to lowercase, replaces non-alphanumeric chars with hyphens,
+/// collapses consecutive hyphens, and trims leading/trailing hyphens.
+pub fn slugify(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() {
+            result.push(c.to_ascii_lowercase());
+        } else if !result.ends_with('-') {
+            result.push('-');
+        }
+    }
+    result.trim_matches('-').to_string()
+}

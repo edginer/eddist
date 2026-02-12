@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use eddist_core::utils::slugify;
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
@@ -27,14 +28,20 @@ struct CaptchaConfigRow {
 }
 
 /// Get default widget config for first-class providers
-fn get_default_widget_config(provider: &str, site_key: &str) -> Option<CaptchaWidgetMetadata> {
+/// Turnstile uses data-response-field-name to generate unique form field names per config,
+/// preventing collisions when multiple configs share the same provider type.
+fn get_default_widget_config(
+    provider: &str,
+    site_key: &str,
+    name: &str,
+) -> Option<CaptchaWidgetMetadata> {
+    let slug = slugify(name);
     match provider {
         "turnstile" => Some(CaptchaWidgetMetadata {
-            form_field_name: "cf-turnstile-response".to_string(),
+            form_field_name: format!("cf-turnstile-response-{slug}"),
             script_url: "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string(),
             widget_html: format!(
-                r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#,
-                site_key
+                r#"<div class="cf-turnstile" data-sitekey="{site_key}" data-response-field-name="cf-turnstile-response-{slug}"></div>"#,
             ),
             script_handler: None,
         }),
@@ -153,14 +160,14 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
                 widget_html,
                 script_handler: row.widget_script_handler,
             },
-            _ => get_default_widget_config(&row.provider, &row.site_key).unwrap_or_else(|| {
-                CaptchaWidgetMetadata {
+            _ => get_default_widget_config(&row.provider, &row.site_key, &row.name).unwrap_or_else(
+                || CaptchaWidgetMetadata {
                     form_field_name: "captcha-response".to_string(),
                     script_url: String::new(),
                     widget_html: String::new(),
                     script_handler: None,
-                }
-            }),
+                },
+            ),
         };
 
         CaptchaProviderConfig {
