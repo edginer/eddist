@@ -52,6 +52,7 @@ sha3.workspace = true
 sha2.workspace = true
 futures.workspace = true
 handlebars.workspace = true
+jsonpath-rust.workspace = true
 metrics.workspace = true
 metrics-exporter-prometheus.workspace = true
 axum-prometheus.workspace = true

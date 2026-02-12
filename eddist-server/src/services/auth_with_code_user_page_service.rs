@@ -93,7 +93,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
         tx.commit().await?;
 
         self.1
-            .activate_authed_status(&token.token, &input.user_agent, Utc::now())
+            .activate_authed_status(&token.token, &input.user_agent, Utc::now(), None)
             .await?;
         counter!("issue_authed_token", "state" => "success", "source" => "login").increment(1);
 

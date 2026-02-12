@@ -5,6 +5,7 @@ use crate::DefaultAppState;
 pub mod archives;
 pub mod auth_tokens;
 pub mod boards;
+pub mod captcha;
 pub mod moderation;
 pub mod notices;
 pub mod terms;
@@ -17,6 +18,7 @@ pub fn create_api_routes() -> Router<DefaultAppState> {
         .merge(threads::routes())
         .merge(archives::routes())
         .merge(auth_tokens::routes())
+        .merge(captcha::routes())
         .merge(moderation::routes())
         .merge(notices::routes())
         .merge(terms::routes())

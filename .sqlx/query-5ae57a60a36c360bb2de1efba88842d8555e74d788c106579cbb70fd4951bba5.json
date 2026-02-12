@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO captcha_configs (\n                id, name, provider, site_key, secret, base_url,\n                widget_form_field_name, widget_script_url, widget_html, widget_script_handler,\n                capture_fields, verification,\n                is_active, display_order, created_at, updated_at, updated_by\n            )\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 17
+    },
+    "nullable": []
+  },
+  "hash": "5ae57a60a36c360bb2de1efba88842d8555e74d788c106579cbb70fd4951bba5"
+}

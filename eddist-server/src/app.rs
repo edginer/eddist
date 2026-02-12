@@ -18,7 +18,6 @@ use tower_http::{
 use tracing::{info_span, Span};
 
 use crate::{
-    domain::captcha_like::CaptchaLikeConfig,
     middleware::user_restriction::user_restriction_middleware,
     repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
@@ -59,7 +58,6 @@ pub struct AppState {
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
     pub tinker_secret: String,
-    pub captcha_like_configs: Vec<CaptchaLikeConfig>,
     pub template_engine: Handlebars<'static>,
 }
 

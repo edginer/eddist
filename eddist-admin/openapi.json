@@ -1009,6 +1009,176 @@
         }
       }
     },
+    "/captcha-configs/": {
+      "get": {
+        "tags": [
+          "captcha"
+        ],
+        "operationId": "list_captcha_configs",
+        "responses": {
+          "200": {
+            "description": "List all captcha configs successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaptchaConfig"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "captcha"
+        ],
+        "operationId": "create_captcha_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaptchaConfigInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Captcha config created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptchaConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/captcha-configs/{id}/": {
+      "get": {
+        "tags": [
+          "captcha"
+        ],
+        "operationId": "get_captcha_config",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Captcha config ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get captcha config successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptchaConfig"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Captcha config not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "captcha"
+        ],
+        "operationId": "delete_captcha_config",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Captcha config ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Captcha config deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Captcha config not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "captcha"
+        ],
+        "operationId": "update_captcha_config",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Captcha config ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaptchaConfigInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Captcha config updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptchaConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Captcha config not found"
+          }
+        }
+      }
+    },
     "/ng_words/": {
       "get": {
         "tags": [
@@ -1935,6 +2105,158 @@
           }
         }
       },
+      "CaptchaConfig": {
+        "type": "object",
+        "description": "Captcha configuration for API responses",
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "site_key",
+          "capture_fields",
+          "is_active",
+          "display_order",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "base_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "display_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "site_key": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaVerificationConfig"
+              }
+            ]
+          },
+          "widget": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaWidgetConfig",
+                "description": "Widget config - optional for first-class providers (turnstile, hcaptcha, monocle)"
+              }
+            ]
+          }
+        }
+      },
+      "CaptchaVerificationConfig": {
+        "type": "object",
+        "description": "Verification API configuration for custom providers",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "body_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "include_ip": {
+            "type": "boolean"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpMethod"
+          },
+          "negate_success": {
+            "type": "boolean"
+          },
+          "request_format": {
+            "$ref": "#/components/schemas/RequestFormat"
+          },
+          "success_path": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "CaptchaWidgetConfig": {
+        "type": "object",
+        "description": "Widget configuration for frontend rendering",
+        "required": [
+          "form_field_name",
+          "script_url",
+          "widget_html"
+        ],
+        "properties": {
+          "form_field_name": {
+            "type": "string"
+          },
+          "script_handler": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "script_url": {
+            "type": "string"
+          },
+          "widget_html": {
+            "type": "string"
+          }
+        }
+      },
       "ClientInfo": {
         "type": "object",
         "required": [
@@ -2048,6 +2370,70 @@
               "null"
             ],
             "minimum": 0
+          }
+        }
+      },
+      "CreateCaptchaConfigInput": {
+        "type": "object",
+        "description": "Input for creating a new captcha config",
+        "required": [
+          "name",
+          "provider",
+          "site_key",
+          "secret"
+        ],
+        "properties": {
+          "base_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "site_key": {
+            "type": "string"
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaVerificationConfig"
+              }
+            ]
+          },
+          "widget": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaWidgetConfig",
+                "description": "Widget config - only required for custom providers"
+              }
+            ]
           }
         }
       },
@@ -2237,6 +2623,14 @@
           }
         }
       },
+      "HttpMethod": {
+        "type": "string",
+        "description": "HTTP method for verification requests",
+        "enum": [
+          "Post",
+          "Get"
+        ]
+      },
       "NativeSessionRequest": {
         "type": "object",
         "required": [
@@ -2374,6 +2768,15 @@
             "format": "date-time"
           }
         }
+      },
+      "RequestFormat": {
+        "type": "string",
+        "description": "Request body format for verification API",
+        "enum": [
+          "Form",
+          "Json",
+          "PlainText"
+        ]
       },
       "Res": {
         "type": "object",
@@ -2641,6 +3044,84 @@
             "type": [
               "string",
               "null"
+            ]
+          }
+        }
+      },
+      "UpdateCaptchaConfigInput": {
+        "type": "object",
+        "description": "Input for updating an existing captcha config",
+        "properties": {
+          "base_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_fields": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_order": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "is_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "secret": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "site_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaVerificationConfig"
+              }
+            ]
+          },
+          "widget": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaptchaWidgetConfig"
+              }
             ]
           }
         }

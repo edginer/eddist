@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            DELETE FROM captcha_configs\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "3a0be2d9cc01e1a114b3d6b9f2f90ecc5c6e461685ff033be1e9f5596c6770cd"
+}

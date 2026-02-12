@@ -7,44 +7,97 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::HeaderMap;
+use serde::Serialize;
 use serde_json::json;
 use time;
 
 use crate::{
-    domain::captcha_like::CaptchaLikeConfig,
+    domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
+        captcha_config_cache::get_cached_captcha_configs,
         AppService,
     },
     utils::{get_origin_ip, get_ua},
     AppState,
 };
 
+/// Script to be loaded for a captcha widget
+#[derive(Debug, Serialize)]
+struct CaptchaScript {
+    url: String,
+}
+
+/// Widget HTML to be rendered
+#[derive(Debug, Serialize)]
+struct CaptchaWidget {
+    html: String,
+}
+
+/// JavaScript event handler code
+#[derive(Debug, Serialize)]
+struct CaptchaHandler {
+    code: String,
+}
+
+/// Resolve placeholders in a template string
+fn resolve_placeholders(template: &str, site_key: &str, base_url: Option<&str>) -> String {
+    template
+        .replace("{{site_key}}", site_key)
+        .replace("{{base_url}}", base_url.unwrap_or(""))
+}
+
+/// Build template variables from captcha provider configs
+fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Value {
+    let mut scripts = Vec::<CaptchaScript>::new();
+    let mut widgets = Vec::<CaptchaWidget>::new();
+    let mut handlers = Vec::<CaptchaHandler>::new();
+
+    for config in configs {
+        // Resolve script URL
+        let script_url = resolve_placeholders(
+            &config.widget.script_url,
+            &config.site_key,
+            config.base_url.as_deref(),
+        );
+        scripts.push(CaptchaScript { url: script_url });
+
+        // Resolve widget HTML
+        let widget_html = resolve_placeholders(
+            &config.widget.widget_html,
+            &config.site_key,
+            config.base_url.as_deref(),
+        );
+        if !widget_html.is_empty() {
+            widgets.push(CaptchaWidget { html: widget_html });
+        }
+
+        // Add script handler if present
+        if let Some(handler) = &config.widget.script_handler {
+            let resolved_handler =
+                resolve_placeholders(handler, &config.site_key, config.base_url.as_deref());
+            handlers.push(CaptchaHandler {
+                code: resolved_handler,
+            });
+        }
+    }
+
+    json!({
+        "captcha_scripts": scripts,
+        "captcha_widgets": widgets,
+        "captcha_handlers": handlers,
+    })
+}
+
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let site_keys =
-        state
-            .captcha_like_configs
-            .iter()
-            .filter_map(|config| match config {
-                CaptchaLikeConfig::Turnstile { site_key, .. } => Some(("cf_site_key", site_key)),
-                CaptchaLikeConfig::Hcaptcha { site_key, .. } => {
-                    Some(("hcaptcha_site_key", site_key))
-                }
-                CaptchaLikeConfig::Monocle { site_key, .. } => Some(("monocle_site_key", site_key)),
-                _ => {
-                    tracing::warn!(
-                        "not implemented yet such captcha like config, ignored: {config:?}",
-                    );
-                    None
-                }
-            })
-            .collect::<HashMap<_, _>>();
+    let captcha_configs = get_cached_captcha_configs().await;
+    let template_vars = build_template_variables(&captcha_configs);
 
     let html = state
         .template_engine
-        .render("auth-code.get", &serde_json::json!(site_keys))
+        .render("auth-code.get", &template_vars)
         .unwrap();
 
     let mut resp = Html(html).into_response();
@@ -63,6 +116,7 @@ pub async fn post_auth_code(
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
+    let captcha_configs = get_cached_captcha_configs().await;
     let (token, rate_limit_token) = match state
         .services
         .auth_with_code()
@@ -70,7 +124,7 @@ pub async fn post_auth_code(
             code: form["auth-code"].to_string(),
             origin_ip: get_origin_ip(&headers).to_string(),
             user_agent: get_ua(&headers).to_string(),
-            captcha_like_configs: state.captcha_like_configs.clone(),
+            captcha_like_configs: captcha_configs,
             responses: form,
             rate_limit_token,
         })

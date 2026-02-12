@@ -17,6 +17,7 @@ use repository::{
     admin_archive_repository::AdminArchiveRepositoryImpl,
     admin_bbs_repository::AdminBbsRepositoryImpl, admin_user_repository::AdminUserRepositoryImpl,
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
+    captcha_config_repository::CaptchaConfigRepositoryImpl,
     ngword_repository::NgWordRepositoryImpl, notice_repository::NoticeRepositoryImpl,
     terms_repository::TermsRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
@@ -45,6 +46,7 @@ mod repository {
     pub mod admin_user_repository;
     pub mod authed_token_repository;
     pub mod cap_repository;
+    pub mod captcha_config_repository;
     pub mod ngword_repository;
     pub mod notice_repository;
     pub mod terms_repository;
@@ -57,9 +59,9 @@ use api_doc::ApiDoc;
 use repository::{
     admin_archive_repository::AdminArchiveRepository, admin_bbs_repository::AdminBbsRepository,
     admin_user_repository::AdminUserRepository, authed_token_repository::AuthedTokenRepository,
-    cap_repository::CapRepository, ngword_repository::NgWordRepository,
-    notice_repository::NoticeRepository, terms_repository::TermsRepository,
-    user_restriction_repository::UserRestrictionRepository,
+    cap_repository::CapRepository, captcha_config_repository::CaptchaConfigRepository,
+    ngword_repository::NgWordRepository, notice_repository::NoticeRepository,
+    terms_repository::TermsRepository, user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
 
@@ -102,6 +104,7 @@ pub(crate) struct AppState<
     UR: UserRestrictionRepository + Clone,
     NO: NoticeRepository + Clone,
     TR: TermsRepository + Clone,
+    CC: CaptchaConfigRepository + Clone,
 > {
     pub oauth2_client: oauth2::basic::BasicClient<
         EndpointSet,
@@ -119,6 +122,7 @@ pub(crate) struct AppState<
     pub user_restriction_repo: UR,
     pub notice_repo: NO,
     pub terms_repo: TR,
+    pub captcha_config_repo: CC,
     pub redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -132,6 +136,7 @@ pub(crate) type DefaultAppState = AppState<
     UserRestrictionRepositoryImpl,
     NoticeRepositoryImpl,
     TermsRepositoryImpl,
+    CaptchaConfigRepositoryImpl,
 >;
 
 #[tokio::main]
@@ -227,7 +232,8 @@ async fn main() {
         user_repo: AdminUserRepositoryImpl::new(pool.clone()),
         user_restriction_repo: UserRestrictionRepositoryImpl::new(pool.clone()),
         notice_repo: NoticeRepositoryImpl::new(pool.clone()),
-        terms_repo: TermsRepositoryImpl::new(pool),
+        terms_repo: TermsRepositoryImpl::new(pool.clone()),
+        captcha_config_repo: CaptchaConfigRepositoryImpl::new(pool),
     };
 
     let app = Router::new()

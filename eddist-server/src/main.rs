@@ -3,7 +3,6 @@ use std::{convert::Infallible, env, time::Duration};
 use axum::{
     body::Body, extract::Request as AxumRequest, response::Response, ServiceExt as AxumServiceExt,
 };
-use domain::captcha_like::CaptchaLikeConfig;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
@@ -15,7 +14,11 @@ use repositories::{
     user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
-use services::{user_restriction_service::start_cache_refresh_task, AppServiceContainer};
+use services::{
+    captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
+    user_restriction_service::start_cache_refresh_task,
+    AppServiceContainer,
+};
 use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
 use tokio::net::TcpListener;
@@ -34,6 +37,7 @@ mod shiftjis;
 mod repositories {
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
+    pub(crate) mod captcha_config_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod notice_repository;
     pub(crate) mod terms_repository;
@@ -126,11 +130,8 @@ async fn main() -> anyhow::Result<()> {
 
     let tinker_secret = env::var("TINKER_SECRET").unwrap();
 
-    let captcha_like_configs_path =
-        env::var("CAPTCHA_CONFIG_PATH").unwrap_or("./captcha-config.json".to_string());
-    let captcha_like_configs = std::fs::read_to_string(captcha_like_configs_path)?;
-    let captcha_like_configs =
-        serde_json::from_str::<Vec<CaptchaLikeConfig>>(&captcha_like_configs)?;
+    // Load initial captcha configs from database and initialize cache
+    refresh_captcha_config_cache(&pool).await?;
 
     let template_engine = load_template_engine();
 
@@ -168,12 +169,14 @@ async fn main() -> anyhow::Result<()> {
         notice_repo,
         terms_repo,
         tinker_secret,
-        captcha_like_configs,
         template_engine,
     };
 
     // Start background task for user restriction cache refresh
     start_cache_refresh_task(user_restriction_repo, Duration::from_secs(300));
+
+    // Start background task for captcha config cache refresh (every 5 minutes)
+    start_captcha_config_refresh_task(pool, Duration::from_secs(300));
 
     log::info!("Start application server with 0.0.0.0:8080");
 
