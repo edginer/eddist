@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import {
   Alert,
   Badge,
@@ -27,6 +28,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQueryClient } from "@tanstack/react-query";
 import { listAuthedTokens } from "~/hooks/queries";
 import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
+import client from "~/openapi/client";
 import type { components } from "~/openapi/schema";
 
 type AuthedToken = components["schemas"]["AuthedToken"];
@@ -37,8 +39,41 @@ const formatDateTime = (dateStr: string | null | undefined) => {
 };
 
 const Page = () => {
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const deleteAuthedToken = useDeleteAuthedToken();
+
+  // Open detail modal when navigating with ?token=<id> from responses page
+  useEffect(() => {
+    const tokenId = searchParams.get("token");
+    if (!tokenId) return;
+    (async () => {
+      const { data } = await client.GET("/authed_tokens/{authed_token_id}/", {
+        params: { path: { authed_token_id: tokenId } },
+      });
+      if (data) setSelectedToken(data);
+    })();
+  }, [searchParams]);
+
+  // Single token lookup
+  const [tokenIdSearch, setTokenIdSearch] = useState("");
+  const [tokenSearchError, setTokenSearchError] = useState("");
+
+  const handleTokenIdSearch = useCallback(async () => {
+    if (!tokenIdSearch) {
+      setTokenSearchError("Token ID is required.");
+      return;
+    }
+    try {
+      const { data } = await client.GET("/authed_tokens/{authed_token_id}/", {
+        params: { path: { authed_token_id: tokenIdSearch } },
+      });
+      setTokenSearchError("");
+      if (data) setSelectedToken(data);
+    } catch {
+      setTokenSearchError("Failed to fetch token.");
+    }
+  }, [tokenIdSearch]);
 
   // Filter state
   const [originIpFilter, setOriginIpFilter] = useState("");
@@ -93,7 +128,13 @@ const Page = () => {
     if (validityFilter !== "") filters.validity = validityFilter === "true";
     setAppliedFilters(filters);
     setPage(1);
-  }, [originIpFilter, writingUaFilter, authedUaFilter, asnNumFilter, validityFilter]);
+  }, [
+    originIpFilter,
+    writingUaFilter,
+    authedUaFilter,
+    asnNumFilter,
+    validityFilter,
+  ]);
 
   const handleRevokeToken = useCallback(async () => {
     if (!selectedToken?.id) return;
@@ -114,7 +155,12 @@ const Page = () => {
     await deleteAuthedToken(selectedToken.id, true);
     queryClient.invalidateQueries({ queryKey: ["/authed_tokens"] });
     setSelectedToken(null);
-  }, [selectedToken?.id, selectedToken?.origin_ip, deleteAuthedToken, queryClient]);
+  }, [
+    selectedToken?.id,
+    selectedToken?.origin_ip,
+    deleteAuthedToken,
+    queryClient,
+  ]);
 
   const columns = useMemo<ColumnDef<AuthedToken>[]>(
     () => [
@@ -206,6 +252,28 @@ const Page = () => {
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold mb-6">Authed Tokens</h1>
+
+      {/* Token ID Lookup */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-3 items-end">
+        <div className="w-full sm:flex-1">
+          <Label htmlFor="search-token-id" className="mb-1 block text-sm">
+            Search by Token ID
+          </Label>
+          <TextInput
+            id="search-token-id"
+            placeholder="Enter Authed Token UUID..."
+            value={tokenIdSearch}
+            onChange={(e) => setTokenIdSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleTokenIdSearch()}
+          />
+        </div>
+        <Button onClick={handleTokenIdSearch}>Lookup</Button>
+      </div>
+      {tokenSearchError && (
+        <Alert color="failure" className="mb-4">
+          {tokenSearchError}
+        </Alert>
+      )}
 
       {/* Filter Bar */}
       <div className="mb-4 flex flex-wrap gap-3 items-end">
@@ -497,9 +565,7 @@ const Page = () => {
                       <dt className="text-sm text-gray-500 dark:text-gray-400">
                         Origin IP
                       </dt>
-                      <dd className="font-mono">
-                        {selectedToken.origin_ip}
-                      </dd>
+                      <dd className="font-mono">{selectedToken.origin_ip}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500 dark:text-gray-400">
