@@ -1,4 +1,8 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import type { ParamsOption, RequestBodyOption } from "openapi-fetch";
 import type { paths } from "../openapi/schema";
 import client from "../openapi/client";
@@ -263,6 +267,24 @@ export const getDatAdminArchivedThread = ({
       });
       return data;
     },
+  });
+};
+
+const LIST_AUTHED_TOKENS = "/authed_tokens";
+
+export const listAuthedTokens = (
+  params: paths[typeof LIST_AUTHED_TOKENS]["get"]["parameters"]["query"],
+) => {
+  return useQuery({
+    queryKey: [LIST_AUTHED_TOKENS, params],
+    queryFn: async ({ signal }) => {
+      const { data } = await client.GET(LIST_AUTHED_TOKENS, {
+        params: { query: params },
+        signal,
+      });
+      return data;
+    },
+    placeholderData: keepPreviousData,
   });
 };
 

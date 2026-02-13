@@ -21,6 +21,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/authed_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_authed_tokens"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/authed_tokens/{authed_token_id}/": {
         parameters: {
             query?: never;
@@ -738,6 +754,17 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        PaginatedAuthedTokens: {
+            items: components["schemas"]["AuthedToken"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            per_page: number;
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            total_pages: number;
+        };
         /**
          * @description Request body format for verification API
          * @enum {string}
@@ -942,6 +969,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_authed_tokens: {
+        parameters: {
+            query?: {
+                page?: number | null;
+                per_page?: number | null;
+                origin_ip?: string | null;
+                writing_ua?: string | null;
+                authed_ua?: string | null;
+                asn_num?: number | null;
+                validity?: boolean | null;
+                sort_by?: string | null;
+                sort_order?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List authed tokens successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuthedTokens"];
+                };
             };
         };
     };
