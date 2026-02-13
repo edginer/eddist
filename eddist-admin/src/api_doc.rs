@@ -41,6 +41,7 @@ use crate::{
         archives::delete_archived_thread,
 
         // Auth token routes
+        auth_tokens::list_authed_tokens,
         auth_tokens::get_authed_token,
         auth_tokens::delete_authed_token,
 
@@ -106,6 +107,7 @@ use crate::{
 
         // Auth models
         AuthedToken,
+        PaginatedAuthedTokens,
         DeleteAuthedTokenInput,
         NativeSessionRequest,
         NativeSessionResponse,

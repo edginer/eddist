@@ -19,6 +19,28 @@ pub struct AuthedToken {
     pub additional_info: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone, IntoParams, Serialize, Deserialize)]
+pub struct ListAuthedTokensQuery {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+    pub origin_ip: Option<String>,
+    pub writing_ua: Option<String>,
+    pub authed_ua: Option<String>,
+    pub asn_num: Option<i32>,
+    pub validity: Option<bool>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct PaginatedAuthedTokens {
+    pub items: Vec<AuthedToken>,
+    pub total: u64,
+    pub page: u32,
+    pub per_page: u32,
+    pub total_pages: u32,
+}
+
 #[derive(Debug, Clone, ToSchema, IntoParams, Serialize, Deserialize)]
 pub struct DeleteAuthedTokenInput {
     pub using_origin_ip: bool,
