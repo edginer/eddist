@@ -1,6 +1,6 @@
 use axum::Router;
 
-use crate::DefaultAppState;
+use crate::AppState;
 
 pub mod archives;
 pub mod auth_tokens;
@@ -12,7 +12,7 @@ pub mod terms;
 pub mod threads;
 pub mod users;
 
-pub fn create_api_routes() -> Router<DefaultAppState> {
+pub fn create_api_routes() -> Router<AppState> {
     Router::new()
         .merge(boards::routes())
         .merge(threads::routes())

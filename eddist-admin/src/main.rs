@@ -1,3 +1,5 @@
+use std::{env, net::SocketAddr, sync::Arc};
+
 use auth::{
     auth_simple_header, get_check_auth, get_login, get_login_callback, get_logout,
     post_native_session,
@@ -15,7 +17,10 @@ use eddist_core::{tracing::init_tracing, utils::is_prod};
 use oauth2::{AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl, TokenUrl};
 use repository::{
     admin_archive_repository::AdminArchiveRepositoryImpl,
-    admin_bbs_repository::AdminBbsRepositoryImpl, admin_user_repository::AdminUserRepositoryImpl,
+    admin_board_repository::AdminBoardRepositoryImpl,
+    admin_response_repository::AdminResponseRepositoryImpl,
+    admin_thread_repository::AdminThreadRepositoryImpl,
+    admin_user_repository::AdminUserRepositoryImpl,
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
     captcha_config_repository::CaptchaConfigRepositoryImpl,
     ngword_repository::NgWordRepositoryImpl, notice_repository::NoticeRepositoryImpl,
@@ -28,7 +33,6 @@ use tokio::net::TcpListener;
 use tower_layer::Layer;
 use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, SessionManagerLayer};
 
-use std::{env, net::SocketAddr};
 use tower_http::{
     normalize_path::NormalizePathLayer,
     services::{ServeDir, ServeFile},
@@ -38,11 +42,14 @@ use tracing::info_span;
 
 mod api_doc;
 mod auth;
+pub(crate) mod error;
 mod models;
 mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
-    pub mod admin_repository;
+    pub mod admin_board_repository;
+    pub mod admin_response_repository;
+    pub mod admin_thread_repository;
     pub mod admin_user_repository;
     pub mod authed_token_repository;
     pub mod cap_repository;
@@ -52,16 +59,17 @@ mod repository {
     pub mod terms_repository;
     pub mod user_restriction_repository;
 }
-mod role;
 mod routes;
 
 use api_doc::ApiDoc;
 use repository::{
-    admin_archive_repository::AdminArchiveRepository, admin_bbs_repository::AdminBbsRepository,
-    admin_user_repository::AdminUserRepository, authed_token_repository::AuthedTokenRepository,
-    cap_repository::CapRepository, captcha_config_repository::CaptchaConfigRepository,
-    ngword_repository::NgWordRepository, notice_repository::NoticeRepository,
-    terms_repository::TermsRepository, user_restriction_repository::UserRestrictionRepository,
+    admin_archive_repository::AdminArchiveRepository, admin_board_repository::AdminBoardRepository,
+    admin_response_repository::AdminResponseRepository,
+    admin_thread_repository::AdminThreadRepository, admin_user_repository::AdminUserRepository,
+    authed_token_repository::AuthedTokenRepository, cap_repository::CapRepository,
+    captcha_config_repository::CaptchaConfigRepository, ngword_repository::NgWordRepository,
+    notice_repository::NoticeRepository, terms_repository::TermsRepository,
+    user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
 
@@ -94,18 +102,7 @@ async fn ok() -> impl IntoResponse {
 }
 
 #[derive(Clone)]
-pub(crate) struct AppState<
-    T: AdminBbsRepository + Clone,
-    R: AdminArchiveRepository + Clone,
-    N: NgWordRepository + Clone,
-    A: AuthedTokenRepository + Clone,
-    C: CapRepository + Clone,
-    U: AdminUserRepository + Clone,
-    UR: UserRestrictionRepository + Clone,
-    NO: NoticeRepository + Clone,
-    TR: TermsRepository + Clone,
-    CC: CaptchaConfigRepository + Clone,
-> {
+pub(crate) struct AppState {
     pub oauth2_client: oauth2::basic::BasicClient<
         EndpointSet,
         EndpointNotSet,
@@ -113,31 +110,20 @@ pub(crate) struct AppState<
         EndpointNotSet,
         EndpointSet,
     >,
-    pub admin_bbs_repo: T,
-    pub ng_word_repo: N,
-    pub admin_archive_repo: R,
-    pub authed_token_repo: A,
-    pub cap_repo: C,
-    pub user_repo: U,
-    pub user_restriction_repo: UR,
-    pub notice_repo: NO,
-    pub terms_repo: TR,
-    pub captcha_config_repo: CC,
+    pub admin_board_repo: Arc<dyn AdminBoardRepository>,
+    pub admin_thread_repo: Arc<dyn AdminThreadRepository>,
+    pub admin_response_repo: Arc<dyn AdminResponseRepository>,
+    pub ng_word_repo: Arc<dyn NgWordRepository>,
+    pub admin_archive_repo: Arc<dyn AdminArchiveRepository>,
+    pub authed_token_repo: Arc<dyn AuthedTokenRepository>,
+    pub cap_repo: Arc<dyn CapRepository>,
+    pub user_repo: Arc<dyn AdminUserRepository>,
+    pub user_restriction_repo: Arc<dyn UserRestrictionRepository>,
+    pub notice_repo: Arc<dyn NoticeRepository>,
+    pub terms_repo: Arc<dyn TermsRepository>,
+    pub captcha_config_repo: Arc<dyn CaptchaConfigRepository>,
     pub redis_conn: redis::aio::ConnectionManager,
 }
-
-pub(crate) type DefaultAppState = AppState<
-    AdminBbsRepositoryImpl,
-    AdminArchiveRepositoryImpl,
-    NgWordRepositoryImpl,
-    AuthedTokenRepositoryImpl,
-    CapRepositoryImpl,
-    AdminUserRepositoryImpl,
-    UserRestrictionRepositoryImpl,
-    NoticeRepositoryImpl,
-    TermsRepositoryImpl,
-    CaptchaConfigRepositoryImpl,
->;
 
 #[tokio::main]
 async fn main() {
@@ -219,21 +205,23 @@ async fn main() {
 
     let state = AppState {
         oauth2_client: client,
-        admin_bbs_repo: AdminBbsRepositoryImpl::new(pool.clone()),
-        ng_word_repo: NgWordRepositoryImpl::new(pool.clone()),
+        admin_board_repo: Arc::new(AdminBoardRepositoryImpl::new(pool.clone())),
+        admin_thread_repo: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
+        admin_response_repo: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
+        ng_word_repo: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
         redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
             .unwrap()
             .get_connection_manager()
             .await
             .unwrap(),
-        admin_archive_repo: AdminArchiveRepositoryImpl::new(*s3_client),
-        authed_token_repo: AuthedTokenRepositoryImpl::new(pool.clone()),
-        cap_repo: CapRepositoryImpl::new(pool.clone()),
-        user_repo: AdminUserRepositoryImpl::new(pool.clone()),
-        user_restriction_repo: UserRestrictionRepositoryImpl::new(pool.clone()),
-        notice_repo: NoticeRepositoryImpl::new(pool.clone()),
-        terms_repo: TermsRepositoryImpl::new(pool.clone()),
-        captcha_config_repo: CaptchaConfigRepositoryImpl::new(pool),
+        admin_archive_repo: Arc::new(AdminArchiveRepositoryImpl::new(*s3_client)),
+        authed_token_repo: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
+        cap_repo: Arc::new(CapRepositoryImpl::new(pool.clone())),
+        user_repo: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
+        user_restriction_repo: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
+        notice_repo: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
+        terms_repo: Arc::new(TermsRepositoryImpl::new(pool.clone())),
+        captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool)),
     };
 
     let app = Router::new()
@@ -254,8 +242,6 @@ async fn main() {
         .fallback_service(serve_dir)
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
-                // Log the matched route's path (with placeholders not filled in).
-                // Use request.uri() or OriginalUri if you want the real path.
                 let matched_path = request
                     .extensions()
                     .get::<MatchedPath>()

@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    response::Response,
+    http::StatusCode,
     routing::{delete, get, patch, post},
     Json, Router,
 };
@@ -10,19 +10,16 @@ use eddist_core::domain::user_restriction::{
 use uuid::Uuid;
 
 use crate::{
-    auth::AdminSession,
+    auth::AdminEmail,
+    error::ApiError,
     models::{
         Cap, CreateRestrictionRuleRequest, CreationCapInput, CreationNgWordInput, NgWord,
         UpdateCapInput, UpdateNgWordInput, UpdateRestrictionRuleRequest,
     },
-    repository::{
-        cap_repository::CapRepository, ngword_repository::NgWordRepository,
-        user_restriction_repository::UserRestrictionRepository,
-    },
-    DefaultAppState,
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         // NgWords
         .route("/ng_words", get(get_ng_words))
@@ -56,9 +53,9 @@ pub fn routes() -> Router<DefaultAppState> {
         (status = 200, description = "List ng words successfully", body = Vec<NgWord>),
     )
 )]
-pub async fn get_ng_words(State(state): State<DefaultAppState>) -> Json<Vec<NgWord>> {
-    let ng_words = state.ng_word_repo.get_ng_words().await.unwrap();
-    ng_words.into()
+pub async fn get_ng_words(State(state): State<AppState>) -> Result<Json<Vec<NgWord>>, ApiError> {
+    let ng_words = state.ng_word_repo.get_ng_words().await?;
+    Ok(Json(ng_words))
 }
 
 #[utoipa::path(
@@ -70,19 +67,14 @@ pub async fn get_ng_words(State(state): State<DefaultAppState>) -> Json<Vec<NgWo
     request_body = CreationNgWordInput
 )]
 pub async fn create_ng_word(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Json(body): Json<CreationNgWordInput>,
-) -> Response {
+) -> Result<Json<NgWord>, ApiError> {
     let ng_word = state
         .ng_word_repo
         .create_ng_word(&body.name, &body.word)
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&ng_word).unwrap().into())
-        .unwrap()
+        .await?;
+    Ok(Json(ng_word))
 }
 
 #[utoipa::path(
@@ -97,10 +89,10 @@ pub async fn create_ng_word(
     request_body = UpdateNgWordInput
 )]
 pub async fn update_ng_word(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(ng_word_id): Path<Uuid>,
     Json(body): Json<UpdateNgWordInput>,
-) -> Response {
+) -> Result<Json<NgWord>, ApiError> {
     let ng_word = state
         .ng_word_repo
         .update_ng_word(
@@ -109,13 +101,8 @@ pub async fn update_ng_word(
             body.word.as_deref(),
             body.board_ids,
         )
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&ng_word).unwrap().into())
-        .unwrap()
+        .await?;
+    Ok(Json(ng_word))
 }
 
 #[utoipa::path(
@@ -129,15 +116,11 @@ pub async fn update_ng_word(
     ),
 )]
 pub async fn delete_ng_word(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(ng_word_id): Path<Uuid>,
-) -> Response {
-    state.ng_word_repo.delete_ng_word(ng_word_id).await.unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(axum::body::Body::empty())
-        .unwrap()
+) -> Result<StatusCode, ApiError> {
+    state.ng_word_repo.delete_ng_word(ng_word_id).await?;
+    Ok(StatusCode::OK)
 }
 
 // Cap handlers
@@ -148,9 +131,9 @@ pub async fn delete_ng_word(
         (status = 200, description = "List cap words successfully", body = Vec<Cap>),
     )
 )]
-pub async fn get_caps(State(state): State<DefaultAppState>) -> Json<Vec<Cap>> {
-    let caps = state.cap_repo.get_caps().await.unwrap();
-    caps.into()
+pub async fn get_caps(State(state): State<AppState>) -> Result<Json<Vec<Cap>>, ApiError> {
+    let caps = state.cap_repo.get_caps().await?;
+    Ok(Json(caps))
 }
 
 #[utoipa::path(
@@ -162,26 +145,20 @@ pub async fn get_caps(State(state): State<DefaultAppState>) -> Json<Vec<Cap>> {
     request_body = CreationCapInput
 )]
 pub async fn create_cap(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Json(body): Json<CreationCapInput>,
-) -> Response {
+) -> Result<Json<Cap>, ApiError> {
+    let tinker_secret = std::env::var("TINKER_SECRET")
+        .map_err(|_| ApiError::Internal(anyhow::anyhow!("TINKER_SECRET not configured")))?;
     let cap = state
         .cap_repo
         .create_cap(
             &body.name,
             &body.description,
-            &eddist_core::domain::cap::calculate_cap_hash(
-                &body.password,
-                &std::env::var("TINKER_SECRET").unwrap(),
-            ),
+            &eddist_core::domain::cap::calculate_cap_hash(&body.password, &tinker_secret),
         )
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&cap).unwrap().into())
-        .unwrap()
+        .await?;
+    Ok(Json(cap))
 }
 
 #[utoipa::path(
@@ -196,10 +173,10 @@ pub async fn create_cap(
     request_body = UpdateCapInput
 )]
 pub async fn update_cap(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(cap_id): Path<Uuid>,
     Json(body): Json<UpdateCapInput>,
-) -> Response {
+) -> Result<Json<Cap>, ApiError> {
     let cap = state
         .cap_repo
         .update_cap(
@@ -208,21 +185,14 @@ pub async fn update_cap(
             body.description.as_deref(),
             body.password
                 .map(|x| {
-                    eddist_core::domain::cap::calculate_cap_hash(
-                        &x,
-                        &std::env::var("TINKER_SECRET").unwrap(),
-                    )
+                    let secret = std::env::var("TINKER_SECRET").unwrap_or_default();
+                    eddist_core::domain::cap::calculate_cap_hash(&x, &secret)
                 })
                 .as_deref(),
             body.board_ids,
         )
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&cap).unwrap().into())
-        .unwrap()
+        .await?;
+    Ok(Json(cap))
 }
 
 #[utoipa::path(
@@ -236,15 +206,11 @@ pub async fn update_cap(
     ),
 )]
 pub async fn delete_cap(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(cap_id): Path<Uuid>,
-) -> Response {
-    state.cap_repo.delete_cap(cap_id).await.unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(axum::body::Body::empty())
-        .unwrap()
+) -> Result<StatusCode, ApiError> {
+    state.cap_repo.delete_cap(cap_id).await?;
+    Ok(StatusCode::OK)
 }
 
 // User Restriction handlers
@@ -256,14 +222,14 @@ pub async fn delete_cap(
     )
 )]
 pub async fn get_restriction_rules(
-    State(app_state): State<DefaultAppState>,
-) -> Json<Vec<UserRestrictionRule>> {
+    State(app_state): State<AppState>,
+) -> Result<Json<Vec<UserRestrictionRule>>, ApiError> {
     let rules = app_state
         .user_restriction_repo
         .get_all_rules()
         .await
         .unwrap_or_default();
-    Json(rules)
+    Ok(Json(rules))
 }
 
 #[utoipa::path(
@@ -275,37 +241,20 @@ pub async fn get_restriction_rules(
     )
 )]
 pub async fn create_restriction_rule(
-    State(app_state): State<DefaultAppState>,
-    admin_session: AdminSession,
+    State(app_state): State<AppState>,
+    AdminEmail(admin_email): AdminEmail,
     Json(req): Json<CreateRestrictionRuleRequest>,
-) -> Response {
-    // Extract Auth0 user ID from session userinfo
-    let Some(admin_user_id) = admin_session.get_admin_email() else {
-        return Response::builder()
-            .status(401)
-            .body("Unauthorized: No user information available".into())
-            .unwrap();
-    };
-
+) -> Result<(StatusCode, Json<UserRestrictionRule>), ApiError> {
     let input = CreateUserRestrictionRuleInput {
         name: req.name,
         rule_type: req.rule_type.into(),
         rule_value: req.rule_value,
         expires_at: req.expires_at,
-        created_by_email: admin_user_id,
+        created_by_email: admin_email,
     };
 
-    let rule = app_state
-        .user_restriction_repo
-        .create_rule(input)
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(201)
-        .header("Content-Type", "application/json")
-        .body(serde_json::to_string(&rule).unwrap().into())
-        .unwrap()
+    let rule = app_state.user_restriction_repo.create_rule(input).await?;
+    Ok((StatusCode::CREATED, Json(rule)))
 }
 
 #[utoipa::path(
@@ -321,9 +270,9 @@ pub async fn create_restriction_rule(
 )]
 pub async fn update_restriction_rule(
     Path(rule_id): Path<Uuid>,
-    State(app_state): State<DefaultAppState>,
+    State(app_state): State<AppState>,
     Json(req): Json<UpdateRestrictionRuleRequest>,
-) -> Json<()> {
+) -> Result<Json<()>, ApiError> {
     let input = UpdateUserRestrictionRuleInput {
         id: rule_id,
         name: req.name,
@@ -332,12 +281,8 @@ pub async fn update_restriction_rule(
         expires_at: req.expires_at,
     };
 
-    app_state
-        .user_restriction_repo
-        .update_rule(input)
-        .await
-        .unwrap();
-    Json(())
+    app_state.user_restriction_repo.update_rule(input).await?;
+    Ok(Json(()))
 }
 
 #[utoipa::path(
@@ -352,14 +297,10 @@ pub async fn update_restriction_rule(
 )]
 pub async fn delete_restriction_rule(
     Path(rule_id): Path<Uuid>,
-    State(app_state): State<DefaultAppState>,
-) -> Json<()> {
-    app_state
-        .user_restriction_repo
-        .delete_rule(rule_id)
-        .await
-        .unwrap();
-    Json(())
+    State(app_state): State<AppState>,
+) -> Result<Json<()>, ApiError> {
+    app_state.user_restriction_repo.delete_rule(rule_id).await?;
+    Ok(Json(()))
 }
 
 #[utoipa::path(
@@ -374,12 +315,11 @@ pub async fn delete_restriction_rule(
 )]
 pub async fn get_restriction_rule(
     Path(rule_id): Path<Uuid>,
-    State(app_state): State<DefaultAppState>,
-) -> Json<Option<UserRestrictionRule>> {
+    State(app_state): State<AppState>,
+) -> Result<Json<Option<UserRestrictionRule>>, ApiError> {
     let rule = app_state
         .user_restriction_repo
         .get_rule_by_id(rule_id)
-        .await
-        .unwrap();
-    Json(rule)
+        .await?;
+    Ok(Json(rule))
 }

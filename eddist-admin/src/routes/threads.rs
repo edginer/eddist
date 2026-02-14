@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    response::Response,
+    http::StatusCode,
     routing::{get, patch, post},
     Json, Router,
 };
@@ -8,12 +8,12 @@ use eddist_core::domain::res::ResView;
 use uuid::Uuid;
 
 use crate::{
+    error::ApiError,
     models::{Res, Thread, ThreadCompactionInput, UpdateResInput},
-    repository::admin_bbs_repository::AdminBbsRepository,
-    DefaultAppState,
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/boards/{boardKey}/threads", get(get_threads))
         .route("/boards/{boardKey}/threads/{threadId}", get(get_thread))
@@ -39,16 +39,14 @@ pub fn routes() -> Router<DefaultAppState> {
     )
 )]
 pub async fn get_threads(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(board_key): Path<String>,
-) -> Json<Vec<Thread>> {
+) -> Result<Json<Vec<Thread>>, ApiError> {
     let threads = state
-        .admin_bbs_repo
+        .admin_thread_repo
         .get_threads_by_thread_id(&board_key, None)
-        .await
-        .unwrap();
-
-    threads.into()
+        .await?;
+    Ok(Json(threads))
 }
 
 #[utoipa::path(
@@ -64,26 +62,18 @@ pub async fn get_threads(
     )
 )]
 pub async fn get_thread(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_id)): Path<(String, u64)>,
-) -> Response {
+) -> Result<Json<Thread>, ApiError> {
     let thread = state
-        .admin_bbs_repo
+        .admin_thread_repo
         .get_threads_by_thread_id(&board_key, Some(vec![thread_id]))
-        .await
-        .unwrap();
-
-    let Some(thread) = thread.first() else {
-        return Response::builder()
-            .status(404)
-            .body(axum::body::Body::empty())
-            .unwrap();
-    };
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&thread).unwrap().into())
-        .unwrap()
+        .await?;
+    let thread = thread
+        .into_iter()
+        .next()
+        .ok_or_else(|| ApiError::not_found("Thread not found"))?;
+    Ok(Json(thread))
 }
 
 #[utoipa::path(
@@ -98,16 +88,14 @@ pub async fn get_thread(
     )
 )]
 pub async fn get_responses(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_id)): Path<(String, u64)>,
-) -> Json<Vec<Res>> {
+) -> Result<Json<Vec<Res>>, ApiError> {
     let responses = state
-        .admin_bbs_repo
+        .admin_response_repo
         .get_reses_by_thread_id(&board_key, thread_id)
-        .await
-        .unwrap();
-
-    responses.into()
+        .await?;
+    Ok(Json(responses))
 }
 
 #[utoipa::path(
@@ -124,14 +112,14 @@ pub async fn get_responses(
     request_body = UpdateResInput
 )]
 pub async fn update_response(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((_a, _aa, res_id)): Path<(String, u64, Uuid)>,
     Json(body): Json<UpdateResInput>,
-) -> Response {
+) -> Result<Json<Res>, ApiError> {
     let (res, default_name, board_key, thread_number, thread_title) =
-        state.admin_bbs_repo.get_res(res_id).await.unwrap();
+        state.admin_response_repo.get_res(res_id).await?;
     let updated_res = state
-        .admin_bbs_repo
+        .admin_response_repo
         .update_res(
             res_id,
             body.author_name.clone(),
@@ -139,8 +127,7 @@ pub async fn update_response(
             body.body.clone(),
             body.is_abone,
         )
-        .await
-        .unwrap();
+        .await?;
     let author_name = if let Some(author_name) = body.author_name {
         author_name
     } else {
@@ -181,10 +168,7 @@ pub async fn update_response(
         ))
         .await;
 
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&updated_res).unwrap().into())
-        .unwrap()
+    Ok(Json(updated_res))
 }
 
 #[utoipa::path(
@@ -199,18 +183,13 @@ pub async fn update_response(
     request_body = ThreadCompactionInput
 )]
 pub async fn threads_compaction(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(board_key): Path<String>,
     Json(body): Json<ThreadCompactionInput>,
-) -> Response {
+) -> Result<StatusCode, ApiError> {
     state
-        .admin_bbs_repo
+        .admin_thread_repo
         .compact_threads(&board_key, body.target_count)
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(axum::body::Body::empty())
-        .unwrap()
+        .await?;
+    Ok(StatusCode::OK)
 }

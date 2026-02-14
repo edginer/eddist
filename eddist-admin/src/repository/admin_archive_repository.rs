@@ -5,7 +5,8 @@ use s3::Bucket;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub(crate) trait AdminArchiveRepository: Send + Sync + Clone {
+#[async_trait::async_trait]
+pub(crate) trait AdminArchiveRepository: Send + Sync {
     async fn get_thread(
         &self,
         board_key: &str,
@@ -82,6 +83,7 @@ pub struct ArchivedAdminThread {
     pub responses: Vec<ArchivedAdminRes>,
 }
 
+#[async_trait::async_trait]
 impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
     async fn get_thread(
         &self,

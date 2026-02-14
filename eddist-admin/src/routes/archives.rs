@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    response::Response,
+    http::StatusCode,
     routing::{delete, get, patch},
     Json, Router,
 };
@@ -9,15 +9,13 @@ use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
 
 use crate::{
+    error::ApiError,
     models::{Res, Thread},
-    repository::{
-        admin_archive_repository::{AdminArchiveRepository, ArchivedResUpdate},
-        admin_bbs_repository::AdminBbsRepository,
-    },
-    DefaultAppState,
+    repository::admin_archive_repository::ArchivedResUpdate,
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/boards/{boardKey}/archives", get(get_archived_threads))
         .route(
@@ -71,7 +69,7 @@ pub struct GetArchivedThreadsQuery {
     )
 )]
 pub async fn get_archived_threads(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(board_key): Path<String>,
     Query(GetArchivedThreadsQuery {
         keyword,
@@ -80,23 +78,21 @@ pub async fn get_archived_threads(
         page,
         limit,
     }): Query<GetArchivedThreadsQuery>,
-) -> Json<Vec<Thread>> {
+) -> Result<Json<Vec<Thread>>, ApiError> {
     let threads = state
-        .admin_bbs_repo
+        .admin_thread_repo
         .get_archived_threads_by_filter(
             &board_key,
             keyword.as_deref(),
             (
-                start.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
-                end.map(|x| Utc.timestamp_opt(x as i64, 0).unwrap().to_utc()),
+                start.and_then(|x| Utc.timestamp_opt(x as i64, 0).single()),
+                end.and_then(|x| Utc.timestamp_opt(x as i64, 0).single()),
             ),
             page.unwrap_or(0),
             limit.unwrap_or(20),
         )
-        .await
-        .unwrap();
-
-    threads.into()
+        .await?;
+    Ok(Json(threads))
 }
 
 #[utoipa::path(
@@ -112,26 +108,18 @@ pub async fn get_archived_threads(
     )
 )]
 pub async fn get_archived_thread(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_id)): Path<(String, u64)>,
-) -> Response {
+) -> Result<Json<Thread>, ApiError> {
     let thread = state
-        .admin_bbs_repo
+        .admin_thread_repo
         .get_archived_threads_by_thread_id(&board_key, Some(vec![thread_id]))
-        .await
-        .unwrap();
-
-    let Some(thread) = thread.first() else {
-        return Response::builder()
-            .status(404)
-            .body(axum::body::Body::empty())
-            .unwrap();
-    };
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&thread).unwrap().into())
-        .unwrap()
+        .await?;
+    let thread = thread
+        .into_iter()
+        .next()
+        .ok_or_else(|| ApiError::not_found("Archived thread not found"))?;
+    Ok(Json(thread))
 }
 
 #[utoipa::path(
@@ -146,16 +134,14 @@ pub async fn get_archived_thread(
     )
 )]
 pub async fn get_archived_responses(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_id)): Path<(String, u64)>,
-) -> Json<Vec<Res>> {
+) -> Result<Json<Vec<Res>>, ApiError> {
     let responses = state
-        .admin_bbs_repo
+        .admin_response_repo
         .get_archived_reses_by_thread_id(&board_key, thread_id)
-        .await
-        .unwrap();
-
-    responses.into()
+        .await?;
+    Ok(Json(responses))
 }
 
 #[utoipa::path(
@@ -170,23 +156,14 @@ pub async fn get_archived_responses(
     )
 )]
 pub async fn get_dat_archived_thread(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_number)): Path<(String, u64)>,
-) -> Response {
-    match state
+) -> Result<Json<crate::repository::admin_archive_repository::ArchivedThread>, ApiError> {
+    let thread = state
         .admin_archive_repo
         .get_thread(&board_key, thread_number)
-        .await
-    {
-        Ok(thread) => Response::builder()
-            .status(200)
-            .body(serde_json::to_string(&thread).unwrap().into())
-            .unwrap(),
-        Err(_) => Response::builder()
-            .status(500)
-            .body(axum::body::Body::empty())
-            .unwrap(),
-    }
+        .await?;
+    Ok(Json(thread))
 }
 
 #[utoipa::path(
@@ -201,23 +178,14 @@ pub async fn get_dat_archived_thread(
     )
 )]
 pub async fn get_admin_dat_archived_thread(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_number)): Path<(String, u64)>,
-) -> Response {
-    match state
+) -> Result<Json<crate::repository::admin_archive_repository::ArchivedAdminThread>, ApiError> {
+    let thread = state
         .admin_archive_repo
         .get_archived_admin_thread(&board_key, thread_number)
-        .await
-    {
-        Ok(thread) => Response::builder()
-            .status(200)
-            .body(serde_json::to_string(&thread).unwrap().into())
-            .unwrap(),
-        Err(_) => Response::builder()
-            .status(500)
-            .body(axum::body::Body::empty())
-            .unwrap(),
-    }
+        .await?;
+    Ok(Json(thread))
 }
 
 #[utoipa::path(
@@ -233,25 +201,15 @@ pub async fn get_admin_dat_archived_thread(
     request_body = Vec<ArchivedResUpdate>,
 )]
 pub async fn update_archived_res(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_number)): Path<(String, u64)>,
     Json(body): Json<Vec<ArchivedResUpdate>>,
-) -> Response {
-    if let Err(e) = state
+) -> Result<StatusCode, ApiError> {
+    state
         .admin_archive_repo
         .update_response(&board_key, thread_number, &body)
-        .await
-    {
-        Response::builder()
-            .status(500)
-            .body(e.to_string().into())
-            .unwrap()
-    } else {
-        Response::builder()
-            .status(200)
-            .body(axum::body::Body::empty())
-            .unwrap()
-    }
+        .await?;
+    Ok(StatusCode::OK)
 }
 
 #[utoipa::path(
@@ -267,24 +225,14 @@ pub async fn update_archived_res(
     ),
 )]
 pub async fn delete_archived_res(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_number, res_order)): Path<(String, u64, u64)>,
-) -> Response {
-    if let Err(e) = state
+) -> Result<StatusCode, ApiError> {
+    state
         .admin_archive_repo
         .delete_response(&board_key, thread_number, res_order)
-        .await
-    {
-        Response::builder()
-            .status(500)
-            .body(e.to_string().into())
-            .unwrap()
-    } else {
-        Response::builder()
-            .status(200)
-            .body(axum::body::Body::empty())
-            .unwrap()
-    }
+        .await?;
+    Ok(StatusCode::OK)
 }
 
 #[utoipa::path(
@@ -299,22 +247,12 @@ pub async fn delete_archived_res(
     ),
 )]
 pub async fn delete_archived_thread(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path((board_key, thread_number)): Path<(String, u64)>,
-) -> Response {
-    if let Err(e) = state
+) -> Result<StatusCode, ApiError> {
+    state
         .admin_archive_repo
         .delete_thread(&board_key, thread_number)
-        .await
-    {
-        Response::builder()
-            .status(500)
-            .body(e.to_string().into())
-            .unwrap()
-    } else {
-        Response::builder()
-            .status(200)
-            .body(axum::body::Body::empty())
-            .unwrap()
-    }
+        .await?;
+    Ok(StatusCode::OK)
 }
