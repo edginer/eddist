@@ -8,13 +8,13 @@ import {
   TableHeadCell,
   TableRow,
 } from "flowbite-react";
-import { useState } from "react";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
-import { toast } from "react-toastify";
 import CreateCapModal from "~/components/CreateCapModal";
 import EditCapModal from "~/components/EditCapModal";
-import { deleteCap, getCaps } from "~/hooks/queries";
+import { getCaps, useDeleteCap } from "~/hooks/queries";
+import { formatDateTime } from "~/utils/format";
 
 export interface Cap {
   id: string;
@@ -26,24 +26,23 @@ export interface Cap {
 
 const CapPage = () => {
   const { data: caps, refetch } = getCaps({});
+  const deleteMutation = useDeleteCap();
 
-  const [openCreateCapModal, setOpenCreateCapModal] = useState(false);
-  const [openEditCapModal, setOpenEditCapModal] = useState(false);
-  const [selectedCap, setSelectedCap] = useState<Cap | undefined>(undefined);
+  const modal = useCrudModalState<Cap>();
 
   return (
     <>
       <CreateCapModal
-        open={openCreateCapModal}
-        setOpen={setOpenCreateCapModal}
+        open={modal.isCreateOpen}
+        setOpen={(v) => { if (!v) modal.closeCreate(); }}
         refetch={refetch}
       />
 
-      {selectedCap && (
+      {modal.editingItem && (
         <EditCapModal
-          open={openEditCapModal}
-          selectedCap={selectedCap}
-          setOpen={setOpenEditCapModal}
+          open={modal.isEditOpen}
+          selectedCap={modal.editingItem}
+          setOpen={(v) => { if (!v) modal.closeEdit(); }}
           refetch={refetch}
         />
       )}
@@ -53,7 +52,7 @@ const CapPage = () => {
           <h1 className="text-3xl font-bold grow">Caps</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
-            onClick={() => setOpenCreateCapModal(true)}
+            onClick={() => modal.openCreate()}
           >
             <FaPlus />
           </button>
@@ -71,15 +70,14 @@ const CapPage = () => {
               <TableRow className="border-gray-200" key={cap.id}>
                 <TableCell>{cap.id}</TableCell>
                 <TableCell>{cap.name}</TableCell>
-                <TableCell>{cap.created_at}</TableCell>
-                <TableCell>{cap.updated_at}</TableCell>
+                <TableCell>{formatDateTime(cap.created_at)}</TableCell>
+                <TableCell>{formatDateTime(cap.updated_at)}</TableCell>
                 <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
                       <DropdownItem
                         onClick={() => {
-                          setOpenEditCapModal(true);
-                          setSelectedCap({
+                          modal.openEdit({
                             ...cap,
                             boardIds: cap.board_ids,
                           });
@@ -89,22 +87,14 @@ const CapPage = () => {
                       </DropdownItem>
                       <DropdownItem
                         className="text-red-500"
-                        onClick={async () => {
-                          const { mutate } = deleteCap({
+                        onClick={() => {
+                          deleteMutation.mutate({
                             params: {
                               path: {
                                 cap_id: cap.id,
                               },
                             },
                           });
-
-                          try {
-                            await mutate();
-                            toast.success("Successfully deleted Cap");
-                            await refetch();
-                          } catch (error) {
-                            toast.error("Failed to delete Cap");
-                          }
                         }}
                       >
                         Delete

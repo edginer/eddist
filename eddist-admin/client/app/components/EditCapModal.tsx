@@ -8,9 +8,8 @@ import {
 } from "flowbite-react";
 import React, { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { getBoards, updateCap } from "~/hooks/queries";
+import { getBoards, useUpdateCap } from "~/hooks/queries";
 import Select from "react-select";
-import { toast } from "react-toastify";
 import { Cap } from "~/routes/dashboard.caps";
 
 interface EditCapModalProps {
@@ -44,6 +43,8 @@ const EditCapModal = ({
     return [];
   }, [boards]);
 
+  const updateCapMutation = useUpdateCap();
+
   return (
     <Modal
       show={open}
@@ -55,15 +56,15 @@ const EditCapModal = ({
       <ModalHeader className="border-gray-200">Edit Cap</ModalHeader>
       <ModalBody>
         <form
-          onSubmit={handleSubmit(async (data) => {
-            try {
-              const boardIds = data.boardKeys.map(
-                (val: BoardSelectOption) =>
-                  boards!.find((board) => board.board_key === val.value)?.id
-              );
-              const password = data.password ? data.password : undefined;
+          onSubmit={handleSubmit((data) => {
+            const boardIds = data.boardKeys.map(
+              (val: BoardSelectOption) =>
+                boards!.find((board) => board.board_key === val.value)?.id
+            );
+            const password = data.password ? data.password : undefined;
 
-              const { mutate } = updateCap({
+            updateCapMutation.mutate(
+              {
                 params: {
                   path: {
                     cap_id: selectedCap.id,
@@ -75,15 +76,15 @@ const EditCapModal = ({
                   password,
                   board_ids: boardIds,
                 },
-              });
-              await mutate();
-              setOpen(false);
-              reset();
-              toast.success("Successfully updated Cap");
-              await refetch();
-            } catch (error) {
-              toast.error("Failed to update Cap");
-            }
+              },
+              {
+                onSuccess: () => {
+                  setOpen(false);
+                  reset();
+                  refetch();
+                },
+              },
+            );
           })}
         >
           <div className="flex flex-col">

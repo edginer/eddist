@@ -13,11 +13,10 @@ import {
   TextInput,
 } from "flowbite-react";
 import { useForm } from "react-hook-form";
-import { createBoard, getBoards } from "~/hooks/queries";
+import { useCreateBoard } from "~/hooks/queries";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { components } from "~/openapi/schema";
-import { toast } from "react-toastify";
 
 interface CreateBoardModalProps {
   open: boolean;
@@ -42,7 +41,7 @@ const boardCreationSchema = z.object({
       {
         message:
           "Sorry, this board key is reserved. Please choose another one.",
-      }
+      },
     ),
   default_name: z.string().min(1).max(64),
   local_rule: z.string().min(1),
@@ -86,24 +85,24 @@ const CreateBoardModal = ({
     resolver: zodResolver(boardCreationSchema),
   });
 
+  const createBoardMutation = useCreateBoard();
+
   return (
     <Modal show={open} onClose={() => setOpen(false)}>
       <ModalHeader className="border-gray-200">Create Board</ModalHeader>
 
       <ModalBody>
         <form
-          onSubmit={handleSubmit(async (data) => {
-            try {
-              const { mutate } = createBoard({
-                body: data,
-              });
-              await mutate();
-              setOpen(false);
-              toast.success("Successfully created board");
-              await refetch();
-            } catch {
-              toast.error("Failed to create board");
-            }
+          onSubmit={handleSubmit((data) => {
+            createBoardMutation.mutate(
+              { body: data },
+              {
+                onSuccess: () => {
+                  setOpen(false);
+                  refetch();
+                },
+              },
+            );
           })}
         >
           <div className="flex flex-col">

@@ -4,17 +4,18 @@ import { twMerge } from "tailwind-merge";
 import { Spinner } from "flowbite-react";
 import { Link, Outlet, useLocation } from "react-router";
 
-type NavBarSectionKind =
-  | "boards"
-  | "caps"
-  | "ngwords"
-  | "notices"
-  | "terms"
-  | "captcha-configs"
-  | "global"
-  | "authed-token"
-  | "users"
-  | "restriction-rules";
+const NAV_ITEMS = [
+  { kind: "boards", label: "Boards" },
+  { kind: "caps", label: "Caps" },
+  { kind: "ngwords", label: "Ng Words" },
+  { kind: "notices", label: "Notices" },
+  { kind: "terms", label: "Terms" },
+  { kind: "captcha-configs", label: "Captcha Configs" },
+  { kind: "global", label: "Global" },
+  { kind: "authed-token", label: "Authed Token" },
+  { kind: "users", label: "Users" },
+  { kind: "restriction-rules", label: "Restriction Rules" },
+] as const;
 
 const Hamburger = () => (
   <svg
@@ -32,67 +33,11 @@ const Hamburger = () => (
   </svg>
 );
 
-const NavBarSection = ({
-  selected,
-  kind,
-}: {
-  selected: boolean;
-  kind: NavBarSectionKind;
-}) => {
-  let displayText = "";
-  switch (kind) {
-    case "boards":
-      displayText = "Boards";
-      break;
-    case "caps":
-      displayText = "Caps";
-      break;
-    case "ngwords":
-      displayText = "Ng Words";
-      break;
-    case "notices":
-      displayText = "Notices";
-      break;
-    case "terms":
-      displayText = "Terms";
-      break;
-    case "captcha-configs":
-      displayText = "Captcha Configs";
-      break;
-    case "global":
-      displayText = "Global";
-      break;
-    case "authed-token":
-      displayText = "Authed Token";
-      break;
-    case "users":
-      displayText = "Users";
-      break;
-    case "restriction-rules":
-      displayText = "Restriction Rules";
-      break;
-  }
-
-  return (
-    <Link
-      to={`/dashboard/${kind}`}
-      className={twMerge(
-        "flex items-center py-2 px-8 hover:bg-gray-700",
-        selected ? "bg-gray-900 text-gray-400" : "text-gray-400"
-      )}
-    >
-      <Hamburger />
-      <span className="mx-4 font-medium">{displayText}</span>
-    </Link>
-  );
-};
-
 const Layout: React.FC = () => {
   const location = useLocation();
-
-  const navBarSection = location.pathname.split("/")[2] as NavBarSectionKind;
-
+  const navBarSection = location.pathname.split("/")[2];
   const [isNavbarOpen, setIsNavbarOpen] = useState(false);
+
   return (
     <div className="flex h-screen flex-col sm:flex-row">
       <div className="hidden sm:block bg-gray-800 w-64">
@@ -105,31 +50,21 @@ const Layout: React.FC = () => {
           </Link>
         </div>
         <nav className="mt-10">
-          <NavBarSection selected={navBarSection === "boards"} kind="boards" />
-          <NavBarSection selected={navBarSection === "caps"} kind="caps" />
-          <NavBarSection
-            selected={navBarSection === "ngwords"}
-            kind="ngwords"
-          />
-          <NavBarSection
-            selected={navBarSection === "notices"}
-            kind="notices"
-          />
-          <NavBarSection selected={navBarSection === "terms"} kind="terms" />
-          <NavBarSection
-            selected={navBarSection === "captcha-configs"}
-            kind="captcha-configs"
-          />
-          <NavBarSection selected={navBarSection === "global"} kind="global" />
-          <NavBarSection
-            selected={navBarSection === "authed-token"}
-            kind="authed-token"
-          />
-          <NavBarSection selected={navBarSection === "users"} kind="users" />
-          <NavBarSection
-            selected={navBarSection === "restriction-rules"}
-            kind="restriction-rules"
-          />
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.kind}
+              to={`/dashboard/${item.kind}`}
+              className={twMerge(
+                "flex items-center py-2 px-8 hover:bg-gray-700",
+                navBarSection === item.kind
+                  ? "bg-gray-900 text-gray-400"
+                  : "text-gray-400",
+              )}
+            >
+              <Hamburger />
+              <span className="mx-4 font-medium">{item.label}</span>
+            </Link>
+          ))}
         </nav>
       </div>
       <div className="w-full flex bg-gray-900 text-gray-300 sm:hidden">
@@ -151,90 +86,27 @@ const Layout: React.FC = () => {
           <div
             className={twMerge(
               " bg-gray-50 text-black z-10 flex flex-col h-screen",
-              !isNavbarOpen && "hidden"
+              !isNavbarOpen && "hidden",
             )}
           >
             <ul className="pt-2 text-lg text-blue-700 font-semibold">
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/boards"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
+              {NAV_ITEMS.map((item, idx) => (
+                <li
+                  key={item.kind}
+                  className={twMerge(
+                    "pl-2 border-slate-400",
+                    idx < NAV_ITEMS.length - 1 &&
+                      "border-b pb-1 border-spacing-y-6",
+                  )}
                 >
-                  Boards
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/caps"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Caps
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/ngwords"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Ng Words
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/notices"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Notices
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/terms"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Terms
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/captcha-configs"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Captcha Configs
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/global"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Global
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/authed-token"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Authed Token
-                </Link>
-              </li>
-              <li className="pl-2 border-b pb-1 border-slate-400 border-spacing-y-6">
-                <Link
-                  to="/dashboard/users"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Users
-                </Link>
-              </li>
-              <li className="pl-2 border-slate-400">
-                <Link
-                  to="/dashboard/restriction-rules"
-                  onClick={() => setIsNavbarOpen((x) => !x)}
-                >
-                  Restriction Rules
-                </Link>
-              </li>
+                  <Link
+                    to={`/dashboard/${item.kind}`}
+                    onClick={() => setIsNavbarOpen((x) => !x)}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </nav>

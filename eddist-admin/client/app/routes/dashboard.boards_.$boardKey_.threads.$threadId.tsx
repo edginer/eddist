@@ -10,9 +10,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "flowbite-react";
-import { toast } from "react-toastify";
-import { getResponses, getThread, updateResponse } from "~/hooks/queries";
-import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
+import { getResponses, getThread, useUpdateResponse, useDeleteAuthedToken } from "~/hooks/queries";
 
 export interface ResInput {
   author_name?: string;
@@ -64,7 +62,7 @@ const Page = () => {
   const [selectedResponses, setSelectedResponses] = useState<ResInput[]>([]);
   const [showingFloatingDetail, setShowingFloatingDetail] = useState(false);
 
-  const { data: responses, refetch } = getResponses({
+  const { data: responses } = getResponses({
     params: {
       path: {
         board_key: params.boardKey,
@@ -81,35 +79,29 @@ const Page = () => {
     },
   });
 
+  const updateResponseMutation = useUpdateResponse();
+  const deleteAuthedTokenMutation = useDeleteAuthedToken();
+
   const updateResp = useCallback(
-    async (res: ResInput, resId: string) => {
-      try {
-        const { mutate } = updateResponse({
-          params: {
-            path: {
-              board_key: params.boardKey!,
-              thread_id: Number(params.threadId!),
-              res_id: resId,
-            },
+    (res: ResInput, resId: string) => {
+      updateResponseMutation.mutate({
+        params: {
+          path: {
+            board_key: params.boardKey!,
+            thread_id: Number(params.threadId!),
+            res_id: resId,
           },
-          body: {
-            author_name: res.author_name,
-            body: res.body,
-            is_abone: res.is_abone,
-            mail: res.mail,
-          },
-        });
-        await mutate();
-        toast.success(`Successfully updated response`);
-        await refetch();
-      } catch (error) {
-        toast.error(`Failed to update response`);
-        return error;
-      }
+        },
+        body: {
+          author_name: res.author_name,
+          body: res.body,
+          is_abone: res.is_abone,
+          mail: res.mail,
+        },
+      });
     },
-    [refetch, params.boardKey, params.threadId],
+    [updateResponseMutation, params.boardKey, params.threadId],
   );
-  const deleteAuthedCookie = useDeleteAuthedToken();
 
   return (
     <>
@@ -224,11 +216,11 @@ const Page = () => {
               await updateResp(abonedRes, res.id);
             }
           }}
-          onClickDeleteAuthedToken={async (token) => {
-            await deleteAuthedCookie(token, false);
+          onClickDeleteAuthedToken={(token) => {
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: false });
           }}
-          onClickDeleteAuthedTokensAssociatedWithIp={async (token) => {
-            await deleteAuthedCookie(token, true);
+          onClickDeleteAuthedTokensAssociatedWithIp={(token) => {
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: true });
           }}
           onClickEditResponse={(response) => {
             setSelectedEditingRes(response);

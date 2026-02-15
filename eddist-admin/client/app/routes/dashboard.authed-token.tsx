@@ -25,23 +25,16 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useQueryClient } from "@tanstack/react-query";
-import { listAuthedTokens } from "~/hooks/queries";
-import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
+import { listAuthedTokens, useDeleteAuthedToken } from "~/hooks/queries";
 import client from "~/openapi/client";
 import type { components } from "~/openapi/schema";
+import { formatDateTime } from "~/utils/format";
 
 type AuthedToken = components["schemas"]["AuthedToken"];
 
-const formatDateTime = (dateStr: string | null | undefined) => {
-  if (!dateStr) return "N/A";
-  return new Date(dateStr).toLocaleString();
-};
-
 const Page = () => {
   const [searchParams] = useSearchParams();
-  const queryClient = useQueryClient();
-  const deleteAuthedToken = useDeleteAuthedToken();
+  const deleteAuthedTokenMutation = useDeleteAuthedToken();
 
   // Open detail modal when navigating with ?token=<id> from responses page
   useEffect(() => {
@@ -136,15 +129,16 @@ const Page = () => {
     validityFilter,
   ]);
 
-  const handleRevokeToken = useCallback(async () => {
+  const handleRevokeToken = useCallback(() => {
     if (!selectedToken?.id) return;
     if (!confirm("Are you sure you want to revoke this token?")) return;
-    await deleteAuthedToken(selectedToken.id, false);
-    queryClient.invalidateQueries({ queryKey: ["/authed_tokens"] });
-    setSelectedToken(null);
-  }, [selectedToken?.id, deleteAuthedToken, queryClient]);
+    deleteAuthedTokenMutation.mutate(
+      { authedTokenId: selectedToken.id, usingOriginIp: false },
+      { onSuccess: () => setSelectedToken(null) },
+    );
+  }, [selectedToken?.id, deleteAuthedTokenMutation]);
 
-  const handleRevokeAllFromOriginIp = useCallback(async () => {
+  const handleRevokeAllFromOriginIp = useCallback(() => {
     if (!selectedToken?.id) return;
     if (
       !confirm(
@@ -152,15 +146,11 @@ const Page = () => {
       )
     )
       return;
-    await deleteAuthedToken(selectedToken.id, true);
-    queryClient.invalidateQueries({ queryKey: ["/authed_tokens"] });
-    setSelectedToken(null);
-  }, [
-    selectedToken?.id,
-    selectedToken?.origin_ip,
-    deleteAuthedToken,
-    queryClient,
-  ]);
+    deleteAuthedTokenMutation.mutate(
+      { authedTokenId: selectedToken.id, usingOriginIp: true },
+      { onSuccess: () => setSelectedToken(null) },
+    );
+  }, [selectedToken?.id, selectedToken?.origin_ip, deleteAuthedTokenMutation]);
 
   const columns = useMemo<ColumnDef<AuthedToken>[]>(
     () => [

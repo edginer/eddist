@@ -7,8 +7,7 @@ import {
   TextInput,
 } from "flowbite-react";
 import { useForm } from "react-hook-form";
-import { toast } from "react-toastify";
-import { createNgWord } from "~/hooks/queries";
+import { useCreateNgWord } from "~/hooks/queries";
 
 interface CreateNgWordModalProps {
   open: boolean;
@@ -23,27 +22,29 @@ const CreateNgWordModal = ({
 }: CreateNgWordModalProps) => {
   const { register, handleSubmit } = useForm();
 
+  const createNgWordMutation = useCreateNgWord();
+
   return (
     <div>
       <Modal show={open} onClose={() => setOpen(false)}>
         <ModalHeader className="border-gray-200">Create NG Word</ModalHeader>
         <ModalBody>
           <form
-            onSubmit={handleSubmit(async (data) => {
-              try {
-                const { mutate } = createNgWord({
+            onSubmit={handleSubmit((data) => {
+              createNgWordMutation.mutate(
+                {
                   body: {
                     name: data.name,
                     word: data.word,
                   },
-                });
-                await mutate();
-                setOpen(false);
-                toast.success("Successfully created NG word");
-                await refetch();
-              } catch (error) {
-                toast.error("Failed to create NG word");
-              }
+                },
+                {
+                  onSuccess: () => {
+                    setOpen(false);
+                    refetch();
+                  },
+                },
+              );
             })}
           >
             <div className="flex flex-col">

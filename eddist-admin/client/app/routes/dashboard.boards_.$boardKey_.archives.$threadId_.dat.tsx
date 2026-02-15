@@ -7,15 +7,14 @@ import {
   ModalHeader,
 } from "flowbite-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
 import Breadcrumb from "~/components/Breadcrumb";
 import DatArchiveResponseList from "~/components/DatArchiveResponseList";
-import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
 import {
-  deleteDatArchivedResponse,
   getDatAdminArchivedThread,
   getDatArcvhiedThread,
-  updateDatArchivedResponse,
+  useUpdateDatArchivedResponse,
+  useDeleteDatArchivedResponse,
+  useDeleteAuthedToken,
 } from "~/hooks/queries";
 
 const Page = () => {
@@ -60,41 +59,9 @@ const Page = () => {
     | undefined
   >();
 
-  const deleteAuthedToken = useDeleteAuthedToken();
-
-  const deleteResponse = (resOrder: number) =>
-    deleteDatArchivedResponse({
-      params: {
-        path: {
-          board_key: params.boardKey!!,
-          thread_number: Number(params.threadId),
-          res_order: resOrder,
-        },
-      },
-    });
-
-  const updateResp = (
-    author_name: string,
-    body: string,
-    email: string,
-    res_order: number
-  ) =>
-    updateDatArchivedResponse({
-      params: {
-        path: {
-          board_key: params.boardKey!!,
-          thread_number: Number(params.threadId),
-        },
-      },
-      body: [
-        {
-          author_name,
-          email,
-          body,
-          res_order,
-        },
-      ],
-    });
+  const deleteAuthedTokenMutation = useDeleteAuthedToken();
+  const updateDatResponseMutation = useUpdateDatArchivedResponse();
+  const deleteDatResponseMutation = useDeleteDatArchivedResponse();
 
   return (
     <>
@@ -168,19 +135,32 @@ const Page = () => {
             Close
           </Button>
           <Button
-            onClick={async () => {
+            onClick={() => {
               if (editRespState) {
-                const { mutate } = updateResp(
-                  editRespState.author_name,
-                  editRespState.body,
-                  editRespState.email,
-                  onEditResponseOrder!!
+                updateDatResponseMutation.mutate(
+                  {
+                    params: {
+                      path: {
+                        board_key: params.boardKey!!,
+                        thread_number: Number(params.threadId),
+                      },
+                    },
+                    body: [
+                      {
+                        author_name: editRespState.author_name,
+                        email: editRespState.email,
+                        body: editRespState.body,
+                        res_order: onEditResponseOrder!!,
+                      },
+                    ],
+                  },
+                  {
+                    onSuccess: () => {
+                      setEditRespState(undefined);
+                      setOnEditResponseOrder(undefined);
+                    },
+                  },
                 );
-                await mutate();
-                setEditRespState(undefined);
-                setOnEditResponseOrder(undefined);
-              } else {
-                toast.error("Failed to update response: invalid state");
               }
             }}
           >
@@ -221,11 +201,11 @@ const Page = () => {
           adminResponses={adminArchivedThread.data?.responses!!}
           selectedResponsesOrder={selectedResponsesOrder}
           setSelectedResponsesOrder={setSelectedResponsesOrder}
-          onClickDeleteAuthedToken={async (token) =>
-            await deleteAuthedToken(token, false)
+          onClickDeleteAuthedToken={(token) =>
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: false })
           }
-          onClickDeleteAuthedTokensAssociatedWithIp={async (token) =>
-            await deleteAuthedToken(token, true)
+          onClickDeleteAuthedTokensAssociatedWithIp={(token) =>
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: true })
           }
           onClickEditResponse={(idx) => {
             setOnEditResponseOrder(idx);
@@ -236,9 +216,16 @@ const Page = () => {
               res_order: idx,
             });
           }}
-          onClieckAbon={async (idx) => {
-            const { mutate } = deleteResponse(idx);
-            await mutate();
+          onClieckAbon={(idx) => {
+            deleteDatResponseMutation.mutate({
+              params: {
+                path: {
+                  board_key: params.boardKey!!,
+                  thread_number: Number(params.threadId),
+                  res_order: idx,
+                },
+              },
+            });
           }}
         />
       </div>

@@ -1,14 +1,11 @@
-import { useCallback } from "react";
 import ResponseList from "../components/ResponseList";
 import { Link, useParams } from "react-router";
 import Breadcrumb from "../components/Breadcrumb";
-import { toast } from "react-toastify";
 import {
-  deleteAuthedToken,
   getArchivedResponses,
   getArchivedThread,
+  useDeleteAuthedToken,
 } from "~/hooks/queries";
-import { useDeleteAuthedToken } from "~/hooks/deleteAuthedToken";
 
 const Page = () => {
   const params = useParams();
@@ -33,7 +30,7 @@ const Page = () => {
     },
   });
 
-  const deleteAuthedCookie = useDeleteAuthedToken();
+  const deleteAuthedTokenMutation = useDeleteAuthedToken();
 
   return (
     <>
@@ -65,11 +62,11 @@ const Page = () => {
         </div>
 
         <ResponseList
-          onClickDeleteAuthedToken={async (token) => {
-            await deleteAuthedCookie(token, false);
+          onClickDeleteAuthedToken={(token) => {
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: false });
           }}
-          onClickDeleteAuthedTokensAssociatedWithIp={async (token) => {
-            await deleteAuthedCookie(token, true);
+          onClickDeleteAuthedTokensAssociatedWithIp={(token) => {
+            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: true });
           }}
           responses={responses!.filter((r) => r != null) ?? []}
         />
