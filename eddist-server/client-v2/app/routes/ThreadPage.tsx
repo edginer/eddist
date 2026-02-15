@@ -54,12 +54,15 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     }),
   ]);
 
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+
   return {
     thread,
     boards,
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
+      baseUrl,
     },
   } satisfies {
     thread: { threadName: string; responses: Response[] };
@@ -67,6 +70,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     eddistData: {
       bbsName: string;
       availableUserRegistration: boolean;
+      baseUrl: string;
     };
   };
 };
@@ -490,7 +494,7 @@ const ThreadPage = ({
                     data-ng-target="body"
                     data-ng-response-id={post.id}
                   >
-                    {processPostBody(post.bodyParts, openPopup)}
+                    {processPostBody(post.bodyParts, openPopup, eddistData.baseUrl)}
                   </div>
                 </div>
               );
@@ -560,7 +564,7 @@ const ThreadPage = ({
                   </span>
                 </div>
                 <div className="text-gray-800 mt-1 wrap-break-word">
-                  {processPostBody(p.bodyParts, openPopup)}
+                  {processPostBody(p.bodyParts, openPopup, eddistData.baseUrl)}
                 </div>
               </div>
             ))}
@@ -654,24 +658,69 @@ const constructReferredNum = (
   </span>
 );
 
+const extractHostname = (url: string): string | null => {
+  try {
+    // Add protocol if missing for URL parsing
+    const urlWithProtocol = url.startsWith('http://') || url.startsWith('https://')
+      ? url
+      : `http://${url}`;
+    const urlObj = new URL(urlWithProtocol);
+    return urlObj.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+};
+
+const isBaseDomainUrl = (url: string, baseUrl: string): boolean => {
+  const urlHostname = extractHostname(url);
+  const baseHostname = extractHostname(baseUrl);
+
+  if (!urlHostname || !baseHostname) {
+    return false;
+  }
+
+  // Exact hostname match (ignoring protocol)
+  return urlHostname === baseHostname;
+};
+
 const processPostBody = (
   bodyParts: BodyAnchorPart[],
-  popup: (e: React.MouseEvent, indices: number[]) => void
+  popup: (e: React.MouseEvent, indices: number[]) => void,
+  baseUrl?: string
 ) => (
   <span>
-    {bodyParts.map((part, i) =>
-      part.isMatch ? (
-        <span
-          key={i}
-          className="text-blue-400 hover:text-blue-600 cursor-pointer"
-          onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
-        >
-          {part.text}
-        </span>
-      ) : (
-        <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
-      )
-    )}
+    {bodyParts.map((part, i) => {
+      if (part.type === 'anchor') {
+        // Anchor reference like >>123
+        return (
+          <span
+            key={i}
+            className="text-blue-400 hover:text-blue-600 cursor-pointer"
+            onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
+          >
+            {part.text}
+          </span>
+        );
+      } else if (part.type === 'url' && baseUrl && isBaseDomainUrl(part.text, baseUrl)) {
+        // URL matching base domain
+        return (
+          <a
+            key={i}
+            href={part.text}
+            className="text-blue-500 hover:text-blue-700 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {part.text}
+          </a>
+        );
+      } else {
+        // Regular text or non-matching URL
+        return (
+          <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
+        );
+      }
+    })}
   </span>
 );
 

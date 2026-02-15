@@ -12,6 +12,7 @@ export interface Response {
 export interface BodyAnchorPart {
   text: string;
   isMatch: boolean;
+  type: 'anchor' | 'url' | 'text';
 }
 
 export const fetchThread = async (
@@ -76,7 +77,7 @@ const convertThreadTextToResponseList = (text: string) => {
         mail: "",
         date: "",
         authorId: "",
-        bodyParts: [{ text: "あぼーん", isMatch: false }],
+        bodyParts: [{ text: "あぼーん", isMatch: false, type: 'text' }],
         id: idx + 1,
         authorIdAppearBeforeCount: 0,
       };
@@ -139,25 +140,47 @@ const convertThreadTextToResponseList = (text: string) => {
 
 const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
   const refs = [];
-  const parts = [];
-  const regex = /&gt;&gt;(\d{1,4})/g;
+  const parts: BodyAnchorPart[] = [];
+
+  // Combined regex to match both anchors and URLs
+  // Match: >>digits OR http(s)://...
+  const combinedRegex = /(&gt;&gt;(\d{1,4}))|(https?:\/\/[^\s<>"]+)/g;
   let lastIndex = 0;
   let match;
 
-  while ((match = regex.exec(body)) !== null) {
+  while ((match = combinedRegex.exec(body)) !== null) {
     const { index } = match;
+
+    // Add text before this match
     if (index > lastIndex) {
-      parts.push({ text: body.slice(lastIndex, index), isMatch: false });
+      const textBefore = body.slice(lastIndex, index);
+      parts.push({ text: textBefore, isMatch: false, type: 'text' });
     }
 
-    parts.push({ text: match[0].replaceAll("&gt;", ">"), isMatch: true });
-    lastIndex = index + match[0].length;
+    // Check if it's an anchor (>>123) or URL
+    if (match[1]) {
+      // It's an anchor match
+      parts.push({
+        text: match[1].replaceAll("&gt;", ">"),
+        isMatch: true,
+        type: 'anchor'
+      });
+      refs.push(parseInt(match[2]));
+    } else if (match[3]) {
+      // It's a URL match
+      parts.push({
+        text: match[3],
+        isMatch: false,
+        type: 'url'
+      });
+    }
 
-    refs.push(parseInt(match[1]));
+    lastIndex = index + match[0].length;
   }
 
+  // Add remaining text
   if (lastIndex < body.length) {
-    parts.push({ text: body.slice(lastIndex), isMatch: false });
+    parts.push({ text: body.slice(lastIndex), isMatch: false, type: 'text' });
   }
 
   return [parts, refs];
