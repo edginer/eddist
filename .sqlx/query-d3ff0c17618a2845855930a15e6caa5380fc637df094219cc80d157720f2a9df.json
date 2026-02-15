@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                registered_user_id\n            FROM authed_tokens WHERE token = ?",
+  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id\n            FROM authed_tokens WHERE token = ?",
   "describe": {
     "columns": [
       {
@@ -122,6 +122,15 @@
       },
       {
         "ordinal": 13,
+        "name": "require_user_registration",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 14,
         "name": "registered_user_id",
         "type_info": {
           "type": "String",
@@ -147,8 +156,9 @@
       false,
       true,
       false,
+      false,
       true
     ]
   },
-  "hash": "ccf5f506bef678b8f3a1ba42614085c1228e2829dcee9710443fe5942967421b"
+  "hash": "d3ff0c17618a2845855930a15e6caa5380fc637df094219cc80d157720f2a9df"
 }
