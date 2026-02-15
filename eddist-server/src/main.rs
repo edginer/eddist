@@ -155,6 +155,9 @@ async fn main() -> anyhow::Result<()> {
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = TermsRepositoryImpl::new(pool.clone());
 
+    let require_user_registration =
+        env::var("REQUIRE_USER_REGISTRATION").map_or(false, |v| v == "true");
+
     let app_state = AppState {
         services: AppServiceContainer::new(
             BbsRepositoryImpl::new(pool.clone()),
@@ -170,6 +173,7 @@ async fn main() -> anyhow::Result<()> {
         terms_repo,
         tinker_secret,
         template_engine,
+        require_user_registration,
     };
 
     // Start background task for user restriction cache refresh
