@@ -1,19 +1,10 @@
 {
   "db_name": "MySQL",
-  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            local_rules,\n            base_thread_creation_span_sec,\n            base_response_creation_span_sec,\n            max_thread_name_byte_length,\n            max_author_name_byte_length,\n            max_email_byte_length,\n            max_response_body_byte_length,\n            max_response_body_lines,\n            threads_archive_cron,\n            threads_archive_trigger_thread_count,\n            created_at,\n            updated_at,\n            read_only AS \"read_only: bool\"\n        FROM boards_info\n        WHERE id = ?\n        ",
+  "query": "\n            SELECT\n                local_rules,\n                base_thread_creation_span_sec,\n                base_response_creation_span_sec,\n                max_thread_name_byte_length,\n                max_author_name_byte_length,\n                max_email_byte_length,\n                max_response_body_byte_length,\n                max_response_body_lines,\n                threads_archive_trigger_thread_count,\n                threads_archive_cron,\n                read_only AS \"read_only!: bool\",\n                force_metadent_type\n            FROM\n                boards_info\n            WHERE\n                id = ?\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: Uuid",
-        "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 16
-        }
-      },
-      {
-        "ordinal": 1,
         "name": "local_rules",
         "type_info": {
           "type": "Blob",
@@ -22,7 +13,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "base_thread_creation_span_sec",
         "type_info": {
           "type": "Long",
@@ -31,7 +22,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "base_response_creation_span_sec",
         "type_info": {
           "type": "Long",
@@ -40,7 +31,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "max_thread_name_byte_length",
         "type_info": {
           "type": "Long",
@@ -49,7 +40,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "max_author_name_byte_length",
         "type_info": {
           "type": "Long",
@@ -58,7 +49,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "max_email_byte_length",
         "type_info": {
           "type": "Long",
@@ -67,7 +58,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "max_response_body_byte_length",
         "type_info": {
           "type": "Long",
@@ -76,11 +67,20 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "max_response_body_lines",
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "threads_archive_trigger_thread_count",
+        "type_info": {
+          "type": "Long",
+          "flags": "",
           "max_size": 11
         }
       },
@@ -95,38 +95,20 @@
       },
       {
         "ordinal": 10,
-        "name": "threads_archive_trigger_thread_count",
-        "type_info": {
-          "type": "Long",
-          "flags": "",
-          "max_size": 11
-        }
-      },
-      {
-        "ordinal": 11,
-        "name": "created_at",
-        "type_info": {
-          "type": "Datetime",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 23
-        }
-      },
-      {
-        "ordinal": 12,
-        "name": "updated_at",
-        "type_info": {
-          "type": "Datetime",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 23
-        }
-      },
-      {
-        "ordinal": 13,
-        "name": "read_only: bool",
+        "name": "read_only!: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
           "max_size": 1
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "force_metadent_type",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 40
         }
       }
     ],
@@ -142,13 +124,11 @@
       false,
       false,
       false,
-      false,
       true,
       true,
       false,
-      false,
-      false
+      true
     ]
   },
-  "hash": "a7c218a18582c748d6de753e51f3f1070f634d381cab819d5ca57f624502480a"
+  "hash": "cc424c3a553099dab63a1fd0e3c57223fab728eda4f76515278136e89990c7e3"
 }

@@ -4,6 +4,7 @@ import {
   Checkbox,
   HelperText,
   Label,
+  Select,
   Textarea,
   TextInput,
 } from "flowbite-react";
@@ -21,6 +22,11 @@ const boardGeneralSettingSchema = z.object({
   default_name: z.string().min(1).max(64),
   local_rule: z.string().min(1),
   read_only: z.boolean(),
+  force_metadent_type: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => (v === "" ? null : v)),
 });
 
 const boardPostRestrictionSettingSchema = z.object({
@@ -129,6 +135,20 @@ const GeneralSetting: React.FC<{
           {...register("read_only")}
           defaultChecked={boardInfo!.read_only}
         />
+      </SettingField>
+      <SettingField>
+        <Label>Force Metadent Type</Label>
+        <Select
+          className="mt-1"
+          {...register("force_metadent_type")}
+          defaultValue={boardInfo!.force_metadent_type ?? ""}
+        >
+          <option value="">None (User opt-in)</option>
+          <option value="v">Verbose (Level only)</option>
+          <option value="vv">VVerbose (ID string)</option>
+          <option value="vvv">VVVerbose (Level + ID)</option>
+        </Select>
+        <HelperText>Force all posts to use this metadent type</HelperText>
       </SettingField>
       <SettingField>
         <Label>Local Rule</Label>

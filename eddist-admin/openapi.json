@@ -2152,6 +2152,12 @@
             "type": "integer",
             "minimum": 0
           },
+          "force_metadent_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "local_rules": {
             "type": "string"
           },
@@ -2443,6 +2449,12 @@
           "default_name": {
             "type": "string"
           },
+          "force_metadent_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "local_rule": {
             "type": "string"
           },
@@ -2676,6 +2688,12 @@
             "minimum": 0
           },
           "default_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "force_metadent_type": {
             "type": [
               "string",
               "null"
