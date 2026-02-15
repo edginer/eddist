@@ -1,32 +1,27 @@
 import {
-  Button,
   Dropdown,
-  Label,
+  DropdownItem,
   Modal,
-  Table,
-  TextInput,
-  Select,
-  Checkbox,
-  ModalHeader,
   ModalBody,
-  TableHeadCell,
-  TableHead,
+  ModalHeader,
+  Table,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeadCell,
   TableRow,
-  DropdownItem,
 } from "flowbite-react";
-import { useState } from "react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
-import { Controller, useForm } from "react-hook-form";
 import {
-  deleteRestrictionRule,
   getRestrictionRules,
-  updateRestrictionRule,
-  createRestrictionRule,
+  useCreateRestrictionRule,
+  useUpdateRestrictionRule,
+  useDeleteRestrictionRule,
 } from "~/hooks/queries";
-import { toast } from "react-toastify";
+import { formatDateTime } from "~/utils/format";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
+import RestrictionRuleForm from "~/components/RestrictionRuleForm";
 
 interface RestrictionRule {
   id: string;
@@ -39,53 +34,12 @@ interface RestrictionRule {
   created_by_email: string;
 }
 
-interface CreateRestrictionRuleForm {
-  name: string;
-  rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
-  rule_value: string;
-  expires_at?: string;
-}
-
-interface EditRestrictionRuleForm {
-  id: string;
-  name: string;
-  rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
-  rule_value: string;
-  expires_at?: string;
-}
-
 const RestrictionRules = () => {
-  const { data: restrictionRules, refetch } = getRestrictionRules({});
-  const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [openEditModal, setOpenEditModal] = useState(false);
-  const [selectedRule, setSelectedRule] = useState<RestrictionRule | undefined>(
-    undefined
-  );
-  const [createNeverExpires, setCreateNeverExpires] = useState(true);
-  const [editNeverExpires, setEditNeverExpires] = useState(true);
-  const {
-    register: registerCreate,
-    handleSubmit: handleSubmitCreate,
-    control: controlCreate,
-    reset: resetCreate,
-  } = useForm<CreateRestrictionRuleForm>();
-  const {
-    register: registerEdit,
-    handleSubmit: handleSubmitEdit,
-    control: controlEdit,
-    reset: resetEdit,
-  } = useForm<EditRestrictionRuleForm>();
-
-  const ruleTypeOptions = [
-    { value: "Asn", label: "ASN" },
-    { value: "IP", label: "IP Address" },
-    { value: "IPCidr", label: "IP CIDR" },
-    { value: "UserAgent", label: "User Agent" },
-  ];
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  const { data: restrictionRules } = getRestrictionRules({});
+  const createMutation = useCreateRestrictionRule();
+  const updateMutation = useUpdateRestrictionRule();
+  const deleteMutation = useDeleteRestrictionRule();
+  const modal = useCrudModalState<RestrictionRule>();
 
   const formatExpiry = (expiresAt?: string | null) => {
     if (!expiresAt) return "Never";
@@ -98,237 +52,57 @@ const RestrictionRules = () => {
   return (
     <>
       <Modal
-        show={openCreateModal}
-        onClose={() => {
-          resetCreate();
-          setCreateNeverExpires(true);
-          setOpenCreateModal(false);
-        }}
+        show={modal.isCreateOpen}
+        onClose={() => modal.closeCreate()}
       >
         <ModalHeader className="border-gray-200">
           Create Restriction Rule
         </ModalHeader>
         <ModalBody>
-          <form
-            onSubmit={handleSubmitCreate(async (data) => {
-              try {
-                const { mutate } = createRestrictionRule({
-                  body: {
-                    name: data.name,
-                    rule_type: data.rule_type,
-                    rule_value: data.rule_value,
-                    expires_at:
-                      createNeverExpires || !data.expires_at
-                        ? undefined
-                        : new Date(data.expires_at).toISOString(),
-                  },
-                });
-                await mutate();
-                setOpenCreateModal(false);
-                resetCreate();
-                setCreateNeverExpires(true);
-                toast.success("Successfully created restriction rule");
-                await refetch();
-              } catch (e) {
-                toast.error("Failed to create restriction rule");
-              }
-            })}
-          >
-            <div className="flex flex-col space-y-4">
-              <div>
-                <Label>Name</Label>
-                <TextInput
-                  placeholder="Rule name..."
-                  required
-                  {...registerCreate("name", { required: true })}
-                />
-              </div>
-              <div>
-                <Label>Rule Type</Label>
-                <Controller
-                  name="rule_type"
-                  control={controlCreate}
-                  rules={{ required: true }}
-                  render={({ field }) => (
-                    <Select
-                      required
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                    >
-                      <option value="">Select rule type...</option>
-                      {ruleTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                />
-              </div>
-              <div>
-                <Label>Rule Value</Label>
-                <TextInput
-                  placeholder="Rule value..."
-                  required
-                  {...registerCreate("rule_value", { required: true })}
-                />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Checkbox
-                    id="create-never-expires"
-                    checked={createNeverExpires}
-                    onChange={(e) => setCreateNeverExpires(e.target.checked)}
-                  />
-                  <Label htmlFor="create-never-expires">Never expires</Label>
-                </div>
-                {!createNeverExpires && (
-                  <div>
-                    <Label>Expires At</Label>
-                    <TextInput
-                      type="datetime-local"
-                      {...registerCreate("expires_at")}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button type="submit" className="mt-4">
-              Create Rule
-            </Button>
-          </form>
+          <RestrictionRuleForm
+            mode="create"
+            onSubmit={(data) => {
+              createMutation.mutate(
+                { body: data },
+                { onSuccess: () => modal.closeCreate() },
+              );
+            }}
+          />
         </ModalBody>
       </Modal>
 
-      <Modal
-        show={openEditModal}
-        onClose={() => {
-          resetEdit();
-          setEditNeverExpires(true);
-          setOpenEditModal(false);
-        }}
-      >
-        <ModalHeader className="border-gray-200">
-          Edit Restriction Rule
-        </ModalHeader>
-        <ModalBody>
-          <form
-            onSubmit={handleSubmitEdit(async (data) => {
-              try {
-                const { mutate } = updateRestrictionRule({
-                  params: {
-                    path: {
-                      rule_id: selectedRule!.id,
-                    },
+      {modal.editingItem && (
+        <Modal
+          show={modal.isEditOpen}
+          onClose={() => modal.closeEdit()}
+        >
+          <ModalHeader className="border-gray-200">
+            Edit Restriction Rule
+          </ModalHeader>
+          <ModalBody>
+            <RestrictionRuleForm
+              mode="edit"
+              defaultValues={modal.editingItem}
+              onSubmit={(data) => {
+                updateMutation.mutate(
+                  {
+                    params: { path: { rule_id: modal.editingItem!.id } },
+                    body: data,
                   },
-                  body: {
-                    name: data.name,
-                    rule_type: data.rule_type,
-                    rule_value: data.rule_value,
-                    expires_at:
-                      editNeverExpires || !data.expires_at
-                        ? undefined
-                        : new Date(data.expires_at).toISOString(),
-                  },
-                });
-                await mutate();
-                setOpenEditModal(false);
-                resetEdit();
-                setEditNeverExpires(true);
-                toast.success("Successfully updated restriction rule");
-                await refetch();
-              } catch (e) {
-                toast.error("Failed to update restriction rule");
-              }
-            })}
-          >
-            <div className="flex flex-col space-y-4">
-              <input
-                type="hidden"
-                {...registerEdit("id")}
-                value={selectedRule?.id}
-              />
-              <div>
-                <Label>Name</Label>
-                <TextInput
-                  placeholder="Rule name..."
-                  required
-                  defaultValue={selectedRule?.name}
-                  {...registerEdit("name", { required: true })}
-                />
-              </div>
-              <div>
-                <Label>Rule Type</Label>
-                <Controller
-                  name="rule_type"
-                  control={controlEdit}
-                  rules={{ required: true }}
-                  defaultValue={selectedRule?.rule_type}
-                  render={({ field }) => (
-                    <Select
-                      required
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                    >
-                      <option value="">Select rule type...</option>
-                      {ruleTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                />
-              </div>
-              <div>
-                <Label>Rule Value</Label>
-                <TextInput
-                  placeholder="Rule value..."
-                  required
-                  defaultValue={selectedRule?.rule_value}
-                  {...registerEdit("rule_value", { required: true })}
-                />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Checkbox
-                    id="edit-never-expires"
-                    checked={editNeverExpires}
-                    onChange={(e) => setEditNeverExpires(e.target.checked)}
-                  />
-                  <Label htmlFor="edit-never-expires">Never expires</Label>
-                </div>
-                {!editNeverExpires && (
-                  <div>
-                    <Label>Expires At</Label>
-                    <TextInput
-                      type="datetime-local"
-                      defaultValue={
-                        selectedRule?.expires_at
-                          ? new Date(selectedRule.expires_at)
-                              .toISOString()
-                              .slice(0, 16)
-                          : ""
-                      }
-                      {...registerEdit("expires_at")}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button type="submit" className="mt-4">
-              Update Rule
-            </Button>
-          </form>
-        </ModalBody>
-      </Modal>
+                  { onSuccess: () => modal.closeEdit() },
+                );
+              }}
+            />
+          </ModalBody>
+        </Modal>
+      )}
 
       <div className="p-2 lg:p-8">
         <div className="flex">
           <h1 className="text-3xl font-bold grow">Restriction Rules</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
-            onClick={() => setOpenCreateModal(true)}
+            onClick={() => modal.openCreate()}
           >
             <FaPlus />
           </button>
@@ -369,38 +143,25 @@ const RestrictionRules = () => {
                   </span>
                 </TableCell>
                 <TableCell>{rule.created_by_email}</TableCell>
-                <TableCell>{formatDate(rule.created_at)}</TableCell>
+                <TableCell>{formatDateTime(rule.created_at)}</TableCell>
                 <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
                       <DropdownItem
-                        onClick={() => {
-                          setOpenEditModal(true);
-                          setSelectedRule(rule);
-                          setEditNeverExpires(!rule.expires_at);
-                        }}
+                        onClick={() => modal.openEdit(rule)}
                       >
                         Edit
                       </DropdownItem>
                       <DropdownItem
                         className="text-red-500"
-                        onClick={async () => {
-                          try {
-                            const { mutate } = deleteRestrictionRule({
-                              params: {
-                                path: {
-                                  rule_id: rule.id,
-                                },
+                        onClick={() => {
+                          deleteMutation.mutate({
+                            params: {
+                              path: {
+                                rule_id: rule.id,
                               },
-                            });
-                            await mutate();
-                            toast.success(
-                              "Successfully deleted restriction rule"
-                            );
-                            await refetch();
-                          } catch (e) {
-                            toast.error("Failed to delete restriction rule");
-                          }
+                            },
+                          });
                         }}
                       >
                         Delete

@@ -1,17 +1,15 @@
 import { Button, Label, Textarea, Spinner } from "flowbite-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "react-toastify";
-import { useQueryClient } from "@tanstack/react-query";
 import { FaSave } from "react-icons/fa";
-import { getTerms, updateTerms } from "~/hooks/queries";
+import { getTerms, useUpdateTerms } from "~/hooks/queries";
 import type { paths } from "~/openapi/schema";
+import { formatDateTime } from "~/utils/format";
 
 type UpdateTermsInput =
   paths["/terms/"]["put"]["requestBody"]["content"]["application/json"];
 
 const TermsPage = () => {
-  const queryClient = useQueryClient();
   const [isDirty, setIsDirty] = useState(false);
 
   const { register, handleSubmit, reset, watch } = useForm<UpdateTermsInput>();
@@ -31,16 +29,17 @@ const TermsPage = () => {
     }
   }, [contentValue, terms]);
 
-  const onSubmit = async (data: UpdateTermsInput) => {
-    try {
-      await updateTerms({ body: data }).mutate();
-      await queryClient.invalidateQueries({ queryKey: ["/terms/"] });
-      toast.success("Terms updated successfully");
-      setIsDirty(false);
-    } catch (error: any) {
-      const message = error?.message || "Failed to update terms";
-      toast.error(message);
-    }
+  const updateMutation = useUpdateTerms();
+
+  const onSubmit = (data: UpdateTermsInput) => {
+    updateMutation.mutate(
+      { body: data },
+      {
+        onSuccess: () => {
+          setIsDirty(false);
+        },
+      },
+    );
   };
 
   if (isLoading) {
@@ -55,7 +54,7 @@ const TermsPage = () => {
     <div className="p-4">
       {terms && (
         <div className="mb-4 text-sm text-gray-600">
-          <div>Last updated: {new Date(terms.updated_at).toLocaleString()}</div>
+          <div>Last updated: {formatDateTime(terms.updated_at)}</div>
           {terms.updated_by && <div>Updated by: {terms.updated_by}</div>}
         </div>
       )}

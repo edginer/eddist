@@ -14,18 +14,18 @@ import {
   TableRow,
   TextInput,
 } from "flowbite-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
 import { Controller, useForm } from "react-hook-form";
 import {
-  deleteNgWord,
   getBoards,
   getNgWords,
-  updateNgWord,
+  useUpdateNgWord,
+  useDeleteNgWord,
 } from "~/hooks/queries";
 import CreateNgWordModal from "~/components/CreateNgWordModal";
-import { toast } from "react-toastify";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
 import Select from "react-select";
 
 interface NgWord {
@@ -42,11 +42,9 @@ interface BoardSelectOption {
 
 const NgWords = () => {
   const { data: ngWords, refetch } = getNgWords({});
-  const [openCreateNgModal, setOpenCreateNgModal] = useState(false);
-  const [openEditNgModal, setOpenEditNgModal] = useState(false);
-  const [selectedNgWord, setSelectedNgWord] = useState<NgWord | undefined>(
-    undefined
-  );
+  const updateMutation = useUpdateNgWord();
+  const deleteMutation = useDeleteNgWord();
+  const modal = useCrudModalState<NgWord>();
   const { register, handleSubmit, control, reset } = useForm();
 
   const { data: boards } = getBoards({});
@@ -63,33 +61,33 @@ const NgWords = () => {
   return (
     <>
       <CreateNgWordModal
-        open={openCreateNgModal}
-        setOpen={setOpenCreateNgModal}
+        open={modal.isCreateOpen}
+        setOpen={(v) => { if (!v) modal.closeCreate(); }}
         refetch={refetch}
       />
       <Modal
-        show={openEditNgModal}
+        show={modal.isEditOpen}
         onClose={() => {
           reset();
-          setOpenEditNgModal(false);
+          modal.closeEdit();
         }}
       >
         <ModalHeader className="border-gray-200">Edit NG Word</ModalHeader>
         <ModalBody>
           <form
-            onSubmit={handleSubmit(async (data) => {
-              try {
-                console.log(data);
-                const boardIds = data.boardKeys.map(
-                  (val: BoardSelectOption) =>
-                    boards!.find((board) => board.board_key === val.value)?.id
-                );
-                console.log(boardIds);
+            onSubmit={handleSubmit((data) => {
+              console.log(data);
+              const boardIds = data.boardKeys.map(
+                (val: BoardSelectOption) =>
+                  boards!.find((board) => board.board_key === val.value)?.id
+              );
+              console.log(boardIds);
 
-                const { mutate } = updateNgWord({
+              updateMutation.mutate(
+                {
                   params: {
                     path: {
-                      ng_word_id: selectedNgWord!.id,
+                      ng_word_id: modal.editingItem!.id,
                     },
                   },
                   body: {
@@ -97,15 +95,14 @@ const NgWords = () => {
                     word: data.word,
                     board_ids: boardIds,
                   },
-                });
-                await mutate();
-                setOpenEditNgModal(false);
-                reset();
-                toast.success("Successfully updated NG word");
-                await refetch();
-              } catch (e) {
-                toast.error("Failed to update NG word");
-              }
+                },
+                {
+                  onSuccess: () => {
+                    modal.closeEdit();
+                    reset();
+                  },
+                }
+              );
             })}
           >
             <div className="flex flex-col">
@@ -113,14 +110,14 @@ const NgWords = () => {
                 type="hidden"
                 {...(register("id"),
                 {
-                  value: selectedNgWord?.id,
+                  value: modal.editingItem?.id,
                 })}
               />
               <Label>Name</Label>
               <TextInput
                 placeholder="Name..."
                 required
-                defaultValue={selectedNgWord?.name}
+                defaultValue={modal.editingItem?.name}
                 {...register("name", {
                   required: true,
                 })}
@@ -130,7 +127,7 @@ const NgWords = () => {
               <Label>Word</Label>
               <TextInput
                 placeholder="Word..."
-                defaultValue={selectedNgWord?.word}
+                defaultValue={modal.editingItem?.word}
                 required
                 {...register("word", {
                   required: true,
@@ -142,7 +139,7 @@ const NgWords = () => {
               <Controller
                 name="boardKeys"
                 control={control}
-                defaultValue={selectedNgWord?.boardIds.map((boardId) => {
+                defaultValue={modal.editingItem?.boardIds.map((boardId) => {
                   const board = boards!.find((b) => b.id === boardId);
                   return {
                     label: board!.board_key,
@@ -183,7 +180,7 @@ const NgWords = () => {
           <h1 className="text-3xl font-bold grow">NG words</h1>
           <button
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
-            onClick={() => setOpenCreateNgModal(true)}
+            onClick={() => modal.openCreate()}
           >
             <FaPlus />
           </button>
@@ -206,8 +203,7 @@ const NgWords = () => {
                     <Dropdown label={<BiDotsHorizontalRounded />}>
                       <DropdownItem
                         onClick={() => {
-                          setOpenEditNgModal(true);
-                          setSelectedNgWord({
+                          modal.openEdit({
                             ...ngWord,
                             boardIds: ngWord.board_ids,
                           });
@@ -217,21 +213,14 @@ const NgWords = () => {
                       </DropdownItem>
                       <DropdownItem
                         className="text-red-500"
-                        onClick={async () => {
-                          try {
-                            const { mutate } = deleteNgWord({
-                              params: {
-                                path: {
-                                  ng_word_id: ngWord.id,
-                                },
+                        onClick={() => {
+                          deleteMutation.mutate({
+                            params: {
+                              path: {
+                                ng_word_id: ngWord.id,
                               },
-                            });
-                            await mutate();
-                            toast.success("Successfully deleted NG word");
-                            await refetch();
-                          } catch (e) {
-                            toast.error("Failed to delete NG word");
-                          }
+                            },
+                          });
                         }}
                       >
                         Delete

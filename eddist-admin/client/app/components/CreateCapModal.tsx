@@ -8,8 +8,7 @@ import {
 } from "flowbite-react";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "react-toastify";
-import { createCap } from "~/hooks/queries";
+import { useCreateCap } from "~/hooks/queries";
 
 interface CreateCapModalProps {
   open: boolean;
@@ -19,6 +18,8 @@ interface CreateCapModalProps {
 
 const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
   const { register, handleSubmit, reset } = useForm();
+
+  const createCapMutation = useCreateCap();
 
   return (
     <div>
@@ -32,22 +33,22 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
         <ModalHeader className="border-gray-200">Create Cap</ModalHeader>
         <ModalBody>
           <form
-            onSubmit={handleSubmit(async (data) => {
-              try {
-                const { mutate } = createCap({
+            onSubmit={handleSubmit((data) => {
+              createCapMutation.mutate(
+                {
                   body: {
                     name: data.name,
                     description: data.description,
                     password: data.password,
                   },
-                });
-                await mutate();
-                setOpen(false);
-                toast.success("Successfully created cap");
-                await refetch();
-              } catch (error) {
-                toast.error("Failed to create cap");
-              }
+                },
+                {
+                  onSuccess: () => {
+                    setOpen(false);
+                    refetch();
+                  },
+                },
+              );
             })}
           >
             <div className="flex flex-col">

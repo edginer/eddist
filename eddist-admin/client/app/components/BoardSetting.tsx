@@ -9,9 +9,8 @@ import {
 } from "flowbite-react";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "react-toastify";
 import { z } from "zod";
-import { getBoardInfo, updateBoard } from "~/hooks/queries";
+import { getBoardInfo, useUpdateBoard } from "~/hooks/queries";
 import { components } from "~/openapi/schema";
 
 type Board = Omit<components["schemas"]["Board"], "thread_count">;
@@ -74,26 +73,24 @@ const GeneralSetting: React.FC<{
     resolver: zodResolver(boardGeneralSettingSchema),
   });
 
+  const updateBoardMutation = useUpdateBoard();
+
   return (
     <form
-      onSubmit={handleSubmit(async (data) => {
-        try {
-          console.log(data);
-          const { mutate } = updateBoard({
+      onSubmit={handleSubmit((data) => {
+        updateBoardMutation.mutate(
+          {
             params: {
               path: {
                 board_key: board.board_key,
               },
             },
             body: data,
-          });
-          await mutate();
-          toast.success("Successfully updated");
-          await refetch();
-        } catch (e) {
-          console.error(e);
-          toast.error("Failed to update");
-        }
+          },
+          {
+            onSuccess: () => refetch(),
+          },
+        );
       })}
     >
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">
@@ -164,25 +161,24 @@ const PostRestrictionSetting: React.FC<{
     resolver: zodResolver(boardPostRestrictionSettingSchema),
   });
 
+  const updateBoardMutation = useUpdateBoard();
+
   return (
     <form
-      onSubmit={handleSubmit(async (data) => {
-        try {
-          const { mutate } = updateBoard({
+      onSubmit={handleSubmit((data) => {
+        updateBoardMutation.mutate(
+          {
             params: {
               path: {
                 board_key: board.board_key,
               },
             },
             body: data,
-          });
-          await mutate();
-          toast.success("Successfully updated");
-          await refetch();
-        } catch (e) {
-          console.error(e);
-          toast.error("Failed to update");
-        }
+          },
+          {
+            onSuccess: () => refetch(),
+          },
+        );
       })}
     >
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">
@@ -309,25 +305,24 @@ const ThreadsArchiveSetting: React.FC<{
     resolver: zodResolver(boardThreadsArchiveSettingSchema),
   });
 
+  const updateBoardMutation = useUpdateBoard();
+
   return (
     <form
-      onSubmit={handleSubmit(async (data) => {
-        try {
-          const { mutate } = updateBoard({
+      onSubmit={handleSubmit((data) => {
+        updateBoardMutation.mutate(
+          {
             params: {
               path: {
                 board_key: board.board_key,
               },
             },
             body: data,
-          });
-          await mutate();
-          toast.success("Successfully updated");
-          await refetch();
-        } catch (e) {
-          console.error(e);
-          toast.error("Failed to update");
-        }
+          },
+          {
+            onSuccess: () => refetch(),
+          },
+        );
       })}
     >
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">

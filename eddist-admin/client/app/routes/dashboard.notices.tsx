@@ -1,6 +1,5 @@
 import {
   Button,
-  Label,
   Modal,
   ModalBody,
   ModalHeader,
@@ -10,117 +9,34 @@ import {
   TableHead,
   TableHeadCell,
   TableRow,
-  Textarea,
-  TextInput,
 } from "flowbite-react";
-import { useState } from "react";
-import { FaPlus, FaEdit, FaTrash, FaSync } from "react-icons/fa";
-import { useForm } from "react-hook-form";
-import { toast } from "react-toastify";
-import { useQueryClient } from "@tanstack/react-query";
+import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import {
   getNotices,
-  createNotice,
-  updateNotice,
-  deleteNotice,
+  useCreateNotice,
+  useUpdateNotice,
+  useDeleteNotice,
 } from "~/hooks/queries";
 import type { paths } from "~/openapi/schema";
-
-// Generate URL-safe slug from title
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+import { formatDateTime } from "~/utils/format";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
+import NoticeForm from "~/components/NoticeForm";
 
 type Notice =
   paths["/notices/"]["get"]["responses"]["200"]["content"]["application/json"][number];
-type NoticeFormData =
-  paths["/notices/"]["post"]["requestBody"]["content"]["application/json"];
 
 const Notices = () => {
-  const queryClient = useQueryClient();
-  const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [openEditModal, setOpenEditModal] = useState(false);
-  const [selectedNotice, setSelectedNotice] = useState<Notice | undefined>();
+  const modal = useCrudModalState<Notice>();
 
-  const {
-    register: registerCreate,
-    handleSubmit: handleCreateSubmit,
-    reset: resetCreate,
-    setValue: setValueCreate,
-    watch: watchCreate,
-  } = useForm<NoticeFormData>();
+  const createMutation = useCreateNotice();
+  const updateMutation = useUpdateNotice();
+  const deleteMutation = useDeleteNotice();
 
-  const {
-    register: registerEdit,
-    handleSubmit: handleEditSubmit,
-    reset: resetEdit,
-    setValue: setValueEdit,
-    watch: watchEdit,
-  } = useForm<Partial<NoticeFormData>>();
-
-  // Fetch notices
   const { data: notices } = getNotices({});
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to delete this notice?")) {
-      try {
-        await deleteNotice({ params: { path: { id } } }).mutate();
-        await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
-        toast.success("Notice deleted successfully");
-      } catch {
-        toast.error("Failed to delete notice");
-      }
-    }
-  };
-
-  const onCreateSubmit = async (data: NoticeFormData) => {
-    try {
-      // Convert datetime-local to NaiveDateTime format (strip timezone from ISO string)
-      // toISOString() gives "2024-01-15T10:30:00.000Z", slice to get "2024-01-15T10:30:00"
-      const formattedData = {
-        ...data,
-        published_at: new Date(data.published_at).toISOString().slice(0, 19),
-      };
-      await createNotice({ body: formattedData }).mutate();
-      await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
-      toast.success("Notice created successfully");
-      setOpenCreateModal(false);
-      resetCreate();
-    } catch (error: any) {
-      const message = error?.message || "Failed to create notice";
-      toast.error(message);
-    }
-  };
-
-  const onEditSubmit = async (data: Partial<NoticeFormData>) => {
-    if (selectedNotice) {
-      try {
-        // Convert datetime-local to NaiveDateTime format if published_at is provided
-        const formattedData = {
-          ...data,
-          ...(data.published_at && {
-            published_at: new Date(data.published_at)
-              .toISOString()
-              .slice(0, 19),
-          }),
-        };
-        await updateNotice({
-          params: { path: { id: selectedNotice.id } },
-          body: formattedData,
-        }).mutate();
-        await queryClient.invalidateQueries({ queryKey: ["/notices/"] });
-        toast.success("Notice updated successfully");
-        setOpenEditModal(false);
-        resetEdit();
-      } catch (error: any) {
-        const message = error?.message || "Failed to update notice";
-        toast.error(message);
-      }
+      deleteMutation.mutate({ params: { path: { id } } });
     }
   };
 
@@ -129,7 +45,7 @@ const Notices = () => {
       <div className="p-4">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">Notices</h1>
-          <Button onClick={() => setOpenCreateModal(true)}>
+          <Button onClick={() => modal.openCreate()}>
             <FaPlus className="mr-2" />
             Create Notice
           </Button>
@@ -150,16 +66,13 @@ const Notices = () => {
                   <code className="text-sm text-gray-600">{notice.slug}</code>
                 </TableCell>
                 <TableCell>
-                  {new Date(notice.published_at).toLocaleString()}
+                  {formatDateTime(notice.published_at)}
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button
                       size="xs"
-                      onClick={() => {
-                        setSelectedNotice(notice);
-                        setOpenEditModal(true);
-                      }}
+                      onClick={() => modal.openEdit(notice)}
                     >
                       <FaEdit />
                     </Button>
@@ -179,135 +92,42 @@ const Notices = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal show={openCreateModal} onClose={() => setOpenCreateModal(false)}>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()}>
         <ModalHeader className="border-gray-200">Create Notice</ModalHeader>
         <ModalBody>
-          <form onSubmit={handleCreateSubmit(onCreateSubmit)}>
-            <div className="flex flex-col gap-4">
-              <div>
-                <Label>Title</Label>
-                <TextInput
-                  {...registerCreate("title", { required: true })}
-                  placeholder="Notice title..."
-                  required
-                />
-              </div>
-              <div>
-                <Label>Slug</Label>
-                <div className="flex gap-2">
-                  <TextInput
-                    {...registerCreate("slug", { required: true })}
-                    placeholder="url-friendly-slug"
-                    required
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    color="gray"
-                    size="sm"
-                    onClick={() => {
-                      const title = watchCreate("title");
-                      if (title) {
-                        setValueCreate("slug", generateSlug(title));
-                      }
-                    }}
-                  >
-                    <FaSync className="m-1 ml-0 mr-2" />
-                    <span>Generate</span>
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label>Content</Label>
-                <Textarea
-                  {...registerCreate("content", { required: true })}
-                  placeholder="Notice content..."
-                  required
-                  rows={6}
-                />
-              </div>
-              <div>
-                <Label>Published At</Label>
-                <TextInput
-                  {...registerCreate("published_at", { required: true })}
-                  type="datetime-local"
-                  required
-                />
-              </div>
-              <Button type="submit">Create</Button>
-            </div>
-          </form>
+          <NoticeForm
+            mode="create"
+            onSubmit={(data) => {
+              createMutation.mutate(
+                { body: data },
+                { onSuccess: () => modal.closeCreate() },
+              );
+            }}
+          />
         </ModalBody>
       </Modal>
 
       {/* Edit Modal */}
-      <Modal show={openEditModal} onClose={() => setOpenEditModal(false)}>
-        <ModalHeader className="border-gray-200">Edit Notice</ModalHeader>
-        <ModalBody>
-          <form onSubmit={handleEditSubmit(onEditSubmit)}>
-            <div className="flex flex-col gap-4">
-              <div>
-                <Label>Title</Label>
-                <TextInput
-                  {...registerEdit("title")}
-                  defaultValue={selectedNotice?.title}
-                  placeholder="Notice title..."
-                />
-              </div>
-              <div>
-                <Label>Slug</Label>
-                <div className="flex gap-2">
-                  <TextInput
-                    {...registerEdit("slug")}
-                    defaultValue={selectedNotice?.slug}
-                    placeholder="url-friendly-slug"
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    color="gray"
-                    size="sm"
-                    className="items-center"
-                    onClick={() => {
-                      const title = watchEdit("title") || selectedNotice?.title;
-                      if (title) {
-                        setValueEdit("slug", generateSlug(title));
-                      }
-                    }}
-                  >
-                    <FaSync className="m-1 ml-0 mr-2" />
-                    <span>Generate</span>
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label>Content</Label>
-                <Textarea
-                  {...registerEdit("content")}
-                  defaultValue={selectedNotice?.content}
-                  placeholder="Notice content..."
-                  rows={6}
-                />
-              </div>
-              <div>
-                <Label>Published At</Label>
-                <TextInput
-                  {...registerEdit("published_at")}
-                  type="datetime-local"
-                  defaultValue={
-                    selectedNotice?.published_at
-                      ? new Date(selectedNotice.published_at)
-                          .toISOString()
-                          .slice(0, 16)
-                      : ""
-                  }
-                />
-              </div>
-              <Button type="submit">Update</Button>
-            </div>
-          </form>
-        </ModalBody>
-      </Modal>
+      {modal.editingItem && (
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()}>
+          <ModalHeader className="border-gray-200">Edit Notice</ModalHeader>
+          <ModalBody>
+            <NoticeForm
+              mode="edit"
+              defaultValues={modal.editingItem}
+              onSubmit={(data) => {
+                updateMutation.mutate(
+                  {
+                    params: { path: { id: modal.editingItem!.id } },
+                    body: data,
+                  },
+                  { onSuccess: () => modal.closeEdit() },
+                );
+              }}
+            />
+          </ModalBody>
+        </Modal>
+      )}
     </>
   );
 };
