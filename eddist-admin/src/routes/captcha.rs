@@ -1,20 +1,19 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::Response,
     routing::{delete, get, patch, post},
     Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
-    auth::AdminSession,
+    auth::AdminEmail,
+    error::ApiError,
     models::{CaptchaConfig, CreateCaptchaConfigInput, UpdateCaptchaConfigInput},
-    repository::captcha_config_repository::CaptchaConfigRepository,
-    DefaultAppState,
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/captcha-configs", get(list_captcha_configs))
         .route("/captcha-configs", post(create_captcha_config))
@@ -32,10 +31,10 @@ pub fn routes() -> Router<DefaultAppState> {
     )
 )]
 pub async fn list_captcha_configs(
-    State(state): State<DefaultAppState>,
-) -> Json<Vec<CaptchaConfig>> {
-    let configs = state.captcha_config_repo.get_all().await.unwrap();
-    Json(configs)
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CaptchaConfig>>, ApiError> {
+    let configs = state.captcha_config_repo.get_all().await?;
+    Ok(Json(configs))
 }
 
 #[utoipa::path(
@@ -51,22 +50,15 @@ pub async fn list_captcha_configs(
     )
 )]
 pub async fn get_captcha_config(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Response {
-    let config = state.captcha_config_repo.get_by_id(id).await.unwrap();
-
-    match config {
-        Some(config) => Response::builder()
-            .status(200)
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&config).unwrap().into())
-            .unwrap(),
-        None => Response::builder()
-            .status(404)
-            .body(axum::body::Body::empty())
-            .unwrap(),
-    }
+) -> Result<Json<CaptchaConfig>, ApiError> {
+    let config = state
+        .captcha_config_repo
+        .get_by_id(id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Captcha config not found"))?;
+    Ok(Json(config))
 }
 
 #[utoipa::path(
@@ -81,33 +73,16 @@ pub async fn get_captcha_config(
     )
 )]
 pub async fn create_captcha_config(
-    State(state): State<DefaultAppState>,
-    admin_session: AdminSession,
+    State(state): State<AppState>,
+    AdminEmail(email): AdminEmail,
     Json(input): Json<CreateCaptchaConfigInput>,
-) -> Response {
-    let updated_by = admin_session.get_admin_email();
-
-    if updated_by.is_none() {
-        return Response::builder()
-            .status(401)
-            .body("Unauthorized: No user information available".into())
-            .unwrap();
-    }
-
-    match state.captcha_config_repo.create(input, updated_by).await {
-        Ok(config) => Response::builder()
-            .status(201)
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&config).unwrap().into())
-            .unwrap(),
-        Err(e) => {
-            tracing::error!("Failed to create captcha config: {e:?}");
-            Response::builder()
-                .status(400)
-                .body(format!("Failed to create captcha config: {e}").into())
-                .unwrap()
-        }
-    }
+) -> Result<(StatusCode, Json<CaptchaConfig>), ApiError> {
+    let config = state
+        .captcha_config_repo
+        .create(input, Some(email))
+        .await
+        .map_err(|e| ApiError::bad_request(format!("Failed to create captcha config: {e}")))?;
+    Ok((StatusCode::CREATED, Json(config)))
 }
 
 #[utoipa::path(
@@ -126,43 +101,23 @@ pub async fn create_captcha_config(
     )
 )]
 pub async fn update_captcha_config(
-    State(state): State<DefaultAppState>,
-    admin_session: AdminSession,
+    State(state): State<AppState>,
+    AdminEmail(email): AdminEmail,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateCaptchaConfigInput>,
-) -> Response {
-    let updated_by = admin_session.get_admin_email();
-
-    if updated_by.is_none() {
-        return Response::builder()
-            .status(401)
-            .body("Unauthorized: No user information available".into())
-            .unwrap();
-    }
-
-    match state
+) -> Result<Json<CaptchaConfig>, ApiError> {
+    let config = state
         .captcha_config_repo
-        .update(id, input, updated_by)
+        .update(id, input, Some(email))
         .await
-    {
-        Ok(config) => Response::builder()
-            .status(200)
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&config).unwrap().into())
-            .unwrap(),
-        Err(e) => {
-            let status = if e.to_string().contains("not found") {
-                StatusCode::NOT_FOUND
+        .map_err(|e| {
+            if e.to_string().contains("not found") {
+                ApiError::not_found("Captcha config not found")
             } else {
-                StatusCode::BAD_REQUEST
-            };
-
-            Response::builder()
-                .status(status)
-                .body(format!("Failed to update captcha config: {e}").into())
-                .unwrap()
-        }
-    }
+                ApiError::bad_request(format!("Failed to update captcha config: {e}"))
+            }
+        })?;
+    Ok(Json(config))
 }
 
 #[utoipa::path(
@@ -179,28 +134,14 @@ pub async fn update_captcha_config(
     )
 )]
 pub async fn delete_captcha_config(
-    State(state): State<DefaultAppState>,
-    admin_session: AdminSession,
+    State(state): State<AppState>,
+    AdminEmail(_email): AdminEmail,
     Path(id): Path<Uuid>,
-) -> Response {
-    if admin_session.get_admin_email().is_none() {
-        return Response::builder()
-            .status(401)
-            .body("Unauthorized: No user information available".into())
-            .unwrap();
-    }
-
-    match state.captcha_config_repo.delete(id).await {
-        Ok(_) => Response::builder()
-            .status(204)
-            .body(axum::body::Body::empty())
-            .unwrap(),
-        Err(e) => {
-            tracing::error!("Failed to delete captcha config: {e:?}");
-            Response::builder()
-                .status(404)
-                .body(format!("Failed to delete captcha config: {e}").into())
-                .unwrap()
-        }
-    }
+) -> Result<StatusCode, ApiError> {
+    state
+        .captcha_config_repo
+        .delete(id)
+        .await
+        .map_err(|e| ApiError::not_found(format!("Failed to delete captcha config: {e}")))?;
+    Ok(StatusCode::NO_CONTENT)
 }

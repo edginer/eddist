@@ -1,18 +1,18 @@
 use axum::{
     extract::{Path, Query, State},
-    response::Response,
+    http::StatusCode,
     routing::{delete, get},
-    Router,
+    Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
-    models::{AuthedToken, DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
-    repository::authed_token_repository::AuthedTokenRepository,
-    DefaultAppState,
+    error::ApiError,
+    models::{DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/authed_tokens", get(list_authed_tokens))
         .route("/authed_tokens/{authedTokenId}", get(get_authed_token))
@@ -35,11 +35,11 @@ const ALLOWED_SORT_COLUMNS: &[&str] = &["created_at", "authed_at", "last_wrote_a
     ),
 )]
 pub async fn list_authed_tokens(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Query(query): Query<ListAuthedTokensQuery>,
-) -> Response {
+) -> Result<Json<PaginatedAuthedTokens>, ApiError> {
     let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(50).min(100).max(1);
+    let per_page = query.per_page.unwrap_or(50).clamp(1, 100);
     let offset = (page - 1) as u64 * per_page as u64;
 
     let sort_column = query
@@ -66,50 +66,38 @@ pub async fn list_authed_tokens(
             sort_column,
             sort_asc,
         )
-        .await
-        .unwrap();
+        .await?;
 
     let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
 
-    let result = PaginatedAuthedTokens {
+    Ok(Json(PaginatedAuthedTokens {
         items,
         total,
         page,
         per_page,
         total_pages,
-    };
-
-    Response::builder()
-        .status(200)
-        .header("content-type", "application/json")
-        .body(serde_json::to_string(&result).unwrap().into())
-        .unwrap()
+    }))
 }
 
 #[utoipa::path(
     get,
     path = "/authed_tokens/{authed_token_id}/",
     responses(
-        (status = 200, description = "Get authed token successfully", body = AuthedToken),
+        (status = 200, description = "Get authed token successfully", body = crate::models::AuthedToken),
     ),
     params(
         ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
     ),
 )]
 pub async fn get_authed_token(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(authed_token_id): Path<Uuid>,
-) -> Response {
+) -> Result<Json<crate::models::AuthedToken>, ApiError> {
     let authed_token = state
         .authed_token_repo
         .get_authed_token(authed_token_id)
-        .await
-        .unwrap();
-
-    Response::builder()
-        .status(200)
-        .body(serde_json::to_string(&authed_token).unwrap().into())
-        .unwrap()
+        .await?;
+    Ok(Json(authed_token))
 }
 
 #[utoipa::path(
@@ -124,26 +112,20 @@ pub async fn get_authed_token(
     ),
 )]
 pub async fn delete_authed_token(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(authed_token_id): Path<Uuid>,
     Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
-) -> Response {
+) -> Result<StatusCode, ApiError> {
     if !using_origin_ip {
         state
             .authed_token_repo
             .delete_authed_token(authed_token_id)
-            .await
-            .unwrap();
+            .await?;
     } else {
         state
             .authed_token_repo
             .delete_authed_token_by_origin_ip(authed_token_id)
-            .await
-            .unwrap();
+            .await?;
     }
-
-    Response::builder()
-        .status(200)
-        .body(axum::body::Body::empty())
-        .unwrap()
+    Ok(StatusCode::OK)
 }

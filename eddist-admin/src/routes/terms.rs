@@ -1,18 +1,15 @@
 use axum::{
     extract::State,
-    response::Response,
     routing::{get, put},
     Json, Router,
 };
 
 use crate::{
-    auth::AdminSession,
-    models::Terms,
-    repository::terms_repository::{TermsRepository, UpdateTermsInput},
-    DefaultAppState,
+    auth::AdminEmail, error::ApiError, models::Terms,
+    repository::terms_repository::UpdateTermsInput, AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/terms", get(get_terms))
         .route("/terms", put(update_terms))
@@ -26,22 +23,13 @@ pub fn routes() -> Router<DefaultAppState> {
         (status = 404, description = "Terms not found"),
     )
 )]
-pub async fn get_terms(State(state): State<DefaultAppState>) -> Response {
-    let terms = state.terms_repo.get_terms().await.unwrap();
-
-    match terms {
-        Some(terms) => {
-            let admin_terms: Terms = terms.into();
-            Response::builder()
-                .status(200)
-                .body(serde_json::to_string(&admin_terms).unwrap().into())
-                .unwrap()
-        }
-        None => Response::builder()
-            .status(404)
-            .body("Terms not found".into())
-            .unwrap(),
-    }
+pub async fn get_terms(State(state): State<AppState>) -> Result<Json<Terms>, ApiError> {
+    let terms = state
+        .terms_repo
+        .get_terms()
+        .await?
+        .ok_or_else(|| ApiError::not_found("Terms not found"))?;
+    Ok(Json(terms.into()))
 }
 
 #[utoipa::path(
@@ -56,39 +44,20 @@ pub async fn get_terms(State(state): State<DefaultAppState>) -> Response {
     )
 )]
 pub async fn update_terms(
-    State(state): State<DefaultAppState>,
-    admin_session: AdminSession,
+    State(state): State<AppState>,
+    AdminEmail(email): AdminEmail,
     Json(input): Json<UpdateTermsInput>,
-) -> Response {
-    let updated_by = admin_session.get_admin_email();
-
-    if updated_by.is_none() {
-        return Response::builder()
-            .status(401)
-            .body("Unauthorized: No user information available".into())
-            .unwrap();
-    }
-
-    match state.terms_repo.update_terms(input, updated_by).await {
-        Ok(terms) => {
-            let admin_terms: Terms = terms.into();
-            Response::builder()
-                .status(200)
-                .body(serde_json::to_string(&admin_terms).unwrap().into())
-                .unwrap()
-        }
-        Err(e) => {
-            tracing::error!("Failed to update terms: {e:?}");
-            let status = if e.to_string().contains("not found") {
-                404
+) -> Result<Json<Terms>, ApiError> {
+    let terms = state
+        .terms_repo
+        .update_terms(input, Some(email))
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("not found") {
+                ApiError::not_found("Terms not found")
             } else {
-                400
-            };
-
-            Response::builder()
-                .status(status)
-                .body(format!("Failed to update terms: {e}").into())
-                .unwrap()
-        }
-    }
+                ApiError::bad_request(format!("Failed to update terms: {e}"))
+            }
+        })?;
+    Ok(Json(terms.into()))
 }

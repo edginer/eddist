@@ -19,7 +19,7 @@ use tracing::info_span;
 
 use crate::{
     models::auth::{NativeSessionRequest, NativeSessionResponse, NativeUserInfo},
-    AppState, DefaultAppState,
+    AppState,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,17 +62,17 @@ pub async fn verify_access_token(
 ) -> Result<KeycloakAccessToken, ErrorKind> {
     if let Ok(userinfo_url) = env::var("EDDIST_USER_INFO_URL") {
         let pub_key = if is_native {
-            std::env::var("EDDIST_ADMIN_NATIVE_JWT_PUB_KEY").unwrap()
+            std::env::var("EDDIST_ADMIN_NATIVE_JWT_PUB_KEY").map_err(|_| ErrorKind::InvalidToken)?
         } else {
-            std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap()
+            std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").map_err(|_| ErrorKind::InvalidToken)?
         };
+        let audience = env::var("EDDIST_AUDIENCE").map_err(|_| ErrorKind::InvalidToken)?;
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        validation.set_audience(&[env::var("EDDIST_AUDIENCE").unwrap().as_str()]);
-        let token = jsonwebtoken::decode::<Auth0AccessToken>(
-            access_token,
-            &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
-            &validation,
-        );
+        validation.set_audience(&[audience.as_str()]);
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes())
+            .map_err(|e| e.kind().clone())?;
+        let token =
+            jsonwebtoken::decode::<Auth0AccessToken>(access_token, &decoding_key, &validation);
 
         match token {
             Ok(t) => {
@@ -81,8 +81,14 @@ pub async fn verify_access_token(
                     .bearer_auth(access_token)
                     .send()
                     .await
-                    .unwrap();
-                let text = res.text().await.unwrap();
+                    .map_err(|e| {
+                        log::error!("failed to fetch userinfo: {e:?}");
+                        ErrorKind::InvalidToken
+                    })?;
+                let text = res.text().await.map_err(|e| {
+                    log::error!("failed to read userinfo response: {e:?}");
+                    ErrorKind::InvalidToken
+                })?;
                 let res = serde_json::from_str::<Auth0UserInfo>(&text);
 
                 let info = match res {
@@ -107,14 +113,14 @@ pub async fn verify_access_token(
             }
         }
     } else {
-        let pub_key = std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").unwrap();
+        let pub_key =
+            std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").map_err(|_| ErrorKind::InvalidToken)?;
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&["account"]);
-        let token = jsonwebtoken::decode::<KeycloakAccessToken>(
-            access_token,
-            &jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes()).unwrap(),
-            &validation,
-        );
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes())
+            .map_err(|e| e.kind().clone())?;
+        let token =
+            jsonwebtoken::decode::<KeycloakAccessToken>(access_token, &decoding_key, &validation);
 
         match token {
             Ok(t) => Ok(t.claims),
@@ -131,41 +137,46 @@ pub async fn auth_simple_header(
     State(AppState {
         oauth2_client: client,
         ..
-    }): State<DefaultAppState>,
+    }): State<AppState>,
     admin_session: AdminSession,
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
-    if admin_session.next_refresh_at > Utc::now() && admin_session.userinfo.is_some() {
-        log::info!("no need to retrieve userinfo");
-        req.extensions_mut().insert(admin_session.userinfo.unwrap());
-        return next.run(req).await;
-    } else if let Some(access_token) = &admin_session.access_token {
+    if let Some(userinfo) = admin_session.userinfo {
+        if admin_session.next_refresh_at > Utc::now() {
+            log::info!("no need to retrieve userinfo");
+            req.extensions_mut().insert(userinfo);
+            return next.run(req).await;
+        }
+    }
+    if let Some(access_token) = &admin_session.access_token {
         let is_native = req
             .headers()
             .get("User-Agent")
-            .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
-            .to_str()
-            .unwrap()
-            .to_string()
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown")
             .contains("eddist-manager");
 
         let access_token = verify_access_token(access_token, is_native).await;
         let access_token = match access_token {
             Ok(token) => {
                 let new_session = AdminSession {
-                    next_refresh_at: Utc::now()
-                        .checked_add_signed(TimeDelta::minutes(5))
-                        .unwrap(),
+                    next_refresh_at: Utc::now() + TimeDelta::minutes(5),
                     userinfo: Some(token.clone()),
                     ..admin_session
                 };
-                session.insert("data", new_session).await.unwrap();
+                if let Err(e) = session.insert("data", new_session).await {
+                    log::error!("failed to insert session: {e:?}");
+                    return Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::empty())
+                        .unwrap();
+                }
                 token
             }
             Err(ErrorKind::ExpiredSignature) => {
                 let Some(refresh_token) = &admin_session.refresh_token else {
-                    session.delete().await.unwrap();
+                    let _ = session.delete().await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .body(Body::empty())
@@ -182,7 +193,7 @@ pub async fn auth_simple_header(
                     .request_async(get_http_client())
                     .await
                 else {
-                    session.delete().await.unwrap();
+                    let _ = session.delete().await;
 
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
@@ -196,14 +207,18 @@ pub async fn auth_simple_header(
                         let new_session = AdminSession {
                             access_token: Some(access_token.to_string()),
                             refresh_token: token.refresh_token().map(|t| t.secret().to_string()),
-                            next_refresh_at: Utc::now()
-                                .checked_add_signed(TimeDelta::minutes(5))
-                                .unwrap(),
+                            next_refresh_at: Utc::now() + TimeDelta::minutes(5),
                             userinfo: Some(userinfo.clone()),
                             ..admin_session
                         };
-                        session.insert("data", new_session).await.unwrap();
-                        info_span!("success to verify access token from refresh token", token = ?userinfo);
+                        if let Err(e) = session.insert("data", new_session).await {
+                            log::error!("failed to insert session: {e:?}");
+                            return Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .body(Body::empty())
+                                .unwrap();
+                        }
+                        log::info!("success to verify access token from refresh token");
                         userinfo
                     }
                     Err(e) => {
@@ -215,29 +230,16 @@ pub async fn auth_simple_header(
                     }
                 }
             }
-            Err(_) => panic!(),
+            Err(e) => {
+                log::error!("unexpected token verification error: {e:?}");
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(Body::empty())
+                    .unwrap();
+            }
         };
 
         req.extensions_mut().insert(access_token);
-
-        // TODO: this only executes after getting access token or refresh token
-        // sqlx::query_as::<_, (String, String, String, String, String)>(
-        //     r#"
-        //     SELECT
-        //         au.id AS user_id,
-        //         au.user_role_id AS user_role_id,
-        //         ar.role_name AS role_name,
-        //         ars.id AS scope_id,
-        //         ars.scope_key AS scope_key
-        //     FROM admin_users AS au
-        //     JOIN admin_roles AS ar ON au.user_role_id = ar.id
-        //     JOIN admin_role_scopes AS ars ON ar.id = ars.role_id
-        //     WHERE au.id = UUID_TO_BIN(?)
-        //     "#,
-        // )
-        // .fetch_all(&pool)
-        // .await
-        // .unwrap();
 
         let mut res = next.run(req).await;
         res.headers_mut().insert(
@@ -277,9 +279,7 @@ impl AdminSession {
             user_id: None,
             access_token: None,
             refresh_token: None,
-            next_refresh_at: Utc::now()
-                .checked_add_signed(TimeDelta::minutes(1))
-                .unwrap(),
+            next_refresh_at: Utc::now() + TimeDelta::minutes(1),
             userinfo: None,
         }
     }
@@ -300,7 +300,7 @@ pub async fn get_login(
     State(AppState {
         oauth2_client: oauth_client,
         ..
-    }): State<DefaultAppState>,
+    }): State<AppState>,
     session: Session,
     _: AdminSession,
 ) -> impl IntoResponse {
@@ -321,7 +321,7 @@ pub async fn get_login(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    session
+    let _ = session
         .insert(
             "oauth",
             OAuthSession {
@@ -329,8 +329,7 @@ pub async fn get_login(
                 pkce_verifier: pkce_verifier.secret().to_string(),
             },
         )
-        .await
-        .unwrap();
+        .await;
 
     Redirect::to(authorize_url.as_str())
 }
@@ -346,12 +345,13 @@ pub async fn get_login_callback(
     State(AppState {
         oauth2_client: oauth_client,
         ..
-    }): State<DefaultAppState>,
+    }): State<AppState>,
     session: Session,
     admin_session: AdminSession,
     query: axum::extract::Query<LoginCallbackQuery>,
 ) -> impl IntoResponse {
-    let Some(oauth_session) = session.remove::<OAuthSession>("oauth").await.unwrap() else {
+    let oauth_session = session.remove::<OAuthSession>("oauth").await;
+    let Some(oauth_session) = oauth_session.ok().flatten() else {
         info_span!("oauth_session is not found");
 
         return Response::builder()
@@ -364,7 +364,6 @@ pub async fn get_login_callback(
     let csrf_state = CsrfToken::new(query.state.clone());
 
     if csrf_state.secret() != oauth_session.csrf_state.secret() {
-        // HACK: this is for testing, should be removed in production (csrf_state)
         info_span!("csrf_state is not matched",
           server_state = ?oauth_session.csrf_state.secret(),
           client_state = ?csrf_state.secret()
@@ -390,13 +389,9 @@ pub async fn get_login_callback(
                 ..admin_session
             };
 
-            // HACK: this is for testing, should be removed in production (access_token and refresh_token)
-            info_span!("success to get token from auth server",
-                refresh_token = ?new_session.refresh_token,
-                access_token = ?new_session.access_token
-            );
+            log::info!("success to get token from auth server");
 
-            session.insert("data", new_session).await.unwrap();
+            let _ = session.insert("data", new_session).await;
 
             Redirect::to("/dashboard").into_response()
         }
@@ -420,48 +415,56 @@ where
     async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let session = Session::from_request_parts(req, state).await?;
 
-        if let Some(session) = session.get::<AdminSession>("data").await.unwrap() {
+        if let Some(session) = session.get::<AdminSession>("data").await.unwrap_or(None) {
             Ok(session)
         } else {
-            let data = AdminSession::new(
-                req.headers
-                    .get("CF-Connecting-IP")
-                    .unwrap_or(&HeaderValue::from_str("localhost").unwrap()) // for testing
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                req.headers
-                    .get("User-Agent")
-                    .unwrap_or(&HeaderValue::from_str("Mozilla/5.0").unwrap()) // for testing
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-            );
-            session.insert("data", data.clone()).await.unwrap();
+            let ip = req
+                .headers
+                .get("CF-Connecting-IP")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("localhost")
+                .to_string();
+            let ua = req
+                .headers
+                .get("User-Agent")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("Mozilla/5.0")
+                .to_string();
+            let data = AdminSession::new(ip, ua);
+            let _ = session.insert("data", data.clone()).await;
 
             Ok(data)
         }
     }
 }
 
+/// Extractor that pulls admin email from the session, returning 401 if not authenticated.
+pub struct AdminEmail(pub String);
+
+impl<S> FromRequestParts<S> for AdminEmail
+where
+    S: Send + Sync,
+{
+    type Rejection = (http::StatusCode, &'static str);
+
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let session = AdminSession::from_request_parts(req, state).await?;
+        session
+            .get_admin_email()
+            .map(AdminEmail)
+            .ok_or((StatusCode::UNAUTHORIZED, "No user information available"))
+    }
+}
+
 // GET: /auth/check
 pub async fn get_check_auth(admin_session: AdminSession) -> impl IntoResponse {
-    let result = if admin_session.access_token.is_some() {
-        serde_json::json!(true)
-    } else {
-        serde_json::json!(false)
-    };
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Body::from(serde_json::to_string(&result).unwrap()))
-        .unwrap()
+    let result = admin_session.access_token.is_some();
+    axum::Json(result)
 }
 
 // GET: /auth/logout
 pub async fn get_logout(session: Session) -> impl IntoResponse {
-    session.remove::<AdminSession>("data").await.unwrap();
+    let _ = session.remove::<AdminSession>("data").await;
     Redirect::to("/login").into_response()
 }
 
@@ -477,7 +480,7 @@ pub async fn get_logout(session: Session) -> impl IntoResponse {
     tag = "auth"
 )]
 pub async fn post_native_session(
-    State(_state): State<DefaultAppState>,
+    State(_state): State<AppState>,
     headers: http::HeaderMap,
     session: Session,
     axum::Json(req): axum::Json<NativeSessionRequest>,
@@ -509,15 +512,20 @@ pub async fn post_native_session(
         user_id: None, // We don't have user_id mapping yet
         access_token: Some(req.access_token),
         refresh_token: None, // Native clients don't get refresh tokens in this flow
-        next_refresh_at: Utc::now()
-            .checked_add_signed(TimeDelta::minutes(5))
-            .unwrap(),
+        next_refresh_at: Utc::now() + TimeDelta::minutes(5),
         userinfo: Some(user_info.clone()),
     };
 
     // Store the session
     let session_id = uuid::Uuid::from_bytes(admin_session.id).to_string();
-    session.insert("data", admin_session).await.unwrap();
+    if let Err(e) = session.insert("data", admin_session).await {
+        log::error!("failed to insert native session: {e:?}");
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header("Content-Type", "application/json")
+            .body(Body::from(r#"{"error": "session_error"}"#))
+            .unwrap();
+    }
 
     let response = NativeSessionResponse {
         session_token: session_id, // Return session ID instead of JWT token
@@ -530,11 +538,7 @@ pub async fn post_native_session(
         },
     };
 
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Body::from(serde_json::to_string(&response).unwrap()))
-        .unwrap()
+    axum::Json(response).into_response()
 }
 
 struct ClientInfo {
@@ -547,15 +551,13 @@ fn get_client_info(headers: &http::HeaderMap) -> ClientInfo {
         .get("Cf-Connecting-IP")
         .or_else(|| headers.get("X-Real-IP"))
         .or_else(|| headers.get("X-Forwarded-For"))
-        .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
-        .to_str()
-        .unwrap()
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown")
         .to_string();
     let client_ua = headers
         .get("User-Agent")
-        .unwrap_or(&HeaderValue::from_str("unknown").unwrap()) // for testing
-        .to_str()
-        .unwrap()
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown")
         .to_string();
 
     ClientInfo {

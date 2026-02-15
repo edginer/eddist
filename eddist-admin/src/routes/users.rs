@@ -1,18 +1,17 @@
 use axum::{
     extract::{Path, Query, State},
-    response::Response,
     routing::{get, patch},
     Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
+    error::ApiError,
     models::{User, UserSearchQuery, UserStatusUpdateInput},
-    repository::admin_user_repository::AdminUserRepository,
-    DefaultAppState,
+    AppState,
 };
 
-pub fn routes() -> Router<DefaultAppState> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/users/search", get(search_users))
         .route("/users/{userId}/status", patch(update_user_status))
@@ -29,16 +28,14 @@ pub fn routes() -> Router<DefaultAppState> {
     )
 )]
 pub async fn search_users(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Query(query): Query<UserSearchQuery>,
-) -> Json<Vec<User>> {
+) -> Result<Json<Vec<User>>, ApiError> {
     let users = state
         .user_repo
         .search_users(query.user_id, query.user_name, query.authed_token_id)
-        .await
-        .unwrap();
-
-    Json(users)
+        .await?;
+    Ok(Json(users))
 }
 
 #[utoipa::path(
@@ -53,25 +50,23 @@ pub async fn search_users(
     request_body = UserStatusUpdateInput
 )]
 pub async fn update_user_status(
-    State(state): State<DefaultAppState>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(body): Json<UserStatusUpdateInput>,
-) -> Response {
+) -> Result<Json<User>, ApiError> {
     state
         .user_repo
         .update_user_status(user_id, body.enabled)
-        .await
-        .unwrap();
+        .await?;
 
     let users = state
         .user_repo
         .search_users(Some(user_id), None, None)
-        .await
-        .unwrap();
+        .await?;
 
-    Response::builder()
-        .status(200)
-        .header("Content-Type", "application/json")
-        .body(serde_json::to_string(&users[0]).unwrap().into())
-        .unwrap()
+    let user = users
+        .into_iter()
+        .next()
+        .ok_or_else(|| ApiError::not_found("User not found after update"))?;
+    Ok(Json(user))
 }
