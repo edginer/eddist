@@ -7,13 +7,13 @@ use axum::{
 };
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
-use eddist_core::utils::is_user_registration_enabled;
 use http::HeaderValue;
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
     services::{
+        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
         },
@@ -33,47 +33,41 @@ use crate::{
 };
 
 pub fn user_routes() -> Router<AppState> {
-    let user_registration_enabled = is_user_registration_enabled();
-
-    if user_registration_enabled {
-        log::info!("User registration is enabled");
-    } else {
-        log::info!("User registration is disabled");
-    }
-
-    if user_registration_enabled {
-        Router::new()
-            .route("/", get(get_user_page))
-            .route("/register/{tempUrlPath}", get(get_user_register_temp_url))
-            .route(
-                "/register/authz/idp/{idpName}",
-                get(get_user_reg_redirect_to_idp_authz),
-            )
-            .route("/login", get(get_user_login))
-            .route(
-                "/login/authz/idp/{idpName}",
-                get(get_user_login_redirect_to_idp_authz),
-            )
-            .route("/logout", get(get_user_logout))
-            .route("/auth/callback", get(get_user_authz_idp_callback))
-            .route("/link", get(get_user_link_idp_selection))
-            .route(
-                "/link/authz/idp/{idpName}",
-                get(get_user_link_redirect_to_idp_authz),
-            )
-            .layer(axum::middleware::from_fn(
-                |req, next: axum::middleware::Next| async move {
-                    let mut response = next.run(req).await;
-                    response
-                        .headers_mut()
-                        .entry("Cache-Control")
-                        .or_insert_with(|| HeaderValue::from_static("no-store"));
-                    response
-                },
-            ))
-    } else {
-        Router::new()
-    }
+    Router::new()
+        .route("/", get(get_user_page))
+        .route("/register/{tempUrlPath}", get(get_user_register_temp_url))
+        .route(
+            "/register/authz/idp/{idpName}",
+            get(get_user_reg_redirect_to_idp_authz),
+        )
+        .route("/login", get(get_user_login))
+        .route(
+            "/login/authz/idp/{idpName}",
+            get(get_user_login_redirect_to_idp_authz),
+        )
+        .route("/logout", get(get_user_logout))
+        .route("/auth/callback", get(get_user_authz_idp_callback))
+        .route("/link", get(get_user_link_idp_selection))
+        .route(
+            "/link/authz/idp/{idpName}",
+            get(get_user_link_redirect_to_idp_authz),
+        )
+        .layer(axum::middleware::from_fn(
+            |req, next: axum::middleware::Next| async move {
+                if !get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
+                    return Response::builder()
+                        .status(404)
+                        .body(Body::from("User registration is disabled"))
+                        .unwrap();
+                }
+                let mut response = next.run(req).await;
+                response
+                    .headers_mut()
+                    .entry("Cache-Control")
+                    .or_insert_with(|| HeaderValue::from_static("no-store"));
+                response
+            },
+        ))
 }
 
 async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {

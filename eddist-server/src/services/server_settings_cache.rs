@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+pub use eddist_core::server_settings::ServerSettingKey;
 use sqlx::MySqlPool;
 use tokio::sync::RwLock;
 
@@ -14,22 +15,10 @@ fn get_global_cache() -> &'static Arc<RwLock<HashMap<String, String>>> {
     GLOBAL_SERVER_SETTINGS_CACHE.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
 }
 
-pub enum ServerSettingKey {
-    RequireUserRegistration,
-}
-
-impl ServerSettingKey {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::RequireUserRegistration => "require_user_registration",
-        }
-    }
-}
-
-impl std::fmt::Display for ServerSettingKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
+pub async fn get_server_setting_bool(key: ServerSettingKey) -> bool {
+    get_server_setting(key)
+        .await
+        .is_some_and(|v| v == "true")
 }
 
 pub async fn get_server_setting(key: ServerSettingKey) -> Option<String> {

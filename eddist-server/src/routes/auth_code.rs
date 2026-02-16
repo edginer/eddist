@@ -11,12 +11,11 @@ use serde::Serialize;
 use serde_json::json;
 use time;
 
-use eddist_core::utils::is_user_registration_enabled;
-
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
+        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         bind_token_to_user_service::BindTokenToUserServiceInput,
         captcha_config_cache::get_cached_captcha_configs,
@@ -184,7 +183,7 @@ pub async fn post_auth_code(
             "auth-code.post.success",
             &json!({
                 "token": token,
-                "enable_user_registration": is_user_registration_enabled()
+                "enable_idp_linking": get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
             }),
         )
         .unwrap();

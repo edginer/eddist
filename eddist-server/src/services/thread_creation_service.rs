@@ -4,7 +4,7 @@ use chrono::Utc;
 use eddist_core::{
     domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker},
     simple_rate_limiter::RateLimiter,
-    utils::{is_thread_pub_enabled, is_user_registration_enabled},
+    utils::is_thread_pub_enabled,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
@@ -38,7 +38,10 @@ use crate::{
     utils::redis::thread_cache_key,
 };
 
-use super::BbsCgiService;
+use super::{
+    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    BbsCgiService,
+};
 
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
@@ -153,7 +156,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             )
             .await?;
 
-        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+            && input.body.starts_with("!userreg")
+        {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });

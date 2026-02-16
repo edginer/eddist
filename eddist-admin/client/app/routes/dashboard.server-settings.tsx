@@ -11,8 +11,14 @@ type SettingDefinition = {
 
 const KNOWN_SETTINGS: SettingDefinition[] = [
   {
-    key: "require_user_registration",
-    label: "Require User Registration",
+    key: "user.enable_idp_linking",
+    label: "Enable IdP Linking",
+    description: "Enable the IdP account linking feature.",
+    type: "boolean",
+  },
+  {
+    key: "user.require_idp_linking",
+    label: "Require IdP Linking",
     description:
       "Require users to link an external IdP account before posting.",
     type: "boolean",

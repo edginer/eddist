@@ -10,12 +10,7 @@ use crate::{
     AppState,
 };
 
-/// Known setting keys and their descriptions.
-/// Only these keys are allowed to be created.
-const KNOWN_SETTINGS: &[(&str, &str)] = &[(
-    "require_user_registration",
-    "Require users to link an external IdP account before posting (true/false)",
-)];
+use eddist_core::server_settings::ServerSettingKey;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -52,16 +47,16 @@ pub async fn upsert_server_setting(
     State(state): State<AppState>,
     Json(input): Json<UpsertServerSettingInput>,
 ) -> Result<Json<ServerSetting>, ApiError> {
-    if !KNOWN_SETTINGS
+    if !ServerSettingKey::ALL
         .iter()
-        .any(|(key, _)| *key == input.setting_key)
+        .any(|k| k.as_str() == input.setting_key)
     {
         return Err(ApiError::bad_request(format!(
             "Unknown setting key: '{}'. Known keys: {}",
             input.setting_key,
-            KNOWN_SETTINGS
+            ServerSettingKey::ALL
                 .iter()
-                .map(|(k, _)| *k)
+                .map(|k| k.as_str())
                 .collect::<Vec<_>>()
                 .join(", ")
         )));

@@ -11,7 +11,7 @@ use eddist_core::{
         tinker::Tinker,
     },
     simple_rate_limiter::RateLimiter,
-    utils::{is_res_pub_enabled, is_user_registration_enabled},
+    utils::is_res_pub_enabled,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
@@ -46,7 +46,11 @@ use crate::{
     utils::redis::thread_cache_key,
 };
 
-use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
+use super::{
+    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    thread_creation_service::USER_CREATION_RATE_LIMIT,
+    BbsCgiService,
+};
 
 #[derive(Clone)]
 pub struct ResCreationService<
@@ -171,7 +175,9 @@ impl<
             )
             .await?;
 
-        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+            && input.body.starts_with("!userreg")
+        {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });
