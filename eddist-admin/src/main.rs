@@ -24,6 +24,7 @@ use repository::{
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
     captcha_config_repository::CaptchaConfigRepositoryImpl,
     ngword_repository::NgWordRepositoryImpl, notice_repository::NoticeRepositoryImpl,
+    server_settings_repository::ServerSettingsRepositoryImpl,
     terms_repository::TermsRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
@@ -56,6 +57,7 @@ mod repository {
     pub mod captcha_config_repository;
     pub mod ngword_repository;
     pub mod notice_repository;
+    pub mod server_settings_repository;
     pub mod terms_repository;
     pub mod user_restriction_repository;
 }
@@ -68,8 +70,8 @@ use repository::{
     admin_thread_repository::AdminThreadRepository, admin_user_repository::AdminUserRepository,
     authed_token_repository::AuthedTokenRepository, cap_repository::CapRepository,
     captcha_config_repository::CaptchaConfigRepository, ngword_repository::NgWordRepository,
-    notice_repository::NoticeRepository, terms_repository::TermsRepository,
-    user_restriction_repository::UserRestrictionRepository,
+    notice_repository::NoticeRepository, server_settings_repository::ServerSettingsRepository,
+    terms_repository::TermsRepository, user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
 
@@ -122,6 +124,7 @@ pub(crate) struct AppState {
     pub notice_repo: Arc<dyn NoticeRepository>,
     pub terms_repo: Arc<dyn TermsRepository>,
     pub captcha_config_repo: Arc<dyn CaptchaConfigRepository>,
+    pub server_settings_repo: Arc<dyn ServerSettingsRepository>,
     pub redis_conn: redis::aio::ConnectionManager,
 }
 
@@ -221,7 +224,8 @@ async fn main() {
         user_restriction_repo: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
         notice_repo: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
         terms_repo: Arc::new(TermsRepositoryImpl::new(pool.clone())),
-        captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool)),
+        captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
+        server_settings_repo: Arc::new(ServerSettingsRepositoryImpl::new(pool)),
     };
 
     let app = Router::new()

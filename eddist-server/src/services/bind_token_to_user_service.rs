@@ -32,8 +32,8 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone>
         let mut redis_conn = self.redis_conn.clone();
 
         // Get user_id from session
-        let user_id_str: Option<String> = redis_conn
-            .get(user_session_key(&input.user_sid))
+        let user_id_str = redis_conn
+            .get::<_, Option<String>>(user_session_key(&input.user_sid))
             .await?;
 
         let Some(user_id_str) = user_id_str else {

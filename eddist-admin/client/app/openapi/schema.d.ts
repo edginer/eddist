@@ -453,6 +453,22 @@ export interface paths {
         patch: operations["update_restriction_rule"];
         trace?: never;
     };
+    "/server-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_server_settings"];
+        put: operations["upsert_server_setting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/terms/": {
         parameters: {
             query?: never;
@@ -796,6 +812,17 @@ export interface components {
         };
         /** @enum {string} */
         RestrictionRuleTypeSchema: "Asn" | "IP" | "IPCidr" | "UserAgent";
+        ServerSetting: {
+            /** Format: date-time */
+            created_at: string;
+            description?: string | null;
+            /** Format: uuid */
+            id: string;
+            setting_key: string;
+            /** Format: date-time */
+            updated_at: string;
+            value: string;
+        };
         /** @description Terms model for API documentation */
         Terms: {
             content: string;
@@ -895,6 +922,11 @@ export interface components {
         };
         UpdateTermsInput: {
             content: string;
+        };
+        UpsertServerSettingInput: {
+            description?: string | null;
+            setting_key: string;
+            value: string;
         };
         User: {
             authed_token_ids: string[];
@@ -2188,6 +2220,57 @@ export interface operations {
         responses: {
             /** @description Update restriction rule */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_server_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all server settings successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSetting"][];
+                };
+            };
+        };
+    };
+    upsert_server_setting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertServerSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Server setting upserted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSetting"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,7 +1,9 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::{
-    domain::{service::oidc_client_service::OidcClientService, user::user_link_state::UserLinkState},
+    domain::{
+        service::oidc_client_service::OidcClientService, user::user_link_state::UserLinkState,
+    },
     repositories::idp_repository::IdpRepository,
     utils::redis::{user_link_oauth2_authreq_key, user_link_oauth2_state_key},
 };

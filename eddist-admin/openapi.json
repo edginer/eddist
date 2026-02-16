@@ -1736,6 +1736,60 @@
         }
       }
     },
+    "/server-settings/": {
+      "get": {
+        "tags": [
+          "server_settings"
+        ],
+        "operationId": "list_server_settings",
+        "responses": {
+          "200": {
+            "description": "List all server settings successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServerSetting"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "server_settings"
+        ],
+        "operationId": "upsert_server_setting",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertServerSettingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Server setting upserted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerSetting"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
     "/terms/": {
       "get": {
         "tags": [
@@ -3038,6 +3092,42 @@
           "UserAgent"
         ]
       },
+      "ServerSetting": {
+        "type": "object",
+        "required": [
+          "id",
+          "setting_key",
+          "value",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setting_key": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "Terms": {
         "type": "object",
         "description": "Terms model for API documentation",
@@ -3436,6 +3526,27 @@
         ],
         "properties": {
           "content": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertServerSettingInput": {
+        "type": "object",
+        "required": [
+          "setting_key",
+          "value"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "setting_key": {
+            "type": "string"
+          },
+          "value": {
             "type": "string"
           }
         }

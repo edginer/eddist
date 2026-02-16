@@ -8,6 +8,7 @@ pub mod boards;
 pub mod captcha;
 pub mod moderation;
 pub mod notices;
+pub mod server_settings;
 pub mod terms;
 pub mod threads;
 pub mod users;
@@ -21,6 +22,7 @@ pub fn create_api_routes() -> Router<AppState> {
         .merge(captcha::routes())
         .merge(moderation::routes())
         .merge(notices::routes())
+        .merge(server_settings::routes())
         .merge(terms::routes())
         .merge(users::routes())
 }

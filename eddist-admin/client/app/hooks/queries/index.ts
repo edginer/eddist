@@ -7,4 +7,5 @@ export * from "./restriction-rules";
 export * from "./users";
 export * from "./terms";
 export * from "./captcha-configs";
+export * from "./server-settings";
 export type { UseQueryOptions } from "./types";

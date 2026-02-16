@@ -90,8 +90,8 @@ pub enum BbsCgiError {
     #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
     EmailAuthenticatedUnsupportedUserAgent,
 
-    #[error("書き込むには外部アカウントとの連携が必要です。{base_url}/user/link?token={token} から連携を行ってください")]
-    UserRegistrationRequired { base_url: String, token: String },
+    #[error("書き込むには外部アカウントとの連携が必要です。{base_url}/user/link?ott={ott} から連携を行ってください")]
+    UserRegistrationRequired { base_url: String, ott: String },
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),

@@ -18,8 +18,8 @@ use crate::{
     error::BbsPostAuthWithCodeError,
     services::{
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
-        captcha_config_cache::get_cached_captcha_configs,
         bind_token_to_user_service::BindTokenToUserServiceInput,
+        captcha_config_cache::get_cached_captcha_configs,
         AppService,
     },
     utils::{get_origin_ip, get_ua},

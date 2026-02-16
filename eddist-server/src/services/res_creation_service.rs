@@ -149,7 +149,7 @@ impl<
             false,
         );
 
-        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let auth_service = BbsCgiAuthService::new(self.0.clone(), redis_conn.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),

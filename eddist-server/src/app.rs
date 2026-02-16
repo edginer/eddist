@@ -59,7 +59,6 @@ pub struct AppState {
     pub terms_repo: TermsRepositoryImpl,
     pub tinker_secret: String,
     pub template_engine: Handlebars<'static>,
-    pub require_user_registration: bool,
 }
 
 impl AppState {

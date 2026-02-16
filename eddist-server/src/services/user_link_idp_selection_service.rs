@@ -1,11 +1,12 @@
 use redis::{aio::ConnectionManager, AsyncCommands};
 use serde::Serialize;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
     domain::user::user_link_state::UserLinkState,
     repositories::{bbs_repository::BbsRepository, idp_repository::IdpRepository},
-    utils::redis::user_link_oauth2_state_key,
+    utils::redis::{user_link_oauth2_state_key, user_link_onetime_key},
 };
 
 use super::AppService;
@@ -38,10 +39,18 @@ impl<I: IdpRepository + Clone, B: BbsRepository + Clone>
     ) -> anyhow::Result<UserLinkIdpSelectionServiceOutput> {
         let mut redis_conn = self.redis_conn.clone();
 
-        // Verify the token exists and is valid
+        // Resolve the one-time token to the authed_token id
+        let authed_token_id = redis_conn
+            .get_del::<_, Option<String>>(user_link_onetime_key(&input.ott))
+            .await?;
+        let authed_token_id = authed_token_id
+            .ok_or_else(|| anyhow::anyhow!("One-time token not found or expired"))?;
+
+        // Fetch authed token by id
+        let authed_token_uuid = Uuid::from_str(&authed_token_id)?;
         let authed_token = self
             .bbs_repo
-            .get_authed_token(&input.token)
+            .get_authed_token_by_id(authed_token_uuid)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Token not found"))?;
 
@@ -73,7 +82,7 @@ impl<I: IdpRepository + Clone, B: BbsRepository + Clone>
         // Create state and store in Redis
         let state_cookie = Uuid::now_v7().to_string();
         let user_link_state = UserLinkState {
-            authed_token: input.token,
+            authed_token: authed_token.token.clone(),
             authed_token_id: authed_token.id.to_string(),
             ..UserLinkState::default()
         };
@@ -101,7 +110,7 @@ pub struct AvailableIdp {
 }
 
 pub struct UserLinkIdpSelectionServiceInput {
-    pub token: String,
+    pub ott: String,
 }
 
 pub enum UserLinkIdpSelectionServiceOutput {

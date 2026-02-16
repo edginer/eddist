@@ -76,10 +76,7 @@ pub fn user_routes() -> Router<AppState> {
     }
 }
 
-async fn get_user_page(
-    State(state): State<AppState>,
-    jar: CookieJar,
-) -> impl IntoResponse {
+async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
     let Some(user_sid) = user_sid else {
         // TODO: more user-friendly error page
@@ -373,12 +370,8 @@ async fn get_user_authz_idp_callback(
         jar.get("user-login-state-id"),
         jar.get("userlink-state-id"),
     ) {
-        (Some(reg_state_cookie), None, None) => {
-            (reg_state_cookie.value(), CallbackKind::Register)
-        }
-        (None, Some(login_state_cookie), None) => {
-            (login_state_cookie.value(), CallbackKind::Login)
-        }
+        (Some(reg_state_cookie), None, None) => (reg_state_cookie.value(), CallbackKind::Register),
+        (None, Some(login_state_cookie), None) => (login_state_cookie.value(), CallbackKind::Login),
         (None, None, Some(link_state_cookie)) => (link_state_cookie.value(), CallbackKind::Link),
         _ => {
             return Response::builder()
@@ -462,7 +455,7 @@ async fn get_user_authz_idp_callback(
 
 #[derive(Debug, Clone, Deserialize)]
 struct UserLinkQuery {
-    token: String,
+    ott: String,
 }
 
 async fn get_user_link_idp_selection(
@@ -472,7 +465,7 @@ async fn get_user_link_idp_selection(
     let svc = state.get_container().user_link_idp_selection();
     let output = match svc
         .execute(UserLinkIdpSelectionServiceInput {
-            token: query.token.clone(),
+            ott: query.ott.clone(),
         })
         .await
     {

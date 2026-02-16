@@ -61,6 +61,10 @@ pub(crate) mod redis {
         format!("userlogin:oauth2:authreq:{state_id}")
     }
 
+    pub fn user_link_onetime_key(key: &str) -> String {
+        format!("userlink:onetime:{key}")
+    }
+
     pub fn user_link_oauth2_state_key(state_id: &str) -> String {
         format!("userlink:oauth2:state:{state_id}")
     }

@@ -1,19 +1,27 @@
 use std::env;
 
 use chrono::Utc;
+use rand::{distr::Uniform, Rng};
+use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::{
     domain::authed_token::AuthedToken,
     error::BbsCgiError,
     repositories::bbs_repository::{BbsRepository, CreatingAuthedToken},
+    utils::redis::user_link_onetime_key,
 };
 
+const ONETIME_TOKEN_LEN: usize = 16;
+
 #[derive(Clone)]
-pub struct BbsCgiAuthService<T: BbsRepository>(T);
+pub struct BbsCgiAuthService<T: BbsRepository> {
+    repo: T,
+    redis_conn: ConnectionManager,
+}
 
 impl<T: BbsRepository> BbsCgiAuthService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
+        Self { repo, redis_conn }
     }
 
     pub async fn check_validity(
@@ -27,7 +35,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
     ) -> Result<AuthedToken, BbsCgiError> {
         let Some(authed_token) = token else {
             let authed_token = AuthedToken::new(ip_addr, user_agent, asn_num);
-            self.0
+            self.repo
                 .create_authed_token(CreatingAuthedToken {
                     token: authed_token.token.clone(),
                     writing_ua: authed_token.writing_ua,
@@ -49,7 +57,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
         };
 
         let authed_token = self
-            .0
+            .repo
             .get_authed_token(authed_token)
             .await
             .map_err(BbsCgiError::Other)?
@@ -60,7 +68,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                 Err(BbsCgiError::RevokedAuthedToken)
             } else if authed_token.is_activation_expired(Utc::now()) {
                 let authed_token = AuthedToken::new(ip_addr, user_agent, asn_num);
-                self.0
+                self.repo
                     .create_authed_token(CreatingAuthedToken {
                         token: authed_token.token.clone(),
                         writing_ua: authed_token.writing_ua,
@@ -90,12 +98,34 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
 
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
+            let ott = generate_onetime_token(ONETIME_TOKEN_LEN);
+            let mut redis_conn = self.redis_conn.clone();
+            redis_conn
+                .set_ex::<_, _, ()>(
+                    user_link_onetime_key(&ott),
+                    authed_token.id.to_string(),
+                    60 * 3, // 3 minutes TTL
+                )
+                .await
+                .map_err(|e| BbsCgiError::Other(e.into()))?;
+
             return Err(BbsCgiError::UserRegistrationRequired {
                 base_url: env::var("BASE_URL").unwrap(),
-                token: authed_token.token.clone(),
+                ott,
             });
         }
 
         Ok(authed_token)
     }
+}
+
+fn generate_onetime_token(len: usize) -> String {
+    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
+    (0..len)
+        .map(|_| {
+            let idx = rand::rng().sample(index_dist);
+            charset[idx] as char
+        })
+        .collect()
 }

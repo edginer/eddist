@@ -8,14 +8,20 @@ use uuid::Uuid;
 use crate::{
     domain::{
         service::oidc_client_service::OidcClientService,
-        user::{user_link_state::UserLinkState, user_login_state::UserLoginState, user_reg_state::UserRegState},
+        user::{
+            user_link_state::UserLinkState, user_login_state::UserLoginState,
+            user_reg_state::UserRegState,
+        },
     },
     repositories::{
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
     utils::{
-        redis::{user_link_oauth2_authreq_key, user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
+        redis::{
+            user_link_oauth2_authreq_key, user_login_oauth2_authreq_key,
+            user_reg_oauth2_authreq_key, user_session_key,
+        },
         TransactionRepository,
     },
 };
@@ -63,21 +69,29 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
                 let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
-                (self.register_user_with_idp(reg_state, input.code).await?, None)
+                (
+                    self.register_user_with_idp(reg_state, input.code).await?,
+                    None,
+                )
             }
             CallbackKind::Login => {
                 let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
-                let (user_sid, edge_token) = self.login_user_with_idp(login_state, input.code).await?;
+                let (user_sid, edge_token) =
+                    self.login_user_with_idp(login_state, input.code).await?;
                 (user_sid, edge_token)
             }
             CallbackKind::Link => {
                 let link_state = serde_json::from_str::<UserLinkState>(&user_state)?;
-                let (user_sid, edge_token) = self.link_user_with_idp(link_state, input.code).await?;
+                let (user_sid, edge_token) =
+                    self.link_user_with_idp(link_state, input.code).await?;
                 (user_sid, Some(edge_token))
             }
         };
 
-        Ok(UserAuthzIdpCallbackServiceOutput { user_sid, edge_token })
+        Ok(UserAuthzIdpCallbackServiceOutput {
+            user_sid,
+            edge_token,
+        })
     }
 }
 
@@ -242,9 +256,10 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
-        let idp_name = user_link_state.idp_name.clone().ok_or_else(|| {
-            anyhow::anyhow!("idp_name is not set in user_link_state")
-        })?;
+        let idp_name = user_link_state
+            .idp_name
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("idp_name is not set in user_link_state"))?;
 
         let (idp, idp_client) = idp_clients
             .get(&idp_name)

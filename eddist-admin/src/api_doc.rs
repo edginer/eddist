@@ -10,7 +10,10 @@ use crate::{
         notice_repository::{CreateNoticeInput, UpdateNoticeInput},
         terms_repository::UpdateTermsInput,
     },
-    routes::{archives, auth_tokens, boards, captcha, moderation, notices, terms, threads, users},
+    routes::{
+        archives, auth_tokens, boards, captcha, moderation, notices, server_settings, terms,
+        threads, users,
+    },
 };
 
 #[derive(OpenApi)]
@@ -82,6 +85,10 @@ use crate::{
         captcha::update_captcha_config,
         captcha::delete_captcha_config,
 
+        // Server settings routes
+        server_settings::list_server_settings,
+        server_settings::upsert_server_setting,
+
         // Auth routes
         post_native_session,
     ),
@@ -139,6 +146,10 @@ use crate::{
         // Terms models
         Terms,
         UpdateTermsInput,
+
+        // Server settings models
+        ServerSetting,
+        UpsertServerSettingInput,
 
         // Captcha config models
         CaptchaConfig,

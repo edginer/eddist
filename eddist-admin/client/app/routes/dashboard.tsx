@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { kind: "notices", label: "Notices" },
   { kind: "terms", label: "Terms" },
   { kind: "captcha-configs", label: "Captcha Configs" },
+  { kind: "server-settings", label: "Server Settings" },
   { kind: "global", label: "Global" },
   { kind: "authed-token", label: "Authed Token" },
   { kind: "users", label: "Users" },
