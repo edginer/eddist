@@ -16,9 +16,7 @@ fn get_global_cache() -> &'static Arc<RwLock<HashMap<String, String>>> {
 }
 
 pub async fn get_server_setting_bool(key: ServerSettingKey) -> bool {
-    get_server_setting(key)
-        .await
-        .is_some_and(|v| v == "true")
+    get_server_setting(key).await.is_some_and(|v| v == "true")
 }
 
 pub async fn get_server_setting(key: ServerSettingKey) -> Option<String> {

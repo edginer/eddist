@@ -1305,6 +1305,167 @@
         }
       }
     },
+    "/idps/": {
+      "get": {
+        "tags": [
+          "idps"
+        ],
+        "operationId": "list_idps",
+        "responses": {
+          "200": {
+            "description": "List all IdPs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Idp"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "idps"
+        ],
+        "operationId": "create_idp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdpInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "IdP created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Idp"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/idps/{id}/": {
+      "get": {
+        "tags": [
+          "idps"
+        ],
+        "operationId": "get_idp",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "IdP ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get IdP by ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Idp"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IdP not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "idps"
+        ],
+        "operationId": "delete_idp",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "IdP ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "IdP deleted successfully"
+          },
+          "404": {
+            "description": "IdP not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "idps"
+        ],
+        "operationId": "update_idp",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "IdP ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdpInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "IdP updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Idp"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "404": {
+            "description": "IdP not found"
+          }
+        }
+      }
+    },
     "/ng_words/": {
       "get": {
         "tags": [
@@ -2629,6 +2790,43 @@
           }
         }
       },
+      "CreateIdpInput": {
+        "type": "object",
+        "required": [
+          "idp_name",
+          "idp_display_name",
+          "oidc_config_url",
+          "client_id",
+          "client_secret",
+          "enabled"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "idp_display_name": {
+            "type": "string"
+          },
+          "idp_logo_svg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "oidc_config_url": {
+            "type": "string"
+          }
+        }
+      },
       "CreateNoticeInput": {
         "type": "object",
         "required": [
@@ -2828,6 +3026,45 @@
           "Post",
           "Get"
         ]
+      },
+      "Idp": {
+        "type": "object",
+        "description": "IdP model for API responses (client_secret is never exposed)",
+        "required": [
+          "id",
+          "idp_name",
+          "idp_display_name",
+          "oidc_config_url",
+          "client_id",
+          "enabled"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idp_display_name": {
+            "type": "string"
+          },
+          "idp_logo_svg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idp_name": {
+            "type": "string"
+          },
+          "oidc_config_url": {
+            "type": "string"
+          }
+        }
       },
       "NativeSessionRequest": {
         "type": "object",
@@ -3394,6 +3631,47 @@
               {
                 "$ref": "#/components/schemas/CaptchaWidgetConfig"
               }
+            ]
+          }
+        }
+      },
+      "UpdateIdpInput": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "idp_display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idp_logo_svg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "oidc_config_url": {
+            "type": [
+              "string",
+              "null"
             ]
           }
         }

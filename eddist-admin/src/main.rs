@@ -22,7 +22,7 @@ use repository::{
     admin_thread_repository::AdminThreadRepositoryImpl,
     admin_user_repository::AdminUserRepositoryImpl,
     authed_token_repository::AuthedTokenRepositoryImpl, cap_repository::CapRepositoryImpl,
-    captcha_config_repository::CaptchaConfigRepositoryImpl,
+    captcha_config_repository::CaptchaConfigRepositoryImpl, idp_repository::IdpAdminRepositoryImpl,
     ngword_repository::NgWordRepositoryImpl, notice_repository::NoticeRepositoryImpl,
     server_settings_repository::ServerSettingsRepositoryImpl,
     terms_repository::TermsRepositoryImpl,
@@ -55,6 +55,7 @@ mod repository {
     pub mod authed_token_repository;
     pub mod cap_repository;
     pub mod captcha_config_repository;
+    pub mod idp_repository;
     pub mod ngword_repository;
     pub mod notice_repository;
     pub mod server_settings_repository;
@@ -69,9 +70,10 @@ use repository::{
     admin_response_repository::AdminResponseRepository,
     admin_thread_repository::AdminThreadRepository, admin_user_repository::AdminUserRepository,
     authed_token_repository::AuthedTokenRepository, cap_repository::CapRepository,
-    captcha_config_repository::CaptchaConfigRepository, ngword_repository::NgWordRepository,
-    notice_repository::NoticeRepository, server_settings_repository::ServerSettingsRepository,
-    terms_repository::TermsRepository, user_restriction_repository::UserRestrictionRepository,
+    captcha_config_repository::CaptchaConfigRepository, idp_repository::IdpAdminRepository,
+    ngword_repository::NgWordRepository, notice_repository::NoticeRepository,
+    server_settings_repository::ServerSettingsRepository, terms_repository::TermsRepository,
+    user_restriction_repository::UserRestrictionRepository,
 };
 use utoipa::OpenApi;
 
@@ -121,6 +123,7 @@ pub(crate) struct AppState {
     pub cap_repo: Arc<dyn CapRepository>,
     pub user_repo: Arc<dyn AdminUserRepository>,
     pub user_restriction_repo: Arc<dyn UserRestrictionRepository>,
+    pub idp_repo: Arc<dyn IdpAdminRepository>,
     pub notice_repo: Arc<dyn NoticeRepository>,
     pub terms_repo: Arc<dyn TermsRepository>,
     pub captcha_config_repo: Arc<dyn CaptchaConfigRepository>,
@@ -222,6 +225,7 @@ async fn main() {
         cap_repo: Arc::new(CapRepositoryImpl::new(pool.clone())),
         user_repo: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
         user_restriction_repo: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
+        idp_repo: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
         notice_repo: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
         terms_repo: Arc::new(TermsRepositoryImpl::new(pool.clone())),
         captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),

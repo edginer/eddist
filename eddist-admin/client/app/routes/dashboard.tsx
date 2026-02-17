@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { kind: "boards", label: "Boards" },
   { kind: "caps", label: "Caps" },
   { kind: "ngwords", label: "Ng Words" },
+  { kind: "idps", label: "IdPs" },
   { kind: "notices", label: "Notices" },
   { kind: "terms", label: "Terms" },
   { kind: "captcha-configs", label: "Captcha Configs" },

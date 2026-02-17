@@ -2,6 +2,7 @@ export * from "./boards";
 export * from "./authed-tokens";
 export * from "./ng-words";
 export * from "./caps";
+export * from "./idps";
 export * from "./notices";
 export * from "./restriction-rules";
 export * from "./users";

@@ -11,7 +11,7 @@ use crate::{
         terms_repository::UpdateTermsInput,
     },
     routes::{
-        archives, auth_tokens, boards, captcha, moderation, notices, server_settings, terms,
+        archives, auth_tokens, boards, captcha, idps, moderation, notices, server_settings, terms,
         threads, users,
     },
 };
@@ -66,6 +66,13 @@ use crate::{
         // User routes
         users::search_users,
         users::update_user_status,
+
+        // IdP routes
+        idps::list_idps,
+        idps::get_idp,
+        idps::create_idp,
+        idps::update_idp,
+        idps::delete_idp,
 
         // Notice routes
         notices::get_notices,
@@ -137,6 +144,11 @@ use crate::{
         UserIdpBinding,
         UserStatusUpdateInput,
         UserSearchQuery,
+
+        // IdP models
+        Idp,
+        CreateIdpInput,
+        UpdateIdpInput,
 
         // Notice models
         Notice,

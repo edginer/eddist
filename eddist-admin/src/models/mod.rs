@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod board;
 pub mod captcha;
+pub mod idp;
 pub mod moderation;
 pub mod notice;
 pub mod response;
@@ -13,6 +14,7 @@ pub mod user;
 pub use auth::*;
 pub use board::*;
 pub use captcha::*;
+pub use idp::*;
 pub use moderation::*;
 pub use notice::*;
 pub use response::*;

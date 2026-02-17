@@ -357,6 +357,38 @@ export interface paths {
         patch: operations["update_captcha_config"];
         trace?: never;
     };
+    "/idps/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_idps"];
+        put?: never;
+        post: operations["create_idp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/idps/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_idp"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_idp"];
+        options?: never;
+        head?: never;
+        patch: operations["update_idp"];
+        trace?: never;
+    };
     "/ng_words/": {
         parameters: {
             query?: never;
@@ -685,6 +717,15 @@ export interface components {
             verification?: null | components["schemas"]["CaptchaVerificationConfig"];
             widget?: null | components["schemas"]["CaptchaWidgetConfig"];
         };
+        CreateIdpInput: {
+            client_id: string;
+            client_secret: string;
+            enabled: boolean;
+            idp_display_name: string;
+            idp_logo_svg?: string | null;
+            idp_name: string;
+            oidc_config_url: string;
+        };
         CreateNoticeInput: {
             content: string;
             /** Format: date-time */
@@ -732,6 +773,17 @@ export interface components {
          * @enum {string}
          */
         HttpMethod: "Post" | "Get";
+        /** @description IdP model for API responses (client_secret is never exposed) */
+        Idp: {
+            client_id: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            idp_display_name: string;
+            idp_logo_svg?: string | null;
+            idp_name: string;
+            oidc_config_url: string;
+        };
         NativeSessionRequest: {
             access_token: string;
         };
@@ -893,6 +945,14 @@ export interface components {
             site_key?: string | null;
             verification?: null | components["schemas"]["CaptchaVerificationConfig"];
             widget?: null | components["schemas"]["CaptchaWidgetConfig"];
+        };
+        UpdateIdpInput: {
+            client_id?: string | null;
+            client_secret?: string | null;
+            enabled?: boolean | null;
+            idp_display_name?: string | null;
+            idp_logo_svg?: string | null;
+            oidc_config_url?: string | null;
         };
         UpdateNgWordInput: {
             board_ids?: string[] | null;
@@ -1829,6 +1889,156 @@ export interface operations {
                 content?: never;
             };
             /** @description Captcha config not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_idps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all IdPs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"][];
+                };
+            };
+        };
+    };
+    create_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIdpInput"];
+            };
+        };
+        responses: {
+            /** @description IdP created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get IdP by ID */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description IdP not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description IdP deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description IdP not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIdpInput"];
+            };
+        };
+        responses: {
+            /** @description IdP updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description IdP not found */
             404: {
                 headers: {
                     [name: string]: unknown;
