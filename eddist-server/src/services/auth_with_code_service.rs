@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use chrono::Utc;
 use futures::future::join_all;
 use metrics::counter;
+use redis::{aio::ConnectionManager, AsyncCommands};
 use tracing::{error_span, info_span};
 
 use crate::{
@@ -12,18 +13,27 @@ use crate::{
         create_captcha_client, CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput,
     },
     repositories::bbs_repository::BbsRepository,
+    utils::{generate_onetime_token, redis::user_link_onetime_key},
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
 use uuid::Uuid;
 
-use super::AppService;
+use super::{
+    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    AppService,
+};
 
-#[derive(Debug, Clone)]
-pub struct AuthWithCodeService<T: BbsRepository>(T);
+const ONETIME_TOKEN_LEN: usize = 16;
+
+#[derive(Clone)]
+pub struct AuthWithCodeService<T: BbsRepository> {
+    repo: T,
+    redis_conn: ConnectionManager,
+}
 
 impl<T: BbsRepository> AuthWithCodeService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
+        Self { repo, redis_conn }
     }
 
     /// Generate a new rate limiting token (browser handles expiration via Max-Age)
@@ -78,7 +88,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         // Get all unauthed tokens with the auth code (non-IP checking)
         let candidate_tokens = self
-            .0
+            .repo
             .get_unauthed_authed_token_by_auth_code(&input.code)
             .await?;
 
@@ -92,7 +102,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         if unauthed_tokens.len() > 1 {
             // Delete all unauthed tokens with this auth_code to resolve collision
             for candidate in &unauthed_tokens {
-                self.0.delete_authed_token(&candidate.token).await?;
+                self.repo.delete_authed_token(&candidate.token).await?;
             }
             counter!("issue_authed_token", "state" => "failed", "reason" => "auth_code_collision")
                 .increment(1);
@@ -196,7 +206,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             }))
         };
 
-        self.0
+        self.repo
             .activate_authed_status(&token.token, &input.user_agent, now, additional_info)
             .await?;
         counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
@@ -204,10 +214,27 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         // Generate rate limiting token after successful authentication
         let rate_limit_token = Some(self.generate_rate_limit_token());
 
+        // Generate a one-time token for optional IdP linking if enabled
+        let ott = if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
+            let ott = generate_onetime_token(ONETIME_TOKEN_LEN);
+            let mut redis_conn = self.redis_conn.clone();
+            redis_conn
+                .set_ex::<_, _, ()>(
+                    user_link_onetime_key(&ott),
+                    token.id.to_string(),
+                    60 * 3, // 3 minutes TTL
+                )
+                .await?;
+            Some(ott)
+        } else {
+            None
+        };
+
         Ok(AuthWithCodeServiceOutput {
             token: token.token,
             authed_token_id: token.id,
             rate_limit_token,
+            ott,
         })
     }
 }
@@ -225,4 +252,6 @@ pub struct AuthWithCodeServiceOutput {
     pub token: String,
     pub authed_token_id: Uuid,
     pub rate_limit_token: Option<String>,
+    /// One-time token for optional IdP linking (only set when IdP linking is enabled)
+    pub ott: Option<String>,
 }

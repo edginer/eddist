@@ -78,6 +78,19 @@ pub(crate) mod redis {
     }
 }
 
+pub fn generate_onetime_token(len: usize) -> String {
+    use rand::{distr::Uniform, Rng};
+
+    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
+    (0..len)
+        .map(|_| {
+            let idx = rand::rng().sample(index_dist);
+            charset[idx] as char
+        })
+        .collect()
+}
+
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
     let origin_ip = headers
         .get("Cf-Connecting-IP")

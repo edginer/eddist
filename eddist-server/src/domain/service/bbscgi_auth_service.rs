@@ -1,14 +1,13 @@
 use std::env;
 
 use chrono::Utc;
-use rand::{distr::Uniform, Rng};
 use redis::{aio::ConnectionManager, AsyncCommands};
 
 use crate::{
     domain::authed_token::AuthedToken,
     error::BbsCgiError,
     repositories::bbs_repository::{BbsRepository, CreatingAuthedToken},
-    utils::redis::user_link_onetime_key,
+    utils::{generate_onetime_token, redis::user_link_onetime_key},
 };
 
 const ONETIME_TOKEN_LEN: usize = 16;
@@ -117,15 +116,4 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
 
         Ok(authed_token)
     }
-}
-
-fn generate_onetime_token(len: usize) -> String {
-    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
-    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
-    (0..len)
-        .map(|_| {
-            let idx = rand::rng().sample(index_dist);
-            charset[idx] as char
-        })
-        .collect()
 }

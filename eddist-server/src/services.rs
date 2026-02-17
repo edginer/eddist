@@ -120,7 +120,7 @@ impl<
         bucket: Bucket,
     ) -> Self {
         AppServiceContainer {
-            auth_with_code: AuthWithCodeService::new(bbs_repo.clone()),
+            auth_with_code: AuthWithCodeService::new(bbs_repo.clone(), redis_conn.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(

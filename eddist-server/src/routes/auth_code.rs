@@ -15,7 +15,6 @@ use crate::{
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
-        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         bind_token_to_user_service::BindTokenToUserServiceInput,
         captcha_config_cache::get_cached_captcha_configs,
@@ -119,7 +118,7 @@ pub async fn post_auth_code(
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
     let captcha_configs = get_cached_captcha_configs().await;
-    let (token, authed_token_id, rate_limit_token) = match state
+    let (token, authed_token_id, rate_limit_token, ott) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -136,7 +135,8 @@ pub async fn post_auth_code(
             token,
             authed_token_id,
             rate_limit_token,
-        }) => (token, authed_token_id, rate_limit_token),
+            ott,
+        }) => (token, authed_token_id, rate_limit_token, ott),
         Err(e) => {
             return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
                 Html(
@@ -183,7 +183,7 @@ pub async fn post_auth_code(
             "auth-code.post.success",
             &json!({
                 "token": token,
-                "enable_idp_linking": get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+                "ott": ott,
             }),
         )
         .unwrap();

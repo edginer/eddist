@@ -2,10 +2,10 @@ use axum::{
     body::Body,
     extract::{Path, State},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
-use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use axum_extra::extract::CookieJar;
 use http::HeaderValue;
 use serde::Deserialize;
@@ -45,7 +45,7 @@ pub fn user_routes() -> Router<AppState> {
             "/login/authz/idp/{idpName}",
             get(get_user_login_redirect_to_idp_authz),
         )
-        .route("/logout", get(get_user_logout))
+        .route("/logout", post(post_user_logout))
         .route("/auth/callback", get(get_user_authz_idp_callback))
         .route("/link", get(get_user_link_idp_selection))
         .route(
@@ -328,7 +328,7 @@ async fn get_user_login_redirect_to_idp_authz(
         .unwrap()
 }
 
-async fn get_user_logout(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
+async fn post_user_logout(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let user_sid = jar.get("user-sid").map(|cookie| cookie.value().to_string());
 
     if let Some(user_sid) = user_sid {
@@ -422,6 +422,7 @@ async fn get_user_authz_idp_callback(
         .path("/")
         .http_only(true)
         .secure(true)
+        .same_site(SameSite::Lax)
         .max_age(time::Duration::seconds(60 * 60 * 24 * 365))
         .build();
 
@@ -559,6 +560,7 @@ fn reset_user_sid_cookie() -> Cookie<'static> {
         .path("/")
         .http_only(true)
         .secure(true)
+        .same_site(SameSite::Lax)
         .max_age(time::Duration::ZERO)
         .build()
 }
