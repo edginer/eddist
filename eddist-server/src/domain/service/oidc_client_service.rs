@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use base64::Engine;
 use chacha20poly1305::{aead::Aead, KeyInit};
 use eddist_core::cache_aside::{self, AsCache, ToCache};
-use openidconnect::{core::CoreProviderMetadata, ClientId, ClientSecret};
+use openidconnect::{core::CoreProviderMetadata, ClientId, ClientSecret, IssuerUrl};
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 
@@ -64,13 +64,18 @@ impl<T: IdpRepository + Clone> OidcClientService<T> {
                 Box::pin(async move {
                     let mut idps = HashMap::new();
 
+                    let http_client = reqwest::Client::new();
                     for idp in repo.get_idps().await? {
-                        let metadata = reqwest::get(&idp.oidc_config_url)
-                            .await
-                            .unwrap()
-                            .json::<CoreProviderMetadata>()
-                            .await
-                            .unwrap();
+                        let issuer_url = IssuerUrl::new(
+                            idp.oidc_config_url
+                                .trim_end_matches("/.well-known/openid-configuration")
+                                .to_string(),
+                        )
+                        .unwrap();
+                        let metadata =
+                            CoreProviderMetadata::discover_async(issuer_url, &http_client)
+                                .await
+                                .unwrap();
                         let idp_name = idp.idp_name.clone();
                         let (client_id, client_secret) = (
                             ClientId::new(idp.client_id.clone()),
