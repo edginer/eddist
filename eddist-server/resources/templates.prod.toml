@@ -30,5 +30,9 @@ name = "login-idp-selection.get"
 path = "./resources/templates/login-idp-selection.get.hbs"
 
 [[template.templates]]
+name = "user-link-idp-selection.get"
+path = "./resources/templates/user-link-idp-selection.get.hbs"
+
+[[template.templates]]
 name = "error-page.get"
 path = "./resources/templates/error-page.get.hbs"
