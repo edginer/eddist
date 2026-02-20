@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use base64::Engine;
 use chacha20poly1305::{aead::Aead, KeyInit};
-use eddist_core::cache_aside::{self, AsCache, ToCache};
 use openidconnect::{core::CoreProviderMetadata, ClientId, ClientSecret, IssuerUrl};
-use redis::aio::ConnectionManager;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::user::idp::Idp, external::oidc_client::OidcClient,
@@ -15,98 +12,52 @@ use crate::{
 #[derive(Clone)]
 pub struct OidcClientService<T: IdpRepository> {
     idp_repo: T,
-    redis_conn: ConnectionManager,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct IdPCache {
-    idps: HashMap<String, (Idp, OidcClient)>,
-    expired_at: u64,
-}
-
-impl AsCache<HashMap<String, (Idp, OidcClient)>> for IdPCache {
-    fn expired_at(&self) -> u64 {
-        self.expired_at
-    }
-
-    fn get(self) -> HashMap<String, (Idp, OidcClient)> {
-        self.idps
-    }
-}
-
-impl ToCache<HashMap<String, (Idp, OidcClient)>, IdPCache> for HashMap<String, (Idp, OidcClient)> {
-    fn into_cache(self, expired_at: u64) -> IdPCache {
-        IdPCache {
-            idps: self,
-            expired_at,
-        }
-    }
 }
 
 impl<T: IdpRepository + Clone> OidcClientService<T> {
-    pub fn new(idp_repo: T, redis_conn: ConnectionManager) -> Self {
-        Self {
-            idp_repo,
-            redis_conn,
-        }
+    pub fn new(idp_repo: T) -> Self {
+        Self { idp_repo }
     }
 
     pub async fn get_idp_clients(&self) -> anyhow::Result<HashMap<String, (Idp, OidcClient)>> {
-        let repo = self.idp_repo.clone();
-        let expired_at = chrono::Utc::now().timestamp() as u64 + 300;
+        let mut idps = HashMap::new();
 
-        let idp = cache_aside::cache_aside(
-            "user",
-            "idp_configs",
-            Box::new(self.redis_conn.clone()),
-            expired_at,
-            || {
-                Box::pin(async move {
-                    let mut idps = HashMap::new();
+        let http_client = reqwest::Client::new();
+        for idp in self.idp_repo.get_idps().await? {
+            let issuer_url = IssuerUrl::new(
+                idp.oidc_config_url
+                    .trim_end_matches("/.well-known/openid-configuration")
+                    .to_string(),
+            )
+            .unwrap();
+            let metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
+                .await
+                .unwrap();
+            let idp_name = idp.idp_name.clone();
+            let (client_id, client_secret) = (
+                ClientId::new(idp.client_id.clone()),
+                ClientSecret::new({
+                    std::env::var("CLIENT_SECRET_SYMMETRIC_ENCRYPTION")
+                        .map(|b| {
+                            let b = b.parse::<bool>().unwrap();
+                            if b {
+                                decrypt_client_secret(&idp.client_secret)
+                            } else {
+                                idp.client_secret.clone()
+                            }
+                        })
+                        .unwrap_or(idp.client_secret.clone())
+                }),
+            );
 
-                    let http_client = reqwest::Client::new();
-                    for idp in repo.get_idps().await? {
-                        let issuer_url = IssuerUrl::new(
-                            idp.oidc_config_url
-                                .trim_end_matches("/.well-known/openid-configuration")
-                                .to_string(),
-                        )
-                        .unwrap();
-                        let metadata =
-                            CoreProviderMetadata::discover_async(issuer_url, &http_client)
-                                .await
-                                .unwrap();
-                        let idp_name = idp.idp_name.clone();
-                        let (client_id, client_secret) = (
-                            ClientId::new(idp.client_id.clone()),
-                            ClientSecret::new({
-                                std::env::var("CLIENT_SECRET_SYMMETRIC_ENCRYPTION")
-                                    .map(|b| {
-                                        let b = b.parse::<bool>().unwrap();
-                                        if b {
-                                            decrypt_client_secret(&idp.client_secret)
-                                        } else {
-                                            idp.client_secret.clone()
-                                        }
-                                    })
-                                    .unwrap_or(idp.client_secret.clone())
-                            }),
-                        );
+            let idp_value = (
+                idp,
+                OidcClient::new(client_id, client_secret, metadata).await,
+            );
+            idps.insert(idp_name, idp_value);
+        }
 
-                        let idp_value = (
-                            idp,
-                            OidcClient::new(client_id, client_secret, metadata).await,
-                        );
-                        idps.insert(idp_name, idp_value);
-                    }
-
-                    Ok(idps)
-                })
-            },
-        )
-        .await?;
-
-        Ok(idp)
+        Ok(idps)
     }
 }
 

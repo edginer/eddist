@@ -9,10 +9,9 @@ use openidconnect::{
     EmptyAdditionalClaims, IdTokenClaims, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
     TokenResponse,
 };
-use serde::{Deserialize, Serialize};
 use url::Url;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct OidcClient {
     client_id: ClientId,
     client_secret: ClientSecret,

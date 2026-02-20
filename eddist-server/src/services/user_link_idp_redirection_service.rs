@@ -37,7 +37,7 @@ impl<I: IdpRepository + Clone>
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (_, idp_client) = idp_clients

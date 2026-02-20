@@ -106,7 +106,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -192,7 +192,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -253,7 +253,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let idp_name = user_link_state
