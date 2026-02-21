@@ -15,7 +15,9 @@ use crate::{
         user_repository::{CreatingUser, UserRepository},
     },
     utils::{
-        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
+        redis::{
+            user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key,
+        },
         TransactionRepository,
     },
 };
@@ -59,18 +61,25 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
         redis_conn.del::<_, ()>(&redis_authreq_key).await?;
 
-        let user_sid = match input.callback_kind {
+        let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
                 let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
-                self.register_user_with_idp(reg_state, input.code).await?
+                let (user_sid, edge_token) =
+                    self.register_user_with_idp(reg_state, input.code).await?;
+                (user_sid, edge_token)
             }
             CallbackKind::Login => {
                 let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
-                self.login_user_with_idp(login_state, input.code).await?
+                let (user_sid, edge_token) =
+                    self.login_user_with_idp(login_state, input.code).await?;
+                (user_sid, edge_token)
             }
         };
 
-        Ok(UserAuthzIdpCallbackServiceOutput { user_sid })
+        Ok(UserAuthzIdpCallbackServiceOutput {
+            user_sid,
+            edge_token,
+        })
     }
 }
 
@@ -81,11 +90,14 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         &self,
         user_reg_state: UserRegState,
         code: String,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
+        let edge_token = user_reg_state.edge_token.clone();
+        let authed_token_id = user_reg_state.authed_token.clone();
+
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -103,6 +115,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             .await;
 
         let sub = id_token_claims.subject().to_string();
+        let authed_token_uuid = Uuid::parse_str(&authed_token_id)?;
 
         let user_id = if let Some(u) = self
             .user_repo
@@ -113,7 +126,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             let tx = self.user_repo.begin().await?;
             let tx = self
                 .user_repo
-                .bind_user_authed_token(u.id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .bind_user_authed_token(u.id, authed_token_uuid, tx)
                 .await?;
             tx.commit().await?;
 
@@ -141,7 +154,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
             let tx = self
                 .user_repo
-                .bind_user_authed_token(user_id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .bind_user_authed_token(user_id, authed_token_uuid, tx)
                 .await?;
             tx.commit().await?;
 
@@ -160,18 +173,18 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             )
             .await?;
 
-        Ok(user_sid)
+        Ok((user_sid, edge_token))
     }
 
     async fn login_user_with_idp(
         &self,
         user_login_state: UserLoginState,
         code: String,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+            OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -208,11 +221,18 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
                     )
                     .await?;
 
-                Ok(user_sid)
+                // Restore edge-token from user's linked tokens
+                let edge_token = self
+                    .user_repo
+                    .get_valid_authed_token_by_user_id(user.id)
+                    .await?;
+
+                Ok((user_sid, edge_token))
             }
             None => Err(anyhow::anyhow!("user not found")),
         }
     }
+
 }
 
 pub struct UserAuthzIdpCallbackServiceInput {
@@ -228,6 +248,8 @@ pub enum CallbackKind {
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
+    /// The edge-token to set for the user (used in Register flow)
+    pub edge_token: Option<String>,
 }
 
 fn user_name_generator() -> String {

@@ -15,6 +15,10 @@ pub trait UserRepository: Send + Sync + 'static {
         idp_sub: &str,
     ) -> anyhow::Result<Option<User>>;
     async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>>;
+    async fn get_valid_authed_token_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<String>>;
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool>;
     async fn create_user_with_idp<'a>(
         &'a self,
@@ -192,6 +196,27 @@ impl UserRepository for UserRepositoryImpl {
             .collect::<Vec<_>>();
 
         Ok(authed_tokens)
+    }
+
+    async fn get_valid_authed_token_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<String>> {
+        let authed_token = sqlx::query!(
+            r#"
+            SELECT at.token AS token
+            FROM authed_tokens at
+            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
+            WHERE uat.user_id = ? AND at.validity = true
+            ORDER BY at.authed_at DESC
+            LIMIT 1
+            "#,
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(authed_token.map(|row| row.token))
     }
 
     /// !!! You need to call begin / commit / rollback outside of this function !!!

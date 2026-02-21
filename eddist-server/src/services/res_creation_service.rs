@@ -11,7 +11,7 @@ use eddist_core::{
         tinker::Tinker,
     },
     simple_rate_limiter::RateLimiter,
-    utils::{is_res_pub_enabled, is_user_registration_enabled},
+    utils::is_res_pub_enabled,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd, Value};
@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -45,7 +46,11 @@ use crate::{
     utils::redis::thread_cache_key,
 };
 
-use super::{thread_creation_service::USER_CREATION_RATE_LIMIT, BbsCgiService};
+use super::{
+    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    thread_creation_service::USER_CREATION_RATE_LIMIT,
+    BbsCgiService,
+};
 
 #[derive(Clone)]
 pub struct ResCreationService<
@@ -127,17 +132,28 @@ impl<
         res_core.validate_content_length(&board_info)?;
         client_info.validate_client_info(&board_info, false)?;
 
+        let metadent_type = board_info
+            .force_metadent_type
+            .as_deref()
+            .and_then(|s| match s {
+                "v" => Some(MetadentType::Verbose),
+                "vv" => Some(MetadentType::VVerbose),
+                "vvv" => Some(MetadentType::VVVerbose),
+                _ => None,
+            })
+            .unwrap_or_else(|| (&th.metadent as &str).into());
+
         let res = Res::new_from_res(
             res_core,
             &input.board_key,
             created_at,
-            (&th.metadent as &str).into(),
+            metadent_type,
             client_info.clone(),
             input.authed_token_cookie,
             false,
         );
 
-        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let auth_service = BbsCgiAuthService::new(self.0.clone(), redis_conn.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
@@ -145,6 +161,7 @@ impl<
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
+                input.require_user_registration,
             )
             .await?;
 
@@ -158,7 +175,9 @@ impl<
             )
             .await?;
 
-        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+            && input.body.starts_with("!userreg")
+        {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });
@@ -362,6 +381,7 @@ pub struct ResCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
+    pub require_user_registration: bool,
 }
 
 pub struct ResCreationServiceOutput {

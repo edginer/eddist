@@ -10,7 +10,10 @@ use crate::{
         notice_repository::{CreateNoticeInput, UpdateNoticeInput},
         terms_repository::UpdateTermsInput,
     },
-    routes::{archives, auth_tokens, boards, captcha, moderation, notices, terms, threads, users},
+    routes::{
+        archives, auth_tokens, boards, captcha, idps, moderation, notices, server_settings, terms,
+        threads, users,
+    },
 };
 
 #[derive(OpenApi)]
@@ -64,6 +67,13 @@ use crate::{
         users::search_users,
         users::update_user_status,
 
+        // IdP routes
+        idps::list_idps,
+        idps::get_idp,
+        idps::create_idp,
+        idps::update_idp,
+        idps::delete_idp,
+
         // Notice routes
         notices::get_notices,
         notices::get_notice,
@@ -81,6 +91,10 @@ use crate::{
         captcha::create_captcha_config,
         captcha::update_captcha_config,
         captcha::delete_captcha_config,
+
+        // Server settings routes
+        server_settings::list_server_settings,
+        server_settings::upsert_server_setting,
 
         // Auth routes
         post_native_session,
@@ -131,6 +145,11 @@ use crate::{
         UserStatusUpdateInput,
         UserSearchQuery,
 
+        // IdP models
+        Idp,
+        CreateIdpInput,
+        UpdateIdpInput,
+
         // Notice models
         Notice,
         CreateNoticeInput,
@@ -139,6 +158,10 @@ use crate::{
         // Terms models
         Terms,
         UpdateTermsInput,
+
+        // Server settings models
+        ServerSetting,
+        UpsertServerSettingInput,
 
         // Captcha config models
         CaptchaConfig,

@@ -8,7 +8,10 @@ use crate::{
         service::bbscgi_user_reg_temp_url_service::USER_REG_TEMP_URL_LEN,
         user::user_reg_state::UserRegState,
     },
-    repositories::{idp_repository::IdpRepository, user_repository::UserRepository},
+    repositories::{
+        bbs_repository::BbsRepository, idp_repository::IdpRepository,
+        user_repository::UserRepository,
+    },
     utils::{
         redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
         TransactionRepository,
@@ -18,26 +21,33 @@ use crate::{
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserRegTempUrlService<I: IdpRepository, U: UserRepository> {
+pub struct UserRegTempUrlService<I: IdpRepository, U: UserRepository, B: BbsRepository> {
     idp_repo: I,
     user_repo: U,
+    bbs_repo: B,
     redis_conn: ConnectionManager,
 }
 
-impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserRegTempUrlService<I, U> {
-    pub fn new(idp_repo: I, user_repo: U, redis_conn: ConnectionManager) -> Self {
+impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
+    UserRegTempUrlService<I, U, B>
+{
+    pub fn new(idp_repo: I, user_repo: U, bbs_repo: B, redis_conn: ConnectionManager) -> Self {
         Self {
             idp_repo,
             user_repo,
+            bbs_repo,
             redis_conn,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<I: IdpRepository + Clone, U: UserRepository + Clone + TransactionRepository<MySql>>
-    AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
-    for UserRegTempUrlService<I, U>
+impl<
+        I: IdpRepository + Clone,
+        U: UserRepository + Clone + TransactionRepository<MySql>,
+        B: BbsRepository + Clone,
+    > AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
+    for UserRegTempUrlService<I, U, B>
 {
     async fn execute(
         &self,
@@ -75,9 +85,16 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone + TransactionRepository
         }
 
         // TODO: non-existance url
-        let authed_token = redis_conn
+        let authed_token_id_str = redis_conn
             .get_del::<_, String>(user_reg_temp_url_register_key(&input.temp_url_path))
             .await?;
+
+        let authed_token_id: Uuid = authed_token_id_str.parse()?;
+        let authed_token_record = self
+            .bbs_repo
+            .get_authed_token_by_id(authed_token_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("authed token not found"))?;
 
         let idps = self.idp_repo.get_idps().await?;
         let available_idps = idps
@@ -96,7 +113,8 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone + TransactionRepository
 
         let state_cookie = Uuid::now_v7().to_string();
         let user_reg_state = UserRegState {
-            authed_token,
+            authed_token: authed_token_id_str,
+            edge_token: Some(authed_token_record.token),
             ..UserRegState::default()
         };
 

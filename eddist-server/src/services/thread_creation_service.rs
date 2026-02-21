@@ -4,7 +4,7 @@ use chrono::Utc;
 use eddist_core::{
     domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker},
     simple_rate_limiter::RateLimiter,
-    utils::{is_thread_pub_enabled, is_user_registration_enabled},
+    utils::is_thread_pub_enabled,
 };
 use metrics::counter;
 use redis::{aio::ConnectionManager, Cmd};
@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -37,7 +38,10 @@ use crate::{
     utils::redis::thread_cache_key,
 };
 
-use super::BbsCgiService;
+use super::{
+    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    BbsCgiService,
+};
 
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
@@ -110,6 +114,16 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         (&res_core, &input.title as &str).validate_content_length(&board_info)?;
         client_info.validate_client_info(&board_info, true)?;
 
+        let force_metadent = board_info
+            .force_metadent_type
+            .as_deref()
+            .and_then(|s| match s {
+                "v" => Some(MetadentType::Verbose),
+                "vv" => Some(MetadentType::VVerbose),
+                "vvv" => Some(MetadentType::VVVerbose),
+                _ => None,
+            });
+
         let res = Res::new_from_thread(
             res_core,
             &input.board_key,
@@ -117,9 +131,10 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             client_info.clone(),
             input.authed_token,
             false,
+            force_metadent,
         );
 
-        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let auth_service = BbsCgiAuthService::new(self.0.clone(), redis_conn.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
@@ -127,6 +142,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
+                input.require_user_registration,
             )
             .await?;
 
@@ -140,7 +156,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             )
             .await?;
 
-        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+            && input.body.starts_with("!userreg")
+        {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });
@@ -295,6 +313,7 @@ pub struct TheradCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
+    pub require_user_registration: bool,
 }
 
 pub struct ThreadCreationServiceOutput {

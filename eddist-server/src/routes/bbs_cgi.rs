@@ -12,6 +12,7 @@ use crate::{
     error::{BbsCgiError, InsufficientParamType, InvalidParamType},
     services::{
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
+        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
         thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
         BbsCgiService,
     },
@@ -92,6 +93,9 @@ pub async fn post_bbs_cgi(
         resp
     }
 
+    let require_user_registration =
+        get_server_setting_bool(ServerSettingKey::RequireIdpLinking).await;
+
     let (tinker, res_order) = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
@@ -110,6 +114,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
+                require_user_registration,
             })
             .await
         {
@@ -140,6 +145,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
+                require_user_registration,
             })
             .await
         {

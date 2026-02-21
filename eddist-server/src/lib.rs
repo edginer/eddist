@@ -65,6 +65,9 @@ use uuid::Uuid;
 
 use crate::repositories::notice_repository::NoticeRepositoryImpl;
 use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
+use crate::services::server_settings_cache::{
+    refresh_server_settings_cache, start_server_settings_refresh_task,
+};
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -98,7 +101,9 @@ pub fn create_test_app(
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
 
+    let _ = refresh_server_settings_cache(&pool);
     start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
+    start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
 
     let app_state = AppState {
         services: AppServiceContainer::new(

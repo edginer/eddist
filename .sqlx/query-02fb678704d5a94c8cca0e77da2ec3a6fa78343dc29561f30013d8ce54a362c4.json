@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                UPDATE idps\n                SET idp_display_name = ?, idp_logo_svg = ?, oidc_config_url = ?, client_id = ?, enabled = ?\n                WHERE id = ?\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "02fb678704d5a94c8cca0e77da2ec3a6fa78343dc29561f30013d8ce54a362c4"
+}

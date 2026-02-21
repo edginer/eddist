@@ -152,7 +152,8 @@ impl BbsRepository for BbsRepositoryImpl {
             threads_archive_trigger_thread_count,
             created_at,
             updated_at,
-            read_only AS "read_only: bool"
+            read_only AS "read_only: bool",
+            force_metadent_type
         FROM boards_info
         WHERE id = ?
         "#,
@@ -265,6 +266,7 @@ impl BbsRepository for BbsRepositoryImpl {
                     at.validity AS "validity: bool",
                     at.last_wrote_at AS last_wrote_at,
                     at.author_id_seed AS author_id_seed,
+                    at.require_user_registration AS "require_user_registration: bool",
                     at.registered_user_id AS "registered_user_id?: Uuid"
                 FROM
                     threads AS t
@@ -314,6 +316,7 @@ impl BbsRepository for BbsRepositoryImpl {
                         validity: x.validity,
                         last_wrote_at: x.last_wrote_at.map(|dt| Utc.from_utc_datetime(&dt)),
                         author_id_seed: x.author_id_seed,
+                        require_user_registration: x.require_user_registration,
                         registered_user_id: x.registered_user_id,
                     },
                 )
@@ -403,6 +406,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 validity,
                 last_wrote_at,
                 author_id_seed,
+                require_user_registration,
                 registered_user_id
             FROM authed_tokens WHERE token = ?"#,
             token
@@ -424,6 +428,7 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
@@ -445,6 +450,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 validity,
                 last_wrote_at,
                 author_id_seed,
+                require_user_registration,
                 registered_user_id
             FROM authed_tokens WHERE id = ?"#,
             id.as_bytes().to_vec()
@@ -466,6 +472,7 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
@@ -491,6 +498,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 validity,
                 last_wrote_at,
                 author_id_seed,
+                require_user_registration,
                 registered_user_id
             FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
             reduced_ip,
@@ -513,6 +521,7 @@ impl BbsRepository for BbsRepositoryImpl {
             validity: x.validity != 0,
             last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: x.author_id_seed,
+            require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
         }))
     }
@@ -537,6 +546,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 validity,
                 last_wrote_at,
                 author_id_seed,
+                require_user_registration,
                 registered_user_id
             FROM authed_tokens WHERE auth_code = ? AND validity = false"#,
             auth_code
@@ -560,6 +570,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 validity: x.validity != 0,
                 last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
                 author_id_seed: x.author_id_seed,
+                require_user_registration: x.require_user_registration != 0,
                 registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
             })
             .collect())
@@ -748,9 +759,10 @@ impl BbsRepository for BbsRepositoryImpl {
                     auth_code,
                     created_at,
                     validity,
-                    author_id_seed
+                    author_id_seed,
+                    require_user_registration
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             authed_token.id.as_bytes().to_vec(),
             authed_token.token,
             ip_addr,
@@ -761,6 +773,7 @@ impl BbsRepository for BbsRepositoryImpl {
             authed_token.created_at,
             false,
             authed_token.author_id_seed,
+            authed_token.require_user_registration,
         );
 
         query.execute(&self.pool).await?;
@@ -944,6 +957,7 @@ struct SelectionThreadWithMetadent {
     validity: bool,
     last_wrote_at: Option<NaiveDateTime>,
     author_id_seed: Vec<u8>,
+    require_user_registration: bool,
     registered_user_id: Option<Uuid>,
 }
 
@@ -972,6 +986,7 @@ struct SelectionAuthedToken {
     validity: i8, // TINYINT
     last_wrote_at: Option<NaiveDateTime>,
     author_id_seed: Vec<u8>,
+    require_user_registration: i8, // TINYINT
     registered_user_id: Option<Vec<u8>>,
 }
 
@@ -1015,4 +1030,5 @@ pub struct CreatingAuthedToken {
     pub auth_code: String,
     pub created_at: DateTime<Utc>,
     pub author_id_seed: Vec<u8>,
+    pub require_user_registration: bool,
 }
