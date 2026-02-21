@@ -12,8 +12,6 @@ use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
 use user_authz_idp_callback_service::UserAuthzIdpCallbackService;
-use user_link_idp_redirection_service::UserLinkIdpRedirectionService;
-use user_link_idp_selection_service::UserLinkIdpSelectionService;
 use user_login_idp_redirection_service::UserLoginIdpRedirectionService;
 use user_login_page_service::UserLoginPageService;
 use user_logout_service::UserLogoutService;
@@ -46,8 +44,6 @@ pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;
 pub(crate) mod user_authz_idp_callback_service;
-pub(crate) mod user_link_idp_redirection_service;
-pub(crate) mod user_link_idp_selection_service;
 pub(crate) mod user_login_idp_redirection_service;
 pub(crate) mod user_login_page_service;
 pub(crate) mod user_logout_service;
@@ -87,14 +83,12 @@ pub struct AppServiceContainer<
     thread_retrival: ThreadRetrievalService<B>,
     kako_thread_retrieval: KakoThreadRetrievalService,
 
-    user_reg_temp_url: UserRegTempUrlService<I, U>,
+    user_reg_temp_url: UserRegTempUrlService<I, U, B>,
     user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
     user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
     user_page: UserPageService<U>,
     user_login_page: UserLoginPageService<U, I>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
-    user_link_idp_selection: UserLinkIdpSelectionService<I, B>,
-    user_link_idp_redirection: UserLinkIdpRedirectionService<I>,
     user_logout: UserLogoutService,
     user_restriction: UserRestrictionService<R>,
     bind_token_to_user: BindTokenToUserService<U>,
@@ -144,6 +138,7 @@ impl<
             user_reg_temp_url: UserRegTempUrlService::new(
                 idp_repo.clone(),
                 user_repo.clone(),
+                bbs_repo,
                 redis_conn.clone(),
             ),
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
@@ -162,15 +157,6 @@ impl<
                 redis_conn.clone(),
             ),
             user_login_idp_redirection: UserLoginIdpRedirectionService::new(
-                idp_repo.clone(),
-                redis_conn.clone(),
-            ),
-            user_link_idp_selection: UserLinkIdpSelectionService::new(
-                idp_repo.clone(),
-                bbs_repo,
-                redis_conn.clone(),
-            ),
-            user_link_idp_redirection: UserLinkIdpRedirectionService::new(
                 idp_repo,
                 redis_conn.clone(),
             ),
@@ -226,7 +212,7 @@ impl<
         &self.kako_thread_retrieval
     }
 
-    pub fn user_reg_temp_url(&self) -> &UserRegTempUrlService<I, U> {
+    pub fn user_reg_temp_url(&self) -> &UserRegTempUrlService<I, U, B> {
         &self.user_reg_temp_url
     }
 
@@ -252,14 +238,6 @@ impl<
 
     pub fn user_login_idp_redirection(&self) -> &UserLoginIdpRedirectionService<I> {
         &self.user_login_idp_redirection
-    }
-
-    pub fn user_link_idp_selection(&self) -> &UserLinkIdpSelectionService<I, B> {
-        &self.user_link_idp_selection
-    }
-
-    pub fn user_link_idp_redirection(&self) -> &UserLinkIdpRedirectionService<I> {
-        &self.user_link_idp_redirection
     }
 
     pub fn user_restriction(&self) -> &UserRestrictionService<R> {

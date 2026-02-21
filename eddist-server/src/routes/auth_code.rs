@@ -118,7 +118,7 @@ pub async fn post_auth_code(
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
     let captcha_configs = get_cached_captcha_configs().await;
-    let (token, authed_token_id, rate_limit_token, ott) = match state
+    let (token, authed_token_id, rate_limit_token, user_reg_url) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -135,8 +135,8 @@ pub async fn post_auth_code(
             token,
             authed_token_id,
             rate_limit_token,
-            ott,
-        }) => (token, authed_token_id, rate_limit_token, ott),
+            user_reg_url,
+        }) => (token, authed_token_id, rate_limit_token, user_reg_url),
         Err(e) => {
             return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
                 Html(
@@ -183,7 +183,7 @@ pub async fn post_auth_code(
             "auth-code.post.success",
             &json!({
                 "token": token,
-                "ott": ott,
+                "user_reg_url": user_reg_url,
             }),
         )
         .unwrap();

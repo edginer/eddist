@@ -23,7 +23,7 @@ impl ServerSettingKey {
         match self {
             Self::EnableIdpLinking => "Enable the IdP account linking feature (true/false)",
             Self::RequireIdpLinking => {
-                "Require users to link an external IdP account before posting (true/false)"
+                "Require users to link an external IdP account before posting. Only applies to auth tokens issued after enabling this setting. (true/false)"
             }
         }
     }

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub mod idp;
-pub mod user_link_state;
 pub mod user_login_state;
 pub mod user_reg_state;
 

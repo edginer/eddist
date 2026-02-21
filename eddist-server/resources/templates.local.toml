@@ -30,9 +30,5 @@ name = "login-idp-selection.get"
 path = "eddist-server/resources/templates/login-idp-selection.get.hbs"
 
 [[template.templates]]
-name = "user-link-idp-selection.get"
-path = "eddist-server/resources/templates/user-link-idp-selection.get.hbs"
-
-[[template.templates]]
 name = "error-page.get"
 path = "eddist-server/resources/templates/error-page.get.hbs"

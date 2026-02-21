@@ -1,16 +1,16 @@
 use std::env;
 
 use chrono::Utc;
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::aio::ConnectionManager;
 
 use crate::{
-    domain::authed_token::AuthedToken,
+    domain::{
+        authed_token::AuthedToken,
+        service::bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
+    },
     error::BbsCgiError,
     repositories::bbs_repository::{BbsRepository, CreatingAuthedToken},
-    utils::{generate_onetime_token, redis::user_link_onetime_key},
 };
-
-const ONETIME_TOKEN_LEN: usize = 16;
 
 #[derive(Clone)]
 pub struct BbsCgiAuthService<T: BbsRepository> {
@@ -97,21 +97,16 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
 
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
-            let ott = generate_onetime_token(ONETIME_TOKEN_LEN);
-            let mut redis_conn = self.redis_conn.clone();
-            redis_conn
-                .set_ex::<_, _, ()>(
-                    user_link_onetime_key(&ott),
-                    authed_token.id.to_string(),
-                    60 * 3, // 3 minutes TTL
-                )
-                .await
-                .map_err(|e| BbsCgiError::Other(e.into()))?;
-
-            return Err(BbsCgiError::UserRegistrationRequired {
-                base_url: env::var("BASE_URL").unwrap(),
-                ott,
-            });
+            let user_reg_url_svc = UserRegTempUrlService::new(self.redis_conn.clone());
+            return match user_reg_url_svc
+                .create_userreg_temp_url(&authed_token)
+                .await?
+            {
+                UserRegUrlKind::Registered => Err(BbsCgiError::UserAlreadyRegistered),
+                UserRegUrlKind::NotRegistered(user_reg_url) => {
+                    Err(BbsCgiError::UserRegistrationRequired { url: user_reg_url })
+                }
+            };
         }
 
         Ok(authed_token)

@@ -13,9 +13,10 @@ use crate::{
         create_captcha_client, CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput,
     },
     repositories::bbs_repository::BbsRepository,
-    utils::{generate_onetime_token, redis::user_link_onetime_key},
+    utils::redis::user_reg_temp_url_register_key,
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
+use rand::{distr::Uniform, Rng};
 use uuid::Uuid;
 
 use super::{
@@ -23,7 +24,7 @@ use super::{
     AppService,
 };
 
-const ONETIME_TOKEN_LEN: usize = 16;
+const USER_REG_TEMP_URL_LEN: usize = 5;
 
 #[derive(Clone)]
 pub struct AuthWithCodeService<T: BbsRepository> {
@@ -214,18 +215,18 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         // Generate rate limiting token after successful authentication
         let rate_limit_token = Some(self.generate_rate_limit_token());
 
-        // Generate a one-time token for optional IdP linking if enabled
-        let ott = if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
-            let ott = generate_onetime_token(ONETIME_TOKEN_LEN);
+        // Generate a temp URL for optional IdP linking if enabled
+        let user_reg_url = if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
             let mut redis_conn = self.redis_conn.clone();
+            let temp_url_path = generate_random_string(USER_REG_TEMP_URL_LEN);
             redis_conn
                 .set_ex::<_, _, ()>(
-                    user_link_onetime_key(&ott),
+                    user_reg_temp_url_register_key(&temp_url_path),
                     token.id.to_string(),
                     60 * 3, // 3 minutes TTL
                 )
                 .await?;
-            Some(ott)
+            Some(format!("/user/register/{temp_url_path}"))
         } else {
             None
         };
@@ -234,7 +235,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             token: token.token,
             authed_token_id: token.id,
             rate_limit_token,
-            ott,
+            user_reg_url,
         })
     }
 }
@@ -252,6 +253,17 @@ pub struct AuthWithCodeServiceOutput {
     pub token: String,
     pub authed_token_id: Uuid,
     pub rate_limit_token: Option<String>,
-    /// One-time token for optional IdP linking (only set when IdP linking is enabled)
-    pub ott: Option<String>,
+    /// URL path for optional user registration/IdP linking (only set when IdP linking is enabled)
+    pub user_reg_url: Option<String>,
+}
+
+fn generate_random_string(len: usize) -> String {
+    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
+    (0..len)
+        .map(|_| {
+            let idx = rand::rng().sample(index_dist);
+            charset[idx] as char
+        })
+        .collect()
 }

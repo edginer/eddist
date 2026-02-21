@@ -20,7 +20,7 @@ const KNOWN_SETTINGS: SettingDefinition[] = [
     key: "user.require_idp_linking",
     label: "Require IdP Linking",
     description:
-      "Require users to link an external IdP account before posting.",
+      "Require users to link an external IdP account before posting. Only applies to auth tokens issued after enabling this setting.",
     type: "boolean",
   },
 ];

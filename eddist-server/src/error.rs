@@ -81,6 +81,9 @@ pub enum BbsCgiError {
     #[error("以下のURLを利用してユーザー登録を行ってください \n {url}")]
     UserRegTempUrl { url: String },
 
+    #[error("書き込むには外部アカウントとの連携が必要です。以下のURLからユーザー登録を行ってください \n {url}")]
+    UserRegistrationRequired { url: String },
+
     #[error("この端末は既にユーザー登録されています")]
     UserAlreadyRegistered,
 
@@ -89,9 +92,6 @@ pub enum BbsCgiError {
 
     #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
     EmailAuthenticatedUnsupportedUserAgent,
-
-    #[error("書き込むには外部アカウントとの連携が必要です。{base_url}/user/link?ott={ott} から連携を行ってください")]
-    UserRegistrationRequired { base_url: String, ott: String },
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -119,10 +119,10 @@ impl BbsCgiError {
             BbsCgiError::TmpCanNotCreateThread => StatusCode::OK,
             BbsCgiError::ReadOnlyBoard => StatusCode::OK,
             BbsCgiError::UserRegTempUrl { .. } => StatusCode::OK,
+            BbsCgiError::UserRegistrationRequired { .. } => StatusCode::OK,
             BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
-            BbsCgiError::UserRegistrationRequired { .. } => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -148,12 +148,12 @@ impl BbsCgiError {
             BbsCgiError::TmpCanNotCreateThread => "TmpCanNotCreateThread",
             BbsCgiError::ReadOnlyBoard => "ReadOnlyBoard",
             BbsCgiError::UserRegTempUrl { .. } => "UserRegTempUrl",
+            BbsCgiError::UserRegistrationRequired { .. } => "UserRegistrationRequired",
             BbsCgiError::UserAlreadyRegistered => "UserAlreadyRegistered",
             BbsCgiError::TooManyUserCreationAttempt => "TooManyUserCreationAttempt",
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => {
                 "EmailAuthenticatedUnsupportedUserAgent"
             }
-            BbsCgiError::UserRegistrationRequired { .. } => "UserRegistrationRequired",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

@@ -17,10 +17,6 @@ use crate::{
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
         },
-        user_link_idp_redirection_service::UserLinkIdpRedirectionServiceInput,
-        user_link_idp_selection_service::{
-            UserLinkIdpSelectionServiceInput, UserLinkIdpSelectionServiceOutput,
-        },
         user_login_idp_redirection_service::UserLoginIdpRedirectionServiceInput,
         user_login_page_service::{UserLoginPageServiceInput, UserLoginPageServiceOutput},
         user_logout_service::UserLogoutServiceInput,
@@ -47,11 +43,6 @@ pub fn user_routes() -> Router<AppState> {
         )
         .route("/logout", post(post_user_logout))
         .route("/auth/callback", get(get_user_authz_idp_callback))
-        .route("/link", get(get_user_link_idp_selection))
-        .route(
-            "/link/authz/idp/{idpName}",
-            get(get_user_link_redirect_to_idp_authz),
-        )
         .layer(axum::middleware::from_fn(
             |req, next: axum::middleware::Next| async move {
                 if !get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
@@ -362,17 +353,14 @@ async fn get_user_authz_idp_callback(
     let (state_cookie, callback_kind) = match (
         jar.get("userreg-state-id"),
         jar.get("user-login-state-id"),
-        jar.get("userlink-state-id"),
     ) {
-        (Some(reg_state_cookie), None, None) => (reg_state_cookie.value(), CallbackKind::Register),
-        (None, Some(login_state_cookie), None) => (login_state_cookie.value(), CallbackKind::Login),
-        (None, None, Some(link_state_cookie)) => (link_state_cookie.value(), CallbackKind::Link),
+        (Some(reg_state_cookie), None) => (reg_state_cookie.value(), CallbackKind::Register),
+        (None, Some(login_state_cookie)) => (login_state_cookie.value(), CallbackKind::Login),
         _ => {
             return Response::builder()
                 .status(400)
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
-                .header("Set-Cookie", reset_userlink_state_id_cookie().to_string())
                 .body(Body::from("Invalid state"))
                 .unwrap();
         }
@@ -411,7 +399,6 @@ async fn get_user_authz_idp_callback(
             return Response::builder()
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
-                .header("Set-Cookie", reset_userlink_state_id_cookie().to_string())
                 .status(400)
                 .body(Body::from("Failed to get user".to_string()))
                 .unwrap();
@@ -431,10 +418,9 @@ async fn get_user_authz_idp_callback(
         .header("Set-Cookie", user_sid_cookie.to_string())
         .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
         .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
-        .header("Set-Cookie", reset_userlink_state_id_cookie().to_string())
         .header("Location", "/user/");
 
-    // Set edge-token cookie if present (from Link flow)
+    // Set edge-token cookie if present (from Register flow)
     if let Some(edge_token) = edge_token {
         let edge_token_cookie = Cookie::build(("edge-token", edge_token))
             .path("/")
@@ -446,113 +432,6 @@ async fn get_user_authz_idp_callback(
     }
 
     response.body(Body::empty()).unwrap()
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct UserLinkQuery {
-    ott: String,
-}
-
-async fn get_user_link_idp_selection(
-    State(state): State<AppState>,
-    query: axum::extract::Query<UserLinkQuery>,
-) -> Response {
-    let svc = state.get_container().user_link_idp_selection();
-    let output = match svc
-        .execute(UserLinkIdpSelectionServiceInput {
-            ott: query.ott.clone(),
-        })
-        .await
-    {
-        Ok(o) => o,
-        Err(e) => {
-            log::error!("Failed to get link IdP selection: {e}");
-            return Response::builder()
-                .status(400)
-                .body(Body::from("Failed to start account linking"))
-                .unwrap();
-        }
-    };
-
-    match output {
-        UserLinkIdpSelectionServiceOutput::AlreadyLinked => Response::builder()
-            .status(302)
-            .header("Location", "/user/")
-            .body(Body::empty())
-            .unwrap(),
-        UserLinkIdpSelectionServiceOutput::NotLinked {
-            available_idps,
-            state_cookie,
-        } => {
-            let html = state
-                .template_engine
-                .render(
-                    "user-link-idp-selection.get",
-                    &json!({ "available_idps": available_idps }),
-                )
-                .unwrap();
-
-            let userlink_state_id_cookie = Cookie::build(("userlink-state-id", state_cookie))
-                .path("/")
-                .http_only(true)
-                .secure(true)
-                .max_age(time::Duration::seconds(60 * 3))
-                .build();
-
-            Response::builder()
-                .header("Set-Cookie", userlink_state_id_cookie.to_string())
-                .status(200)
-                .body(Body::from(html))
-                .unwrap()
-        }
-    }
-}
-
-async fn get_user_link_redirect_to_idp_authz(
-    State(state): State<AppState>,
-    Path(idp_name): Path<String>,
-    jar: CookieJar,
-) -> Response {
-    let Some(user_link_state_id) = jar
-        .get("userlink-state-id")
-        .map(|cookie| cookie.value().to_string())
-    else {
-        return Response::builder()
-            .status(400)
-            .body(Body::from("Link state session is not found"))
-            .unwrap();
-    };
-
-    let svc = state.get_container().user_link_idp_redirection();
-
-    let output = match svc
-        .execute(UserLinkIdpRedirectionServiceInput {
-            idp_name,
-            user_link_state_id,
-        })
-        .await
-    {
-        Ok(o) => o,
-        Err(e) if e.to_string().contains("user_link_state_id not found") => {
-            return Response::builder()
-                .header("Set-Cookie", reset_userlink_state_id_cookie().to_string())
-                .status(400)
-                .body(Body::from("Link state session is not found"))
-                .unwrap();
-        }
-        Err(_) => {
-            return Response::builder()
-                .status(400)
-                .body(Body::from("Failed to redirect to IDP"))
-                .unwrap();
-        }
-    };
-
-    Response::builder()
-        .status(302)
-        .header("Location", output.authz_url)
-        .body(Body::empty())
-        .unwrap()
 }
 
 fn reset_user_sid_cookie() -> Cookie<'static> {
@@ -582,11 +461,3 @@ fn reset_user_login_state_id_cookie() -> Cookie<'static> {
         .build()
 }
 
-fn reset_userlink_state_id_cookie() -> Cookie<'static> {
-    Cookie::build(("userlink-state-id", ""))
-        .path("/")
-        .http_only(true)
-        .secure(true)
-        .max_age(time::Duration::ZERO)
-        .build()
-}

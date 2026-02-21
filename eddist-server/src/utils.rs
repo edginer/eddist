@@ -61,34 +61,9 @@ pub(crate) mod redis {
         format!("userlogin:oauth2:authreq:{state_id}")
     }
 
-    pub fn user_link_onetime_key(key: &str) -> String {
-        format!("userlink:onetime:{key}")
-    }
-
-    pub fn user_link_oauth2_state_key(state_id: &str) -> String {
-        format!("userlink:oauth2:state:{state_id}")
-    }
-
-    pub fn user_link_oauth2_authreq_key(state_id: &str) -> String {
-        format!("userlink:oauth2:authreq:{state_id}")
-    }
-
     pub fn email_auth_used_key(token: &str) -> String {
         format!("resp:email_auth_used:{token}")
     }
-}
-
-pub fn generate_onetime_token(len: usize) -> String {
-    use rand::{distr::Uniform, Rng};
-
-    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
-    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
-    (0..len)
-        .map(|_| {
-            let idx = rand::rng().sample(index_dist);
-            charset[idx] as char
-        })
-        .collect()
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
