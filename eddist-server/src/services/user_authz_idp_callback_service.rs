@@ -15,9 +15,7 @@ use crate::{
         user_repository::{CreatingUser, UserRepository},
     },
     utils::{
-        redis::{
-            user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key,
-        },
+        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
         TransactionRepository,
     },
 };
@@ -96,8 +94,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let edge_token = user_reg_state.edge_token.clone();
         let authed_token_id = user_reg_state.authed_token.clone();
 
-        let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -183,8 +180,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
     ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -232,7 +228,6 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             None => Err(anyhow::anyhow!("user not found")),
         }
     }
-
 }
 
 pub struct UserAuthzIdpCallbackServiceInput {

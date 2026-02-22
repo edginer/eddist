@@ -17,6 +17,7 @@ import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
 import { NGContextMenu } from "../components/NGContextMenu";
 import type { Route } from "./+types/ThreadListPage";
 import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
@@ -47,7 +48,7 @@ const convertLinuxTimeToDateString = (linuxTime: number): string => {
 const calculateThreadSpeed = (
   threadId: number,
   responseCount: number,
-  currentTime: number
+  currentTime: number,
 ): number => {
   const threadCreationTime = threadId * 1000;
   let ageInDays: number;
@@ -62,15 +63,15 @@ const calculateThreadSpeed = (
 };
 
 export const loader = async ({ params, context }: Route.LoaderArgs) => {
-  const [threadList, boards] = await Promise.all([
-    fetchThreadList(params.boardKey!, {
-      baseUrl:
-        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
-    }),
-    fetchBoards({
-      baseUrl:
-        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
-    }),
+  const baseUrl =
+    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+
+  const [threadList, boards, clientConfig] = await Promise.all([
+    fetchThreadList(params.boardKey!, { baseUrl }),
+    fetchBoards({ baseUrl }),
+    fetchClientConfig({ baseUrl }).catch(() => ({
+      enable_user_registration: false,
+    })),
   ]);
 
   return {
@@ -79,7 +80,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     currentTime: Date.now(),
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
+      availableUserRegistration: clientConfig.enable_user_registration,
     },
   } satisfies {
     threadList: Thread[];
@@ -120,7 +121,7 @@ const ThreadListPage = ({
     {
       fallbackData: data,
       revalidateOnMount: false,
-    }
+    },
   );
 
   const [creatingThread, setCreatingThread] = useState(false);
@@ -133,10 +134,10 @@ const ThreadListPage = ({
   const { shouldFilterThread } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(
-    null
+    null,
   );
   const [selectedTitleText, setSelectedTitleText] = useState<string | null>(
-    null
+    null,
   );
   const capturedSelectionRef = useRef<string | null>(null);
 
@@ -210,7 +211,9 @@ const ThreadListPage = ({
         <div
           className="fixed top-16 left-0 right-0 z-40 flex justify-center items-center transition-all duration-200"
           style={{
-            paddingTop: isPullRefreshing ? "16px" : `${Math.min(pullDistance / 2, 40)}px`,
+            paddingTop: isPullRefreshing
+              ? "16px"
+              : `${Math.min(pullDistance / 2, 40)}px`,
           }}
         >
           <div
@@ -225,7 +228,7 @@ const ThreadListPage = ({
             <FaSync
               className={twMerge(
                 "text-blue-600 text-lg",
-                isPullRefreshing && "animate-spin"
+                isPullRefreshing && "animate-spin",
               )}
             />
           </div>
@@ -242,7 +245,7 @@ const ThreadListPage = ({
           boardName={
             boards?.find(
               (board: { board_key: string }) =>
-                board.board_key === params.boardKey
+                board.board_key === params.boardKey,
             )?.name ?? "スレッド一覧"
           }
         />
@@ -253,7 +256,7 @@ const ThreadListPage = ({
           {
             boards?.find(
               (board: { board_key: string }) =>
-                board.board_key === params.boardKey
+                board.board_key === params.boardKey,
             )?.name
           }
         </h1>
@@ -267,7 +270,7 @@ const ThreadListPage = ({
           <FaSync
             className={twMerge(
               "w-4 h-4",
-              (isRefreshing || isPullRefreshing) && "animate-spin"
+              (isRefreshing || isPullRefreshing) && "animate-spin",
             )}
           />
         </button>
@@ -286,7 +289,7 @@ const ThreadListPage = ({
             "px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border transition-colors flex items-center gap-1.5",
             sortKey
               ? "bg-blue-600 text-white border-blue-600"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
           )}
         >
           <FaSort className="w-4 h-4" />
@@ -296,10 +299,10 @@ const ThreadListPage = ({
                   sortKey === "responseCount"
                     ? "レス数"
                     : sortKey === "speed"
-                    ? "勢い"
-                    : sortKey === "creationTime"
-                    ? "作成"
-                    : "更新"
+                      ? "勢い"
+                      : sortKey === "creationTime"
+                        ? "作成"
+                        : "更新"
                 }${sortOrder === "asc" ? "↑" : "↓"}`
               : "ソート順"}
           </span>
@@ -308,7 +311,7 @@ const ThreadListPage = ({
           onClick={() => setCreatingThread(true)}
           className={twMerge(
             "px-4 py-2 lg:px-6 lg:py-3 mx-2",
-            params.boardKey || "hidden"
+            params.boardKey || "hidden",
           )}
         >
           <FaPen className="lg:mr-3" />
@@ -337,7 +340,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "lastUpdated"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
             )}
           >
             <span>更新日時</span>
@@ -352,7 +355,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "responseCount"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
             )}
           >
             <span>レス数</span>
@@ -367,7 +370,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "speed"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
             )}
           >
             <span>勢い</span>
@@ -382,7 +385,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "creationTime"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
             )}
           >
             <span>作成日時</span>
@@ -425,7 +428,7 @@ const ThreadListPage = ({
                 if (e.button === 2) {
                   // Right mouse button
                   capturedSelectionRef.current = getSelectedTextInElement(
-                    e.currentTarget
+                    e.currentTarget,
                   );
                 }
               }}
@@ -460,7 +463,7 @@ const ThreadListPage = ({
                   {calculateThreadSpeed(
                     thread.id,
                     thread.responseCount,
-                    currentTime
+                    currentTime,
                   )}
                   /day
                 </span>

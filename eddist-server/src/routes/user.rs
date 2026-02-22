@@ -350,21 +350,19 @@ async fn get_user_authz_idp_callback(
     jar: CookieJar,
     query: axum::extract::Query<AuthzIdpCallbackQuery>,
 ) -> Response {
-    let (state_cookie, callback_kind) = match (
-        jar.get("userreg-state-id"),
-        jar.get("user-login-state-id"),
-    ) {
-        (Some(reg_state_cookie), None) => (reg_state_cookie.value(), CallbackKind::Register),
-        (None, Some(login_state_cookie)) => (login_state_cookie.value(), CallbackKind::Login),
-        _ => {
-            return Response::builder()
-                .status(400)
-                .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
-                .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
-                .body(Body::from("Invalid state"))
-                .unwrap();
-        }
-    };
+    let (state_cookie, callback_kind) =
+        match (jar.get("userreg-state-id"), jar.get("user-login-state-id")) {
+            (Some(reg_state_cookie), None) => (reg_state_cookie.value(), CallbackKind::Register),
+            (None, Some(login_state_cookie)) => (login_state_cookie.value(), CallbackKind::Login),
+            _ => {
+                return Response::builder()
+                    .status(400)
+                    .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
+                    .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
+                    .body(Body::from("Invalid state"))
+                    .unwrap();
+            }
+        };
 
     if state_cookie != query.state {
         return Response::builder()
@@ -460,4 +458,3 @@ fn reset_user_login_state_id_cookie() -> Cookie<'static> {
         .max_age(time::Duration::ZERO)
         .build()
 }
-
