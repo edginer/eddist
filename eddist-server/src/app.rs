@@ -19,7 +19,6 @@ use tracing::{info_span, Span};
 
 use crate::{
     middleware::user_restriction::user_restriction_middleware,
-    services::server_settings_cache::{get_server_setting_bool, ServerSettingKey},
     repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
@@ -38,6 +37,7 @@ use crate::{
         terms::get_terms,
         user::user_routes,
     },
+    services::server_settings_cache::{get_server_setting_bool, ServerSettingKey},
     services::{
         board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         AppService, AppServiceContainer,

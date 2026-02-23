@@ -315,13 +315,25 @@ impl Res<AuthorIdUninitialized> {
         retrieved_cap_name: Option<String>,
     ) -> Res<AuthorIdInitialized> {
         let author_id = if retrieved_cap_name.is_none() {
-            get_author_id_with_device_info(
-                &self.board_key,
-                self.created_at,
-                &authed_token.author_id_seed,
-                Some(&authed_token.writing_ua),
-                &authed_token.reduced_ip,
-            )
+            if authed_token.registered_user_id.is_some() {
+                // For user-linked tokens, use a stable ID with no device suffix
+                get_author_id_by_seed(
+                    &self.board_key,
+                    self.created_at,
+                    &authed_token.author_id_seed,
+                )
+                .chars()
+                .take(AUTHOR_ID_LENGTH)
+                .collect()
+            } else {
+                get_author_id_with_device_info(
+                    &self.board_key,
+                    self.created_at,
+                    &authed_token.author_id_seed,
+                    Some(&authed_token.writing_ua),
+                    &authed_token.reduced_ip,
+                )
+            }
         } else {
             "????".to_string()
         };
@@ -417,6 +429,7 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
+pub const AUTHOR_ID_LENGTH: usize = 9;
 pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 1;
 
 // Character set for ID generation (base64-like encoding)
@@ -515,7 +528,7 @@ pub fn get_author_id_with_device_info(
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
     generate_id_with_device_suffix(
         &base_id,
-        9,
+        AUTHOR_ID_LENGTH,
         None,
         Some(reduced_ip),
         Some(generate_date_seed(

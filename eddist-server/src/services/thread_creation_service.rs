@@ -298,7 +298,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         counter!("response_creation", "board_key" => board_key.clone()).increment(1);
         counter!("thread_creation", "board_key" => board_key.clone()).increment(1);
 
-        Ok(ThreadCreationServiceOutput { tinker })
+        Ok(ThreadCreationServiceOutput {
+            tinker,
+            authed_token_id: authed_token.id,
+            is_authed_token_bound: authed_token.registered_user_id.is_some(),
+        })
     }
 }
 
@@ -318,6 +322,8 @@ pub struct TheradCreationServiceInput {
 
 pub struct ThreadCreationServiceOutput {
     pub tinker: Tinker,
+    pub authed_token_id: Uuid,
+    pub is_authed_token_bound: bool,
 }
 
 pub fn sanitize_thread_name(name: &str) -> String {

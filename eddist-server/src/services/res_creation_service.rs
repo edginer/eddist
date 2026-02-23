@@ -366,7 +366,12 @@ impl<
 
         let res_order = if order <= 2000 { Some(order) } else { None };
 
-        Ok(ResCreationServiceOutput { tinker, res_order })
+        Ok(ResCreationServiceOutput {
+            tinker,
+            res_order,
+            authed_token_id: authed_token.id,
+            is_authed_token_bound: authed_token.registered_user_id.is_some(),
+        })
     }
 }
 
@@ -387,4 +392,6 @@ pub struct ResCreationServiceInput {
 pub struct ResCreationServiceOutput {
     pub tinker: Tinker,
     pub res_order: Option<i32>,
+    pub authed_token_id: Uuid,
+    pub is_authed_token_bound: bool,
 }

@@ -85,7 +85,7 @@ pub struct AppServiceContainer<
 
     user_reg_temp_url: UserRegTempUrlService<I, U, B>,
     user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
-    user_authz_idp_callback: UserAuthzIdpCallbackService<I, U>,
+    user_authz_idp_callback: UserAuthzIdpCallbackService<I, U, B>,
     user_page: UserPageService<U>,
     user_login_page: UserLoginPageService<U, I>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
@@ -138,7 +138,7 @@ impl<
             user_reg_temp_url: UserRegTempUrlService::new(
                 idp_repo.clone(),
                 user_repo.clone(),
-                bbs_repo,
+                bbs_repo.clone(),
                 redis_conn.clone(),
             ),
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
@@ -148,6 +148,7 @@ impl<
             user_authz_idp_callback: UserAuthzIdpCallbackService::new(
                 idp_repo.clone(),
                 user_repo.clone(),
+                bbs_repo,
                 redis_conn.clone(),
             ),
             user_page: UserPageService::new(user_repo.clone(), redis_conn.clone()),
@@ -220,7 +221,7 @@ impl<
         &self.user_reg_idp_redirection
     }
 
-    pub fn user_authz_idp_callback(&self) -> &UserAuthzIdpCallbackService<I, U> {
+    pub fn user_authz_idp_callback(&self) -> &UserAuthzIdpCallbackService<I, U, B> {
         &self.user_authz_idp_callback
     }
 

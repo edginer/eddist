@@ -371,6 +371,8 @@ async fn get_user_authz_idp_callback(
             .unwrap();
     }
 
+    let browser_edge_token = jar.get("edge-token").map(|c| c.value().to_string());
+
     let (user_sid, edge_token) = match state
         .services
         .user_authz_idp_callback()
@@ -378,6 +380,7 @@ async fn get_user_authz_idp_callback(
             code: query.code.clone(),
             state_id: state_cookie.to_string(),
             callback_kind,
+            browser_edge_token,
         })
         .await
     {

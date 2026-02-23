@@ -11,10 +11,11 @@ use jsonwebtoken::EncodingKey;
 use crate::{
     error::{BbsCgiError, InsufficientParamType, InvalidParamType},
     services::{
+        bind_token_to_user_service::BindTokenToUserServiceInput,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         server_settings_cache::{get_server_setting_bool, ServerSettingKey},
         thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
-        BbsCgiService,
+        AppService, BbsCgiService,
     },
     shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType},
     utils::{get_asn_num, get_origin_ip, get_tinker, get_ua},
@@ -46,7 +47,22 @@ pub async fn post_bbs_cgi(
     let tinker = jar
         .get("tinker-token")
         .and_then(|x| get_tinker(x.value(), state.tinker_secret()));
-    let edge_token = jar.get("edge-token").map(|x| x.value().to_string());
+    let user_sid = jar.get("user-sid").map(|x| x.value().to_string());
+    let mut edge_token = jar.get("edge-token").map(|x| x.value().to_string());
+
+    // If the user is logged in but has no edge-token, restore it from the linked tokens
+    if edge_token.is_none() {
+        if let Some(ref sid) = user_sid {
+            if let Ok(Some(restored)) = state
+                .services
+                .bind_token_to_user()
+                .restore_user_authed_token(sid)
+                .await
+            {
+                edge_token = Some(restored);
+            }
+        }
+    }
 
     let Some(board_key) = form.get("bbs").map(|x| x.to_string()) else {
         return BbsCgiError::from(InsufficientParamType::Bbs).into_response();
@@ -96,13 +112,13 @@ pub async fn post_bbs_cgi(
     let require_user_registration =
         get_server_setting_bool(ServerSettingKey::RequireIdpLinking).await;
 
-    let (tinker, res_order) = if is_thread {
+    let (tinker, res_order, authed_token_id, is_authed_token_bound) = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
         };
 
         let svc = state.services.thread_creation();
-        let tinker = match svc
+        let (tinker, authed_token_id, is_authed_token_bound) = match svc
             .execute(TheradCreationServiceInput {
                 board_key,
                 title,
@@ -118,12 +134,16 @@ pub async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(ThreadCreationServiceOutput { tinker }) => tinker,
+            Ok(ThreadCreationServiceOutput {
+                tinker,
+                authed_token_id,
+                is_authed_token_bound,
+            }) => (tinker, authed_token_id, is_authed_token_bound),
             Err(e) => {
                 return on_error(e, true);
             }
         };
-        (tinker, None)
+        (tinker, None, authed_token_id, is_authed_token_bound)
     } else {
         let Some(thread_number) = form.get("key").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Key).into_response();
@@ -149,12 +169,32 @@ pub async fn post_bbs_cgi(
             })
             .await
         {
-            Ok(ResCreationServiceOutput { tinker, res_order }) => (tinker, res_order),
+            Ok(ResCreationServiceOutput {
+                tinker,
+                res_order,
+                authed_token_id,
+                is_authed_token_bound,
+            }) => (tinker, res_order, authed_token_id, is_authed_token_bound),
             Err(e) => {
                 return on_error(e, false);
             }
         }
     };
+
+    // Fire-and-forget: bind the token to the user if logged in and not yet bound
+    if !is_authed_token_bound {
+        if let Some(sid) = user_sid {
+            let bind_svc = state.services.bind_token_to_user().clone();
+            tokio::spawn(async move {
+                let _ = bind_svc
+                    .execute(BindTokenToUserServiceInput {
+                        user_sid: sid,
+                        authed_token_id,
+                    })
+                    .await;
+            });
+        }
+    }
 
     let mut response = SJisResponseBuilder::new(SJisStr::from(
         r#"<html><!-- 2ch_X:true -->
