@@ -3,6 +3,11 @@ name = "eddist"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
@@ -64,6 +69,7 @@ openidconnect.workspace = true
 url.workspace = true
 chacha20poly1305.workspace = true
 toml.workspace = true
+mimalloc = { workspace = true }
 
 [dev-dependencies]
 testcontainers.workspace = true

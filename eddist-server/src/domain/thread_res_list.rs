@@ -10,14 +10,11 @@ pub struct ThreadResList {
 
 impl ThreadResList {
     pub fn get_sjis_thread_res_list(&self, default_name: &str) -> Vec<u8> {
-        let text = self
-            .get_sjis_list_inner(default_name)
-            .fold(Vec::new(), |mut cur, mut next| {
-                cur.append(&mut next);
-                cur
-            });
-
-        text
+        let mut result = Vec::with_capacity(self.res_list.len() * 200);
+        for chunk in self.get_sjis_list_inner(default_name) {
+            result.extend_from_slice(&chunk);
+        }
+        result
     }
 
     pub fn get_sjis_list_thread_res_list(&self, default_name: &str) -> Vec<Vec<u8>> {
