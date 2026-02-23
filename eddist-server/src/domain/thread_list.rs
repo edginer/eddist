@@ -11,20 +11,15 @@ pub struct ThreadList {
 
 impl ThreadList {
     pub fn get_sjis_thread_list(&self) -> Vec<u8> {
-        let text = self
-            .thread_list
-            .iter()
-            .map(|x| {
-                format!(
-                    "{}.dat<>{} ({})\n",
-                    x.thread_number, x.title, x.response_count
-                )
-            })
-            .fold(String::new(), |mut cur, next| {
-                cur.push_str(&next);
-                cur
-            });
-
+        use std::fmt::Write;
+        let mut text = String::with_capacity(self.thread_list.len() * 100);
+        for thread in &self.thread_list {
+            let _ = writeln!(
+                text,
+                "{}.dat<>{} ({})",
+                thread.thread_number, thread.title, thread.response_count
+            );
+        }
         SHIFT_JIS.encode(&text).0.to_vec()
     }
 }
@@ -37,20 +32,15 @@ pub struct ThreadListWithMetadent {
 
 impl ThreadListWithMetadent {
     pub fn get_sjis_thread_list(&self) -> Vec<u8> {
-        let text = self
-            .thread_list
-            .iter()
-            .map(|(x, metadent)| {
-                format!(
-                    "{}.dat<>{} [{}★] ({})\n",
-                    x.thread_number, x.title, metadent, x.response_count
-                )
-            })
-            .fold(String::new(), |mut cur, next| {
-                cur.push_str(&next);
-                cur
-            });
-
+        use std::fmt::Write;
+        let mut text = String::with_capacity(self.thread_list.len() * 120);
+        for (thread, metadent) in &self.thread_list {
+            let _ = writeln!(
+                text,
+                "{}.dat<>{} [{}★] ({})",
+                thread.thread_number, thread.title, metadent, thread.response_count
+            );
+        }
         SHIFT_JIS.encode(&text).0.to_vec()
     }
 }
