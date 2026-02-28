@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        metadent::MetadentType,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -127,11 +128,22 @@ impl<
         res_core.validate_content_length(&board_info)?;
         client_info.validate_client_info(&board_info, false)?;
 
+        let metadent_type = board_info
+            .force_metadent_type
+            .as_deref()
+            .and_then(|s| match s {
+                "v" => Some(MetadentType::Verbose),
+                "vv" => Some(MetadentType::VVerbose),
+                "vvv" => Some(MetadentType::VVVerbose),
+                _ => None,
+            })
+            .unwrap_or_else(|| (&th.metadent as &str).into());
+
         let res = Res::new_from_res(
             res_core,
             &input.board_key,
             created_at,
-            (&th.metadent as &str).into(),
+            metadent_type,
             client_info.clone(),
             input.authed_token_cookie,
             false,

@@ -152,7 +152,8 @@ impl BbsRepository for BbsRepositoryImpl {
             threads_archive_trigger_thread_count,
             created_at,
             updated_at,
-            read_only AS "read_only: bool"
+            read_only AS "read_only: bool",
+            force_metadent_type
         FROM boards_info
         WHERE id = ?
         "#,

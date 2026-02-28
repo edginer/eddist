@@ -27,6 +27,7 @@ pub struct SelectionBoardInfo {
     pub threads_archive_trigger_thread_count: Option<i32>,
     pub threads_archive_cron: Option<String>,
     pub read_only: bool,
+    pub force_metadent_type: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
