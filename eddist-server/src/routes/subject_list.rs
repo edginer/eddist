@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
+use http::HeaderMap;
 
 use crate::{
     services::{thread_list_service::BoardKey, AppService},
@@ -13,6 +14,7 @@ use crate::{
 
 pub async fn get_subject_txt(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(board_key): Path<String>,
 ) -> impl IntoResponse {
     if validate_board_key(&board_key).is_err() {
@@ -32,16 +34,23 @@ pub async fn get_subject_txt(
         }
     };
 
+    let if_none_match = headers
+        .get("If-None-Match")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
         .content_type(SjisContentType::TextPlain)
         .client_ttl(5)
         .server_ttl(1)
+        .if_none_match(if_none_match)
         .build()
         .into_response()
 }
 
 pub async fn get_subject_txt_with_metadent(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(board_key): Path<String>,
 ) -> impl IntoResponse {
     if validate_board_key(&board_key).is_err() {
@@ -66,10 +75,16 @@ pub async fn get_subject_txt_with_metadent(
         }
     };
 
+    let if_none_match = headers
+        .get("If-None-Match")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
         .content_type(SjisContentType::TextPlain)
         .client_ttl(5)
         .server_ttl(1)
+        .if_none_match(if_none_match)
         .build()
         .into_response()
 }
