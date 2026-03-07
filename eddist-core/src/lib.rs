@@ -13,6 +13,7 @@ pub mod domain {
 }
 
 pub mod cache_aside;
+pub mod server_settings;
 pub mod simple_rate_limiter;
 pub mod tracing;
 pub mod utils;

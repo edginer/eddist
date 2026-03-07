@@ -10,12 +10,12 @@ use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 use http::{HeaderMap, StatusCode};
 
 use crate::{
+    AppState,
     services::{
-        kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
-        thread_retrieval_service::ThreadRetrievalServiceInput, AppService,
+        AppService, kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
+        thread_retrieval_service::ThreadRetrievalServiceInput,
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
-    AppState,
 };
 
 pub async fn get_dat_txt(
@@ -98,10 +98,20 @@ pub async fn get_dat_txt(
         _ => (result.raw(), false),
     };
 
+    let if_none_match = if !is_partial {
+        headers
+            .get("If-None-Match")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+    } else {
+        None
+    };
+
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
         .content_type(SjisContentType::TextPlain)
         .client_ttl(5)
         .server_ttl(1)
+        .if_none_match(if_none_match)
         .status_code(if is_partial {
             StatusCode::PARTIAL_CONTENT
         } else {
@@ -113,6 +123,7 @@ pub async fn get_dat_txt(
 
 pub async fn get_kako_dat_txt(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path((board_key, _, _, thread_id_with_dat)): Path<(String, String, String, String)>,
 ) -> Response {
     if thread_id_with_dat.len() != 14 {
@@ -148,9 +159,15 @@ pub async fn get_kako_dat_txt(
         SJisStr::from_unchecked_vec(result)
     };
 
+    let if_none_match = headers
+        .get("If-None-Match")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
     SJisResponseBuilder::new(sjis_str)
         .content_type(SjisContentType::TextPlain)
         .server_ttl(3600)
+        .if_none_match(if_none_match)
         .build()
         .into_response()
 }

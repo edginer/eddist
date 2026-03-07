@@ -357,6 +357,38 @@ export interface paths {
         patch: operations["update_captcha_config"];
         trace?: never;
     };
+    "/idps/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_idps"];
+        put?: never;
+        post: operations["create_idp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/idps/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_idp"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_idp"];
+        options?: never;
+        head?: never;
+        patch: operations["update_idp"];
+        trace?: never;
+    };
     "/ng_words/": {
         parameters: {
             query?: never;
@@ -451,6 +483,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["update_restriction_rule"];
+        trace?: never;
+    };
+    "/server-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_server_settings"];
+        put: operations["upsert_server_setting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/terms/": {
@@ -570,6 +618,7 @@ export interface components {
         BoardInfo: {
             base_response_creation_span_sec: number;
             base_thread_creation_span_sec: number;
+            force_metadent_type?: string | null;
             local_rules: string;
             max_author_name_byte_length: number;
             max_email_byte_length: number;
@@ -643,6 +692,7 @@ export interface components {
             base_thread_creation_span_sec?: number | null;
             board_key: string;
             default_name: string;
+            force_metadent_type?: string | null;
             local_rule: string;
             max_author_name_byte_length?: number | null;
             max_email_byte_length?: number | null;
@@ -666,6 +716,15 @@ export interface components {
             site_key: string;
             verification?: null | components["schemas"]["CaptchaVerificationConfig"];
             widget?: null | components["schemas"]["CaptchaWidgetConfig"];
+        };
+        CreateIdpInput: {
+            client_id: string;
+            client_secret: string;
+            enabled: boolean;
+            idp_display_name: string;
+            idp_logo_svg?: string | null;
+            idp_name: string;
+            oidc_config_url: string;
         };
         CreateNoticeInput: {
             content: string;
@@ -697,6 +756,7 @@ export interface components {
             base_response_creation_span_sec?: number | null;
             base_thread_creation_span_sec?: number | null;
             default_name?: string | null;
+            force_metadent_type?: string | null;
             local_rule?: string | null;
             max_author_name_byte_length?: number | null;
             max_email_byte_length?: number | null;
@@ -713,6 +773,17 @@ export interface components {
          * @enum {string}
          */
         HttpMethod: "Post" | "Get";
+        /** @description IdP model for API responses (client_secret is never exposed) */
+        Idp: {
+            client_id: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            idp_display_name: string;
+            idp_logo_svg?: string | null;
+            idp_name: string;
+            oidc_config_url: string;
+        };
         NativeSessionRequest: {
             access_token: string;
         };
@@ -793,6 +864,17 @@ export interface components {
         };
         /** @enum {string} */
         RestrictionRuleTypeSchema: "Asn" | "IP" | "IPCidr" | "UserAgent";
+        ServerSetting: {
+            /** Format: date-time */
+            created_at: string;
+            description?: string | null;
+            /** Format: uuid */
+            id: string;
+            setting_key: string;
+            /** Format: date-time */
+            updated_at: string;
+            value: string;
+        };
         /** @description Terms model for API documentation */
         Terms: {
             content: string;
@@ -864,6 +946,14 @@ export interface components {
             verification?: null | components["schemas"]["CaptchaVerificationConfig"];
             widget?: null | components["schemas"]["CaptchaWidgetConfig"];
         };
+        UpdateIdpInput: {
+            client_id?: string | null;
+            client_secret?: string | null;
+            enabled?: boolean | null;
+            idp_display_name?: string | null;
+            idp_logo_svg?: string | null;
+            oidc_config_url?: string | null;
+        };
         UpdateNgWordInput: {
             board_ids?: string[] | null;
             name?: string | null;
@@ -892,6 +982,11 @@ export interface components {
         };
         UpdateTermsInput: {
             content: string;
+        };
+        UpsertServerSettingInput: {
+            description?: string | null;
+            setting_key: string;
+            value: string;
         };
         User: {
             authed_token_ids: string[];
@@ -1802,6 +1897,156 @@ export interface operations {
             };
         };
     };
+    list_idps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all IdPs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"][];
+                };
+            };
+        };
+    };
+    create_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIdpInput"];
+            };
+        };
+        responses: {
+            /** @description IdP created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get IdP by ID */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description IdP not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description IdP deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description IdP not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_idp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description IdP ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIdpInput"];
+            };
+        };
+        responses: {
+            /** @description IdP updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Idp"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description IdP not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_ng_words: {
         parameters: {
             query?: never;
@@ -2185,6 +2430,57 @@ export interface operations {
         responses: {
             /** @description Update restriction rule */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_server_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all server settings successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSetting"][];
+                };
+            };
+        };
+    };
+    upsert_server_setting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertServerSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Server setting upserted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSetting"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

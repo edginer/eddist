@@ -1,7 +1,7 @@
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
-use rand::{distr::Alphanumeric, Rng};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use rand::{Rng, distr::Alphanumeric};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use sqlx::MySql;
 use uuid::Uuid;
 
@@ -11,38 +11,46 @@ use crate::{
         user::{user_login_state::UserLoginState, user_reg_state::UserRegState},
     },
     repositories::{
+        bbs_repository::BbsRepository,
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
     utils::{
-        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
         TransactionRepository,
+        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
     },
 };
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository> {
+pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository, B: BbsRepository> {
     idp_repo: I,
     user_repo: U,
+    bbs_repo: B,
     redis_conn: ConnectionManager,
 }
 
-impl<I: IdpRepository + Clone, U: UserRepository + Clone> UserAuthzIdpCallbackService<I, U> {
-    pub fn new(idp_repo: I, user_repo: U, redis_conn: ConnectionManager) -> Self {
+impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
+    UserAuthzIdpCallbackService<I, U, B>
+{
+    pub fn new(idp_repo: I, user_repo: U, bbs_repo: B, redis_conn: ConnectionManager) -> Self {
         Self {
             idp_repo,
             user_repo,
+            bbs_repo,
             redis_conn,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> + Clone>
-    AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
-    for UserAuthzIdpCallbackService<I, U>
+impl<
+    I: IdpRepository + Clone,
+    U: UserRepository + TransactionRepository<MySql> + Clone,
+    B: BbsRepository + Clone,
+> AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
+    for UserAuthzIdpCallbackService<I, U, B>
 {
     async fn execute(
         &self,
@@ -59,33 +67,48 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
         let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
         redis_conn.del::<_, ()>(&redis_authreq_key).await?;
 
-        let user_sid = match input.callback_kind {
+        let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
                 let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
-                self.register_user_with_idp(reg_state, input.code).await?
+                let (user_sid, edge_token) = self
+                    .register_user_with_idp(reg_state, input.code, input.browser_edge_token)
+                    .await?;
+                (user_sid, edge_token)
             }
             CallbackKind::Login => {
                 let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
-                self.login_user_with_idp(login_state, input.code).await?
+                let (user_sid, edge_token) = self
+                    .login_user_with_idp(login_state, input.code, input.browser_edge_token)
+                    .await?;
+                (user_sid, edge_token)
             }
         };
 
-        Ok(UserAuthzIdpCallbackServiceOutput { user_sid })
+        Ok(UserAuthzIdpCallbackServiceOutput {
+            user_sid,
+            edge_token,
+        })
     }
 }
 
-impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> + Clone>
-    UserAuthzIdpCallbackService<I, U>
+impl<
+    I: IdpRepository + Clone,
+    U: UserRepository + TransactionRepository<MySql> + Clone,
+    B: BbsRepository + Clone,
+> UserAuthzIdpCallbackService<I, U, B>
 {
     async fn register_user_with_idp(
         &self,
         user_reg_state: UserRegState,
         code: String,
-    ) -> anyhow::Result<String> {
+        browser_edge_token: Option<String>,
+    ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+        let edge_token = user_reg_state.edge_token.clone();
+        let authed_token_id = user_reg_state.authed_token.clone();
+
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -103,6 +126,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             .await;
 
         let sub = id_token_claims.subject().to_string();
+        let authed_token_uuid = Uuid::parse_str(&authed_token_id)?;
 
         let user_id = if let Some(u) = self
             .user_repo
@@ -113,7 +137,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             let tx = self.user_repo.begin().await?;
             let tx = self
                 .user_repo
-                .bind_user_authed_token(u.id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .bind_user_authed_token(u.id, authed_token_uuid, tx)
                 .await?;
             tx.commit().await?;
 
@@ -141,12 +165,27 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
 
             let tx = self
                 .user_repo
-                .bind_user_authed_token(user_id, Uuid::parse_str(&user_reg_state.authed_token)?, tx)
+                .bind_user_authed_token(user_id, authed_token_uuid, tx)
                 .await?;
             tx.commit().await?;
 
             user_id
         };
+
+        // Also bind the browser's current edge-token if it differs from the reg-state token
+        if let Some(browser_token) = browser_edge_token
+            && edge_token.as_deref() != Some(&browser_token)
+            && let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await
+            && token.validity
+            && token.registered_user_id.is_none()
+        {
+            let tx = self.user_repo.begin().await?;
+            let tx = self
+                .user_repo
+                .bind_user_authed_token(user_id, token.id, tx)
+                .await?;
+            tx.commit().await?;
+        }
 
         let mut hasher = sha3::Sha3_512::new();
         hasher.update(Uuid::now_v7().to_string());
@@ -160,18 +199,18 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
             )
             .await?;
 
-        Ok(user_sid)
+        Ok((user_sid, edge_token))
     }
 
     async fn login_user_with_idp(
         &self,
         user_login_state: UserLoginState,
         code: String,
-    ) -> anyhow::Result<String> {
+        browser_edge_token: Option<String>,
+    ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -208,7 +247,26 @@ impl<I: IdpRepository + Clone, U: UserRepository + TransactionRepository<MySql> 
                     )
                     .await?;
 
-                Ok(user_sid)
+                // Sweep browser token: try to bind and restore it; fall back to stored token
+                let edge_token = if let Some(browser_token) = browser_edge_token
+                    && let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await
+                    && token.validity
+                    && token.registered_user_id.is_none()
+                {
+                    let tx = self.user_repo.begin().await?;
+                    let tx = self
+                        .user_repo
+                        .bind_user_authed_token(user.id, token.id, tx)
+                        .await?;
+                    tx.commit().await?;
+                    Some(browser_token)
+                } else {
+                    self.user_repo
+                        .get_valid_authed_token_by_user_id(user.id)
+                        .await?
+                };
+
+                Ok((user_sid, edge_token))
             }
             None => Err(anyhow::anyhow!("user not found")),
         }
@@ -219,6 +277,7 @@ pub struct UserAuthzIdpCallbackServiceInput {
     pub code: String,
     pub state_id: String,
     pub callback_kind: CallbackKind,
+    pub browser_edge_token: Option<String>,
 }
 
 pub enum CallbackKind {
@@ -228,6 +287,8 @@ pub enum CallbackKind {
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
+    /// The edge-token to set for the user (used in Register flow)
+    pub edge_token: Option<String>,
 }
 
 fn user_name_generator() -> String {

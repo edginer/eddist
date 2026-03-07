@@ -3,27 +3,38 @@ use std::collections::HashMap;
 use chrono::Utc;
 use futures::future::join_all;
 use metrics::counter;
+use redis::{AsyncCommands, aio::ConnectionManager};
 use tracing::{error_span, info_span};
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        create_captcha_client, CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput,
+        CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
     repositories::bbs_repository::BbsRepository,
+    utils::redis::user_reg_temp_url_register_key,
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
+use rand::{Rng, distr::Uniform};
 use uuid::Uuid;
 
-use super::AppService;
+use super::{
+    AppService,
+    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+};
 
-#[derive(Debug, Clone)]
-pub struct AuthWithCodeService<T: BbsRepository>(T);
+const USER_REG_TEMP_URL_LEN: usize = 5;
+
+#[derive(Clone)]
+pub struct AuthWithCodeService<T: BbsRepository> {
+    repo: T,
+    redis_conn: ConnectionManager,
+}
 
 impl<T: BbsRepository> AuthWithCodeService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
+        Self { repo, redis_conn }
     }
 
     /// Generate a new rate limiting token (browser handles expiration via Max-Age)
@@ -78,7 +89,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
 
         // Get all unauthed tokens with the auth code (non-IP checking)
         let candidate_tokens = self
-            .0
+            .repo
             .get_unauthed_authed_token_by_auth_code(&input.code)
             .await?;
 
@@ -92,7 +103,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         if unauthed_tokens.len() > 1 {
             // Delete all unauthed tokens with this auth_code to resolve collision
             for candidate in &unauthed_tokens {
-                self.0.delete_authed_token(&candidate.token).await?;
+                self.repo.delete_authed_token(&candidate.token).await?;
             }
             counter!("issue_authed_token", "state" => "failed", "reason" => "auth_code_collision")
                 .increment(1);
@@ -128,7 +139,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         let provider_types: Vec<String> = clients_responses.iter().map(|x| x.2.clone()).collect();
         let handles = clients_responses
             .iter()
-            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
+            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
             .collect::<Vec<_>>();
         let results = join_all(handles).await;
 
@@ -196,7 +207,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             }))
         };
 
-        self.0
+        self.repo
             .activate_authed_status(&token.token, &input.user_agent, now, additional_info)
             .await?;
         counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
@@ -204,9 +215,27 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         // Generate rate limiting token after successful authentication
         let rate_limit_token = Some(self.generate_rate_limit_token());
 
+        // Generate a temp URL for optional IdP linking if enabled
+        let user_reg_url = if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
+            let mut redis_conn = self.redis_conn.clone();
+            let temp_url_path = generate_random_string(USER_REG_TEMP_URL_LEN);
+            redis_conn
+                .set_ex::<_, _, ()>(
+                    user_reg_temp_url_register_key(&temp_url_path),
+                    token.id.to_string(),
+                    60 * 3, // 3 minutes TTL
+                )
+                .await?;
+            Some(format!("/user/register/{temp_url_path}"))
+        } else {
+            None
+        };
+
         Ok(AuthWithCodeServiceOutput {
             token: token.token,
+            authed_token_id: token.id,
             rate_limit_token,
+            user_reg_url,
         })
     }
 }
@@ -222,5 +251,19 @@ pub struct AuthWithCodeServiceInput {
 
 pub struct AuthWithCodeServiceOutput {
     pub token: String,
+    pub authed_token_id: Uuid,
     pub rate_limit_token: Option<String>,
+    /// URL path for optional user registration/IdP linking (only set when IdP linking is enabled)
+    pub user_reg_url: Option<String>,
+}
+
+fn generate_random_string(len: usize) -> String {
+    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
+    (0..len)
+        .map(|_| {
+            let idx = rand::rng().sample(index_dist);
+            charset[idx] as char
+        })
+        .collect()
 }

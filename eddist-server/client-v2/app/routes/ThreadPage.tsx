@@ -10,6 +10,7 @@ import { FloatingNGButton } from "../components/FloatingNGButton";
 import type { Route } from "./+types/ThreadPage";
 import useSWR from "swr";
 import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchClientConfig } from "~/api-client/client-config";
 import {
   fetchThread,
   type BodyAnchorPart,
@@ -43,15 +44,15 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const [thread, boards] = await Promise.all([
-    fetchThread(params.boardKey!, params.threadKey!, {
-      baseUrl:
-        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
-    }),
-    fetchBoards({
-      baseUrl:
-        context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL,
-    }),
+  const baseUrl =
+    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+
+  const [thread, boards, clientConfig] = await Promise.all([
+    fetchThread(params.boardKey!, params.threadKey!, { baseUrl }),
+    fetchBoards({ baseUrl }),
+    fetchClientConfig({ baseUrl }).catch(() => ({
+      enable_user_registration: false,
+    })),
   ]);
 
   return {
@@ -59,7 +60,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     boards,
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
+      availableUserRegistration: clientConfig.enable_user_registration,
     },
   } satisfies {
     thread: { threadName: string; responses: Response[] };
@@ -187,7 +188,7 @@ const ThreadPage = ({
   const [creatingResponse, setCreatingResponse] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
   const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -226,18 +227,18 @@ const ThreadPage = ({
     {
       fallbackData: thread,
       revalidateOnMount: false,
-    }
+    },
   );
 
   // Find current board
   const currentBoard = boards?.find(
-    (board: { board_key: string }) => board.board_key === params.boardKey
+    (board: { board_key: string }) => board.board_key === params.boardKey,
   );
 
   const boardName = currentBoard?.name || "";
   const threadName = useMemo(
     () => decodeNumericCharRefsStr(posts?.threadName || ""),
-    [posts?.threadName]
+    [posts?.threadName],
   );
 
   if (
@@ -284,7 +285,7 @@ const ThreadPage = ({
             <FaSync
               className={twMerge(
                 "text-blue-600 text-lg",
-                isPullRefreshing && "animate-spin"
+                isPullRefreshing && "animate-spin",
               )}
             />
           </div>
@@ -335,7 +336,7 @@ const ThreadPage = ({
           <FaSync
             className={twMerge(
               "w-4 h-4",
-              (isRefreshing || isPullRefreshing) && "animate-spin"
+              (isRefreshing || isPullRefreshing) && "animate-spin",
             )}
           />
         </button>
@@ -351,7 +352,7 @@ const ThreadPage = ({
           onClick={() => setCreatingResponse(true)}
           className={twMerge(
             "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
-            params.boardKey || params.threadKey || "hidden"
+            params.boardKey || params.threadKey || "hidden",
           )}
         >
           <FaPen className="lg:mr-3" />
@@ -451,8 +452,8 @@ const ThreadPage = ({
                               cur.authorId === post.authorId
                                 ? acc.concat(i)
                                 : acc,
-                            [] as number[]
-                          )
+                            [] as number[],
+                          ),
                         )
                       }
                       onContextMenu={(e) => {
@@ -472,7 +473,7 @@ const ThreadPage = ({
                       onTouchCancel={contextMenuHandlers.onTouchCancel}
                       style={{ cursor: "pointer" }}
                       className={`select-none md:select-auto ${authorIdResponseCountToColor(
-                        posts.authorIdMap.get(post.authorId)?.length ?? 0
+                        posts.authorIdMap.get(post.authorId)?.length ?? 0,
                       )}`}
                     >
                       ID:{post.authorId}{" "}
@@ -513,7 +514,7 @@ const ThreadPage = ({
                 ? MAX_POPUP_HEIGHT_MOBILE
                 : Math.min(
                     window.innerHeight * 0.9,
-                    window.innerHeight - popup.y - 20
+                    window.innerHeight - popup.y - 20,
                   ),
               zIndex: 1 + idx,
             }}
@@ -524,7 +525,7 @@ const ThreadPage = ({
                 : `max-w-[${MAX_POPUP_WIDTH_DESKTOP}px] w-auto`,
               isTop
                 ? "overflow-y-auto pointer-events-auto"
-                : "overflow-y-hidden pointer-events-none"
+                : "overflow-y-hidden pointer-events-none",
             )}
           >
             {popup.posts.map((p) => (
@@ -541,13 +542,13 @@ const ThreadPage = ({
                         posts.responses.reduce(
                           (acc, cur, i) =>
                             cur.authorId === p.authorId ? acc.concat(i) : acc,
-                          [] as number[]
-                        )
+                          [] as number[],
+                        ),
                       )
                     }
                     style={{ cursor: "pointer" }}
                     className={authorIdResponseCountToColor(
-                      posts.authorIdMap.get(p.authorId)?.length ?? 0
+                      posts.authorIdMap.get(p.authorId)?.length ?? 0,
                     )}
                   >
                     ID:{p.authorId}{" "}
@@ -626,7 +627,7 @@ const processPostName = (name: string) => {
 };
 
 const authorIdResponseCountToColor = (
-  authorIdResponseCount: number
+  authorIdResponseCount: number,
 ): string => {
   if (authorIdResponseCount <= 1) {
     return "";
@@ -639,13 +640,13 @@ const authorIdResponseCountToColor = (
 
 const constructReferredNum = (
   refs: number[],
-  popup: (e: React.MouseEvent, indices: number[]) => void
+  popup: (e: React.MouseEvent, indices: number[]) => void,
 ) => (
   <span
     onClick={(e) =>
       popup(
         e,
-        refs.map((x) => x - 1)
+        refs.map((x) => x - 1),
       )
     }
     className="text-blue-400 hover:text-blue-600 cursor-pointer"
@@ -656,7 +657,7 @@ const constructReferredNum = (
 
 const processPostBody = (
   bodyParts: BodyAnchorPart[],
-  popup: (e: React.MouseEvent, indices: number[]) => void
+  popup: (e: React.MouseEvent, indices: number[]) => void,
 ) => (
   <span>
     {bodyParts.map((part, i) =>
@@ -670,7 +671,7 @@ const processPostBody = (
         </span>
       ) : (
         <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
-      )
+      ),
     )}
   </span>
 );

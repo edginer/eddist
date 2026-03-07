@@ -206,27 +206,25 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
                 });
             }
 
-            if is_thread {
-                if let Some(last_created_thread_at) = tinker.last_created_thread_at() {
-                    let elapsed = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;
-                    // Thread creation span limit (in seconds) based on tinker level
-                    // Base values are doubled for the final limit
-                    let base_span = match tinker.level() {
-                        0 => 60 * 60, // 1 hour
-                        1 => 60 * 30, // 30 min
-                        2 => 60 * 15, // 15 min
-                        3 => 60 * 8,  // 8 min
-                        4 => 60 * 4,  // 4 min
-                        _ => 60 * 2,  // 2 min (level >= 5)
-                    };
-                    let span_limit = base_span * 2;
+            if is_thread && let Some(last_created_thread_at) = tinker.last_created_thread_at() {
+                let elapsed = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;
+                // Thread creation span limit (in seconds) based on tinker level
+                // Base values are doubled for the final limit
+                let base_span = match tinker.level() {
+                    0 => 60 * 60, // 1 hour
+                    1 => 60 * 30, // 30 min
+                    2 => 60 * 15, // 15 min
+                    3 => 60 * 8,  // 8 min
+                    4 => 60 * 4,  // 4 min
+                    _ => 60 * 2,  // 2 min (level >= 5)
+                };
+                let span_limit = base_span * 2;
 
-                    if elapsed < span_limit {
-                        return Err(BbsCgiError::TooManyCreatingThread {
-                            tinker_level: tinker.level(),
-                            span_sec: span_limit as i32,
-                        });
-                    }
+                if elapsed < span_limit {
+                    return Err(BbsCgiError::TooManyCreatingThread {
+                        tinker_level: tinker.level(),
+                        span_sec: span_limit as i32,
+                    });
                 }
             }
 

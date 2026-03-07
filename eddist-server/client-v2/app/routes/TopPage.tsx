@@ -1,16 +1,21 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/TopPage";
 import { fetchBoards, type Board } from "~/api-client/board";
+import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
   const baseUrl =
     context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
+  const clientConfig = await fetchClientConfig({ baseUrl }).catch(() => ({
+    enable_user_registration: false,
+  }));
+
   return {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: context.ENABLE_USER_REGISTRATION ?? false,
+      availableUserRegistration: clientConfig.enable_user_registration,
     },
     boards: await fetchBoards({ baseUrl }),
     notices: await fetchLatestNotices({ baseUrl }).catch(() => []),
@@ -96,7 +101,10 @@ function TopPage({
                       day: "2-digit",
                     })}
                   </span>
-                  <Link to={`/notices/${notice.slug}`} className="text-blue-500">
+                  <Link
+                    to={`/notices/${notice.slug}`}
+                    className="text-blue-500"
+                  >
                     {notice.title}
                   </Link>
                 </li>

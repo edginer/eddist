@@ -65,6 +65,9 @@ use uuid::Uuid;
 
 use crate::repositories::notice_repository::NoticeRepositoryImpl;
 use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
+use crate::services::server_settings_cache::{
+    refresh_server_settings_cache, start_server_settings_refresh_task,
+};
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -80,7 +83,7 @@ pub fn create_test_app(
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
-    use crate::services::AppServiceContainer;
+    use crate::services::{AppServiceContainer, PubSubRepos};
 
     // Create test S3 bucket (stub for testing)
     let bucket = s3::Bucket::new(
@@ -98,7 +101,9 @@ pub fn create_test_app(
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
 
+    let _ = refresh_server_settings_cache(&pool);
     start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
+    start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -107,16 +112,18 @@ pub fn create_test_app(
             IdpRepositoryImpl::new(pool.clone()),
             user_restriction_repo,
             redis_conn.clone(),
-            pub_repo,
-            event_repo,
+            PubSubRepos {
+                pub_repo,
+                event_repo,
+            },
             *bucket,
         ),
         notice_repo,
         terms_repo,
+        template_engine: load_template_engine(),
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::new_v4().as_bytes())
             .to_string(),
-        template_engine: load_template_engine(),
     };
 
     // Use the actual create_app from app module

@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{
     domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,

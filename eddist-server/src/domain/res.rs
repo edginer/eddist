@@ -13,13 +13,13 @@ use md5::Md5;
 use pwhash::unix;
 use sha1::{Digest, Sha1};
 
-use crate::domain::metadent::{generate_date_seed, Metadent};
+use crate::domain::metadent::{Metadent, generate_date_seed};
 
 use super::{
     authed_token::AuthedToken,
     metadent::MetadentType,
     res_core::ResCore,
-    utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
+    utils::{SimpleSecret, sanitize_base, sanitize_num_refs},
 };
 
 pub trait ResState {}
@@ -262,8 +262,21 @@ impl Res<AuthorIdUninitialized> {
         client_info: ClientInfo,
         authed_token: Option<String>,
         is_abone: bool,
+        force_metadent_type: Option<MetadentType>,
     ) -> Self {
-        let (body, metadent_type) = if body.contains("!metadent:") {
+        let (body, metadent_type) = if let Some(forced) = force_metadent_type {
+            // Strip markers from body but apply forced type
+            let body = if body.contains("!metadent:v:") {
+                Cow::Owned(body.replacen("!metadent:v:", "!metadent:v - forced", 1))
+            } else if body.contains("!metadent:vv:") {
+                Cow::Owned(body.replacen("!metadent:vv:", "!metadent:vv - forced", 1))
+            } else if body.contains("!metadent:vvv:") {
+                Cow::Owned(body.replacen("!metadent:vvv:", "!metadent:vvv - forced", 1))
+            } else {
+                body
+            };
+            (body, forced)
+        } else if body.contains("!metadent:") {
             if body.contains("!metadent:v:") {
                 (
                     Cow::Owned(body.replacen("!metadent:v:", "!metadent:v - configured", 1)),
@@ -302,13 +315,25 @@ impl Res<AuthorIdUninitialized> {
         retrieved_cap_name: Option<String>,
     ) -> Res<AuthorIdInitialized> {
         let author_id = if retrieved_cap_name.is_none() {
-            get_author_id_with_device_info(
-                &self.board_key,
-                self.created_at,
-                &authed_token.author_id_seed,
-                Some(&authed_token.writing_ua),
-                &authed_token.reduced_ip,
-            )
+            if authed_token.registered_user_id.is_some() {
+                // For user-linked tokens, use a stable ID with no device suffix
+                get_author_id_by_seed(
+                    &self.board_key,
+                    self.created_at,
+                    &authed_token.author_id_seed,
+                )
+                .chars()
+                .take(AUTHOR_ID_LENGTH)
+                .collect()
+            } else {
+                get_author_id_with_device_info(
+                    &self.board_key,
+                    self.created_at,
+                    &authed_token.author_id_seed,
+                    Some(&authed_token.writing_ua),
+                    &authed_token.reduced_ip,
+                )
+            }
         } else {
             "????".to_string()
         };
@@ -404,6 +429,7 @@ impl From<Res<AuthorIdInitialized>> for ResView {
     }
 }
 
+pub const AUTHOR_ID_LENGTH: usize = 9;
 pub const AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS: u64 = 1;
 
 // Character set for ID generation (base64-like encoding)
@@ -502,7 +528,7 @@ pub fn get_author_id_with_device_info(
     let base_id = get_author_id_by_seed(board_key, datetime, seed);
     generate_id_with_device_suffix(
         &base_id,
-        9,
+        AUTHOR_ID_LENGTH,
         None,
         Some(reduced_ip),
         Some(generate_date_seed(

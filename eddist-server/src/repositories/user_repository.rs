@@ -15,6 +15,10 @@ pub trait UserRepository: Send + Sync + 'static {
         idp_sub: &str,
     ) -> anyhow::Result<Option<User>>;
     async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>>;
+    async fn get_valid_authed_token_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<String>>;
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool>;
     async fn create_user_with_idp<'a>(
         &'a self,
@@ -194,6 +198,27 @@ impl UserRepository for UserRepositoryImpl {
         Ok(authed_tokens)
     }
 
+    async fn get_valid_authed_token_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<String>> {
+        let authed_token = sqlx::query!(
+            r#"
+            SELECT at.token AS token
+            FROM authed_tokens at
+            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
+            WHERE uat.user_id = ? AND at.validity = true
+            ORDER BY at.authed_at DESC
+            LIMIT 1
+            "#,
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(authed_token.map(|row| row.token))
+    }
+
     /// !!! You need to call begin / commit / rollback outside of this function !!!
     async fn create_user_with_idp<'a>(
         &'a self,
@@ -275,17 +300,54 @@ impl UserRepository for UserRepositoryImpl {
         );
 
         // TODO: It is not good idea that update authed_tokens outside of BbsRepository
-        sqlx::query!(
+        //
+        // Inherit the canonical seed from the user's existing linked tokens so that
+        // the author ID is consistent before and after registration:
+        //   - First token bound  → keep its own seed (no change, preserving continuity)
+        //   - Later tokens bound → copy the seed from the first token
+        let canonical_seed = sqlx::query!(
             r#"
-            UPDATE authed_tokens
-            SET registered_user_id = ?
-            WHERE id = ?
+            SELECT at.author_id_seed AS "author_id_seed: Vec<u8>"
+            FROM authed_tokens at
+            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
+            WHERE uat.user_id = ?
+            ORDER BY uat.created_at ASC
+            LIMIT 1
             "#,
-            user_id,
-            authed_token_id
+            user_id
         )
-        .execute(&mut *tx)
-        .await?;
+        .fetch_optional(&mut *tx)
+        .await?
+        .map(|row| row.author_id_seed);
+
+        if let Some(seed) = canonical_seed {
+            // Propagate the existing user seed to the newly bound token
+            sqlx::query!(
+                r#"
+                UPDATE authed_tokens
+                SET registered_user_id = ?, author_id_seed = ?
+                WHERE id = ?
+                "#,
+                user_id,
+                seed,
+                authed_token_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            // First token for this user — preserve its existing seed
+            sqlx::query!(
+                r#"
+                UPDATE authed_tokens
+                SET registered_user_id = ?
+                WHERE id = ?
+                "#,
+                user_id,
+                authed_token_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
 
         Ok(tx)
     }

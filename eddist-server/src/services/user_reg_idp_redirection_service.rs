@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
@@ -34,8 +34,7 @@ impl<I: IdpRepository + Clone>
     ) -> anyhow::Result<UserRegIdpRedirectionServiceOutput> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc =
-            OidcClientService::new(self.idp_repo.clone(), self.redis_conn.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (_, idp_client) = idp_clients

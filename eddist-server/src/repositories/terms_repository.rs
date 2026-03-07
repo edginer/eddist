@@ -1,5 +1,5 @@
 use eddist_core::domain::terms::Terms;
-use sqlx::{query_as, MySqlPool};
+use sqlx::{MySqlPool, query_as};
 use uuid::Uuid;
 
 #[async_trait::async_trait]

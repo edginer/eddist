@@ -95,7 +95,8 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
                 max_response_body_lines,
                 threads_archive_trigger_thread_count,
                 threads_archive_cron,
-                read_only AS "read_only!: bool"
+                read_only AS "read_only!: bool",
+                force_metadent_type
             FROM
                 boards_info
             WHERE
@@ -120,6 +121,7 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
                 .map(|v| v as usize),
             threads_archive_cron: board.threads_archive_cron,
             read_only: board.read_only,
+            force_metadent_type: board.force_metadent_type,
         })
     }
 
@@ -167,6 +169,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         if board.threads_archive_cron.is_some() {
             sets.push("threads_archive_cron");
         }
+        if board.force_metadent_type.is_some() {
+            sets.push("force_metadent_type");
+        }
 
         let mut tx = pool.begin().await?;
 
@@ -202,6 +207,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         }
         if let Some(threads_archive_cron) = &board.threads_archive_cron {
             query = query.bind(threads_archive_cron);
+        }
+        if let Some(force_metadent_type) = &board.force_metadent_type {
+            query = query.bind(force_metadent_type);
         }
 
         query.execute(&mut *tx).await?;
@@ -243,6 +251,10 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         if let Some(threads_archive_cron) = &board.threads_archive_cron {
             sets.push("threads_archive_cron = ?");
             values_str.push(threads_archive_cron);
+        }
+        if let Some(force_metadent_type) = &board.force_metadent_type {
+            sets.push("force_metadent_type = ?");
+            values_str.push(force_metadent_type);
         }
 
         if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {

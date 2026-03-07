@@ -25,6 +25,7 @@ pub struct BoardInfo {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub read_only: bool,
+    pub force_metadent_type: Option<String>,
 }
 
 pub fn validate_board_key(board_key: &str) -> anyhow::Result<()> {

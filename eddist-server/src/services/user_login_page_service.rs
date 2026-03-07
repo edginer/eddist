@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
 
 use crate::{
@@ -28,13 +28,12 @@ impl<U: UserRepository + Clone, I: IdpRepository + Clone>
     ) -> anyhow::Result<UserLoginPageServiceOutput> {
         let mut redis_conn = self.2.clone();
 
-        if let Some(user_sid) = input.user_sid {
-            if redis_conn
+        if let Some(user_sid) = input.user_sid
+            && redis_conn
                 .exists::<_, bool>(user_session_key(&user_sid))
                 .await?
-            {
-                return Ok(UserLoginPageServiceOutput::LoggedIn);
-            }
+        {
+            return Ok(UserLoginPageServiceOutput::LoggedIn);
         }
 
         let idps = self.1.get_idps().await?;
