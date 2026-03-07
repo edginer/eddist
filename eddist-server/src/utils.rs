@@ -190,9 +190,9 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
 
-        std::env::set_var("ENV", "production");
+        unsafe { std::env::set_var("ENV", "production") };
         assert_eq!(get_origin_ip(&headers), "203.0.113.1");
-        std::env::remove_var("ENV");
+        unsafe { std::env::remove_var("ENV") };
     }
 
     #[test]
@@ -200,9 +200,9 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
 
-        std::env::set_var("ENV", "production");
+        unsafe { std::env::set_var("ENV", "production") };
         assert_eq!(get_origin_ip(&headers), "198.51.100.1");
-        std::env::remove_var("ENV");
+        unsafe { std::env::remove_var("ENV") };
     }
 
     #[test]
