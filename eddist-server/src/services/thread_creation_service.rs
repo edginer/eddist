@@ -7,7 +7,7 @@ use eddist_core::{
     utils::is_thread_pub_enabled,
 };
 use metrics::counter;
-use redis::{aio::ConnectionManager, Cmd};
+use redis::{Cmd, aio::ConnectionManager};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -39,8 +39,8 @@ use crate::{
 };
 
 use super::{
-    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
     BbsCgiService,
+    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
 pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();

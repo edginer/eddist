@@ -14,7 +14,7 @@ use eddist_core::{
     utils::is_res_pub_enabled,
 };
 use metrics::counter;
-use redis::{aio::ConnectionManager, Cmd, Value};
+use redis::{Cmd, Value, aio::ConnectionManager};
 use tokio::sync::Mutex;
 use tracing::error_span;
 use uuid::Uuid;
@@ -47,9 +47,9 @@ use crate::{
 };
 
 use super::{
-    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
-    thread_creation_service::USER_CREATION_RATE_LIMIT,
     BbsCgiService,
+    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    thread_creation_service::USER_CREATION_RATE_LIMIT,
 };
 
 #[derive(Clone)]
@@ -76,11 +76,11 @@ impl<T: BbsRepository, U: UserRepository, P: PubRepository, E: CreationEventRepo
 
 #[async_trait::async_trait]
 impl<
-        T: BbsRepository + Clone,
-        U: UserRepository + Clone,
-        P: PubRepository,
-        E: CreationEventRepository,
-    > BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
+    T: BbsRepository + Clone,
+    U: UserRepository + Clone,
+    P: PubRepository,
+    E: CreationEventRepository,
+> BbsCgiService<ResCreationServiceInput, ResCreationServiceOutput>
     for ResCreationService<T, U, P, E>
 {
     async fn execute(

@@ -1,7 +1,7 @@
 use std::{convert::Infallible, env, time::Duration};
 
 use axum::{
-    body::Body, extract::Request as AxumRequest, response::Response, ServiceExt as AxumServiceExt,
+    ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
 };
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
@@ -15,10 +15,10 @@ use repositories::{
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 use services::{
+    AppServiceContainer,
     captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
     server_settings_cache::{refresh_server_settings_cache, start_server_settings_refresh_task},
     user_restriction_service::start_cache_refresh_task,
-    AppServiceContainer,
 };
 use sqlx::mysql::MySqlPoolOptions;
 use template::load_template_engine;
@@ -27,7 +27,7 @@ use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
 
 use crate::{
-    app::{create_app, AppState},
+    app::{AppState, create_app},
     repositories::{
         notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
     },

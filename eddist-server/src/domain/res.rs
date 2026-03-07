@@ -13,13 +13,13 @@ use md5::Md5;
 use pwhash::unix;
 use sha1::{Digest, Sha1};
 
-use crate::domain::metadent::{generate_date_seed, Metadent};
+use crate::domain::metadent::{Metadent, generate_date_seed};
 
 use super::{
     authed_token::AuthedToken,
     metadent::MetadentType,
     res_core::ResCore,
-    utils::{sanitize_base, sanitize_num_refs, SimpleSecret},
+    utils::{SimpleSecret, sanitize_base, sanitize_num_refs},
 };
 
 pub trait ResState {}

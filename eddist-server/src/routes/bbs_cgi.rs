@@ -9,17 +9,17 @@ use http::HeaderMap;
 use jsonwebtoken::EncodingKey;
 
 use crate::{
+    AppState,
     error::{BbsCgiError, InsufficientParamType, InvalidParamType},
     services::{
+        AppService, BbsCgiService,
         bind_token_to_user_service::BindTokenToUserServiceInput,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
-        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
         thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
-        AppService, BbsCgiService,
     },
-    shiftjis::{shift_jis_url_encodeded_body_to_vec, SJisResponseBuilder, SjisContentType},
+    shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
     utils::{get_asn_num, get_origin_ip, get_tinker, get_ua},
-    AppState,
 };
 
 pub async fn post_bbs_cgi(
@@ -51,17 +51,15 @@ pub async fn post_bbs_cgi(
     let mut edge_token = jar.get("edge-token").map(|x| x.value().to_string());
 
     // If the user is logged in but has no edge-token, restore it from the linked tokens
-    if edge_token.is_none() {
-        if let Some(ref sid) = user_sid {
-            if let Ok(Some(restored)) = state
-                .services
-                .bind_token_to_user()
-                .restore_user_authed_token(sid)
-                .await
-            {
-                edge_token = Some(restored);
-            }
-        }
+    if edge_token.is_none()
+        && let Some(ref sid) = user_sid
+        && let Ok(Some(restored)) = state
+            .services
+            .bind_token_to_user()
+            .restore_user_authed_token(sid)
+            .await
+    {
+        edge_token = Some(restored);
     }
 
     let Some(board_key) = form.get("bbs").map(|x| x.to_string()) else {
@@ -182,18 +180,16 @@ pub async fn post_bbs_cgi(
     };
 
     // Fire-and-forget: bind the token to the user if logged in and not yet bound
-    if !is_authed_token_bound {
-        if let Some(sid) = user_sid {
-            let bind_svc = state.services.bind_token_to_user().clone();
-            tokio::spawn(async move {
-                let _ = bind_svc
-                    .execute(BindTokenToUserServiceInput {
-                        user_sid: sid,
-                        authed_token_id,
-                    })
-                    .await;
-            });
-        }
+    if !is_authed_token_bound && let Some(sid) = user_sid {
+        let bind_svc = state.services.bind_token_to_user().clone();
+        tokio::spawn(async move {
+            let _ = bind_svc
+                .execute(BindTokenToUserServiceInput {
+                    user_sid: sid,
+                    authed_token_id,
+                })
+                .await;
+        });
     }
 
     let mut response = SJisResponseBuilder::new(SJisStr::from(

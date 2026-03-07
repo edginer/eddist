@@ -3,25 +3,25 @@ use std::collections::HashMap;
 use chrono::Utc;
 use futures::future::join_all;
 use metrics::counter;
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use tracing::{error_span, info_span};
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        create_captcha_client, CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput,
+        CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
     repositories::bbs_repository::BbsRepository,
     utils::redis::user_reg_temp_url_register_key,
 };
 use eddist_core::domain::ip_addr::ReducedIpAddr;
-use rand::{distr::Uniform, Rng};
+use rand::{Rng, distr::Uniform};
 use uuid::Uuid;
 
 use super::{
-    server_settings_cache::{get_server_setting_bool, ServerSettingKey},
     AppService,
+    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
 const USER_REG_TEMP_URL_LEN: usize = 5;
@@ -139,7 +139,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         let provider_types: Vec<String> = clients_responses.iter().map(|x| x.2.clone()).collect();
         let handles = clients_responses
             .iter()
-            .map(|x| x.0.verify_captcha(&x.1 .0, &x.1 .1))
+            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
             .collect::<Vec<_>>();
         let results = join_all(handles).await;
 

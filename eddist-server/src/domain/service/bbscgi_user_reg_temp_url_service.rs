@@ -1,5 +1,5 @@
-use rand::{distr::Uniform, Rng};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use rand::{Rng, distr::Uniform};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{domain::authed_token::AuthedToken, utils::redis::user_reg_temp_url_register_key};
 

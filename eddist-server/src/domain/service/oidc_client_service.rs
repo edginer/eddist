@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use base64::Engine;
-use chacha20poly1305::{aead::Aead, KeyInit};
-use openidconnect::{core::CoreProviderMetadata, ClientId, ClientSecret, IssuerUrl};
+use chacha20poly1305::{KeyInit, aead::Aead};
+use openidconnect::{ClientId, ClientSecret, IssuerUrl, core::CoreProviderMetadata};
 
 use crate::{
     domain::user::idp::Idp, external::oidc_client::OidcClient,
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_decrypt_client_secret() {
         // Set up the environment variable for the key
-        std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!");
+        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
 
         // Encrypt a sample secret
         let key = std::env::var("TINKER_SECRET").unwrap();

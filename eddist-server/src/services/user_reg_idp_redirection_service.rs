@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},

@@ -131,11 +131,11 @@ pub fn sanitize_ascii_numeric_character_reference(input: &str) -> String {
 
             let mut num_str = String::new();
             let mut is_hex = false;
-            if let Some(&next) = iter.peek() {
-                if next == 'x' || next == 'X' {
-                    is_hex = true;
-                    original.push(iter.next().unwrap());
-                }
+            if let Some(&next) = iter.peek()
+                && (next == 'x' || next == 'X')
+            {
+                is_hex = true;
+                original.push(iter.next().unwrap());
             }
             while let Some(&next) = iter.peek() {
                 if (is_hex && next.is_ascii_hexdigit()) || (!is_hex && next.is_ascii_digit()) {
@@ -153,14 +153,12 @@ pub fn sanitize_ascii_numeric_character_reference(input: &str) -> String {
                     } else {
                         num_str.parse::<u32>()
                     };
-                    if let Ok(code_point) = parsed {
-                        if let Some(ch) = std::char::from_u32(code_point) {
-                            // Replace only if the character is ASCII
-                            if ch.is_ascii() {
-                                sanitized.push(ch);
-                                continue;
-                            }
-                        }
+                    if let Ok(code_point) = parsed
+                        && let Some(ch) = std::char::from_u32(code_point)
+                        && ch.is_ascii()
+                    {
+                        sanitized.push(ch);
+                        continue;
                     }
                 }
             }

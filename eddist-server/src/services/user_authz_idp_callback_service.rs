@@ -1,7 +1,7 @@
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
-use rand::{distr::Alphanumeric, Rng};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use rand::{Rng, distr::Alphanumeric};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use sqlx::MySql;
 use uuid::Uuid;
 
@@ -16,8 +16,8 @@ use crate::{
         user_repository::{CreatingUser, UserRepository},
     },
     utils::{
-        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
         TransactionRepository,
+        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
     },
 };
 
@@ -46,10 +46,10 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
 
 #[async_trait::async_trait]
 impl<
-        I: IdpRepository + Clone,
-        U: UserRepository + TransactionRepository<MySql> + Clone,
-        B: BbsRepository + Clone,
-    > AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
+    I: IdpRepository + Clone,
+    U: UserRepository + TransactionRepository<MySql> + Clone,
+    B: BbsRepository + Clone,
+> AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
     for UserAuthzIdpCallbackService<I, U, B>
 {
     async fn execute(
@@ -92,10 +92,10 @@ impl<
 }
 
 impl<
-        I: IdpRepository + Clone,
-        U: UserRepository + TransactionRepository<MySql> + Clone,
-        B: BbsRepository + Clone,
-    > UserAuthzIdpCallbackService<I, U, B>
+    I: IdpRepository + Clone,
+    U: UserRepository + TransactionRepository<MySql> + Clone,
+    B: BbsRepository + Clone,
+> UserAuthzIdpCallbackService<I, U, B>
 {
     async fn register_user_with_idp(
         &self,
@@ -173,19 +173,18 @@ impl<
         };
 
         // Also bind the browser's current edge-token if it differs from the reg-state token
-        if let Some(browser_token) = browser_edge_token {
-            if edge_token.as_deref() != Some(&browser_token) {
-                if let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await {
-                    if token.validity && token.registered_user_id.is_none() {
-                        let tx = self.user_repo.begin().await?;
-                        let tx = self
-                            .user_repo
-                            .bind_user_authed_token(user_id, token.id, tx)
-                            .await?;
-                        tx.commit().await?;
-                    }
-                }
-            }
+        if let Some(browser_token) = browser_edge_token
+            && edge_token.as_deref() != Some(&browser_token)
+            && let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await
+            && token.validity
+            && token.registered_user_id.is_none()
+        {
+            let tx = self.user_repo.begin().await?;
+            let tx = self
+                .user_repo
+                .bind_user_authed_token(user_id, token.id, tx)
+                .await?;
+            tx.commit().await?;
         }
 
         let mut hasher = sha3::Sha3_512::new();
@@ -249,26 +248,18 @@ impl<
                     .await?;
 
                 // Sweep browser token: try to bind and restore it; fall back to stored token
-                let edge_token = if let Some(browser_token) = browser_edge_token {
-                    if let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await {
-                        if token.validity && token.registered_user_id.is_none() {
-                            let tx = self.user_repo.begin().await?;
-                            let tx = self
-                                .user_repo
-                                .bind_user_authed_token(user.id, token.id, tx)
-                                .await?;
-                            tx.commit().await?;
-                            Some(browser_token)
-                        } else {
-                            self.user_repo
-                                .get_valid_authed_token_by_user_id(user.id)
-                                .await?
-                        }
-                    } else {
-                        self.user_repo
-                            .get_valid_authed_token_by_user_id(user.id)
-                            .await?
-                    }
+                let edge_token = if let Some(browser_token) = browser_edge_token
+                    && let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await
+                    && token.validity
+                    && token.registered_user_id.is_none()
+                {
+                    let tx = self.user_repo.begin().await?;
+                    let tx = self
+                        .user_repo
+                        .bind_user_authed_token(user.id, token.id, tx)
+                        .await?;
+                    tx.commit().await?;
+                    Some(browser_token)
                 } else {
                     self.user_repo
                         .get_valid_authed_token_by_user_id(user.id)

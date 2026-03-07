@@ -8,7 +8,7 @@ use eddist_core::domain::{
     res::ResView,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, types::Json, MySqlPool};
+use sqlx::{MySqlPool, query, query_as, types::Json};
 use uuid::Uuid;
 
 use crate::domain::{

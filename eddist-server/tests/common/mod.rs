@@ -4,7 +4,7 @@ use sqlx::mysql::MySqlPoolOptions;
 use sqlx::{MySql, Pool};
 use std::time::Duration;
 use testcontainers::ImageExt;
-use testcontainers::{core::IntoContainerPort, runners::AsyncRunner, ContainerAsync};
+use testcontainers::{ContainerAsync, core::IntoContainerPort, runners::AsyncRunner};
 use testcontainers_modules::{mysql::Mysql, redis::Redis};
 
 pub struct TestContext {
@@ -16,8 +16,8 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new() -> Self {
-        std::env::set_var("BASE_URL", "http://localhost:8000");
-        std::env::set_var("RUST_ENV", "prod");
+        unsafe { std::env::set_var("BASE_URL", "http://localhost:8000") };
+        unsafe { std::env::set_var("RUST_ENV", "prod") };
 
         let mysql_container = Mysql::default()
             .with_name("mysql")

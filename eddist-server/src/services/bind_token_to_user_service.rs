@@ -1,10 +1,10 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
     repositories::user_repository::UserRepository,
-    utils::{redis::user_session_key, TransactionRepository},
+    utils::{TransactionRepository, redis::user_session_key},
 };
 
 use super::AppService;

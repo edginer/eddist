@@ -81,7 +81,9 @@ pub enum BbsCgiError {
     #[error("以下のURLを利用してユーザー登録を行ってください \n {url}")]
     UserRegTempUrl { url: String },
 
-    #[error("書き込むには外部アカウントとの連携が必要です。以下のURLからユーザー登録を行ってください \n {url}")]
+    #[error(
+        "書き込むには外部アカウントとの連携が必要です。以下のURLからユーザー登録を行ってください \n {url}"
+    )]
     UserRegistrationRequired { url: String },
 
     #[error("この端末は既にユーザー登録されています")]

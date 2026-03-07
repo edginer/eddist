@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
 use sqlx::MySql;
 use uuid::Uuid;
@@ -13,8 +13,8 @@ use crate::{
         user_repository::UserRepository,
     },
     utils::{
-        redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
         TransactionRepository,
+        redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
     },
 };
 
@@ -43,10 +43,10 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
 
 #[async_trait::async_trait]
 impl<
-        I: IdpRepository + Clone,
-        U: UserRepository + Clone + TransactionRepository<MySql>,
-        B: BbsRepository + Clone,
-    > AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
+    I: IdpRepository + Clone,
+    U: UserRepository + Clone + TransactionRepository<MySql>,
+    B: BbsRepository + Clone,
+> AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
     for UserRegTempUrlService<I, U, B>
 {
     async fn execute(
@@ -59,29 +59,26 @@ impl<
 
         let mut redis_conn = self.redis_conn.clone();
 
-        if let Some(user_sid) = &input.user_sid {
-            if let Some(user_id) = redis_conn
+        if let Some(user_sid) = &input.user_sid
+            && let Some(user_id) = redis_conn
                 .get::<_, Option<String>>(user_session_key(user_sid))
                 .await?
-            {
-                let Some(authed_token_id) = redis_conn
-                    .get_del::<_, Option<String>>(user_reg_temp_url_register_key(
-                        &input.temp_url_path,
-                    ))
-                    .await?
-                else {
-                    return Ok(UserRegTempUrlServiceOutput::NotFound);
-                };
+        {
+            let Some(authed_token_id) = redis_conn
+                .get_del::<_, Option<String>>(user_reg_temp_url_register_key(&input.temp_url_path))
+                .await?
+            else {
+                return Ok(UserRegTempUrlServiceOutput::NotFound);
+            };
 
-                let mut tx = self.user_repo.begin().await?;
-                tx = self
-                    .user_repo
-                    .bind_user_authed_token(user_id.parse()?, authed_token_id.parse()?, tx)
-                    .await?;
-                tx.commit().await?;
+            let mut tx = self.user_repo.begin().await?;
+            tx = self
+                .user_repo
+                .bind_user_authed_token(user_id.parse()?, authed_token_id.parse()?, tx)
+                .await?;
+            tx.commit().await?;
 
-                return Ok(UserRegTempUrlServiceOutput::Registered);
-            }
+            return Ok(UserRegTempUrlServiceOutput::Registered);
         }
 
         // TODO: non-existance url

@@ -1,19 +1,21 @@
 use axum::{
+    Router,
     body::Body,
     extract::{Path, State},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
 };
-use axum_extra::extract::cookie::{Cookie, SameSite};
 use axum_extra::extract::CookieJar;
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use http::HeaderValue;
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    AppState,
     services::{
-        server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+        AppService,
+        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
         },
@@ -23,9 +25,7 @@ use crate::{
         user_page_service::{UserPageServiceInput, UserPageServiceOutput},
         user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
-        AppService,
     },
-    AppState,
 };
 
 pub fn user_routes() -> Router<AppState> {

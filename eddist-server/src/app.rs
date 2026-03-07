@@ -1,21 +1,21 @@
 use std::{env, time::Duration};
 
 use axum::{
+    Extension, Json, Router,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, State},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
-    Extension, Json, Router,
 };
 use axum_prometheus::PrometheusMetricLayer;
-use eddist_core::domain::board::{validate_board_key, BoardInfo};
+use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower_http::{
     catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 
 use crate::{
     middleware::user_restriction::user_restriction_middleware,
@@ -37,10 +37,10 @@ use crate::{
         terms::get_terms,
         user::user_routes,
     },
-    services::server_settings_cache::{get_server_setting_bool, ServerSettingKey},
+    services::server_settings_cache::{ServerSettingKey, get_server_setting_bool},
     services::{
-        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         AppService, AppServiceContainer,
+        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
     utils::CsrfState,

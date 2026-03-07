@@ -5,10 +5,10 @@ use std::ops::Add;
 
 use crate::{
     domain::{
-        metadent::{generate_date_seed, generate_meta_ident, METADENT_RESET_PERIOD_DAYS},
+        metadent::{METADENT_RESET_PERIOD_DAYS, generate_date_seed, generate_meta_ident},
         res::{
-            generate_id_with_device_suffix, get_author_id_by_seed,
-            AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS,
+            AUTHOR_ID_SUFFIX_RESET_PERIOD_DAYS, generate_id_with_device_suffix,
+            get_author_id_by_seed,
         },
         thread_list::ThreadListWithMetadent,
     },
