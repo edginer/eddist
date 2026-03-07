@@ -112,5 +112,11 @@ tower-sessions = "0.14.0"
 env_logger = "0.11.3"
 tokio-util = "0.7.11"
 
+# Allocator
+mimalloc = { version = "0.1", default-features = false }
+
+# Hashing
+twox-hash = "2"
+
 # Internal
 eddist-core = { path = "eddist-core" }
