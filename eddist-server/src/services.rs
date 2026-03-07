@@ -5,7 +5,6 @@ use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
 use metadent_thread_list_service::MetadentThreadListService;
 use redis::aio::ConnectionManager;
-
 use res_creation_service::ResCreationService;
 use s3::Bucket;
 use thread_creation_service::TheradCreationService;
@@ -30,6 +29,12 @@ use crate::{
         user_restriction_repository::UserRestrictionRepository,
     },
 };
+
+/// Groups the two pub/sub repositories to keep `AppServiceContainer::new` within argument limits.
+pub struct PubSubRepos<P: PubRepository, E: CreationEventRepository> {
+    pub pub_repo: P,
+    pub event_repo: E,
+}
 
 pub(crate) mod auth_with_code_service;
 pub(crate) mod auth_with_code_user_page_service;
@@ -108,8 +113,7 @@ impl<
         idp_repo: I,
         user_restriction_repo: R,
         redis_conn: ConnectionManager,
-        pub_repo: P,
-        event_repo: E,
+        pubsub: PubSubRepos<P, E>,
         bucket: Bucket,
     ) -> Self {
         AppServiceContainer {
@@ -120,14 +124,14 @@ impl<
                 bbs_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
-                pub_repo.clone(),
-                event_repo.clone(),
+                pubsub.pub_repo.clone(),
+                pubsub.event_repo.clone(),
             ),
             thread_creation: TheradCreationService::new(
                 bbs_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
-                event_repo.clone(),
+                pubsub.event_repo.clone(),
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),

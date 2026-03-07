@@ -7,6 +7,7 @@ use axum::{
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
+use twox_hash::XxHash3_64;
 
 pub fn shift_jis_url_encodeded_body_to_vec(data: &str) -> Result<HashMap<&str, String>, ()> {
     fn ascii_hex_digit_to_byte(value: u8) -> Result<u8, ()> {
@@ -85,6 +86,7 @@ pub struct SJisResponseBuilder {
     status_code: StatusCode,
     cookies: CookieJar,
     headers: Vec<(String, String)>,
+    if_none_match: Option<String>,
 }
 
 pub enum SjisContentType {
@@ -102,6 +104,14 @@ impl SJisResponseBuilder {
             status_code: StatusCode::OK,
             cookies: CookieJar::new(),
             headers: Vec::new(),
+            if_none_match: None,
+        }
+    }
+
+    pub fn if_none_match(self, value: Option<String>) -> Self {
+        Self {
+            if_none_match: value,
+            ..self
         }
     }
 
@@ -149,19 +159,50 @@ impl SJisResponseBuilder {
     }
 
     pub fn build(self) -> SJisResponse {
-        let mut resp = Response::new(self.body.get_inner().into());
-        let headers = resp.headers_mut();
-        headers.clear();
+        let body_bytes = self.body.get_inner();
 
         let cache_control_value = if let Some(max_age) = self.max_age {
             format!("max-age={},s-maxage={}", max_age, self.s_max_age)
         } else {
             format!("s-maxage={}", self.s_max_age)
         };
+
+        // Compute ETag only for full (non-partial) responses.
+        let etag = if self.status_code == StatusCode::OK {
+            let hash = XxHash3_64::oneshot(&body_bytes);
+            Some(format!("W/\"{:016x}\"", hash))
+        } else {
+            None
+        };
+
+        // Return 304 Not Modified when the client's cached ETag matches.
+        if let (Some(ref etag_val), Some(ref inm)) = (&etag, &self.if_none_match) {
+            let inm_trimmed = inm.trim();
+            if inm_trimmed == etag_val.as_str() || inm_trimmed == "*" {
+                let mut resp = Response::new(vec![].into());
+                *resp.status_mut() = StatusCode::NOT_MODIFIED;
+                let headers = resp.headers_mut();
+                headers.append("ETag", HeaderValue::from_str(etag_val).unwrap());
+                headers.append(
+                    "Cache-Control",
+                    HeaderValue::from_str(&cache_control_value).unwrap(),
+                );
+                return SJisResponse(resp);
+            }
+        }
+
+        let mut resp = Response::new(body_bytes.into());
+        let headers = resp.headers_mut();
+        headers.clear();
+
         headers.append(
             "Cache-Control",
             HeaderValue::from_str(&cache_control_value).unwrap(),
         );
+
+        if let Some(ref etag_val) = etag {
+            headers.append("ETag", HeaderValue::from_str(etag_val).unwrap());
+        }
 
         headers.append(
             "Content-Type",
@@ -186,8 +227,7 @@ impl SJisResponseBuilder {
             }
         }
 
-        let status_code = resp.status_mut();
-        *status_code = self.status_code;
+        *resp.status_mut() = self.status_code;
 
         SJisResponse(resp)
     }

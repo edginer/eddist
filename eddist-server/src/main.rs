@@ -33,6 +33,7 @@ use crate::{
     repositories::{
         notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
     },
+    services::PubSubRepos,
 };
 
 pub mod app;
@@ -165,14 +166,16 @@ async fn main() -> anyhow::Result<()> {
             IdpRepositoryImpl::new(pool.clone()),
             user_restriction_repo.clone(),
             conn_mgr.clone(),
-            pub_repo,
-            event_repo,
+            PubSubRepos {
+                pub_repo,
+                event_repo,
+            },
             *s3_client,
         ),
         notice_repo,
         terms_repo,
-        tinker_secret,
         template_engine,
+        tinker_secret,
     };
 
     // Start background task for user restriction cache refresh
