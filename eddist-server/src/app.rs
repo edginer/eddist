@@ -12,8 +12,8 @@ use eddist_core::domain::board::{validate_board_key, BoardInfo};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower_http::{
-    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
-    trace::TraceLayer,
+    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass,
+    compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
 use tracing::{info_span, Span};
 
@@ -57,8 +57,8 @@ pub struct AppState {
     >,
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
-    pub tinker_secret: String,
     pub template_engine: Handlebars<'static>,
+    pub tinker_secret: String,
 }
 
 impl AppState {
@@ -266,6 +266,8 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
                 .unwrap()
         }))
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        // NOTE: comment out for now (is is not confirmed in twinkle environment)
+        // .layer(CompressionLayer::new())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
