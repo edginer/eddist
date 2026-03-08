@@ -98,13 +98,20 @@ pub async fn get_dat_txt(
         _ => (result.raw(), false),
     };
 
-    let if_none_match = if !is_partial {
-        headers
+    let (if_none_match, etag) = if !is_partial {
+        let inm = headers
             .get("If-None-Match")
             .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
+            .map(|s| s.to_string());
+        let etag = Some(format!(
+            "W/\"{}-{}-{}\"",
+            board_key,
+            thread_number_num,
+            result.len()
+        ));
+        (inm, etag)
     } else {
-        None
+        (None, None)
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(result))
@@ -112,6 +119,7 @@ pub async fn get_dat_txt(
         .client_ttl(5)
         .server_ttl(1)
         .if_none_match(if_none_match)
+        .with_etag(etag)
         .status_code(if is_partial {
             StatusCode::PARTIAL_CONTENT
         } else {
@@ -138,8 +146,8 @@ pub async fn get_kako_dat_txt(
 
     let result = match svc
         .execute(KakoThreadRetrievalServiceInput {
-            board_key,
-            thread_number,
+            board_key: board_key.clone(),
+            thread_number: thread_number.clone(),
         })
         .await
     {
@@ -153,6 +161,12 @@ pub async fn get_kako_dat_txt(
         }
     };
 
+    let etag = Some(format!(
+        "W/\"{}-{}-{}\"",
+        board_key,
+        thread_number,
+        result.len()
+    ));
     let sjis_str = if let Ok(result) = str::from_utf8(&result) {
         SJisStr::from(result)
     } else {
@@ -168,6 +182,7 @@ pub async fn get_kako_dat_txt(
         .content_type(SjisContentType::TextPlain)
         .server_ttl(3600)
         .if_none_match(if_none_match)
+        .with_etag(etag)
         .build()
         .into_response()
 }
