@@ -1,5 +1,5 @@
 import { Button } from "flowbite-react";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, lazy, Suspense } from "react";
 import {
   FaArrowLeft,
   FaCog,
@@ -12,8 +12,6 @@ import {
 import { Link, useNavigate, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
 import useSWR from "swr";
-import PostThreadModal from "../components/PostThreadModal";
-import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
 import { NGContextMenu } from "../components/NGContextMenu";
 import type { Route } from "./+types/ThreadListPage";
 import { fetchBoards, type Board } from "~/api-client/board";
@@ -23,6 +21,13 @@ import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
+
+const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
+const LazyNGWordsSettingsModal = lazy(() =>
+  import("../components/NGWordsSettingsModal").then((m) => ({
+    default: m.NGWordsSettingsModal,
+  })),
+);
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
 type SortOrder = "asc" | "desc";
@@ -130,6 +135,8 @@ const ThreadListPage = ({
   const [showSortControls, setShowSortControls] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasEverOpenedThread = useRef(false);
+  const hasEverOpenedNGSettings = useRef(false);
 
   const { shouldFilterThread } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
@@ -276,7 +283,10 @@ const ThreadListPage = ({
         </button>
         <button
           type="button"
-          onClick={() => setShowNGSettings(true)}
+          onClick={() => {
+            hasEverOpenedNGSettings.current = true;
+            setShowNGSettings(true);
+          }}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-1.5"
           title="NG設定"
         >
@@ -308,7 +318,10 @@ const ThreadListPage = ({
           </span>
         </button>
         <Button
-          onClick={() => setCreatingThread(true)}
+          onClick={() => {
+            hasEverOpenedThread.current = true;
+            setCreatingThread(true);
+          }}
           className={twMerge(
             "px-4 py-2 lg:px-6 lg:py-3 mx-2",
             params.boardKey || "hidden",
@@ -318,18 +331,26 @@ const ThreadListPage = ({
           <span className="lg:block hidden">スレッド作成</span>
         </Button>
 
-        <NGWordsSettingsModal
-          open={showNGSettings}
-          setOpen={setShowNGSettings}
-        />
+        {hasEverOpenedNGSettings.current && (
+          <Suspense fallback={null}>
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+            />
+          </Suspense>
+        )}
       </header>
 
-      <PostThreadModal
-        boardKey={params.boardKey!}
-        open={creatingThread}
-        setOpen={setCreatingThread}
-        refetchThreadList={mutate}
-      />
+      {hasEverOpenedThread.current && (
+        <Suspense fallback={null}>
+          <LazyPostThreadModal
+            boardKey={params.boardKey!}
+            open={creatingThread}
+            setOpen={setCreatingThread}
+            refetchThreadList={mutate}
+          />
+        </Suspense>
+      )}
 
       {showSortControls && (
         <div className="bg-white border-b border-gray-300 p-3 flex flex-wrap gap-2 items-center">

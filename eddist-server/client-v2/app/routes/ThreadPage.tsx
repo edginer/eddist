@@ -1,10 +1,8 @@
 import { Button } from "flowbite-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { Link, useParams } from "react-router";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
-import PostResponseModal from "../components/PostResponseModal";
-import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import type { Route } from "./+types/ThreadPage";
@@ -20,6 +18,15 @@ import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import React from "react";
+
+const LazyPostResponseModal = lazy(
+  () => import("../components/PostResponseModal"),
+);
+const LazyNGWordsSettingsModal = lazy(() =>
+  import("../components/NGWordsSettingsModal").then((m) => ({
+    default: m.NGWordsSettingsModal,
+  })),
+);
 
 export const headers = (_: Route.HeadersArgs) => {
   return {
@@ -96,8 +103,6 @@ interface Popup {
   ref: React.RefObject<HTMLDivElement | null>;
 }
 
-let popupCounter = 0;
-
 // Set maximum width and height for popups
 const MAX_POPUP_WIDTH_DESKTOP = "90vw";
 const MAX_POPUP_WIDTH_MOBILE = "95vw";
@@ -126,6 +131,9 @@ const ThreadPage = ({
   const params = useParams();
 
   const [popups, setPopups] = useState<Popup[]>([]);
+  const popupCounter = useRef(0);
+  const hasEverOpenedResponse = useRef(false);
+  const hasEverOpenedNGSettings = useRef(false);
 
   useEffect(() => {
     const htmlEl = document.documentElement;
@@ -181,7 +189,7 @@ const ThreadPage = ({
       .map((i) => posts.responses[i]);
     setPopups((prev) => [
       ...prev,
-      { id: ++popupCounter, x, y, posts: postsByIndices, ref },
+      { id: ++popupCounter.current, x, y, posts: postsByIndices, ref },
     ]);
   };
 
@@ -239,6 +247,11 @@ const ThreadPage = ({
   const threadName = useMemo(
     () => decodeNumericCharRefsStr(posts?.threadName || ""),
     [posts?.threadName],
+  );
+
+  const filterResults = useMemo(
+    () => posts?.responses.map(shouldFilterResponse) ?? [],
+    [posts?.responses, shouldFilterResponse],
   );
 
   if (
@@ -342,14 +355,20 @@ const ThreadPage = ({
         </button>
         <button
           type="button"
-          onClick={() => setShowNGSettings(true)}
+          onClick={() => {
+            hasEverOpenedNGSettings.current = true;
+            setShowNGSettings(true);
+          }}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
           title="NG設定"
         >
           <FaCog className="w-4 h-4" />
         </button>
         <Button
-          onClick={() => setCreatingResponse(true)}
+          onClick={() => {
+            hasEverOpenedResponse.current = true;
+            setCreatingResponse(true);
+          }}
           className={twMerge(
             "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
             params.boardKey || params.threadKey || "hidden",
@@ -359,25 +378,33 @@ const ThreadPage = ({
           <span className="lg:block hidden">書き込み</span>
         </Button>
 
-        <NGWordsSettingsModal
-          open={showNGSettings}
-          setOpen={setShowNGSettings}
-        />
+        {hasEverOpenedNGSettings.current && (
+          <Suspense fallback={null}>
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+            />
+          </Suspense>
+        )}
       </header>
 
-      <PostResponseModal
-        open={creatingResponse}
-        setOpen={setCreatingResponse}
-        boardKey={params.boardKey!}
-        threadKey={params.threadKey!}
-        refetchThread={mutate}
-      />
+      {hasEverOpenedResponse.current && (
+        <Suspense fallback={null}>
+          <LazyPostResponseModal
+            open={creatingResponse}
+            setOpen={setCreatingResponse}
+            boardKey={params.boardKey!}
+            threadKey={params.threadKey!}
+            refetchThread={mutate}
+          />
+        </Suspense>
+      )}
 
       <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
-            {posts?.responses.map((post) => {
-              const filterResult = shouldFilterResponse(post);
+            {posts?.responses.map((post, index) => {
+              const filterResult = filterResults[index];
               const isExpanded = expandedNGPosts.has(post.id);
 
               // Completely hidden
@@ -447,13 +474,9 @@ const ThreadPage = ({
                       onClick={(e) =>
                         openPopup(
                           e,
-                          posts.responses.reduce(
-                            (acc, cur, i) =>
-                              cur.authorId === post.authorId
-                                ? acc.concat(i)
-                                : acc,
-                            [] as number[],
-                          ),
+                          posts.authorIdMap
+                            .get(post.authorId)
+                            ?.map(([, i]) => i) ?? [],
                         )
                       }
                       onContextMenu={(e) => {
@@ -499,6 +522,7 @@ const ThreadPage = ({
           </div>
         </div>
       </main>
+
       {popups.map((popup, idx) => {
         const isTop = idx === popups.length - 1;
         const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
@@ -539,11 +563,8 @@ const ThreadPage = ({
                     onClick={(e) =>
                       openPopup(
                         e,
-                        posts.responses.reduce(
-                          (acc, cur, i) =>
-                            cur.authorId === p.authorId ? acc.concat(i) : acc,
-                          [] as number[],
-                        ),
+                        posts.authorIdMap.get(p.authorId)?.map(([, i]) => i) ??
+                          [],
                       )
                     }
                     style={{ cursor: "pointer" }}
