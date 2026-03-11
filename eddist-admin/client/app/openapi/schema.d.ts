@@ -570,6 +570,7 @@ export interface components {
         BoardInfo: {
             base_response_creation_span_sec: number;
             base_thread_creation_span_sec: number;
+            force_metadent_type?: string | null;
             local_rules: string;
             max_author_name_byte_length: number;
             max_email_byte_length: number;
@@ -643,6 +644,7 @@ export interface components {
             base_thread_creation_span_sec?: number | null;
             board_key: string;
             default_name: string;
+            force_metadent_type?: string | null;
             local_rule: string;
             max_author_name_byte_length?: number | null;
             max_email_byte_length?: number | null;
@@ -697,6 +699,7 @@ export interface components {
             base_response_creation_span_sec?: number | null;
             base_thread_creation_span_sec?: number | null;
             default_name?: string | null;
+            force_metadent_type?: string | null;
             local_rule?: string | null;
             max_author_name_byte_length?: number | null;
             max_email_byte_length?: number | null;

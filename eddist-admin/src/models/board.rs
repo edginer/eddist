@@ -24,6 +24,7 @@ pub struct BoardInfo {
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<usize>,
     pub read_only: bool,
+    pub force_metadent_type: Option<String>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -41,6 +42,7 @@ pub struct CreateBoardInput {
     pub max_response_body_lines: Option<usize>,
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<usize>,
+    pub force_metadent_type: Option<String>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -58,4 +60,5 @@ pub struct EditBoardInput {
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<usize>,
     pub read_only: Option<bool>,
+    pub force_metadent_type: Option<String>,
 }

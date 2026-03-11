@@ -110,6 +110,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         (&res_core, &input.title as &str).validate_content_length(&board_info)?;
         client_info.validate_client_info(&board_info, true)?;
 
+        let force_metadent = board_info
+            .force_metadent_type
+            .as_deref()
+            .and_then(|s| s.parse().ok());
+
         let res = Res::new_from_thread(
             res_core,
             &input.board_key,
@@ -117,6 +122,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             client_info.clone(),
             input.authed_token,
             false,
+            force_metadent,
         );
 
         let auth_service = BbsCgiAuthService::new(self.0.clone());

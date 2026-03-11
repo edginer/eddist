@@ -262,8 +262,21 @@ impl Res<AuthorIdUninitialized> {
         client_info: ClientInfo,
         authed_token: Option<String>,
         is_abone: bool,
+        force_metadent_type: Option<MetadentType>,
     ) -> Self {
-        let (body, metadent_type) = if body.contains("!metadent:") {
+        let (body, metadent_type) = if let Some(forced) = force_metadent_type {
+            // Strip markers from body but apply forced type
+            let body = if body.contains("!metadent:v:") {
+                Cow::Owned(body.replacen("!metadent:v:", "!metadent:v - forced", 1))
+            } else if body.contains("!metadent:vv:") {
+                Cow::Owned(body.replacen("!metadent:vv:", "!metadent:vv - forced", 1))
+            } else if body.contains("!metadent:vvv:") {
+                Cow::Owned(body.replacen("!metadent:vvv:", "!metadent:vvv - forced", 1))
+            } else {
+                body
+            };
+            (body, forced)
+        } else if body.contains("!metadent:") {
             if body.contains("!metadent:v:") {
                 (
                     Cow::Owned(body.replacen("!metadent:v:", "!metadent:v - configured", 1)),
