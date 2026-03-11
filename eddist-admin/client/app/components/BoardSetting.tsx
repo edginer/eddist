@@ -22,11 +22,7 @@ const boardGeneralSettingSchema = z.object({
   default_name: z.string().min(1).max(64),
   local_rule: z.string().min(1),
   read_only: z.boolean(),
-  force_metadent_type: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((v) => (v === "" ? null : v)),
+  force_metadent_type: z.string().optional().nullable(),
 });
 
 const boardPostRestrictionSettingSchema = z.object({

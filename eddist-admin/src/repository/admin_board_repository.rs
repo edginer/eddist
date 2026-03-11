@@ -248,13 +248,25 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             sets.push("local_rules = ?");
             values_str.push(local_rule);
         }
-        if let Some(threads_archive_cron) = &board.threads_archive_cron {
-            sets.push("threads_archive_cron = ?");
-            values_str.push(threads_archive_cron);
+        match &board.threads_archive_cron {
+            Some(v) if v.is_empty() => {
+                sets.push("threads_archive_cron = NULL");
+            }
+            Some(v) => {
+                sets.push("threads_archive_cron = ?");
+                values_str.push(v);
+            }
+            None => {}
         }
-        if let Some(force_metadent_type) = &board.force_metadent_type {
-            sets.push("force_metadent_type = ?");
-            values_str.push(force_metadent_type);
+        match &board.force_metadent_type {
+            Some(v) if v.is_empty() => {
+                sets.push("force_metadent_type = NULL");
+            }
+            Some(v) => {
+                sets.push("force_metadent_type = ?");
+                values_str.push(v);
+            }
+            None => {}
         }
 
         if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
