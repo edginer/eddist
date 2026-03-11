@@ -48,19 +48,7 @@ pub async fn post_bbs_cgi(
         .get("tinker-token")
         .and_then(|x| get_tinker(x.value(), state.tinker_secret()));
     let user_sid = jar.get("user-sid").map(|x| x.value().to_string());
-    let mut edge_token = jar.get("edge-token").map(|x| x.value().to_string());
-
-    // If the user is logged in but has no edge-token, restore it from the linked tokens
-    if edge_token.is_none()
-        && let Some(ref sid) = user_sid
-        && let Ok(Some(restored)) = state
-            .services
-            .bind_token_to_user()
-            .restore_user_authed_token(sid)
-            .await
-    {
-        edge_token = Some(restored);
-    }
+    let edge_token = jar.get("edge-token").map(|x| x.value().to_string());
 
     let Some(board_key) = form.get("bbs").map(|x| x.to_string()) else {
         return BbsCgiError::from(InsufficientParamType::Bbs).into_response();

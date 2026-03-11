@@ -22,27 +22,6 @@ impl<U: UserRepository + Clone> BindTokenToUserService<U> {
             redis_conn,
         }
     }
-
-    pub async fn restore_user_authed_token(
-        &self,
-        user_sid: &str,
-    ) -> anyhow::Result<Option<String>> {
-        let mut redis_conn = self.redis_conn.clone();
-
-        let user_id_str = redis_conn
-            .get::<_, Option<String>>(user_session_key(user_sid))
-            .await?;
-
-        let Some(user_id_str) = user_id_str else {
-            return Ok(None);
-        };
-
-        let user_id = Uuid::parse_str(&user_id_str)?;
-
-        self.user_repo
-            .get_valid_authed_token_by_user_id(user_id)
-            .await
-    }
 }
 
 #[async_trait::async_trait]

@@ -281,6 +281,20 @@ impl UserRepository for UserRepositoryImpl {
             authed_token_id
         );
 
+        // Serialize concurrent bindings for the same user to prevent seed normalization races.
+        // Two concurrent transactions without this lock could both see "no canonical seed"
+        // under REPEATABLE READ and end up with different author_id_seed values.
+        let user_exists = sqlx::query!(
+            r#"SELECT id AS "id: Uuid" FROM users WHERE id = ? FOR UPDATE"#,
+            user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if user_exists.is_none() {
+            anyhow::bail!("user {user_id} not found");
+        }
+
         sqlx::query!(
             r#"
             INSERT INTO user_authed_tokens (id, user_id, authed_token_id, created_at, updated_at)
