@@ -38,6 +38,19 @@ impl From<&str> for MetadentType {
     }
 }
 
+impl std::str::FromStr for MetadentType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "v" => Ok(MetadentType::Verbose),
+            "vv" => Ok(MetadentType::VVerbose),
+            "vvv" => Ok(MetadentType::VVVerbose),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Metadent {
     None,
