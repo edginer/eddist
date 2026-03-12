@@ -189,16 +189,23 @@ async fn get_robots_txt() -> impl IntoResponse {
 }
 
 pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) -> Router {
-    let enable_metrics = env::var("AXUM_METRICS") == Ok("true".to_string());
-    let (prometheus_layer, metric_handle) = if enable_metrics {
+    let enable_axum_metrics = env::var("AXUM_METRICS") == Ok("true".to_string());
+    let (prometheus_layer, metric_handle) = {
         let (layer, handle) = PrometheusMetricLayer::pair();
-        (Some(layer), Some(handle))
-    } else {
-        (None, None)
+        let layer = if enable_axum_metrics {
+            Some(layer)
+        } else {
+            None
+        };
+        (layer, handle)
     };
 
     let app = Router::new()
         .route("/health-check", get(health_check))
+        .route(
+            "/metrics",
+            get(move || async move { metric_handle.render() }),
+        )
         .route("/robots.txt", get(get_robots_txt))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
@@ -248,13 +255,6 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
                 },
             ),
         );
-
-    // Add metrics route if enabled
-    let app = if let Some(handle) = metric_handle {
-        app.route("/metrics", get(move || async move { handle.render() }))
-    } else {
-        app
-    };
 
     let app = app
         .with_state(app_state.clone())
