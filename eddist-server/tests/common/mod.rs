@@ -18,6 +18,7 @@ impl TestContext {
     pub async fn new() -> Self {
         std::env::set_var("BASE_URL", "http://localhost:8000");
         std::env::set_var("RUST_ENV", "prod");
+        std::env::set_var("DISABLE_METRICS", "true");
 
         let mysql_container = Mysql::default()
             .with_name("mysql")
