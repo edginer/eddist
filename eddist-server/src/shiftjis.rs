@@ -7,7 +7,6 @@ use axum::{
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
-use twox_hash::XxHash3_64;
 
 pub fn shift_jis_url_encodeded_body_to_vec(data: &str) -> Result<HashMap<&str, String>, ()> {
     fn ascii_hex_digit_to_byte(value: u8) -> Result<u8, ()> {
@@ -87,6 +86,7 @@ pub struct SJisResponseBuilder {
     cookies: CookieJar,
     headers: Vec<(String, String)>,
     if_none_match: Option<String>,
+    etag: Option<String>,
 }
 
 pub enum SjisContentType {
@@ -105,7 +105,12 @@ impl SJisResponseBuilder {
             cookies: CookieJar::new(),
             headers: Vec::new(),
             if_none_match: None,
+            etag: None,
         }
+    }
+
+    pub fn with_etag(self, etag: Option<String>) -> Self {
+        Self { etag, ..self }
     }
 
     pub fn if_none_match(self, value: Option<String>) -> Self {
@@ -167,13 +172,8 @@ impl SJisResponseBuilder {
             format!("s-maxage={}", self.s_max_age)
         };
 
-        // Compute ETag only for full (non-partial) responses.
-        let etag = if self.status_code == StatusCode::OK {
-            let hash = XxHash3_64::oneshot(&body_bytes);
-            Some(format!("W/\"{:016x}\"", hash))
-        } else {
-            None
-        };
+        // Use pre-computed ETag only for full (non-partial) responses.
+        let etag = self.etag.filter(|_| self.status_code == StatusCode::OK);
 
         // Return 304 Not Modified when the client's cached ETag matches.
         if let (Some(etag_val), Some(inm)) = (&etag, &self.if_none_match) {
