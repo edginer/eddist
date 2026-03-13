@@ -1,4 +1,4 @@
-use std::{borrow::Cow, env, sync::OnceLock};
+use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::{
@@ -17,7 +17,7 @@ use crate::{
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::BbsCgiAuthService,
+            bbscgi_auth_service::{BbsCgiAuthService, USER_CREATION_RATE_LIMIT},
             bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
@@ -42,7 +42,6 @@ use super::{
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
-pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(

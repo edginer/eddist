@@ -1,7 +1,9 @@
-use std::env;
+use std::{env, sync::OnceLock};
 
 use chrono::Utc;
+use eddist_core::simple_rate_limiter::RateLimiter;
 use redis::aio::ConnectionManager;
+use tokio::sync::Mutex;
 
 use crate::{
     domain::{
@@ -11,6 +13,8 @@ use crate::{
     error::BbsCgiError,
     repositories::bbs_repository::{BbsRepository, CreatingAuthedToken},
 };
+
+pub static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct BbsCgiAuthService<T: BbsRepository> {
@@ -97,6 +101,16 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
 
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
+            let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
+                Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
+            });
+            {
+                let mut rate_limiter = rate_limiter.lock().await;
+                if !rate_limiter.check_and_add(&authed_token.token) {
+                    return Err(BbsCgiError::TooManyUserCreationAttempt);
+                }
+            }
+
             let user_reg_url_svc = UserRegTempUrlService::new(self.redis_conn.clone());
             return match user_reg_url_svc
                 .create_userreg_temp_url(&authed_token)

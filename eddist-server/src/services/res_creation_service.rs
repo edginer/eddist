@@ -25,7 +25,7 @@ use crate::{
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::BbsCgiAuthService,
+            bbscgi_auth_service::{BbsCgiAuthService, USER_CREATION_RATE_LIMIT},
             bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
@@ -48,7 +48,6 @@ use crate::{
 use super::{
     BbsCgiService,
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
-    thread_creation_service::USER_CREATION_RATE_LIMIT,
 };
 
 #[derive(Clone)]
