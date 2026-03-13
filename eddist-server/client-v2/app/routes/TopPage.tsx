@@ -3,6 +3,10 @@ import type { Route } from "./+types/TopPage";
 import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
 
+export const headers = () => ({
+  "Cache-Control": "s-maxage=300",
+});
+
 export const loader = async ({ context }: Route.LoaderArgs) => {
   const baseUrl =
     context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
