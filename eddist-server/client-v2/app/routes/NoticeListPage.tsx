@@ -2,6 +2,10 @@ import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/NoticeListPage";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
 
+export const headers = () => ({
+  "Cache-Control": "s-maxage=300",
+});
+
 export const loader = async ({ context, request }: Route.LoaderArgs) => {
   const baseUrl =
     context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;

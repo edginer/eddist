@@ -30,7 +30,7 @@ export const headers = (_: Route.HeadersArgs) => {
   return {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "max-age=5, s-maxage=1",
+    "Cache-Control": "max-age=5, s-maxage=3",
   };
 };
 

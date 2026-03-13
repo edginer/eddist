@@ -3,6 +3,10 @@ import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { parseMarkdown } from "~/utils/markdown";
 
+export const headers = () => ({
+  "Cache-Control": "s-maxage=3600",
+});
+
 export const loader = async ({ context, params }: Route.LoaderArgs) => {
   const baseUrl =
     context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
