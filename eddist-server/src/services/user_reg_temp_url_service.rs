@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     domain::{
         service::bbscgi_user_reg_temp_url_service::USER_REG_TEMP_URL_LEN,
-        user::user_reg_state::UserRegState,
+        user::user_reg_state::{TempUrlRegistrationRecord, UserRegState},
     },
     repositories::{
         bbs_repository::BbsRepository, idp_repository::IdpRepository,
@@ -64,17 +64,18 @@ impl<
                 .get::<_, Option<String>>(user_session_key(user_sid))
                 .await?
         {
-            let Some(authed_token_id) = redis_conn
+            let Some(record_str) = redis_conn
                 .get_del::<_, Option<String>>(user_reg_temp_url_register_key(&input.temp_url_path))
                 .await?
             else {
                 return Ok(UserRegTempUrlServiceOutput::NotFound);
             };
+            let record = serde_json::from_str::<TempUrlRegistrationRecord>(&record_str)?;
 
             let mut tx = self.user_repo.begin().await?;
             tx = self
                 .user_repo
-                .bind_user_authed_token(user_id.parse()?, authed_token_id.parse()?, tx)
+                .bind_user_authed_token(user_id.parse()?, record.authed_token_id.parse()?, tx)
                 .await?;
             tx.commit().await?;
 
@@ -82,11 +83,12 @@ impl<
         }
 
         // TODO: non-existance url
-        let authed_token_id_str = redis_conn
+        let record_str = redis_conn
             .get_del::<_, String>(user_reg_temp_url_register_key(&input.temp_url_path))
             .await?;
+        let record = serde_json::from_str::<TempUrlRegistrationRecord>(&record_str)?;
 
-        let authed_token_id: Uuid = authed_token_id_str.parse()?;
+        let authed_token_id: Uuid = record.authed_token_id.parse()?;
         let authed_token_record = self
             .bbs_repo
             .get_authed_token_by_id(authed_token_id)
@@ -110,9 +112,12 @@ impl<
 
         let state_cookie = Uuid::now_v7().to_string();
         let user_reg_state = UserRegState {
-            authed_token: authed_token_id_str,
+            authed_token: record.authed_token_id,
             edge_token: Some(authed_token_record.token),
-            ..UserRegState::default()
+            idp_name: None,
+            nonce: None,
+            code_verifier: None,
+            source: record.source,
         };
 
         redis_conn

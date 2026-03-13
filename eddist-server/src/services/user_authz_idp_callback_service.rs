@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::{
     domain::{
         service::oidc_client_service::OidcClientService,
-        user::{user_login_state::UserLoginState, user_reg_state::UserRegState},
+        user::{
+            user_login_state::UserLoginState,
+            user_reg_state::{RegistrationSource, UserRegState},
+        },
     },
     repositories::{
         bbs_repository::BbsRepository,
@@ -107,6 +110,17 @@ impl<
 
         let edge_token = user_reg_state.edge_token.clone();
         let authed_token_id = user_reg_state.authed_token.clone();
+
+        // For AuthCode-initiated registrations the callback must arrive in the same browser.
+        // BbsCgi registrations may legitimately hand off to a system browser (different cookie jar).
+        if matches!(user_reg_state.source, RegistrationSource::AuthCode)
+            && browser_edge_token.as_deref() != edge_token.as_deref()
+        {
+            return Err(anyhow::anyhow!(
+                "edge-token mismatch: registration was initiated from auth-code page \
+                 but callback arrived with a different browser token"
+            ));
+        }
 
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;

@@ -7,7 +7,10 @@ use redis::{AsyncCommands, aio::ConnectionManager};
 use tracing::{error_span, info_span};
 
 use crate::{
-    domain::captcha_like::CaptchaProviderConfig,
+    domain::{
+        captcha_like::CaptchaProviderConfig,
+        user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
+    },
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
@@ -222,7 +225,10 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             redis_conn
                 .set_ex::<_, _, ()>(
                     user_reg_temp_url_register_key(&temp_url_path),
-                    token.id.to_string(),
+                    serde_json::to_string(&TempUrlRegistrationRecord {
+                        authed_token_id: token.id.to_string(),
+                        source: RegistrationSource::AuthCode,
+                    })?,
                     60 * 3, // 3 minutes TTL
                 )
                 .await?;
