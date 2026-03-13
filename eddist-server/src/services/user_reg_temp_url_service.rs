@@ -82,10 +82,12 @@ impl<
             return Ok(UserRegTempUrlServiceOutput::Registered);
         }
 
-        // TODO: non-existance url
-        let record_str = redis_conn
-            .get_del::<_, String>(user_reg_temp_url_register_key(&input.temp_url_path))
-            .await?;
+        let Some(record_str) = redis_conn
+            .get_del::<_, Option<String>>(user_reg_temp_url_register_key(&input.temp_url_path))
+            .await?
+        else {
+            return Ok(UserRegTempUrlServiceOutput::NotFound);
+        };
         let record = serde_json::from_str::<TempUrlRegistrationRecord>(&record_str)?;
 
         let authed_token_id: Uuid = record.authed_token_id.parse()?;
