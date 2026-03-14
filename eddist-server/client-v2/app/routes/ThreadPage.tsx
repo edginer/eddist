@@ -238,6 +238,12 @@ const ThreadPage = ({
     },
   );
 
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+    mutate();
+  }, []);
+
   // Find current board
   const currentBoard = boards?.find(
     (board: { board_key: string }) => board.board_key === params.boardKey,
@@ -253,6 +259,11 @@ const ThreadPage = ({
     () => posts?.responses.map(shouldFilterResponse) ?? [],
     [posts?.responses, shouldFilterResponse],
   );
+
+  const allResponses = posts?.responses ?? [];
+  const responsesToRender = isHydrated
+    ? allResponses
+    : allResponses.slice(0, 100);
 
   if (
     thread.redirected &&
@@ -403,8 +414,8 @@ const ThreadPage = ({
       <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
-            {posts?.responses.map((post, index) => {
-              const filterResult = filterResults[index];
+            {responsesToRender.map((post) => {
+              const filterResult = filterResults[post.id - 1];
               const isExpanded = expandedNGPosts.has(post.id);
 
               // Completely hidden
@@ -596,10 +607,6 @@ const ThreadPage = ({
           y={menuState.y}
           onClose={closeMenu}
           options={(() => {
-            const bodyText = contextMenuResponse.bodyParts
-              .map((part) => part.text)
-              .join("");
-
             if (contextMenuType === "authorId") {
               return [
                 {
