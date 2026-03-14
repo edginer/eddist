@@ -1,13 +1,13 @@
-use std::{borrow::Cow, env, sync::OnceLock};
+use std::{borrow::Cow, env};
 
 use chrono::Utc;
 use eddist_core::{
     domain::{cap::calculate_cap_hash, client_info::ClientInfo, tinker::Tinker},
     simple_rate_limiter::RateLimiter,
-    utils::{is_thread_pub_enabled, is_user_registration_enabled},
+    utils::is_thread_pub_enabled,
 };
 use metrics::counter;
-use redis::{aio::ConnectionManager, Cmd};
+use redis::{Cmd, aio::ConnectionManager};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -17,7 +17,7 @@ use crate::{
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::BbsCgiAuthService,
+            bbscgi_auth_service::{BbsCgiAuthService, USER_CREATION_RATE_LIMIT},
             bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
@@ -37,9 +37,11 @@ use crate::{
     utils::redis::thread_cache_key,
 };
 
-use super::BbsCgiService;
+use super::{
+    BbsCgiService,
+    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+};
 
-pub(super) static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
@@ -125,7 +127,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             force_metadent,
         );
 
-        let auth_service = BbsCgiAuthService::new(self.0.clone());
+        let auth_service = BbsCgiAuthService::new(self.0.clone(), redis_conn.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
@@ -133,6 +135,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
+                input.require_user_registration,
             )
             .await?;
 
@@ -146,7 +149,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             )
             .await?;
 
-        if is_user_registration_enabled() && input.body.starts_with("!userreg") {
+        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
+            && input.body.starts_with("!userreg")
+        {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
                 Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
             });
@@ -286,7 +291,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         counter!("response_creation", "board_key" => board_key.clone()).increment(1);
         counter!("thread_creation", "board_key" => board_key.clone()).increment(1);
 
-        Ok(ThreadCreationServiceOutput { tinker })
+        Ok(ThreadCreationServiceOutput {
+            tinker,
+            authed_token_id: authed_token.id,
+            is_authed_token_bound: authed_token.registered_user_id.is_some(),
+        })
     }
 }
 
@@ -301,10 +310,13 @@ pub struct TheradCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
+    pub require_user_registration: bool,
 }
 
 pub struct ThreadCreationServiceOutput {
     pub tinker: Tinker,
+    pub authed_token_id: Uuid,
+    pub is_authed_token_bound: bool,
 }
 
 pub fn sanitize_thread_name(name: &str) -> String {

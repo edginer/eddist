@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 use uuid::Uuid;
 
 use crate::{
@@ -31,7 +31,7 @@ impl<I: IdpRepository + Clone>
     ) -> anyhow::Result<UserLoginIdpRedirectionServiceOutput> {
         let mut redis_conn = self.1.clone();
 
-        let idp_clients_svc = OidcClientService::new(self.0.clone(), self.1.clone());
+        let idp_clients_svc = OidcClientService::new(self.0.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (_, idp_client) = idp_clients

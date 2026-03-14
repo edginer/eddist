@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{error::BbsCgiError, utils::redis::email_auth_used_key};
 

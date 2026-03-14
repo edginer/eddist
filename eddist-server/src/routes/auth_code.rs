@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use axum::{
+    Form,
     extract::State,
     response::{Html, IntoResponse},
-    Form,
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::HeaderMap;
@@ -12,15 +12,16 @@ use serde_json::json;
 use time;
 
 use crate::{
+    AppState,
     domain::captcha_like::CaptchaProviderConfig,
     error::BbsPostAuthWithCodeError,
     services::{
-        auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
-        captcha_config_cache::get_cached_captcha_configs,
         AppService,
+        auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
+        bind_token_to_user_service::BindTokenToUserServiceInput,
+        captcha_config_cache::get_cached_captcha_configs,
     },
     utils::{get_origin_ip, get_ua},
-    AppState,
 };
 
 /// Script to be loaded for a captcha widget
@@ -117,7 +118,7 @@ pub async fn post_auth_code(
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
     let captcha_configs = get_cached_captcha_configs().await;
-    let (token, rate_limit_token) = match state
+    let (token, authed_token_id, rate_limit_token, user_reg_url) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
@@ -132,8 +133,10 @@ pub async fn post_auth_code(
     {
         Ok(AuthWithCodeServiceOutput {
             token,
+            authed_token_id,
             rate_limit_token,
-        }) => (token, rate_limit_token),
+            user_reg_url,
+        }) => (token, authed_token_id, rate_limit_token, user_reg_url),
         Err(e) => {
             return if let Some(e) = e.downcast_ref::<BbsPostAuthWithCodeError>() {
                 Html(
@@ -159,9 +162,29 @@ pub async fn post_auth_code(
         }
     };
 
+    // Auto-bind token to user if logged in
+    if let Some(user_sid) = jar.get("user-sid").map(|c| c.value().to_string())
+        && let Err(e) = state
+            .services
+            .bind_token_to_user()
+            .execute(BindTokenToUserServiceInput {
+                user_sid,
+                authed_token_id,
+            })
+            .await
+    {
+        log::warn!("Failed to auto-bind token to user: {e}");
+    }
+
     let html = state
         .template_engine
-        .render("auth-code.post.success", &json!({ "token": token }))
+        .render(
+            "auth-code.post.success",
+            &json!({
+                "token": token,
+                "user_reg_url": user_reg_url,
+            }),
+        )
         .unwrap();
 
     // Set rate limiting cookie if provided by the service

@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO server_settings (id, setting_key, value, description, created_at, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?)\n            ON DUPLICATE KEY UPDATE\n                value = VALUES(value),\n                description = VALUES(description),\n                updated_at = VALUES(updated_at)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "94105d228358c82212e4b3af9dee1598d087db3fca145d725d2e45c4ebf2839f"
+}

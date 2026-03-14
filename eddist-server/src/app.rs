@@ -1,21 +1,21 @@
 use std::{env, time::Duration};
 
 use axum::{
+    Extension, Json, Router,
     body::{Body, Bytes},
     extract::{MatchedPath, Path, State},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
-    Extension, Json, Router,
 };
 use axum_prometheus::PrometheusMetricLayer;
-use eddist_core::domain::board::{validate_board_key, BoardInfo};
+use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower_http::{
     catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass,
     compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 
 use crate::{
     middleware::user_restriction::user_restriction_middleware,
@@ -37,9 +37,10 @@ use crate::{
         terms::get_terms,
         user::user_routes,
     },
+    services::server_settings_cache::{ServerSettingKey, get_server_setting_bool},
     services::{
-        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         AppService, AppServiceContainer,
+        board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
     utils::CsrfState,
@@ -178,6 +179,19 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     resp
 }
 
+async fn get_api_client_config() -> impl IntoResponse {
+    let enable_user_registration =
+        get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await;
+
+    let mut resp = Json(serde_json::json!({
+        "enable_user_registration": enable_user_registration,
+    }))
+    .into_response();
+    resp.headers_mut()
+        .insert("Cache-Control", "s-maxage=60".parse().unwrap());
+    resp
+}
+
 async fn get_robots_txt() -> impl IntoResponse {
     let robot_txt = "User-agent: *\nAllow: /\nDisallow: /auth-code\n";
     SJisResponseBuilder::new((robot_txt as &str).into())
@@ -234,6 +248,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route("/api/notices/latest", get(get_latest_notices))
         .route("/api/notices", get(get_notices_paginated))
         .route("/api/notices/{slug}", get(get_notice_by_slug))
+        .route("/api/client-config", get(get_api_client_config))
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",

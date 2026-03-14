@@ -7,12 +7,12 @@ use axum::{
 use eddist_core::domain::user_restriction::UserRestrictionRule;
 
 use crate::{
+    AppState,
     services::{
-        user_restriction_service::{UserRestrictionCheckInput, UserRestrictionCheckOutput},
         AppService,
+        user_restriction_service::{UserRestrictionCheckInput, UserRestrictionCheckOutput},
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
-    AppState,
 };
 
 pub async fn user_restriction_middleware(

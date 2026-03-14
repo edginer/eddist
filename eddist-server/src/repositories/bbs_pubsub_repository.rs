@@ -1,5 +1,5 @@
 use eddist_core::domain::pubsub_repository::{CreatingRes, PubSubItem};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
 use super::bbs_repository::CreatingThread;
 

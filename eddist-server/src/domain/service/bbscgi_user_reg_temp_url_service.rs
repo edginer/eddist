@@ -1,7 +1,13 @@
-use rand::{distr::Uniform, Rng};
-use redis::{aio::ConnectionManager, AsyncCommands};
+use rand::{Rng, distr::Uniform};
+use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{domain::authed_token::AuthedToken, utils::redis::user_reg_temp_url_register_key};
+use crate::{
+    domain::{
+        authed_token::AuthedToken,
+        user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
+    },
+    utils::redis::user_reg_temp_url_register_key,
+};
 
 pub const USER_REG_TEMP_URL_LEN: usize = 5;
 
@@ -47,7 +53,10 @@ impl UserRegTempUrlService {
         redis_conn
             .set_ex::<_, _, ()>(
                 user_reg_temp_url_register_key(&temp_url_path),
-                authed_token.id.to_string().clone(),
+                serde_json::to_string(&TempUrlRegistrationRecord {
+                    authed_token_id: authed_token.id.to_string(),
+                    source: RegistrationSource::BbsCgi,
+                })?,
                 60 * 3,
             )
             .await?;

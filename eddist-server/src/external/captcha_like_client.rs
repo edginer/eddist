@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        CaptchaProviderConfig, CaptchaVerificationConfig, HCaptchaResponse, HttpMethod,
-        MonocleResponse, PlaceholderResolver, RequestFormat, TurnstileResponse, HCAPTCHA_URL,
-        MONOCLE_URL, TURNSTILE_URL,
+        CaptchaProviderConfig, CaptchaVerificationConfig, HCAPTCHA_URL, HCaptchaResponse,
+        HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver, RequestFormat,
+        TURNSTILE_URL, TurnstileResponse,
     },
     utils::SimpleSecret,
 };

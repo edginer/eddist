@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderName, HeaderValue},
     response::{IntoResponse, Response},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
 use eddist_core::domain::sjis_str::SJisStr;
 use hyper::StatusCode;
 
@@ -176,7 +176,7 @@ impl SJisResponseBuilder {
         let etag = self.etag.filter(|_| self.status_code == StatusCode::OK);
 
         // Return 304 Not Modified when the client's cached ETag matches.
-        if let (Some(ref etag_val), Some(ref inm)) = (&etag, &self.if_none_match) {
+        if let (Some(etag_val), Some(inm)) = (&etag, &self.if_none_match) {
             let inm_trimmed = inm.trim();
             if inm_trimmed == etag_val.as_str() || inm_trimmed == "*" {
                 let mut resp = Response::new(vec![].into());

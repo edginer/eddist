@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT at.author_id_seed AS \"author_id_seed: Vec<u8>\"\n            FROM authed_tokens at\n            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id\n            WHERE uat.user_id = ?\n            ORDER BY uat.created_at ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_id_seed: Vec<u8>",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 64
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "79cd171b3927493af9742738c776cfeb806d4eddda4ea9aba7f594703f5b8304"
+}
