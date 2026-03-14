@@ -282,8 +282,8 @@ impl UserRepository for UserRepositoryImpl {
         );
 
         // Serialize concurrent bindings for the same user to prevent seed normalization races.
-        // Two concurrent transactions without this lock could both see "no canonical seed"
-        // under REPEATABLE READ and end up with different author_id_seed values.
+        // Under READ COMMITTED, two concurrent transactions without this lock could both see
+        // "no canonical seed" and end up assigning different author_id_seed values.
         let user_exists = sqlx::query!(
             r#"SELECT id AS "id: Uuid" FROM users WHERE id = ? FOR UPDATE"#,
             user_id

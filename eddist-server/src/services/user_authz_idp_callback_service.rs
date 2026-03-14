@@ -1,3 +1,4 @@
+use chrono::Utc;
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
 use rand::{Rng, distr::Alphanumeric};
@@ -7,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        authed_token::AuthedToken,
         service::oidc_client_service::OidcClientService,
         user::{
             user_login_state::UserLoginState,
@@ -14,7 +16,7 @@ use crate::{
         },
     },
     repositories::{
-        bbs_repository::BbsRepository,
+        bbs_repository::{BbsRepository, CreatingAuthedToken},
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
@@ -81,7 +83,14 @@ impl<
             CallbackKind::Login => {
                 let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
                 let (user_sid, edge_token) = self
-                    .login_user_with_idp(login_state, input.code, input.browser_edge_token)
+                    .login_user_with_idp(
+                        login_state,
+                        input.code,
+                        input.browser_edge_token,
+                        input.ip_addr,
+                        input.user_agent,
+                        input.asn_num,
+                    )
                     .await?;
                 (user_sid, edge_token)
             }
@@ -221,6 +230,9 @@ impl<
         user_login_state: UserLoginState,
         code: String,
         browser_edge_token: Option<String>,
+        ip_addr: String,
+        user_agent: String,
+        asn_num: i32,
     ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
@@ -261,7 +273,10 @@ impl<
                     )
                     .await?;
 
-                // Sweep browser token: try to bind and restore it; fall back to stored token
+                // Sweep browser token: try to bind the current browser's token if valid and
+                // unbound. Otherwise issue a fresh token for this browser session — the user's
+                // existing bound tokens likely belong to other browser sessions and should not
+                // be shared across them.
                 let edge_token = if let Some(browser_token) = browser_edge_token
                     && let Ok(Some(token)) = self.bbs_repo.get_authed_token(&browser_token).await
                     && token.validity
@@ -275,9 +290,34 @@ impl<
                     tx.commit().await?;
                     Some(browser_token)
                 } else {
-                    self.user_repo
-                        .get_valid_authed_token_by_user_id(user.id)
-                        .await?
+                    // No valid unbound browser token — create and activate a new one.
+                    // IDP authentication already serves as verification so the token is
+                    // immediately valid.
+                    let new_token = AuthedToken::new(ip_addr, user_agent.clone(), asn_num);
+                    let created_at = Utc::now();
+                    self.bbs_repo
+                        .create_authed_token(CreatingAuthedToken {
+                            id: new_token.id,
+                            token: new_token.token.clone(),
+                            origin_ip: new_token.origin_ip,
+                            asn_num: new_token.asn_num,
+                            writing_ua: new_token.writing_ua.clone(),
+                            auth_code: "000000".to_string(), // Use psuedo auth code since the token is valid immediately
+                            created_at,
+                            author_id_seed: new_token.author_id_seed,
+                            require_user_registration: false,
+                        })
+                        .await?;
+                    self.bbs_repo
+                        .activate_authed_status(&new_token.token, &user_agent, created_at, None)
+                        .await?;
+                    let tx = self.user_repo.begin().await?;
+                    let tx = self
+                        .user_repo
+                        .bind_user_authed_token(user.id, new_token.id, tx)
+                        .await?;
+                    tx.commit().await?;
+                    Some(new_token.token)
                 };
 
                 Ok((user_sid, edge_token))
@@ -292,6 +332,9 @@ pub struct UserAuthzIdpCallbackServiceInput {
     pub state_id: String,
     pub callback_kind: CallbackKind,
     pub browser_edge_token: Option<String>,
+    pub ip_addr: String,
+    pub user_agent: String,
+    pub asn_num: i32,
 }
 
 pub enum CallbackKind {

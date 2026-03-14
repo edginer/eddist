@@ -7,12 +7,13 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::{Cookie, SameSite};
-use http::HeaderValue;
+use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
     AppState,
+    utils::{get_asn_num, get_origin_ip, get_ua},
     services::{
         AppService,
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
@@ -346,6 +347,7 @@ struct AuthzIdpCallbackQuery {
 }
 
 async fn get_user_authz_idp_callback(
+    headers: HeaderMap,
     State(state): State<AppState>,
     jar: CookieJar,
     query: axum::extract::Query<AuthzIdpCallbackQuery>,
@@ -372,6 +374,9 @@ async fn get_user_authz_idp_callback(
     }
 
     let browser_edge_token = jar.get("edge-token").map(|c| c.value().to_string());
+    let ip_addr = get_origin_ip(&headers);
+    let user_agent = get_ua(&headers);
+    let asn_num = get_asn_num(&headers);
 
     let (user_sid, edge_token) = match state
         .services
@@ -381,6 +386,9 @@ async fn get_user_authz_idp_callback(
             state_id: state_cookie.to_string(),
             callback_kind,
             browser_edge_token,
+            ip_addr: ip_addr.to_string(),
+            user_agent: user_agent.to_string(),
+            asn_num: asn_num.try_into().unwrap(),
         })
         .await
     {
