@@ -78,7 +78,7 @@ pub struct AppServiceContainer<
     R: UserRestrictionRepository + 'static,
     E: CreationEventRepository + 'static,
 > {
-    auth_with_code: AuthWithCodeService<B>,
+    auth_with_code: AuthWithCodeService<B, E>,
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B, U, P, E>,
@@ -118,7 +118,11 @@ impl<
         bucket: Bucket,
     ) -> Self {
         AppServiceContainer {
-            auth_with_code: AuthWithCodeService::new(bbs_repo.clone(), redis_conn.clone()),
+            auth_with_code: AuthWithCodeService::new(
+                bbs_repo.clone(),
+                redis_conn.clone(),
+                pubsub.event_repo.clone(),
+            ),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
@@ -181,7 +185,7 @@ impl<
     E: CreationEventRepository + 'static,
 > AppServiceContainer<B, U, I, P, R, E>
 {
-    pub fn auth_with_code(&self) -> &AuthWithCodeService<B> {
+    pub fn auth_with_code(&self) -> &AuthWithCodeService<B, E> {
         &self.auth_with_code
     }
 

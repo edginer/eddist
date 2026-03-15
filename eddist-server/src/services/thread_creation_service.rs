@@ -42,7 +42,6 @@ use super::{
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
-
 #[derive(Clone)]
 pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
     T,
@@ -127,7 +126,8 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             force_metadent,
         );
 
-        let auth_service = BbsCgiAuthService::new(self.0.clone(), redis_conn.clone());
+        let auth_service =
+            BbsCgiAuthService::new(self.0.clone(), redis_conn.clone(), self.3.clone());
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
 use super::client_info::ClientInfo;
@@ -19,6 +20,29 @@ pub struct CreatingRes {
     pub client_info: ClientInfo,
     pub res_order: i32,
     pub is_sage: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthTokenInitiated {
+    pub origin_ip: String,
+    pub user_agent: String,
+    pub asn_num: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthTokenRequested {
+    pub origin_ip: String,
+    pub user_agent: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthTokenSucceeded {
+    pub authed_token_id: Uuid,
+    pub origin_ip: String,
+    pub user_agent: String,
+    pub asn_num: i32,
+    pub authed_at: DateTime<Utc>,
+    pub additional_info: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

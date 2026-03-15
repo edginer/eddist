@@ -12,20 +12,31 @@ use crate::{
         service::bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
     },
     error::BbsCgiError,
-    repositories::bbs_repository::{BbsRepository, CreatingAuthedToken},
+    repositories::{
+        bbs_pubsub_repository::CreationEventRepository,
+        bbs_repository::{BbsRepository, CreatingAuthedToken},
+    },
+};
+use eddist_core::{
+    domain::pubsub_repository::AuthTokenInitiated, utils::is_auth_token_pub_enabled,
 };
 
 pub static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
 
 #[derive(Clone)]
-pub struct BbsCgiAuthService<T: BbsRepository> {
+pub struct BbsCgiAuthService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
     redis_conn: ConnectionManager,
+    event_repo: E,
 }
 
-impl<T: BbsRepository> BbsCgiAuthService<T> {
-    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
-        Self { repo, redis_conn }
+impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
+    pub fn new(repo: T, redis_conn: ConnectionManager, event_repo: E) -> Self {
+        Self {
+            repo,
+            redis_conn,
+            event_repo,
+        }
     }
 
     pub async fn check_validity(
@@ -38,7 +49,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
         require_user_registration: bool,
     ) -> Result<AuthedToken, BbsCgiError> {
         let Some(authed_token) = token else {
-            let authed_token = AuthedToken::new(ip_addr, user_agent, asn_num);
+            let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
             self.repo
                 .create_authed_token(CreatingAuthedToken {
                     token: authed_token.token.clone(),
@@ -53,6 +64,16 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                 })
                 .await?;
             counter!("token_request", "state" => "created").increment(1);
+            if is_auth_token_pub_enabled() {
+                let _ = self
+                    .event_repo
+                    .publish_auth_token_initiated(AuthTokenInitiated {
+                        origin_ip: ip_addr,
+                        user_agent,
+                        asn_num,
+                    })
+                    .await;
+            }
 
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
@@ -72,7 +93,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
             return if authed_token.authed_at.is_some() {
                 Err(BbsCgiError::RevokedAuthedToken)
             } else if authed_token.is_activation_expired(Utc::now()) {
-                let authed_token = AuthedToken::new(ip_addr, user_agent, asn_num);
+                let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
                 self.repo
                     .create_authed_token(CreatingAuthedToken {
                         token: authed_token.token.clone(),
@@ -87,6 +108,16 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                     })
                     .await?;
                 counter!("token_request", "state" => "created").increment(1);
+                if is_auth_token_pub_enabled() {
+                    let _ = self
+                        .event_repo
+                        .publish_auth_token_initiated(AuthTokenInitiated {
+                            origin_ip: ip_addr,
+                            user_agent,
+                            asn_num,
+                        })
+                        .await;
+                }
 
                 return Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,

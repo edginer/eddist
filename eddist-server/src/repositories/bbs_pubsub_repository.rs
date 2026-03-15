@@ -1,4 +1,6 @@
-use eddist_core::domain::pubsub_repository::{CreatingRes, PubSubItem};
+use eddist_core::domain::pubsub_repository::{
+    AuthTokenInitiated, AuthTokenRequested, AuthTokenSucceeded, CreatingRes, PubSubItem,
+};
 use redis::{AsyncCommands, aio::ConnectionManager};
 
 use super::bbs_repository::CreatingThread;
@@ -46,6 +48,18 @@ impl RedisCreationEventRepository {
 pub trait CreationEventRepository: Clone + 'static + Send + Sync {
     async fn publish_res_created(&self, event: CreatingRes) -> Result<(), anyhow::Error>;
     async fn publish_thread_created(&self, event: CreatingThread) -> Result<(), anyhow::Error>;
+    async fn publish_auth_token_initiated(
+        &self,
+        event: AuthTokenInitiated,
+    ) -> Result<(), anyhow::Error>;
+    async fn publish_auth_token_requested(
+        &self,
+        event: AuthTokenRequested,
+    ) -> Result<(), anyhow::Error>;
+    async fn publish_auth_token_succeeded(
+        &self,
+        event: AuthTokenSucceeded,
+    ) -> Result<(), anyhow::Error>;
 }
 
 #[async_trait::async_trait]
@@ -64,6 +78,42 @@ impl CreationEventRepository for RedisCreationEventRepository {
         let event = serde_json::to_string(&event)?;
         redis_conn
             .publish::<'_, _, _, ()>("bbs:event:thread_created", event)
+            .await?;
+        Ok(())
+    }
+
+    async fn publish_auth_token_initiated(
+        &self,
+        event: AuthTokenInitiated,
+    ) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let event = serde_json::to_string(&event)?;
+        redis_conn
+            .publish::<'_, _, _, ()>("bbs:event:auth_token_initiated", event)
+            .await?;
+        Ok(())
+    }
+
+    async fn publish_auth_token_requested(
+        &self,
+        event: AuthTokenRequested,
+    ) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let event = serde_json::to_string(&event)?;
+        redis_conn
+            .publish::<'_, _, _, ()>("bbs:event:auth_token_requested", event)
+            .await?;
+        Ok(())
+    }
+
+    async fn publish_auth_token_succeeded(
+        &self,
+        event: AuthTokenSucceeded,
+    ) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let event = serde_json::to_string(&event)?;
+        redis_conn
+            .publish::<'_, _, _, ()>("bbs:event:auth_token_succeeded", event)
             .await?;
         Ok(())
     }

@@ -15,10 +15,16 @@ use crate::{
     external::captcha_like_client::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
-    repositories::bbs_repository::BbsRepository,
+    repositories::{bbs_pubsub_repository::CreationEventRepository, bbs_repository::BbsRepository},
     utils::redis::user_reg_temp_url_register_key,
 };
-use eddist_core::domain::ip_addr::ReducedIpAddr;
+use eddist_core::{
+    domain::{
+        ip_addr::ReducedIpAddr,
+        pubsub_repository::{AuthTokenRequested, AuthTokenSucceeded},
+    },
+    utils::is_auth_token_pub_enabled,
+};
 use rand::{Rng, distr::Uniform};
 use uuid::Uuid;
 
@@ -30,14 +36,19 @@ use super::{
 const USER_REG_TEMP_URL_LEN: usize = 5;
 
 #[derive(Clone)]
-pub struct AuthWithCodeService<T: BbsRepository> {
+pub struct AuthWithCodeService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
     redis_conn: ConnectionManager,
+    event_repo: E,
 }
 
-impl<T: BbsRepository> AuthWithCodeService<T> {
-    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
-        Self { repo, redis_conn }
+impl<T: BbsRepository, E: CreationEventRepository> AuthWithCodeService<T, E> {
+    pub fn new(repo: T, redis_conn: ConnectionManager, event_repo: E) -> Self {
+        Self {
+            repo,
+            redis_conn,
+            event_repo,
+        }
     }
 
     /// Generate a new rate limiting token (browser handles expiration via Max-Age)
@@ -47,8 +58,8 @@ impl<T: BbsRepository> AuthWithCodeService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput>
-    for AuthWithCodeService<T>
+impl<T: BbsRepository, E: CreationEventRepository>
+    AppService<AuthWithCodeServiceInput, AuthWithCodeServiceOutput> for AuthWithCodeService<T, E>
 {
     async fn execute(
         &self,
@@ -88,6 +99,15 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             })
             .collect::<Vec<_>>();
         counter!("auth_code_request").increment(1);
+        if is_auth_token_pub_enabled() {
+            let _ = self
+                .event_repo
+                .publish_auth_token_requested(AuthTokenRequested {
+                    origin_ip: input.origin_ip.clone(),
+                    user_agent: input.user_agent.clone(),
+                })
+                .await;
+        }
 
         // Get all unauthed tokens with the auth code (non-IP checking)
         let candidate_tokens = self
@@ -169,7 +189,8 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     if let Some(data) = captured_data {
                         captured_data_map.insert(provider, data);
                     }
-                    counter!("auth_code_failure", "reason" => format!("captcha_{provider_type}")).increment(1);
+                    counter!("auth_code_failure", "reason" => format!("captcha_{provider_type}"))
+                        .increment(1);
                     return Err(BbsPostAuthWithCodeError::CaptchaError(e).into());
                 }
                 Ok(CaptchaVerificationOutput {
@@ -206,9 +227,27 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         };
 
         self.repo
-            .activate_authed_status(&token.token, &input.user_agent, now, additional_info)
+            .activate_authed_status(
+                &token.token,
+                &input.user_agent,
+                now,
+                additional_info.clone(),
+            )
             .await?;
         counter!("auth_code_success").increment(1);
+        if is_auth_token_pub_enabled() {
+            let _ = self
+                .event_repo
+                .publish_auth_token_succeeded(AuthTokenSucceeded {
+                    authed_token_id: token.id,
+                    origin_ip: input.origin_ip.clone(),
+                    user_agent: input.user_agent.clone(),
+                    asn_num: token.asn_num,
+                    authed_at: now,
+                    additional_info: additional_info.clone(),
+                })
+                .await;
+        }
 
         // Generate rate limiting token after successful authentication
         let rate_limit_token = Some(self.generate_rate_limit_token());
