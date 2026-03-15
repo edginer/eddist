@@ -1,6 +1,6 @@
 import { Button } from "flowbite-react";
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { Link, useParams } from "react-router";
+import { data, Link, useParams } from "react-router";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
 import { NGContextMenu } from "../components/NGContextMenu";
@@ -28,11 +28,16 @@ const LazyNGWordsSettingsModal = lazy(() =>
   })),
 );
 
-export const headers = (_: Route.HeadersArgs) => {
+export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
+  const responseCount = parseInt(
+    loaderHeaders.get("X-Response-Count") ?? "0",
+    10,
+  );
+  const sMaxAge = responseCount > 100 ? 300 : 30;
   return {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "max-age=15, s-maxage=30",
+    "Cache-Control": `max-age=15, s-maxage=${sMaxAge}`,
   };
 };
 
@@ -62,21 +67,24 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     })),
   ]);
 
-  return {
-    thread,
-    boards,
-    eddistData: {
-      bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: clientConfig.enable_user_registration,
+  return data(
+    {
+      thread,
+      boards,
+      eddistData: {
+        bbsName: context.BBS_NAME ?? "エッヂ掲示板",
+        availableUserRegistration: clientConfig.enable_user_registration,
+      },
+    } satisfies {
+      thread: { threadName: string; responses: Response[] };
+      boards: Board[];
+      eddistData: {
+        bbsName: string;
+        availableUserRegistration: boolean;
+      };
     },
-  } satisfies {
-    thread: { threadName: string; responses: Response[] };
-    boards: Board[];
-    eddistData: {
-      bbsName: string;
-      availableUserRegistration: boolean;
-    };
-  };
+    { headers: { "X-Response-Count": String(thread.responses.length) } },
+  );
 };
 
 const lastResponseDate = (responses: Response[]): Date | undefined => {
