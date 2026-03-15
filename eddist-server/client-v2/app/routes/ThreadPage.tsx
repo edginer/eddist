@@ -1,10 +1,8 @@
 import { Button } from "flowbite-react";
-import { useState, useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { data, Link, useParams } from "react-router";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { twMerge } from "tailwind-merge";
-import PostResponseModal from "../components/PostResponseModal";
-import { NGWordsSettingsModal } from "../components/NGWordsSettingsModal";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import type { Route } from "./+types/ThreadPage";
@@ -21,11 +19,25 @@ import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import React from "react";
 
-export const headers = (_: Route.HeadersArgs) => {
+const LazyPostResponseModal = lazy(
+  () => import("../components/PostResponseModal"),
+);
+const LazyNGWordsSettingsModal = lazy(() =>
+  import("../components/NGWordsSettingsModal").then((m) => ({
+    default: m.NGWordsSettingsModal,
+  })),
+);
+
+export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
+  const responseCount = parseInt(
+    loaderHeaders.get("X-Response-Count") ?? "0",
+    10,
+  );
+  const sMaxAge = responseCount > 100 ? 300 : 30;
   return {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "max-age=15, s-maxage=30",
+    "Cache-Control": `max-age=15, s-maxage=${sMaxAge}`,
   };
 };
 
@@ -55,21 +67,24 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     })),
   ]);
 
-  return {
-    thread,
-    boards,
-    eddistData: {
-      bbsName: context.BBS_NAME ?? "エッヂ掲示板",
-      availableUserRegistration: clientConfig.enable_user_registration,
+  return data(
+    {
+      thread,
+      boards,
+      eddistData: {
+        bbsName: context.BBS_NAME ?? "エッヂ掲示板",
+        availableUserRegistration: clientConfig.enable_user_registration,
+      },
+    } satisfies {
+      thread: { threadName: string; responses: Response[] };
+      boards: Board[];
+      eddistData: {
+        bbsName: string;
+        availableUserRegistration: boolean;
+      };
     },
-  } satisfies {
-    thread: { threadName: string; responses: Response[] };
-    boards: Board[];
-    eddistData: {
-      bbsName: string;
-      availableUserRegistration: boolean;
-    };
-  };
+    { headers: { "X-Response-Count": String(thread.responses.length) } },
+  );
 };
 
 const lastResponseDate = (responses: Response[]): Date | undefined => {
@@ -95,8 +110,6 @@ interface Popup {
   posts: Response[];
   ref: React.RefObject<HTMLDivElement | null>;
 }
-
-let popupCounter = 0;
 
 // Set maximum width and height for popups
 const MAX_POPUP_WIDTH_DESKTOP = "90vw";
@@ -126,6 +139,9 @@ const ThreadPage = ({
   const params = useParams();
 
   const [popups, setPopups] = useState<Popup[]>([]);
+  const popupCounter = useRef(0);
+  const hasEverOpenedResponse = useRef(false);
+  const hasEverOpenedNGSettings = useRef(false);
 
   useEffect(() => {
     const htmlEl = document.documentElement;
@@ -181,7 +197,7 @@ const ThreadPage = ({
       .map((i) => posts.responses[i]);
     setPopups((prev) => [
       ...prev,
-      { id: ++popupCounter, x, y, posts: postsByIndices, ref },
+      { id: ++popupCounter.current, x, y, posts: postsByIndices, ref },
     ]);
   };
 
@@ -217,7 +233,7 @@ const ThreadPage = ({
     onRefresh: handleRefresh,
     threshold: 80,
     direction: "up",
-    enabled: true,
+    enabled: popups.length === 0,
     scrollTarget: "window",
   });
 
@@ -230,6 +246,12 @@ const ThreadPage = ({
     },
   );
 
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+    mutate();
+  }, []);
+
   // Find current board
   const currentBoard = boards?.find(
     (board: { board_key: string }) => board.board_key === params.boardKey,
@@ -240,6 +262,16 @@ const ThreadPage = ({
     () => decodeNumericCharRefsStr(posts?.threadName || ""),
     [posts?.threadName],
   );
+
+  const filterResults = useMemo(
+    () => posts?.responses.map(shouldFilterResponse) ?? [],
+    [posts?.responses, shouldFilterResponse],
+  );
+
+  const allResponses = posts?.responses ?? [];
+  const responsesToRender = isHydrated
+    ? allResponses
+    : allResponses.slice(0, 100);
 
   if (
     thread.redirected &&
@@ -342,14 +374,20 @@ const ThreadPage = ({
         </button>
         <button
           type="button"
-          onClick={() => setShowNGSettings(true)}
+          onClick={() => {
+            hasEverOpenedNGSettings.current = true;
+            setShowNGSettings(true);
+          }}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
           title="NG設定"
         >
           <FaCog className="w-4 h-4" />
         </button>
         <Button
-          onClick={() => setCreatingResponse(true)}
+          onClick={() => {
+            hasEverOpenedResponse.current = true;
+            setCreatingResponse(true);
+          }}
           className={twMerge(
             "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
             params.boardKey || params.threadKey || "hidden",
@@ -359,25 +397,33 @@ const ThreadPage = ({
           <span className="lg:block hidden">書き込み</span>
         </Button>
 
-        <NGWordsSettingsModal
-          open={showNGSettings}
-          setOpen={setShowNGSettings}
-        />
+        {hasEverOpenedNGSettings.current && (
+          <Suspense fallback={null}>
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+            />
+          </Suspense>
+        )}
       </header>
 
-      <PostResponseModal
-        open={creatingResponse}
-        setOpen={setCreatingResponse}
-        boardKey={params.boardKey!}
-        threadKey={params.threadKey!}
-        refetchThread={mutate}
-      />
+      {hasEverOpenedResponse.current && (
+        <Suspense fallback={null}>
+          <LazyPostResponseModal
+            open={creatingResponse}
+            setOpen={setCreatingResponse}
+            boardKey={params.boardKey!}
+            threadKey={params.threadKey!}
+            refetchThread={mutate}
+          />
+        </Suspense>
+      )}
 
       <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white border border-gray-300 rounded-lg shadow-md">
-            {posts?.responses.map((post) => {
-              const filterResult = shouldFilterResponse(post);
+            {responsesToRender.map((post) => {
+              const filterResult = filterResults[post.id - 1];
               const isExpanded = expandedNGPosts.has(post.id);
 
               // Completely hidden
@@ -447,13 +493,9 @@ const ThreadPage = ({
                       onClick={(e) =>
                         openPopup(
                           e,
-                          posts.responses.reduce(
-                            (acc, cur, i) =>
-                              cur.authorId === post.authorId
-                                ? acc.concat(i)
-                                : acc,
-                            [] as number[],
-                          ),
+                          posts.authorIdMap
+                            .get(post.authorId)
+                            ?.map(([, i]) => i) ?? [],
                         )
                       }
                       onContextMenu={(e) => {
@@ -499,6 +541,7 @@ const ThreadPage = ({
           </div>
         </div>
       </main>
+
       {popups.map((popup, idx) => {
         const isTop = idx === popups.length - 1;
         const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
@@ -539,11 +582,8 @@ const ThreadPage = ({
                     onClick={(e) =>
                       openPopup(
                         e,
-                        posts.responses.reduce(
-                          (acc, cur, i) =>
-                            cur.authorId === p.authorId ? acc.concat(i) : acc,
-                          [] as number[],
-                        ),
+                        posts.authorIdMap.get(p.authorId)?.map(([, i]) => i) ??
+                          [],
                       )
                     }
                     style={{ cursor: "pointer" }}
@@ -575,10 +615,6 @@ const ThreadPage = ({
           y={menuState.y}
           onClose={closeMenu}
           options={(() => {
-            const bodyText = contextMenuResponse.bodyParts
-              .map((part) => part.text)
-              .join("");
-
             if (contextMenuType === "authorId") {
               return [
                 {

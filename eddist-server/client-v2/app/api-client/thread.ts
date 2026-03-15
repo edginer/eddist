@@ -14,6 +14,16 @@ export interface BodyAnchorPart {
   isMatch: boolean;
 }
 
+const THREAD_CACHE_MAX = 20;
+const THREAD_CACHE_TTL_MS = 30_000;
+type ThreadCacheData = ReturnType<typeof convertThreadTextToResponseList> & {
+  redirected: boolean;
+};
+let _threadCache: Map<
+  string,
+  { data: ThreadCacheData; expiresAt: number }
+> | null = null;
+
 export const fetchThread = async (
   boardKey: string,
   threadKey: string,
@@ -21,8 +31,15 @@ export const fetchThread = async (
     | {
         baseUrl: string;
       }
-    | undefined
+    | undefined,
 ) => {
+  if (import.meta.env.SSR) {
+    const key = `${boardKey}:${threadKey}`;
+    if (!_threadCache) _threadCache = new Map();
+    const cached = _threadCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+  }
+
   const res = await fetch(
     `${
       (import.meta.env.SSR && options?.baseUrl) || ""
@@ -37,15 +54,32 @@ export const fetchThread = async (
         // import.meta.env.SSR ? "follow" : "manual",
         // TODO: for now, always manual
         "manual",
-    }
+    },
   );
   const sjisText = await res.blob();
   const arrayBuffer = await sjisText.arrayBuffer();
   const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-  return {
+  const result = {
     ...convertThreadTextToResponseList(text),
     redirected: res.redirected,
   };
+
+  if (import.meta.env.SSR) {
+    const key = `${boardKey}:${threadKey}`;
+    for (const [k, v] of _threadCache!) {
+      if (v.expiresAt <= Date.now()) _threadCache!.delete(k);
+    }
+    if (_threadCache!.size >= THREAD_CACHE_MAX) {
+      const oldestKey = _threadCache!.keys().next().value;
+      if (oldestKey) _threadCache!.delete(oldestKey);
+    }
+    _threadCache!.set(key, {
+      data: result,
+      expiresAt: Date.now() + THREAD_CACHE_TTL_MS,
+    });
+  }
+
+  return result;
 };
 
 const convertThreadTextToResponseList = (text: string) => {

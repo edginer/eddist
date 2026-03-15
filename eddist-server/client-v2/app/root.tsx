@@ -10,7 +10,6 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { Suspense } from "react";
 import { ThemeInit } from ".flowbite-react/init";
 import { NGWordsProvider } from "~/contexts/NGWordsContext";
 import { ToastProvider } from "~/contexts/ToastContext";
@@ -56,9 +55,7 @@ export default function App() {
     <ToastProvider>
       <NGWordsProvider>
         <ThemeInit />
-        <Suspense fallback={<div>Loading...</div>}>
-          <Outlet />
-        </Suspense>
+        <Outlet />
       </NGWordsProvider>
     </ToastProvider>
   );
