@@ -233,7 +233,7 @@ const ThreadPage = ({
     onRefresh: handleRefresh,
     threshold: 80,
     direction: "up",
-    enabled: true,
+    enabled: popups.length === 0,
     scrollTarget: "window",
   });
 
