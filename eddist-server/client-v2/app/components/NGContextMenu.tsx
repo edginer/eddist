@@ -12,6 +12,12 @@ interface NGContextMenuProps {
     category: NGCategory;
     isResponse?: boolean;
   }[];
+  actions?: {
+    label: string;
+    href?: string;
+    target?: string;
+    onClick?: () => void;
+  }[];
 }
 
 export const NGContextMenu = ({
@@ -19,6 +25,7 @@ export const NGContextMenu = ({
   y,
   onClose,
   options,
+  actions = [],
 }: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { addRule } = useNGWords();
@@ -64,19 +71,17 @@ export const NGContextMenu = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node;
-      const clickedInsideMenu =
-        menuRef.current && menuRef.current.contains(target);
-
+      const clickedInsideMenu = menuRef.current?.contains(target) ?? false;
       if (!clickedInsideMenu) {
         onClose();
       }
     };
 
-    // Add delay to prevent immediate closing
-    setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
-    }, 100);
+    // No setTimeout: useEffect runs after paint, so the right-click mousedown
+    // that opened this menu has already fully completed. Adding listeners
+    // immediately is safe and avoids orphaned listeners from cancelled timeouts.
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -99,7 +104,7 @@ export const NGContextMenu = ({
   // Adjust position to keep menu in viewport
   const adjustedPosition = (() => {
     const menuWidth = 280;
-    const menuHeight = menuItems.length * 56 + 16;
+    const menuHeight = (menuItems.length + actions.length) * 56 + 16;
 
     let adjustedX = x;
     let adjustedY = y;
@@ -147,6 +152,32 @@ export const NGContextMenu = ({
         top: `${adjustedPosition.y}px`,
       }}
     >
+      {actions.map((action, idx) =>
+        action.href ? (
+          <a
+            key={`action-${idx}`}
+            href={action.href}
+            target={action.target}
+            rel={action.target === "_blank" ? "noopener noreferrer" : undefined}
+            onClick={onClose}
+            className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center border-b border-gray-100"
+          >
+            <div className="text-sm text-gray-900">{action.label}</div>
+          </a>
+        ) : (
+          <button
+            key={`action-${idx}`}
+            type="button"
+            onClick={() => {
+              action.onClick?.();
+              onClose();
+            }}
+            className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center border-b border-gray-100"
+          >
+            <div className="text-sm text-gray-900">{action.label}</div>
+          </button>
+        ),
+      )}
       {menuItems.map((item, idx) => (
         <button
           key={idx}

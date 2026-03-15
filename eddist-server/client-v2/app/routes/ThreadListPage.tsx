@@ -9,7 +9,7 @@ import {
   FaSortUp,
   FaSync,
 } from "react-icons/fa";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { twMerge } from "tailwind-merge";
 import useSWR from "swr";
 import { NGContextMenu } from "../components/NGContextMenu";
@@ -118,7 +118,6 @@ const ThreadListPage = ({
   loaderData: { threadList: data, boards, currentTime, eddistData },
 }: Route.ComponentProps) => {
   const params = useParams();
-  const navigate = useNavigate();
 
   const { data: threadList, mutate } = useSWR(
     `${params.boardKey}/subject.txt`,
@@ -434,15 +433,11 @@ const ThreadListPage = ({
             {i !== 0 && (
               <div className="border-b border-gray-400 lg:border-none lg:pt-2"></div>
             )}
-            <button
-              type="button"
-              key={thread.id}
+            <Link
+              to={`/${params.boardKey}/${thread.id}`}
               className="hover:bg-gray-200 cursor-default text-left block w-full bg-gray-100 p-2 lg:p-3 select-none md:select-auto"
               data-ng-target="title"
               data-ng-thread-id={thread.id}
-              onClick={() => {
-                navigate(`/${params.boardKey}/${thread.id}`);
-              }}
               {...contextMenuHandlers}
               onMouseDown={(e) => {
                 // Capture selection before it gets cleared by right-click
@@ -489,7 +484,7 @@ const ThreadListPage = ({
                   /day
                 </span>
               </div>
-            </button>
+            </Link>
           </div>
         ))}
       </div>
@@ -499,6 +494,13 @@ const ThreadListPage = ({
           x={menuState.x}
           y={menuState.y}
           onClose={closeMenu}
+          actions={[
+            {
+              label: "新しいタブで開く",
+              href: `/${params.boardKey}/${contextMenuThread.id}`,
+              target: "_blank",
+            },
+          ]}
           options={[
             {
               label: selectedTitleText
