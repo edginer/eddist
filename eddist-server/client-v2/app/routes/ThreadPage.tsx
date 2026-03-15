@@ -20,10 +20,10 @@ import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import React from "react";
 
 const LazyPostResponseModal = lazy(
-  () => import("../components/PostResponseModal"),
+  () => import(/* @vite-ignore */ "../components/PostResponseModal"),
 );
 const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
+  import(/* @vite-ignore */ "../components/NGWordsSettingsModal").then((m) => ({
     default: m.NGWordsSettingsModal,
   })),
 );

@@ -22,11 +22,13 @@ import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
 
-const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
+const LazyPostThreadModal = lazy(
+  () => import(/* @vite-ignore */ "../components/PostThreadModal"),
+);
 const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
-    default: m.NGWordsSettingsModal,
-  })),
+  import(/* @vite-ignore */ "../components/NGWordsSettingsModal").then(
+    (m) => ({ default: m.NGWordsSettingsModal }),
+  ),
 );
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";

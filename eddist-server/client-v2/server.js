@@ -35,7 +35,14 @@ if (DEVELOPMENT) {
     console.log("Starting production server");
     app.use(
         "/assets",
-        express.static("build/client/assets", { maxAge: "5m" }),
+        express.static("build/client/assets", {
+            setHeaders: (res) => {
+                res.setHeader(
+                    "Cache-Control",
+                    "public, max-age=300, s-maxage=31536000, immutable",
+                );
+            },
+        }),
     );
     app.use(morgan("tiny"));
     app.use(express.static("build/client", { maxAge: "1h" }));
