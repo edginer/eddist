@@ -56,8 +56,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
     ) -> anyhow::Result<AuthWithCodeServiceOutput> {
         if input.rate_limit_token.is_some() {
             // User is rate limited (cookie exists and browser hasn't expired it)
-            counter!("issue_authed_token", "state" => "failed", "reason" => "rate_limited")
-                .increment(1);
+            counter!("auth_code_failure", "reason" => "rate_limited").increment(1);
             return Err(BbsPostAuthWithCodeError::RateLimited.into());
         }
         let clients_responses = input
@@ -88,7 +87,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                 ))
             })
             .collect::<Vec<_>>();
-        counter!("issue_authed_token", "state" => "request").increment(1);
+        counter!("auth_code_request").increment(1);
 
         // Get all unauthed tokens with the auth code (non-IP checking)
         let candidate_tokens = self
@@ -108,22 +107,20 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             for candidate in &unauthed_tokens {
                 self.repo.delete_authed_token(&candidate.token).await?;
             }
-            counter!("issue_authed_token", "state" => "failed", "reason" => "auth_code_collision")
-                .increment(1);
+            counter!("auth_code_failure", "reason" => "auth_code_collision").increment(1);
             return Err(BbsPostAuthWithCodeError::AuthCodeCollision.into());
         }
 
         // Check if we found exactly one unauthed token
         let Some(token) = unauthed_tokens.into_iter().next() else {
-            counter!("issue_authed_token", "state" => "failed", "reason" => "not_found")
-                .increment(1);
+            counter!("auth_code_failure", "reason" => "not_found").increment(1);
             info_span!("failed to find authed token", code = %input.code);
             return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken.into());
         };
 
         let now = Utc::now();
         if token.is_activation_expired(now) {
-            counter!("issue_authed_token", "state" => "failed", "reason" => "expired").increment(1);
+            counter!("auth_code_failure", "reason" => "expired").increment(1);
             return Err(BbsPostAuthWithCodeError::ExpiredActivationCode.into());
         }
 
@@ -131,8 +128,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
             let request_origin_reduced = ReducedIpAddr::from(request_origin_ip.to_string());
 
             if token_reduced_ip != request_origin_reduced {
-                counter!("issue_authed_token", "state" => "failed", "reason" => "ip_mismatch")
-                    .increment(1);
+                counter!("auth_code_failure", "reason" => "ip_mismatch").increment(1);
                 return Err(BbsPostAuthWithCodeError::FailedToFindAuthedToken);
             }
 
@@ -173,8 +169,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
                     if let Some(data) = captured_data {
                         captured_data_map.insert(provider, data);
                     }
-                    counter!("issue_authed_token", "state" => "failed", "reason" => "captcha")
-                        .increment(1);
+                    counter!("auth_code_failure", "reason" => format!("captcha_{provider_type}")).increment(1);
                     return Err(BbsPostAuthWithCodeError::CaptchaError(e).into());
                 }
                 Ok(CaptchaVerificationOutput {
@@ -213,7 +208,7 @@ impl<T: BbsRepository> AppService<AuthWithCodeServiceInput, AuthWithCodeServiceO
         self.repo
             .activate_authed_status(&token.token, &input.user_agent, now, additional_info)
             .await?;
-        counter!("issue_authed_token", "state" => "success", "source" => "normal").increment(1);
+        counter!("auth_code_success").increment(1);
 
         // Generate rate limiting token after successful authentication
         let rate_limit_token = Some(self.generate_rate_limit_token());

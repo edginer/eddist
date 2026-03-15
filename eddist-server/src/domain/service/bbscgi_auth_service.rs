@@ -2,6 +2,7 @@ use std::{env, sync::OnceLock};
 
 use chrono::Utc;
 use eddist_core::simple_rate_limiter::RateLimiter;
+use metrics::counter;
 use redis::aio::ConnectionManager;
 use tokio::sync::Mutex;
 
@@ -51,6 +52,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                     require_user_registration,
                 })
                 .await?;
+            counter!("token_request", "state" => "created").increment(1);
 
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
@@ -84,6 +86,7 @@ impl<T: BbsRepository> BbsCgiAuthService<T> {
                         require_user_registration,
                     })
                     .await?;
+                counter!("token_request", "state" => "created").increment(1);
 
                 return Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,
