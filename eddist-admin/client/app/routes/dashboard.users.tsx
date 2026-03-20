@@ -46,7 +46,7 @@ const UserSearchPage = () => {
           query: {
             user_id: userId || undefined,
             user_name: userName || undefined,
-            authed_token: authedToken || undefined,
+            authed_token_id: authedToken || undefined,
           },
         },
       });
@@ -54,12 +54,12 @@ const UserSearchPage = () => {
       setSearchError("");
       setActionMessage("");
 
-      if (data == null) {
+      if (!data || data.length === 0) {
         setSearchError("No user found.");
         return;
       }
 
-      if (data?.length > 1) {
+      if (data.length > 1) {
         setSearchError("Multiple users found. Showing the first one.");
       }
 
@@ -113,7 +113,7 @@ const UserSearchPage = () => {
       });
 
       setActionMessage(
-        `User ${newEnabledStatus ? "enabled" : "disabled"} successfully`
+        `User ${newEnabledStatus ? "enabled" : "disabled"} successfully`,
       );
     } catch (error: any) {
       setActionMessage(`Error: ${error.message}`);

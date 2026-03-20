@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                authed_token_id AS \"token_id!: Uuid\"\n            FROM\n                user_authed_tokens\n            WHERE\n                user_id = ?\n        ",
+  "query": "\n                SELECT\n                    authed_token_id AS \"token_id!: Uuid\"\n                FROM\n                    user_authed_tokens\n                WHERE\n                    user_id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "4300c470b55a8f9d48155bbd6e0530257f09b5776a761d8dc7cd23cb3f48ab26"
+  "hash": "eff1e415cdfedf50bb11107e5b5d897efcb4302b54f3741428923def6b96cd00"
 }
