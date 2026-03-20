@@ -289,8 +289,12 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
                 .unwrap()
         }))
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
-        // NOTE: comment out for now (is is not confirmed in twinkle environment)
-        // .layer(CompressionLayer::new())
+        .layer(
+            CompressionLayer::new()
+                .gzip(true)
+                .br(false)
+                .quality(tower_http::CompressionLevel::Fastest),
+        )
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
