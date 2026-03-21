@@ -48,6 +48,10 @@ jobs:
             eddist-admin/client/pnpm-lock.yaml
       - name: Install pnpm dependencies
         run: pnpm install && pnpm -F eddist-client-v2 install
+      - name: Biome check (eddist-admin-client)
+        run: pnpm -F eddist-admin-client ci:check
+      - name: Biome check (eddist-client-v2)
+        run: pnpm -F eddist-client-v2 ci:check
       - name: Check eddist-client-v2
         run: pnpm -F eddist-client-v2 typecheck
       - name: Build eddist-admin-client

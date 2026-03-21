@@ -1,11 +1,4 @@
-import {
-  Button,
-  Checkbox,
-  Label,
-  Select,
-  Textarea,
-  TextInput,
-} from "flowbite-react";
+import { Button, Checkbox, Label, Select, Textarea, TextInput } from "flowbite-react";
 import { Controller, useForm } from "react-hook-form";
 import type { paths } from "~/openapi/schema";
 
@@ -52,7 +45,10 @@ const CaptchaConfigForm = (props: Props) => {
   const transformCaptureFields = (captureFields: string | string[] | undefined) => {
     if (typeof captureFields === "string") {
       return captureFields.trim()
-        ? captureFields.split(",").map((s) => s.trim()).filter(Boolean)
+        ? captureFields
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
         : [];
     }
     return captureFields;
@@ -60,9 +56,7 @@ const CaptchaConfigForm = (props: Props) => {
 
   const onFormSubmit = handleSubmit((data) => {
     const widget =
-      data.widget?.form_field_name &&
-      data.widget?.script_url &&
-      data.widget?.widget_html
+      data.widget?.form_field_name && data.widget?.script_url && data.widget?.widget_html
         ? data.widget
         : undefined;
 
@@ -73,8 +67,7 @@ const CaptchaConfigForm = (props: Props) => {
         widget,
       } as CreateCaptchaConfigInput);
     } else {
-      const emptyToUndefined = (v: string | undefined | null) =>
-        v?.trim() ? v : undefined;
+      const emptyToUndefined = (v: string | undefined | null) => (v?.trim() ? v : undefined);
 
       props.onSubmit({
         ...data,
@@ -164,8 +157,8 @@ const CaptchaConfigForm = (props: Props) => {
           <div className="border-t pt-4 mt-2">
             <h3 className="font-semibold mb-2">Widget Configuration</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Required for custom providers. First-class providers (Turnstile,
-              hCaptcha, Monocle) use default configurations.
+              Required for custom providers. First-class providers (Turnstile, hCaptcha, Monocle)
+              use default configurations.
             </p>
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
@@ -266,9 +259,7 @@ const CaptchaConfigForm = (props: Props) => {
                   <Label>Success Path</Label>
                   <TextInput
                     {...register("verification.success_path")}
-                    defaultValue={
-                      defaults?.verification?.success_path ?? "success"
-                    }
+                    defaultValue={defaults?.verification?.success_path ?? "success"}
                     placeholder="success"
                   />
                 </div>
@@ -289,11 +280,7 @@ const CaptchaConfigForm = (props: Props) => {
                   defaultValue={defaults?.verification?.include_ip ?? false}
                   render={({ field }) => (
                     <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="include_ip"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
+                      <Checkbox id="include_ip" checked={field.value} onChange={field.onChange} />
                       <Label htmlFor="include_ip">Include IP</Label>
                     </div>
                   )}
@@ -301,9 +288,7 @@ const CaptchaConfigForm = (props: Props) => {
                 <Controller
                   name="verification.negate_success"
                   control={control}
-                  defaultValue={
-                    defaults?.verification?.negate_success ?? false
-                  }
+                  defaultValue={defaults?.verification?.negate_success ?? false}
                   render={({ field }) => (
                     <div className="flex items-center gap-2">
                       <Checkbox

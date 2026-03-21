@@ -1,15 +1,14 @@
 import { Link } from "react-router";
-import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { parseMarkdown } from "~/utils/markdown";
+import type { Route } from "./+types/NoticeDetailPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
 export const loader = async ({ context, params }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const notice = await fetchNoticeBySlug({ baseUrl, slug: params.slug });
 
@@ -57,16 +56,10 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
           <div className="max-w-none">{parseMarkdown(notice.content)}</div>
         </section>
       </article>
-      <footer
-        id="footer"
-        className="py-2 text-center bg-white border-t border-gray-300"
-      >
+      <footer id="footer" className="py-2 text-center bg-white border-t border-gray-300">
         <p className="text-xs text-gray-500">
           This BBS is powered by{" "}
-          <a
-            href="https://github.com/edginer/eddist"
-            className="text-blue-500 underline"
-          >
+          <a href="https://github.com/edginer/eddist" className="text-blue-500 underline">
             Eddist
           </a>
           .

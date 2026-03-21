@@ -1,10 +1,9 @@
 import { Button, Label, Textarea, TextInput } from "flowbite-react";
-import { FaSync } from "react-icons/fa";
 import { useForm } from "react-hook-form";
+import { FaSync } from "react-icons/fa";
 import type { paths } from "~/openapi/schema";
 
-type NoticeFormData =
-  paths["/notices/"]["post"]["requestBody"]["content"]["application/json"];
+type NoticeFormData = paths["/notices/"]["post"]["requestBody"]["content"]["application/json"];
 
 function generateSlug(title: string): string {
   return title
@@ -48,9 +47,7 @@ const NoticeForm = (props: Props) => {
         const formattedData = {
           ...data,
           ...(data.published_at && {
-            published_at: new Date(data.published_at)
-              .toISOString()
-              .slice(0, 19),
+            published_at: new Date(data.published_at).toISOString().slice(0, 19),
           }),
         };
         props.onSubmit(formattedData as NoticeFormData & Partial<NoticeFormData>);

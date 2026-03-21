@@ -2,22 +2,22 @@ import {
   Alert,
   Button,
   Label,
-  Table,
-  TextInput,
   Modal,
-  ModalHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHeadCell,
-  TableHead,
   ModalBody,
   ModalFooter,
+  ModalHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+  TextInput,
 } from "flowbite-react";
 import { useCallback, useState } from "react";
-import client from "~/openapi/client";
-import { components } from "~/openapi/schema";
 import { Link } from "react-router";
+import client from "~/openapi/client";
+import type { components } from "~/openapi/schema";
 
 const UserSearchPage = () => {
   const [userId, setUserId] = useState("");
@@ -26,9 +26,9 @@ const UserSearchPage = () => {
   const [searchError, setSearchError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [userData, setUserData] = useState<components["schemas"]["User"]>();
-  const [userIdpBindings, setUserIdpBindings] = useState<
-    components["schemas"]["UserIdpBinding"][]
-  >([]);
+  const [userIdpBindings, setUserIdpBindings] = useState<components["schemas"]["UserIdpBinding"][]>(
+    [],
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [newEnabledStatus, setNewEnabledStatus] = useState(false);
@@ -112,9 +112,7 @@ const UserSearchPage = () => {
         enabled: data.enabled,
       });
 
-      setActionMessage(
-        `User ${newEnabledStatus ? "enabled" : "disabled"} successfully`,
-      );
+      setActionMessage(`User ${newEnabledStatus ? "enabled" : "disabled"} successfully`);
     } catch (error: any) {
       setActionMessage(`Error: ${error.message}`);
     } finally {
@@ -171,11 +169,7 @@ const UserSearchPage = () => {
             </div>
           </div>
 
-          <Button
-            onClick={handleSearch}
-            type="submit"
-            className="mt-2 xl:h-12 px-8 xl:mx-4"
-          >
+          <Button onClick={handleSearch} type="submit" className="mt-2 xl:h-12 px-8 xl:mx-4">
             Search
           </Button>
         </div>
@@ -213,9 +207,7 @@ const UserSearchPage = () => {
                     <TableRow className="border-gray-200">
                       <TableCell className="font-medium">Enabled</TableCell>
                       <TableCell className="flex items-center gap-3">
-                        <span className="mr-2">
-                          {userData?.enabled === true ? "Yes" : "No"}
-                        </span>
+                        <span className="mr-2">{userData?.enabled === true ? "Yes" : "No"}</span>
                         <div className="flex items-center">
                           <label className="relative inline-flex items-center cursor-pointer">
                             <input
@@ -236,9 +228,7 @@ const UserSearchPage = () => {
 
               {userIdpBindings.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    Identity Provider Bindings
-                  </h2>
+                  <h2 className="text-xl font-semibold mb-2">Identity Provider Bindings</h2>
                   <Table>
                     <TableHead>
                       <TableHeadCell>IDP Name</TableHeadCell>
@@ -256,35 +246,32 @@ const UserSearchPage = () => {
                 </div>
               )}
 
-              {userData.authed_token_ids &&
-                userData.authed_token_ids.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-2">
-                      Authed Tokens
-                    </h2>
-                    <Table>
-                      <TableHead>
-                        <TableHeadCell>Token ID</TableHeadCell>
-                        <TableHeadCell>Actions</TableHeadCell>
-                      </TableHead>
-                      <TableBody className="divide-y">
-                        {userData.authed_token_ids.map((token) => (
-                          <TableRow className="border-gray-200" key={token}>
-                            <TableCell>{token}</TableCell>
-                            <TableCell>
-                              <Link
-                                to={`/dashboard/authed-token/?token=${token}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                View Details
-                              </Link>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+              {userData.authed_token_ids && userData.authed_token_ids.length > 0 && (
+                <div>
+                  <h2 className="text-xl font-semibold mb-2">Authed Tokens</h2>
+                  <Table>
+                    <TableHead>
+                      <TableHeadCell>Token ID</TableHeadCell>
+                      <TableHeadCell>Actions</TableHeadCell>
+                    </TableHead>
+                    <TableBody className="divide-y">
+                      {userData.authed_token_ids.map((token) => (
+                        <TableRow className="border-gray-200" key={token}>
+                          <TableCell>{token}</TableCell>
+                          <TableCell>
+                            <Link
+                              to={`/dashboard/authed-token/?token=${token}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              View Details
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -292,20 +279,12 @@ const UserSearchPage = () => {
 
       {/* Confirmation Modal */}
       <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
-        <ModalHeader>
-          {newEnabledStatus ? "Enable User" : "Disable User"}
-        </ModalHeader>
+        <ModalHeader>{newEnabledStatus ? "Enable User" : "Disable User"}</ModalHeader>
         <ModalBody>
           {newEnabledStatus ? (
-            <p>
-              Enabling this user will re-enable all authed tokens associated
-              with the user.
-            </p>
+            <p>Enabling this user will re-enable all authed tokens associated with the user.</p>
           ) : (
-            <p>
-              Disabling this user will revoke all authed tokens associated with
-              the user.
-            </p>
+            <p>Disabling this user will revoke all authed tokens associated with the user.</p>
           )}
         </ModalBody>
         <ModalFooter>

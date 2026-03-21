@@ -1,10 +1,8 @@
 import { Dropdown, DropdownItem } from "flowbite-react";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { Link } from "react-router";
-import {
-  Res,
-  ResInput,
-} from "~/routes/dashboard.boards_.$boardKey_.threads.$threadId";
+import type { Res, ResInput } from "~/routes/dashboard.boards_.$boardKey_.threads.$threadId";
 
 interface Props {
   responses: Res[];
@@ -25,9 +23,7 @@ const ResponseList = ({
   onClickDeleteAuthedTokensAssociatedWithIp,
   onClickEditResponse,
 }: Props) => {
-  const [expandedClientInfo, setExpandedClientInfo] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedClientInfo, setExpandedClientInfo] = useState<Set<string>>(new Set());
 
   const toggleClientInfo = (responseId: string) => {
     setExpandedClientInfo((prev) => {
@@ -51,9 +47,7 @@ const ResponseList = ({
             id={`${response.id}`}
             onClick={() => {
               if (selectedResponses.find((r) => r.id === response.id) != null) {
-                setSelectedResponses((s) =>
-                  s.filter((res) => res.id !== response.id),
-                );
+                setSelectedResponses((s) => s.filter((res) => res.id !== response.id));
               } else {
                 setSelectedResponses((s) => [
                   ...s,
@@ -101,7 +95,7 @@ const ResponseList = ({
             <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
-                onClickDeleteAuthedToken(response.authed_token_id!!);
+                onClickDeleteAuthedToken(response.authed_token_id!);
               }}
             >
               Delete authed token
@@ -109,13 +103,10 @@ const ResponseList = ({
             <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
-                onClickDeleteAuthedTokensAssociatedWithIp(
-                  response.authed_token_id!!,
-                );
+                onClickDeleteAuthedTokensAssociatedWithIp(response.authed_token_id!);
               }}
             >
-              Delete authed token associated with writing origin ip of authed
-              token
+              Delete authed token associated with writing origin ip of authed token
             </DropdownItem>
             {onClickEditResponse && (
               <DropdownItem
@@ -134,10 +125,8 @@ const ResponseList = ({
           </Dropdown>
         </div>
       </div>
-      <div
-        className="whitespace-pre-wrap"
-        dangerouslySetInnerHTML={{ __html: response.body }}
-      />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body rendered for admin review only */}
+      <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: response.body }} />
       <div className="text-gray-500 text-sm mt-2">
         <p>IP: {response.ip_addr}</p>
         <p>
@@ -155,6 +144,7 @@ const ResponseList = ({
         </p>
         <div className="mt-2">
           <button
+            type="button"
             onClick={() => toggleClientInfo(response.id)}
             className="flex items-center text-gray-600 hover:text-gray-800"
           >
@@ -165,13 +155,9 @@ const ResponseList = ({
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             Client Info
           </button>
@@ -183,37 +169,25 @@ const ResponseList = ({
               {response.client_info.tinker && (
                 <div className="mt-2 pt-2 border-t border-gray-300">
                   <p className="font-semibold">Tinker:</p>
+                  <p className="ml-2">Authed Token: {response.client_info.tinker.authed_token}</p>
+                  <p className="ml-2">Wrote Count: {response.client_info.tinker.wrote_count}</p>
                   <p className="ml-2">
-                    Authed Token: {response.client_info.tinker.authed_token}
+                    Created Thread Count: {response.client_info.tinker.created_thread_count}
                   </p>
-                  <p className="ml-2">
-                    Wrote Count: {response.client_info.tinker.wrote_count}
-                  </p>
-                  <p className="ml-2">
-                    Created Thread Count:{" "}
-                    {response.client_info.tinker.created_thread_count}
-                  </p>
-                  <p className="ml-2">
-                    Level: {response.client_info.tinker.level}
-                  </p>
+                  <p className="ml-2">Level: {response.client_info.tinker.level}</p>
                   <p className="ml-2">
                     Last Level Up:{" "}
-                    {new Date(
-                      response.client_info.tinker.last_level_up_at * 1000,
-                    ).toLocaleString()}
+                    {new Date(response.client_info.tinker.last_level_up_at * 1000).toLocaleString()}
                   </p>
                   <p className="ml-2">
                     Last Wrote:{" "}
-                    {new Date(
-                      response.client_info.tinker.last_wrote_at * 1000,
-                    ).toLocaleString()}
+                    {new Date(response.client_info.tinker.last_wrote_at * 1000).toLocaleString()}
                   </p>
                   {response.client_info.tinker.last_created_thread_at && (
                     <p className="ml-2">
                       Last Created Thread:{" "}
                       {new Date(
-                        response.client_info.tinker.last_created_thread_at *
-                          1000,
+                        response.client_info.tinker.last_created_thread_at * 1000,
                       ).toLocaleString()}
                     </p>
                   )}

@@ -1,10 +1,4 @@
-import {
-  Button,
-  Checkbox,
-  Label,
-  Select,
-  TextInput,
-} from "flowbite-react";
+import { Button, Checkbox, Label, Select, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
@@ -49,12 +43,9 @@ const RULE_TYPE_OPTIONS = [
 
 const RestrictionRuleForm = (props: Props) => {
   const defaults = props.mode === "edit" ? props.defaultValues : undefined;
-  const [neverExpires, setNeverExpires] = useState(
-    defaults ? !defaults.expires_at : true,
-  );
+  const [neverExpires, setNeverExpires] = useState(defaults ? !defaults.expires_at : true);
 
-  const { register, handleSubmit, control, reset } =
-    useForm<RestrictionRuleFormData>();
+  const { register, handleSubmit, control, reset } = useForm<RestrictionRuleFormData>();
 
   return (
     <form
@@ -64,9 +55,7 @@ const RestrictionRuleForm = (props: Props) => {
           rule_type: data.rule_type,
           rule_value: data.rule_value,
           expires_at:
-            neverExpires || !data.expires_at
-              ? undefined
-              : new Date(data.expires_at).toISOString(),
+            neverExpires || !data.expires_at ? undefined : new Date(data.expires_at).toISOString(),
         });
         reset();
         setNeverExpires(true);
@@ -90,11 +79,7 @@ const RestrictionRuleForm = (props: Props) => {
             rules={{ required: true }}
             defaultValue={defaults?.rule_type}
             render={({ field }) => (
-              <Select
-                required
-                value={field.value}
-                onChange={(e) => field.onChange(e.target.value)}
-              >
+              <Select required value={field.value} onChange={(e) => field.onChange(e.target.value)}>
                 <option value="">Select rule type...</option>
                 {RULE_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

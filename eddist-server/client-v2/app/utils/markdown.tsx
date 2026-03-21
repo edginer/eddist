@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 /**
  * Simple markdown parser supporting:
@@ -21,7 +21,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       elements.push(
         <p key={`p-${key++}`} className="text-gray-700 leading-relaxed mb-3">
           {parseInline(currentParagraph.join("\n"))}
-        </p>
+        </p>,
       );
       currentParagraph = [];
     }
@@ -32,21 +32,15 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       const list = listStack[listStack.length - 1];
       if (list.type === "ul") {
         elements.push(
-          <ul
-            key={`ul-${key++}`}
-            className="list-disc list-inside text-gray-700 mb-3 space-y-1"
-          >
+          <ul key={`ul-${key++}`} className="list-disc list-inside text-gray-700 mb-3 space-y-1">
             {list.items}
-          </ul>
+          </ul>,
         );
       } else {
         elements.push(
-          <ol
-            key={`ol-${key++}`}
-            className="list-decimal list-inside text-gray-700 mb-3 space-y-1"
-          >
+          <ol key={`ol-${key++}`} className="list-decimal list-inside text-gray-700 mb-3 space-y-1">
             {list.items}
-          </ol>
+          </ol>,
         );
       }
       listStack = [];
@@ -75,7 +69,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       elements.push(
         <Tag key={`h-${key++}`} className={headerStyles[level]}>
           {parseInline(text)}
-        </Tag>
+        </Tag>,
       );
       continue;
     }
@@ -84,15 +78,12 @@ export function parseMarkdown(content: string): React.ReactNode[] {
     const ulMatch = line.match(/^[-*+]\s+(.+)$/);
     if (ulMatch) {
       flushParagraph();
-      if (
-        listStack.length === 0 ||
-        listStack[listStack.length - 1].type !== "ul"
-      ) {
+      if (listStack.length === 0 || listStack[listStack.length - 1].type !== "ul") {
         flushList();
         listStack.push({ type: "ul", items: [] });
       }
       listStack[listStack.length - 1].items.push(
-        <li key={`li-${key++}`}>{parseInline(ulMatch[1])}</li>
+        <li key={`li-${key++}`}>{parseInline(ulMatch[1])}</li>,
       );
       continue;
     }
@@ -101,15 +92,12 @@ export function parseMarkdown(content: string): React.ReactNode[] {
     const olMatch = line.match(/^\d+\.\s+(.+)$/);
     if (olMatch) {
       flushParagraph();
-      if (
-        listStack.length === 0 ||
-        listStack[listStack.length - 1].type !== "ol"
-      ) {
+      if (listStack.length === 0 || listStack[listStack.length - 1].type !== "ol") {
         flushList();
         listStack.push({ type: "ol", items: [] });
       }
       listStack[listStack.length - 1].items.push(
-        <li key={`li-${key++}`}>{parseInline(olMatch[1])}</li>
+        <li key={`li-${key++}`}>{parseInline(olMatch[1])}</li>,
       );
       continue;
     }
@@ -152,7 +140,7 @@ function parseInline(text: string): React.ReactNode[] {
       elements.push(
         <strong key={`b-${key++}`} className="font-bold">
           {boldMatch[2]}
-        </strong>
+        </strong>,
       );
       remaining = remaining.slice(boldMatch[0].length);
       continue;
@@ -170,7 +158,7 @@ function parseInline(text: string): React.ReactNode[] {
           rel="noopener noreferrer"
         >
           {linkMatch[1]}
-        </a>
+        </a>,
       );
       remaining = remaining.slice(linkMatch[0].length);
       continue;
@@ -188,7 +176,7 @@ function parseInline(text: string): React.ReactNode[] {
           rel="noopener noreferrer"
         >
           {urlMatch[1]}
-        </a>
+        </a>,
       );
       remaining = remaining.slice(urlMatch[0].length);
       continue;

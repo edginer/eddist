@@ -11,16 +11,16 @@ import {
   TableHeadCell,
   TableRow,
 } from "flowbite-react";
-import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaPlus, FaTrash } from "react-icons/fa";
+import CaptchaConfigForm from "~/components/CaptchaConfigForm";
 import {
   getCaptchaConfigs,
   useCreateCaptchaConfig,
-  useUpdateCaptchaConfig,
   useDeleteCaptchaConfig,
+  useUpdateCaptchaConfig,
 } from "~/hooks/queries";
-import type { paths } from "~/openapi/schema";
 import { useCrudModalState } from "~/hooks/useCrudModalState";
-import CaptchaConfigForm from "~/components/CaptchaConfigForm";
+import type { paths } from "~/openapi/schema";
 
 type CaptchaConfig =
   paths["/captcha-configs/"]["get"]["responses"]["200"]["content"]["application/json"][number];
@@ -35,9 +35,7 @@ const CaptchaConfigs = () => {
   const deleteMutation = useDeleteCaptchaConfig();
 
   const handleDelete = (id: string) => {
-    if (
-      window.confirm("Are you sure you want to delete this captcha config?")
-    ) {
+    if (window.confirm("Are you sure you want to delete this captcha config?")) {
       deleteMutation.mutate({ params: { path: { id } } });
     }
   };
@@ -80,9 +78,7 @@ const CaptchaConfigs = () => {
               <TableRow className="border-gray-200" key={config.id}>
                 <TableCell>{config.name}</TableCell>
                 <TableCell>
-                  <Badge color={getProviderBadgeColor(config.provider)}>
-                    {config.provider}
-                  </Badge>
+                  <Badge color={getProviderBadgeColor(config.provider)}>{config.provider}</Badge>
                 </TableCell>
                 <TableCell>
                   <code className="text-sm text-gray-600 max-w-xs truncate block">
@@ -97,17 +93,10 @@ const CaptchaConfigs = () => {
                 <TableCell>{config.display_order}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button
-                      size="xs"
-                      onClick={() => modal.openEdit(config)}
-                    >
+                    <Button size="xs" onClick={() => modal.openEdit(config)}>
                       <FaEdit />
                     </Button>
-                    <Button
-                      size="xs"
-                      color="alternative"
-                      onClick={() => handleDelete(config.id)}
-                    >
+                    <Button size="xs" color="alternative" onClick={() => handleDelete(config.id)}>
                       <FaTrash />
                     </Button>
                   </div>
@@ -119,22 +108,13 @@ const CaptchaConfigs = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal
-        show={modal.isCreateOpen}
-        onClose={() => modal.closeCreate()}
-        size="xl"
-      >
-        <ModalHeader className="border-gray-200">
-          Create Captcha Config
-        </ModalHeader>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} size="xl">
+        <ModalHeader className="border-gray-200">Create Captcha Config</ModalHeader>
         <ModalBody>
           <CaptchaConfigForm
             mode="create"
             onSubmit={(data) => {
-              createMutation.mutate(
-                { body: data },
-                { onSuccess: () => modal.closeCreate() },
-              );
+              createMutation.mutate({ body: data }, { onSuccess: () => modal.closeCreate() });
             }}
           />
         </ModalBody>
@@ -142,14 +122,8 @@ const CaptchaConfigs = () => {
 
       {/* Edit Modal */}
       {modal.editingItem && (
-        <Modal
-          show={modal.isEditOpen}
-          onClose={() => modal.closeEdit()}
-          size="xl"
-        >
-          <ModalHeader className="border-gray-200">
-            Edit Captcha Config
-          </ModalHeader>
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} size="xl">
+          <ModalHeader className="border-gray-200">Edit Captcha Config</ModalHeader>
           <ModalBody>
             <CaptchaConfigForm
               mode="edit"
@@ -157,7 +131,7 @@ const CaptchaConfigs = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { id: modal.editingItem!.id } },
+                    params: { path: { id: modal.editingItem?.id } },
                     body: data,
                   },
                   { onSuccess: () => modal.closeEdit() },

@@ -1,14 +1,13 @@
 import { Link, useSearchParams } from "react-router";
-import type { Route } from "./+types/NoticeListPage";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
+import type { Route } from "./+types/NoticeListPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
 });
 
 export const loader = async ({ context, request }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "0", 10);
@@ -92,16 +91,10 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
           </nav>
         )}
       </article>
-      <footer
-        id="footer"
-        className="py-2 text-center bg-white border-t border-gray-300"
-      >
+      <footer id="footer" className="py-2 text-center bg-white border-t border-gray-300">
         <p className="text-xs text-gray-500">
           This BBS is powered by{" "}
-          <a
-            href="https://github.com/edginer/eddist"
-            className="text-blue-500 underline"
-          >
+          <a href="https://github.com/edginer/eddist" className="text-blue-500 underline">
             Eddist
           </a>
           .

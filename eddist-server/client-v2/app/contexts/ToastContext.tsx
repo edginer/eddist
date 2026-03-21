@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
 import { Toast } from "flowbite-react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { HiCheck, HiX } from "react-icons/hi";
 
 type ToastType = "success" | "error";
@@ -57,9 +51,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
           <Toast key={toast.id}>
             <div
               className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                toast.type === "success"
-                  ? "bg-green-100 text-green-500"
-                  : "bg-red-100 text-red-500"
+                toast.type === "success" ? "bg-green-100 text-green-500" : "bg-red-100 text-red-500"
               }`}
             >
               {toast.type === "success" ? (

@@ -1,18 +1,12 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_CAPS = "/caps/";
 
-export const getCaps = ({
-  params,
-}: UseQueryOptions<paths[typeof GET_CAPS]["get"]>) => {
+export const getCaps = ({ params }: UseQueryOptions<paths[typeof GET_CAPS]["get"]>) => {
   return useSuspenseQuery({
     queryKey: [GET_CAPS],
     queryFn: async ({ signal }) => {
@@ -43,9 +37,7 @@ const CREATE_CAP = "/caps/";
 export const useCreateCap = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_CAP]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_CAP]["post"]>) => {
       const { data } = await client.POST(CREATE_CAP, {
         body: args.body,
       });
@@ -64,9 +56,7 @@ const UPDATE_CAP = "/caps/{cap_id}/";
 export const useUpdateCap = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_CAP]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_CAP]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_CAP, {
         params: args.params,
         body: args.body,
@@ -86,9 +76,7 @@ const DELETE_CAP = "/caps/{cap_id}/";
 export const useDeleteCap = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof DELETE_CAP]["delete"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof DELETE_CAP]["delete"]>) => {
       await client.DELETE(DELETE_CAP, {
         params: args.params,
       });

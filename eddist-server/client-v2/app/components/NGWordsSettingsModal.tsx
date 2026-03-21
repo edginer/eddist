@@ -1,27 +1,16 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  Tooltip,
-} from "flowbite-react";
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader, Tooltip } from "flowbite-react";
 import { HiInformationCircle } from "react-icons/hi";
 import { useNGWords } from "~/contexts/NGWordsContext";
-import { Tabs } from "./Tabs";
 import { NGRuleSection } from "./NGRuleSection";
+import { Tabs } from "./Tabs";
 
 interface NGWordsSettingsModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
 }
 
-export const NGWordsSettingsModal = ({
-  open,
-  setOpen,
-}: NGWordsSettingsModalProps) => {
-  const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } =
-    useNGWords();
+export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProps) => {
+  const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
   return (
     <Modal show={open} size="5xl" onClose={() => setOpen(false)}>
@@ -45,9 +34,7 @@ export const NGWordsSettingsModal = ({
                     title="投稿者ID"
                     rules={config.thread.authorIds}
                     onAdd={(rule) => addRule("thread.authorIds", rule)}
-                    onUpdate={(id, updates) =>
-                      updateRule("thread.authorIds", id, updates)
-                    }
+                    onUpdate={(id, updates) => updateRule("thread.authorIds", id, updates)}
                     onRemove={(id) => removeRule("thread.authorIds", id)}
                     onToggle={(id) => toggleRule("thread.authorIds", id)}
                     isResponseRule={false}
@@ -56,9 +43,7 @@ export const NGWordsSettingsModal = ({
                     title="スレッドタイトル"
                     rules={config.thread.titles}
                     onAdd={(rule) => addRule("thread.titles", rule)}
-                    onUpdate={(id, updates) =>
-                      updateRule("thread.titles", id, updates)
-                    }
+                    onUpdate={(id, updates) => updateRule("thread.titles", id, updates)}
                     onRemove={(id) => removeRule("thread.titles", id)}
                     onToggle={(id) => toggleRule("thread.titles", id)}
                     isResponseRule={false}
@@ -75,9 +60,7 @@ export const NGWordsSettingsModal = ({
                     title="投稿者ID"
                     rules={config.response.authorIds}
                     onAdd={(rule) => addRule("response.authorIds", rule)}
-                    onUpdate={(id, updates) =>
-                      updateRule("response.authorIds", id, updates)
-                    }
+                    onUpdate={(id, updates) => updateRule("response.authorIds", id, updates)}
                     onRemove={(id) => removeRule("response.authorIds", id)}
                     onToggle={(id) => toggleRule("response.authorIds", id)}
                     isResponseRule={true}
@@ -86,9 +69,7 @@ export const NGWordsSettingsModal = ({
                     title="本文"
                     rules={config.response.bodies}
                     onAdd={(rule) => addRule("response.bodies", rule)}
-                    onUpdate={(id, updates) =>
-                      updateRule("response.bodies", id, updates)
-                    }
+                    onUpdate={(id, updates) => updateRule("response.bodies", id, updates)}
                     onRemove={(id) => removeRule("response.bodies", id)}
                     onToggle={(id) => toggleRule("response.bodies", id)}
                     isResponseRule={true}
@@ -97,9 +78,7 @@ export const NGWordsSettingsModal = ({
                     title="投稿者名"
                     rules={config.response.names}
                     onAdd={(rule) => addRule("response.names", rule)}
-                    onUpdate={(id, updates) =>
-                      updateRule("response.names", id, updates)
-                    }
+                    onUpdate={(id, updates) => updateRule("response.names", id, updates)}
                     onRemove={(id) => removeRule("response.names", id)}
                     onToggle={(id) => toggleRule("response.names", id)}
                     isResponseRule={true}
@@ -114,11 +93,7 @@ export const NGWordsSettingsModal = ({
         <Button
           color="gray"
           onClick={() => {
-            if (
-              window.confirm(
-                "すべてのNG設定をクリアしますか？\nこの操作は取り消せません。"
-              )
-            ) {
+            if (window.confirm("すべてのNG設定をクリアしますか？\nこの操作は取り消せません。")) {
               clearAllRules();
             }
           }}

@@ -19,10 +19,7 @@ const THREAD_CACHE_TTL_MS = 30_000;
 type ThreadCacheData = ReturnType<typeof convertThreadTextToResponseList> & {
   redirected: boolean;
 };
-let _threadCache: Map<
-  string,
-  { data: ThreadCacheData; expiresAt: number }
-> | null = null;
+let _threadCache: Map<string, { data: ThreadCacheData; expiresAt: number }> | null = null;
 
 export const fetchThread = async (
   boardKey: string,
@@ -41,9 +38,7 @@ export const fetchThread = async (
   }
 
   const res = await fetch(
-    `${
-      (import.meta.env.SSR && options?.baseUrl) || ""
-    }/${boardKey}/dat/${threadKey}.dat`,
+    `${(import.meta.env.SSR && options?.baseUrl) || ""}/${boardKey}/dat/${threadKey}.dat`,
     {
       headers: {
         "Content-Type": "text/plain; charset=shift_jis",
@@ -67,13 +62,13 @@ export const fetchThread = async (
   if (import.meta.env.SSR) {
     const key = `${boardKey}:${threadKey}`;
     for (const [k, v] of _threadCache!) {
-      if (v.expiresAt <= Date.now()) _threadCache!.delete(k);
+      if (v.expiresAt <= Date.now()) _threadCache?.delete(k);
     }
-    if (_threadCache!.size >= THREAD_CACHE_MAX) {
-      const oldestKey = _threadCache!.keys().next().value;
-      if (oldestKey) _threadCache!.delete(oldestKey);
+    if (_threadCache?.size >= THREAD_CACHE_MAX) {
+      const oldestKey = _threadCache?.keys().next().value;
+      if (oldestKey) _threadCache?.delete(oldestKey);
     }
-    _threadCache!.set(key, {
+    _threadCache?.set(key, {
       data: result,
       expiresAt: Date.now() + THREAD_CACHE_TTL_MS,
     });
@@ -176,9 +171,9 @@ const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
   const parts = [];
   const regex = /&gt;&gt;(\d{1,4})/g;
   let lastIndex = 0;
-  let match;
+  let match = regex.exec(body);
 
-  while ((match = regex.exec(body)) !== null) {
+  while (match !== null) {
     const { index } = match;
     if (index > lastIndex) {
       parts.push({ text: body.slice(lastIndex, index), isMatch: false });
@@ -187,7 +182,8 @@ const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
     parts.push({ text: match[0].replaceAll("&gt;", ">"), isMatch: true });
     lastIndex = index + match[0].length;
 
-    refs.push(parseInt(match[1]));
+    refs.push(parseInt(match[1], 10));
+    match = regex.exec(body);
   }
 
   if (lastIndex < body.length) {

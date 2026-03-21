@@ -10,20 +10,14 @@ import {
   TableHeadCell,
   TableRow,
 } from "flowbite-react";
-import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
-import {
-  getNotices,
-  useCreateNotice,
-  useUpdateNotice,
-  useDeleteNotice,
-} from "~/hooks/queries";
+import { FaEdit, FaPlus, FaTrash } from "react-icons/fa";
+import NoticeForm from "~/components/NoticeForm";
+import { getNotices, useCreateNotice, useDeleteNotice, useUpdateNotice } from "~/hooks/queries";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
 import type { paths } from "~/openapi/schema";
 import { formatDateTime } from "~/utils/format";
-import { useCrudModalState } from "~/hooks/useCrudModalState";
-import NoticeForm from "~/components/NoticeForm";
 
-type Notice =
-  paths["/notices/"]["get"]["responses"]["200"]["content"]["application/json"][number];
+type Notice = paths["/notices/"]["get"]["responses"]["200"]["content"]["application/json"][number];
 
 const Notices = () => {
   const modal = useCrudModalState<Notice>();
@@ -65,22 +59,13 @@ const Notices = () => {
                 <TableCell>
                   <code className="text-sm text-gray-600">{notice.slug}</code>
                 </TableCell>
-                <TableCell>
-                  {formatDateTime(notice.published_at)}
-                </TableCell>
+                <TableCell>{formatDateTime(notice.published_at)}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button
-                      size="xs"
-                      onClick={() => modal.openEdit(notice)}
-                    >
+                    <Button size="xs" onClick={() => modal.openEdit(notice)}>
                       <FaEdit />
                     </Button>
-                    <Button
-                      size="xs"
-                      color="alternative"
-                      onClick={() => handleDelete(notice.id)}
-                    >
+                    <Button size="xs" color="alternative" onClick={() => handleDelete(notice.id)}>
                       <FaTrash />
                     </Button>
                   </div>
@@ -98,10 +83,7 @@ const Notices = () => {
           <NoticeForm
             mode="create"
             onSubmit={(data) => {
-              createMutation.mutate(
-                { body: data },
-                { onSuccess: () => modal.closeCreate() },
-              );
+              createMutation.mutate({ body: data }, { onSuccess: () => modal.closeCreate() });
             }}
           />
         </ModalBody>
@@ -118,7 +100,7 @@ const Notices = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { id: modal.editingItem!.id } },
+                    params: { path: { id: modal.editingItem?.id } },
                     body: data,
                   },
                   { onSuccess: () => modal.closeEdit() },

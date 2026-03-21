@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { twMerge } from "tailwind-merge";
 
 export interface Tab {
@@ -64,7 +64,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
                 "px-4 py-2 font-medium transition-colors",
                 isActive
                   ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
+                  : "text-gray-600 hover:text-gray-800",
               )}
             >
               {tab.title}

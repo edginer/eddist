@@ -1,4 +1,4 @@
-import { Button, Label, Textarea, Spinner } from "flowbite-react";
+import { Button, Label, Spinner, Textarea } from "flowbite-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FaSave } from "react-icons/fa";
@@ -6,8 +6,7 @@ import { getTerms, useUpdateTerms } from "~/hooks/queries";
 import type { paths } from "~/openapi/schema";
 import { formatDateTime } from "~/utils/format";
 
-type UpdateTermsInput =
-  paths["/terms/"]["put"]["requestBody"]["content"]["application/json"];
+type UpdateTermsInput = paths["/terms/"]["put"]["requestBody"]["content"]["application/json"];
 
 const TermsPage = () => {
   const [isDirty, setIsDirty] = useState(false);

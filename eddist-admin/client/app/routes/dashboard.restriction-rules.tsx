@@ -13,15 +13,15 @@ import {
 } from "flowbite-react";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
+import RestrictionRuleForm from "~/components/RestrictionRuleForm";
 import {
   getRestrictionRules,
   useCreateRestrictionRule,
-  useUpdateRestrictionRule,
   useDeleteRestrictionRule,
+  useUpdateRestrictionRule,
 } from "~/hooks/queries";
-import { formatDateTime } from "~/utils/format";
 import { useCrudModalState } from "~/hooks/useCrudModalState";
-import RestrictionRuleForm from "~/components/RestrictionRuleForm";
+import { formatDateTime } from "~/utils/format";
 
 interface RestrictionRule {
   id: string;
@@ -51,34 +51,21 @@ const RestrictionRules = () => {
 
   return (
     <>
-      <Modal
-        show={modal.isCreateOpen}
-        onClose={() => modal.closeCreate()}
-      >
-        <ModalHeader className="border-gray-200">
-          Create Restriction Rule
-        </ModalHeader>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()}>
+        <ModalHeader className="border-gray-200">Create Restriction Rule</ModalHeader>
         <ModalBody>
           <RestrictionRuleForm
             mode="create"
             onSubmit={(data) => {
-              createMutation.mutate(
-                { body: data },
-                { onSuccess: () => modal.closeCreate() },
-              );
+              createMutation.mutate({ body: data }, { onSuccess: () => modal.closeCreate() });
             }}
           />
         </ModalBody>
       </Modal>
 
       {modal.editingItem && (
-        <Modal
-          show={modal.isEditOpen}
-          onClose={() => modal.closeEdit()}
-        >
-          <ModalHeader className="border-gray-200">
-            Edit Restriction Rule
-          </ModalHeader>
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()}>
+          <ModalHeader className="border-gray-200">Edit Restriction Rule</ModalHeader>
           <ModalBody>
             <RestrictionRuleForm
               mode="edit"
@@ -86,7 +73,7 @@ const RestrictionRules = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { rule_id: modal.editingItem!.id } },
+                    params: { path: { rule_id: modal.editingItem?.id } },
                     body: data,
                   },
                   { onSuccess: () => modal.closeEdit() },
@@ -101,6 +88,7 @@ const RestrictionRules = () => {
         <div className="flex">
           <h1 className="text-3xl font-bold grow">Restriction Rules</h1>
           <button
+            type="button"
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => modal.openCreate()}
           >
@@ -126,9 +114,7 @@ const RestrictionRules = () => {
                     {rule.rule_type}
                   </span>
                 </TableCell>
-                <TableCell className="font-mono text-sm">
-                  {rule.rule_value}
-                </TableCell>
+                <TableCell className="font-mono text-sm">{rule.rule_value}</TableCell>
                 <TableCell>
                   <span
                     className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -147,11 +133,7 @@ const RestrictionRules = () => {
                 <TableCell>
                   <div className="text-right">
                     <Dropdown label={<BiDotsHorizontalRounded />}>
-                      <DropdownItem
-                        onClick={() => modal.openEdit(rule)}
-                      >
-                        Edit
-                      </DropdownItem>
+                      <DropdownItem onClick={() => modal.openEdit(rule)}>Edit</DropdownItem>
                       <DropdownItem
                         className="text-red-500"
                         onClick={() => {

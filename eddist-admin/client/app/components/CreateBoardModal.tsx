@@ -1,3 +1,4 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Accordion,
   AccordionContent,
@@ -13,10 +14,9 @@ import {
   TextInput,
 } from "flowbite-react";
 import { useForm } from "react-hook-form";
-import { useCreateBoard } from "~/hooks/queries";
 import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { components } from "~/openapi/schema";
+import { useCreateBoard } from "~/hooks/queries";
+import type { components } from "~/openapi/schema";
 
 interface CreateBoardModalProps {
   open: boolean;
@@ -39,8 +39,7 @@ const boardCreationSchema = z.object({
         return !["test", "api", "auth", "auth-code", "bbsmenu"].includes(value);
       },
       {
-        message:
-          "Sorry, this board key is reserved. Please choose another one.",
+        message: "Sorry, this board key is reserved. Please choose another one.",
       },
     ),
   default_name: z.string().min(1).max(64),
@@ -72,11 +71,7 @@ const boardCreationSchema = z.object({
     .optional(),
 });
 
-const CreateBoardModal = ({
-  open,
-  setOpen,
-  refetch,
-}: CreateBoardModalProps) => {
+const CreateBoardModal = ({ open, setOpen, refetch }: CreateBoardModalProps) => {
   const {
     register,
     handleSubmit,
@@ -123,9 +118,7 @@ const CreateBoardModal = ({
               {...register("board_key")}
               color={errors.board_key ? "red" : undefined}
             />
-            <HelperText>
-              {errors.board_key && <>{errors.board_key.message}</>}
-            </HelperText>
+            <HelperText>{errors.board_key && <>{errors.board_key.message}</>}</HelperText>
           </div>
           <div className="flex flex-col mt-4">
             <Label>Default Name</Label>
@@ -135,9 +128,7 @@ const CreateBoardModal = ({
               {...register("default_name")}
               color={errors.default_name ? "red" : undefined}
             />
-            <HelperText>
-              {errors.default_name && <>{errors.default_name.message}</>}
-            </HelperText>
+            <HelperText>{errors.default_name && <>{errors.default_name.message}</>}</HelperText>
             <div className="flex flex-col mt-4">
               <Label>Local Rules</Label>
               <Textarea
@@ -147,16 +138,12 @@ const CreateBoardModal = ({
                 {...register("local_rule")}
                 color={errors.local_rule ? "red" : undefined}
               />
-              <HelperText>
-                {errors.local_rule && <>{errors.local_rule.message}</>}
-              </HelperText>
+              <HelperText>{errors.local_rule && <>{errors.local_rule.message}</>}</HelperText>
             </div>
           </div>
           <Accordion className="mt-4" collapseAll>
             <AccordionPanel title="Advanced Settings">
-              <AccordionTitle className="p-3.5">
-                Advanced Settings
-              </AccordionTitle>
+              <AccordionTitle className="p-3.5">Advanced Settings</AccordionTitle>
               <AccordionContent>
                 <div className="flex flex-col">
                   <div className="flex flex-row content-between space-x-4">
@@ -168,17 +155,9 @@ const CreateBoardModal = ({
                         {...register("base_thread_creation_span_sec", {
                           valueAsNumber: true,
                         })}
-                        color={
-                          errors.base_thread_creation_span_sec
-                            ? "red"
-                            : undefined
-                        }
+                        color={errors.base_thread_creation_span_sec ? "red" : undefined}
                       />
-                      <HelperText>
-                        {errors.base_thread_creation_span_sec && (
-                          <>{errors.base_thread_creation_span_sec.message}</>
-                        )}
-                      </HelperText>
+                      <HelperText>{errors.base_thread_creation_span_sec?.message}</HelperText>
                     </div>
                     <div className="flex flex-col grow">
                       <Label>Base Response Creation Span (sec)</Label>
@@ -188,17 +167,9 @@ const CreateBoardModal = ({
                         {...register("base_response_creation_span_sec", {
                           valueAsNumber: true,
                         })}
-                        color={
-                          errors.base_response_creation_span_sec
-                            ? "red"
-                            : undefined
-                        }
+                        color={errors.base_response_creation_span_sec ? "red" : undefined}
                       />
-                      <HelperText>
-                        {errors.base_response_creation_span_sec && (
-                          <>{errors.base_response_creation_span_sec.message}</>
-                        )}
-                      </HelperText>
+                      <HelperText>{errors.base_response_creation_span_sec?.message}</HelperText>
                     </div>
                   </div>
                   <div className="flex flex-row content-between space-x-4 mt-4">
@@ -210,15 +181,9 @@ const CreateBoardModal = ({
                         {...register("max_thread_name_byte_length", {
                           valueAsNumber: true,
                         })}
-                        color={
-                          errors.max_thread_name_byte_length ? "red" : undefined
-                        }
+                        color={errors.max_thread_name_byte_length ? "red" : undefined}
                       />
-                      <HelperText>
-                        {errors.max_thread_name_byte_length && (
-                          <>{errors.max_thread_name_byte_length.message}</>
-                        )}
-                      </HelperText>
+                      <HelperText>{errors.max_thread_name_byte_length?.message}</HelperText>
                     </div>
                     <div className="flex flex-col grow">
                       <Label>Max Author Name Byte Length</Label>
@@ -228,15 +193,9 @@ const CreateBoardModal = ({
                         {...register("max_author_name_byte_length", {
                           valueAsNumber: true,
                         })}
-                        color={
-                          errors.max_author_name_byte_length ? "red" : undefined
-                        }
+                        color={errors.max_author_name_byte_length ? "red" : undefined}
                       />
-                      <HelperText>
-                        {errors.max_author_name_byte_length && (
-                          <>{errors.max_author_name_byte_length.message}</>
-                        )}
-                      </HelperText>
+                      <HelperText>{errors.max_author_name_byte_length?.message}</HelperText>
                     </div>
                   </div>
                 </div>
@@ -252,9 +211,7 @@ const CreateBoardModal = ({
                       color={errors.max_email_byte_length ? "red" : undefined}
                     />
                     <HelperText>
-                      {errors.max_email_byte_length && (
-                        <>{errors.max_email_byte_length.message}</>
-                      )}
+                      {errors.max_email_byte_length && <>{errors.max_email_byte_length.message}</>}
                     </HelperText>
                   </div>
                   <div className="flex flex-col grow">
@@ -265,16 +222,10 @@ const CreateBoardModal = ({
                       {...register("max_response_body_byte_length", {
                         valueAsNumber: true,
                       })}
-                      color={
-                        errors.max_response_body_byte_length ? "red" : undefined
-                      }
+                      color={errors.max_response_body_byte_length ? "red" : undefined}
                     />
                   </div>
-                  <HelperText>
-                    {errors.max_response_body_byte_length && (
-                      <>{errors.max_response_body_byte_length.message}</>
-                    )}
-                  </HelperText>
+                  <HelperText>{errors.max_response_body_byte_length?.message}</HelperText>
                 </div>
                 <div className="flex flex-col mt-4">
                   <Label>Max Response Body Lines</Label>
@@ -286,11 +237,7 @@ const CreateBoardModal = ({
                     })}
                     color={errors.max_response_body_lines ? "red" : undefined}
                   />
-                  <HelperText>
-                    {errors.max_response_body_lines && (
-                      <>{errors.max_response_body_lines.message}</>
-                    )}
-                  </HelperText>
+                  <HelperText>{errors.max_response_body_lines?.message}</HelperText>
                 </div>
                 <div className="flex flex-row content-between space-x-4 mt-4">
                   <div className="flex flex-col grow">
@@ -301,9 +248,7 @@ const CreateBoardModal = ({
                       color={errors.threads_archive_cron ? "red" : undefined}
                     />
                     <HelperText>
-                      {errors.threads_archive_cron && (
-                        <>{errors.threads_archive_cron.message}</>
-                      )}
+                      {errors.threads_archive_cron && <>{errors.threads_archive_cron.message}</>}
                     </HelperText>
                   </div>
                   <div className="flex flex-col grow">
@@ -314,19 +259,9 @@ const CreateBoardModal = ({
                       {...register("threads_archive_trigger_thread_count", {
                         valueAsNumber: true,
                       })}
-                      color={
-                        errors.threads_archive_trigger_thread_count
-                          ? "red"
-                          : undefined
-                      }
+                      color={errors.threads_archive_trigger_thread_count ? "red" : undefined}
                     />
-                    <HelperText>
-                      {errors.threads_archive_trigger_thread_count && (
-                        <>
-                          {errors.threads_archive_trigger_thread_count.message}
-                        </>
-                      )}
-                    </HelperText>
+                    <HelperText>{errors.threads_archive_trigger_thread_count?.message}</HelperText>
                   </div>
                 </div>
               </AccordionContent>

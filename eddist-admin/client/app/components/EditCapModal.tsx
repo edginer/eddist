@@ -1,16 +1,9 @@
-import {
-  Button,
-  Label,
-  Modal,
-  ModalBody,
-  ModalHeader,
-  TextInput,
-} from "flowbite-react";
-import React, { useMemo } from "react";
+import { Button, Label, Modal, ModalBody, ModalHeader, TextInput } from "flowbite-react";
+import { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { getBoards, useUpdateCap } from "~/hooks/queries";
 import Select from "react-select";
-import { Cap } from "~/routes/dashboard.caps";
+import { getBoards, useUpdateCap } from "~/hooks/queries";
+import type { Cap } from "~/routes/dashboard.caps";
 
 interface EditCapModalProps {
   open: boolean;
@@ -24,12 +17,7 @@ interface BoardSelectOption {
   value: string;
 }
 
-const EditCapModal = ({
-  open,
-  selectedCap,
-  setOpen,
-  refetch,
-}: EditCapModalProps) => {
+const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps) => {
   const { register, handleSubmit, control, reset } = useForm();
 
   const { data: boards } = getBoards({});
@@ -59,7 +47,7 @@ const EditCapModal = ({
           onSubmit={handleSubmit((data) => {
             const boardIds = data.boardKeys.map(
               (val: BoardSelectOption) =>
-                boards!.find((board) => board.board_key === val.value)?.id
+                boards?.find((board) => board.board_key === val.value)?.id,
             );
             const password = data.password ? data.password : undefined;
 
@@ -124,10 +112,10 @@ const EditCapModal = ({
               name="boardKeys"
               control={control}
               defaultValue={selectedCap?.boardIds.map((boardId) => {
-                const board = boards!.find((b) => b.id === boardId);
+                const board = boards?.find((b) => b.id === boardId);
                 return {
-                  label: board!.board_key,
-                  value: board!.board_key,
+                  label: board?.board_key,
+                  value: board?.board_key,
                 };
               })}
               render={({ field }) => (
@@ -135,11 +123,7 @@ const EditCapModal = ({
                   options={boardSelectOptions}
                   value={boardSelectOptions
                     .map((board) => {
-                      if (
-                        field.value?.find(
-                          (v: BoardSelectOption) => v.value === board.value
-                        )
-                      ) {
+                      if (field.value?.find((v: BoardSelectOption) => v.value === board.value)) {
                         return board;
                       }
                       return null;

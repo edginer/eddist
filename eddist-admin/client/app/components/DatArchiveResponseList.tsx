@@ -1,7 +1,7 @@
 import { Dropdown, DropdownItem } from "flowbite-react";
-import React from "react";
+import type React from "react";
 import { Link } from "react-router";
-import { components } from "~/openapi/schema";
+import type { components } from "~/openapi/schema";
 
 interface Props {
   responses?: components["schemas"]["ArchivedRes"][];
@@ -35,12 +35,8 @@ const DatArchiveResponseList = ({
             type="checkbox"
             className="mr-2"
             onClick={() => {
-              if (
-                selectedResponsesOrder.find((order) => order === idx) != null
-              ) {
-                setSelectedResponsesOrder((s) =>
-                  s.filter((order) => order !== idx),
-                );
+              if (selectedResponsesOrder.find((order) => order === idx) != null) {
+                setSelectedResponsesOrder((s) => s.filter((order) => order !== idx));
               } else {
                 setSelectedResponsesOrder((s) => [...s, idx]);
               }
@@ -52,12 +48,10 @@ const DatArchiveResponseList = ({
           <span className="text-gray-500 mr-2">{response.mail}</span>
           <span className="text-gray-500 mr-2">{response.date}</span>
           <span className="text-gray-500 grow">ID:{response.author_id}</span>
-          {responses && responses[idx] && responses[idx].is_abone && (
+          {responses?.[idx]?.is_abone && (
             <div>
               <hr className="mr-2" />
-              <span className="text-gray-500 mr-2">
-                This responses is deleted.
-              </span>
+              <span className="text-gray-500 mr-2">This responses is deleted.</span>
             </div>
           )}
           <div>
@@ -76,25 +70,13 @@ const DatArchiveResponseList = ({
               }
               inline
             >
-              <DropdownItem onClick={() => onClickEditResponse(idx)}>
-                Edit
-              </DropdownItem>
-              <DropdownItem onClick={() => onClieckAbon(idx)}>
-                Abon
-              </DropdownItem>
-              <DropdownItem
-                onClick={() =>
-                  onClickDeleteAuthedToken(response.authed_token_id)
-                }
-              >
+              <DropdownItem onClick={() => onClickEditResponse(idx)}>Edit</DropdownItem>
+              <DropdownItem onClick={() => onClieckAbon(idx)}>Abon</DropdownItem>
+              <DropdownItem onClick={() => onClickDeleteAuthedToken(response.authed_token_id)}>
                 Delete Authed Token
               </DropdownItem>
               <DropdownItem
-                onClick={() =>
-                  onClickDeleteAuthedTokensAssociatedWithIp(
-                    response.authed_token_id,
-                  )
-                }
+                onClick={() => onClickDeleteAuthedTokensAssociatedWithIp(response.authed_token_id)}
               >
                 Delete Authed Tokens Associated With IP
               </DropdownItem>
@@ -102,8 +84,7 @@ const DatArchiveResponseList = ({
           </div>
         </div>
         <div className="p-2">{response.body}</div>
-        {responses &&
-          responses[idx] &&
+        {responses?.[idx] &&
           !responses[idx].is_abone &&
           (responses[idx].body !== response.body ||
             responses[idx].name !== response.name ||
@@ -114,9 +95,7 @@ const DatArchiveResponseList = ({
               <span className="text-gray-500 mr-2">{responses[idx].name}</span>
               <span className="text-gray-500 mr-2">{responses[idx].mail}</span>
               <span className="text-gray-500 mr-2">{responses[idx].date}</span>
-              <span className="text-gray-500 grow">
-                ID:{responses[idx].author_id}
-              </span>
+              <span className="text-gray-500 grow">ID:{responses[idx].author_id}</span>
               <div className="p-2">{responses[idx].body}</div>
             </div>
           )}

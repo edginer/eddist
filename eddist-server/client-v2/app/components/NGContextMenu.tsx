@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNGWords, type NGCategory } from "~/contexts/NGWordsContext";
+import { type NGCategory, useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
 
 interface NGContextMenuProps {
@@ -20,13 +20,7 @@ interface NGContextMenuProps {
   }[];
 }
 
-export const NGContextMenu = ({
-  x,
-  y,
-  onClose,
-  options,
-  actions = [],
-}: NGContextMenuProps) => {
+export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { addRule } = useNGWords();
   const { showToast } = useToast();
@@ -34,7 +28,7 @@ export const NGContextMenu = ({
   // Truncate long text for display
   const truncateText = (text: string, maxLength: number = 100): string => {
     if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + "...";
+    return `${text.slice(0, maxLength)}...`;
   };
 
   // Build flat menu items
@@ -45,8 +39,7 @@ export const NGContextMenu = ({
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
           description: "NGに追加 (折りたたむ)",
-          onClick: () =>
-            handleAddToNG(option.value, option.category, "collapsed"),
+          onClick: () => handleAddToNG(option.value, option.category, "collapsed"),
         },
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
@@ -60,8 +53,7 @@ export const NGContextMenu = ({
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
           description: "NGに追加",
-          onClick: () =>
-            handleAddToNG(option.value, option.category, undefined),
+          onClick: () => handleAddToNG(option.value, option.category, undefined),
         },
       ];
     }
@@ -123,7 +115,7 @@ export const NGContextMenu = ({
   const handleAddToNG = (
     value: string,
     category: NGCategory,
-    hideMode?: "hidden" | "collapsed"
+    hideMode?: "hidden" | "collapsed",
   ) => {
     try {
       addRule(category, {
@@ -186,9 +178,7 @@ export const NGContextMenu = ({
           className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center justify-between border-b border-gray-100 last:border-b-0"
         >
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-gray-900 wrap-break-word">
-              {item.label}
-            </div>
+            <div className="text-sm text-gray-900 wrap-break-word">{item.label}</div>
             <div className="text-xs text-gray-500 mt-1">{item.description}</div>
           </div>
         </button>

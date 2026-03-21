@@ -1,14 +1,13 @@
-import type { Route } from "./+types/TermsPage";
 import { fetchTerms } from "~/api-client/terms";
 import { parseMarkdown } from "~/utils/markdown";
+import type { Route } from "./+types/TermsPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const terms = await fetchTerms({ baseUrl });
 
@@ -36,9 +35,7 @@ function TermsPage({ loaderData }: Route.ComponentProps) {
       <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-white rounded-lg shadow-sm border p-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-              利用規約
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">利用規約</h1>
             <div className="space-y-6">{parseMarkdown(terms.content)}</div>
           </div>
         </div>
