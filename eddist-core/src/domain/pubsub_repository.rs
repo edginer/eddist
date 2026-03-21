@@ -26,13 +26,14 @@ pub struct CreatingRes {
 pub struct AuthTokenInitiated {
     pub origin_ip: String,
     pub user_agent: String,
-    pub asn_num: i32,
+    pub asn_num: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthTokenRequested {
     pub origin_ip: String,
     pub user_agent: String,
+    pub auth_code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +41,7 @@ pub struct AuthTokenSucceeded {
     pub authed_token_id: Uuid,
     pub origin_ip: String,
     pub user_agent: String,
-    pub asn_num: i32,
+    pub asn_num: u32,
     pub authed_at: DateTime<Utc>,
     pub additional_info: Option<Value>,
 }

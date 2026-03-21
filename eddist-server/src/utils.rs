@@ -64,6 +64,12 @@ pub(crate) mod redis {
     pub fn email_auth_used_key(token: &str) -> String {
         format!("resp:email_auth_used:{token}")
     }
+
+    pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
+    pub const CHANNEL_THREAD_CREATED: &str = "bbs:event:thread_created";
+    pub const CHANNEL_AUTH_TOKEN_INITIATED: &str = "bbs:event:auth_token_initiated";
+    pub const CHANNEL_AUTH_TOKEN_REQUESTED: &str = "bbs:event:auth_token_requested";
+    pub const CHANNEL_AUTH_TOKEN_SUCCEEDED: &str = "bbs:event:auth_token_succeeded";
 }
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {

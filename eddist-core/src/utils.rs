@@ -1,10 +1,19 @@
+use std::sync::OnceLock;
+
 use chrono::{DateTime, Datelike, TimeDelta, Weekday};
 
+static IS_PROD: OnceLock<bool> = OnceLock::new();
+static IS_RES_PUB_ENABLED: OnceLock<bool> = OnceLock::new();
+static IS_THREAD_PUB_ENABLED: OnceLock<bool> = OnceLock::new();
+static IS_AUTH_TOKEN_PUB_ENABLED: OnceLock<bool> = OnceLock::new();
+
 pub fn is_prod() -> bool {
-    matches!(
-        std::env::var("RUST_ENV").as_deref(),
-        Ok("prod" | "production")
-    )
+    *IS_PROD.get_or_init(|| {
+        matches!(
+            std::env::var("RUST_ENV").as_deref(),
+            Ok("prod" | "production")
+        )
+    })
 }
 
 pub fn is_user_registration_enabled() -> bool {
@@ -15,18 +24,22 @@ pub fn is_user_registration_enabled() -> bool {
 }
 
 pub fn is_res_pub_enabled() -> bool {
-    !matches!(std::env::var("ENABLE_RES_PUB").as_deref(), Ok("false"))
+    *IS_RES_PUB_ENABLED
+        .get_or_init(|| !matches!(std::env::var("ENABLE_RES_PUB").as_deref(), Ok("false")))
 }
 
 pub fn is_thread_pub_enabled() -> bool {
-    !matches!(std::env::var("ENABLE_THREAD_PUB").as_deref(), Ok("false"))
+    *IS_THREAD_PUB_ENABLED
+        .get_or_init(|| !matches!(std::env::var("ENABLE_THREAD_PUB").as_deref(), Ok("false")))
 }
 
 pub fn is_auth_token_pub_enabled() -> bool {
-    !matches!(
-        std::env::var("ENABLE_AUTH_TOKEN_PUB").as_deref(),
-        Ok("false")
-    )
+    *IS_AUTH_TOKEN_PUB_ENABLED.get_or_init(|| {
+        matches!(
+            std::env::var("ENABLE_AUTH_TOKEN_PUB").as_deref(),
+            Ok("true")
+        )
+    })
 }
 
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {

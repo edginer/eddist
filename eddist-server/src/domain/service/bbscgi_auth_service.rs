@@ -39,6 +39,21 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         }
     }
 
+    fn publish_initiated(&self, origin_ip: String, user_agent: String, asn_num: u32) {
+        if is_auth_token_pub_enabled() {
+            let event_repo = self.event_repo.clone();
+            tokio::spawn(async move {
+                let _ = event_repo
+                    .publish_auth_token_initiated(AuthTokenInitiated {
+                        origin_ip,
+                        user_agent,
+                        asn_num,
+                    })
+                    .await;
+            });
+        }
+    }
+
     pub async fn check_validity(
         &self,
         token: Option<&str>,
@@ -64,16 +79,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                 })
                 .await?;
             counter!("token_request", "state" => "created").increment(1);
-            if is_auth_token_pub_enabled() {
-                let _ = self
-                    .event_repo
-                    .publish_auth_token_initiated(AuthTokenInitiated {
-                        origin_ip: ip_addr,
-                        user_agent,
-                        asn_num,
-                    })
-                    .await;
-            }
+            self.publish_initiated(ip_addr, user_agent, asn_num as u32);
 
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
@@ -108,16 +114,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                     })
                     .await?;
                 counter!("token_request", "state" => "created").increment(1);
-                if is_auth_token_pub_enabled() {
-                    let _ = self
-                        .event_repo
-                        .publish_auth_token_initiated(AuthTokenInitiated {
-                            origin_ip: ip_addr,
-                            user_agent,
-                            asn_num,
-                        })
-                        .await;
-                }
+                self.publish_initiated(ip_addr, user_agent, asn_num as u32);
 
                 return Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,

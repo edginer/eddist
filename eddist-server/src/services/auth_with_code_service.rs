@@ -100,13 +100,15 @@ impl<T: BbsRepository, E: CreationEventRepository>
             .collect::<Vec<_>>();
         counter!("auth_code_request").increment(1);
         if is_auth_token_pub_enabled() {
-            let _ = self
-                .event_repo
-                .publish_auth_token_requested(AuthTokenRequested {
-                    origin_ip: input.origin_ip.clone(),
-                    user_agent: input.user_agent.clone(),
-                })
-                .await;
+            let event_repo = self.event_repo.clone();
+            let event = AuthTokenRequested {
+                origin_ip: input.origin_ip.clone(),
+                user_agent: input.user_agent.clone(),
+                auth_code: input.code.clone(),
+            };
+            tokio::spawn(async move {
+                let _ = event_repo.publish_auth_token_requested(event).await;
+            });
         }
 
         // Get all unauthed tokens with the auth code (non-IP checking)
@@ -236,17 +238,18 @@ impl<T: BbsRepository, E: CreationEventRepository>
             .await?;
         counter!("auth_code_success").increment(1);
         if is_auth_token_pub_enabled() {
-            let _ = self
-                .event_repo
-                .publish_auth_token_succeeded(AuthTokenSucceeded {
-                    authed_token_id: token.id,
-                    origin_ip: input.origin_ip.clone(),
-                    user_agent: input.user_agent.clone(),
-                    asn_num: token.asn_num,
-                    authed_at: now,
-                    additional_info: additional_info.clone(),
-                })
-                .await;
+            let event_repo = self.event_repo.clone();
+            let event = AuthTokenSucceeded {
+                authed_token_id: token.id,
+                origin_ip: input.origin_ip.clone(),
+                user_agent: input.user_agent.clone(),
+                asn_num: token.asn_num as u32,
+                authed_at: now,
+                additional_info,
+            };
+            tokio::spawn(async move {
+                let _ = event_repo.publish_auth_token_succeeded(event).await;
+            });
         }
 
         // Generate rate limiting token after successful authentication

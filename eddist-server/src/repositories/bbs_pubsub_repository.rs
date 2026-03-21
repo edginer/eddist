@@ -2,8 +2,13 @@ use eddist_core::domain::pubsub_repository::{
     AuthTokenInitiated, AuthTokenRequested, AuthTokenSucceeded, CreatingRes, PubSubItem,
 };
 use redis::{AsyncCommands, aio::ConnectionManager};
+use serde::Serialize;
 
 use super::bbs_repository::CreatingThread;
+use crate::utils::redis::{
+    CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_SUCCEEDED,
+    CHANNEL_RES_CREATED, CHANNEL_THREAD_CREATED,
+};
 
 #[derive(Clone)]
 pub struct RedisPubRepository {
@@ -42,6 +47,17 @@ impl RedisCreationEventRepository {
     pub fn new(redis_conn: ConnectionManager) -> Self {
         Self { redis_conn }
     }
+
+    async fn publish_to_channel<T: Serialize>(
+        &self,
+        channel: &str,
+        event: T,
+    ) -> Result<(), anyhow::Error> {
+        let mut redis_conn = self.redis_conn.clone();
+        let payload = serde_json::to_string(&event)?;
+        redis_conn.publish::<'_, _, _, ()>(channel, payload).await?;
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -65,56 +81,34 @@ pub trait CreationEventRepository: Clone + 'static + Send + Sync {
 #[async_trait::async_trait]
 impl CreationEventRepository for RedisCreationEventRepository {
     async fn publish_res_created(&self, event: CreatingRes) -> Result<(), anyhow::Error> {
-        let mut redis_conn = self.redis_conn.clone();
-        let event = serde_json::to_string(&event)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:res_created", event)
-            .await?;
-        Ok(())
+        self.publish_to_channel(CHANNEL_RES_CREATED, event).await
     }
 
     async fn publish_thread_created(&self, event: CreatingThread) -> Result<(), anyhow::Error> {
-        let mut redis_conn = self.redis_conn.clone();
-        let event = serde_json::to_string(&event)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:thread_created", event)
-            .await?;
-        Ok(())
+        self.publish_to_channel(CHANNEL_THREAD_CREATED, event).await
     }
 
     async fn publish_auth_token_initiated(
         &self,
         event: AuthTokenInitiated,
     ) -> Result<(), anyhow::Error> {
-        let mut redis_conn = self.redis_conn.clone();
-        let event = serde_json::to_string(&event)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:auth_token_initiated", event)
-            .await?;
-        Ok(())
+        self.publish_to_channel(CHANNEL_AUTH_TOKEN_INITIATED, event)
+            .await
     }
 
     async fn publish_auth_token_requested(
         &self,
         event: AuthTokenRequested,
     ) -> Result<(), anyhow::Error> {
-        let mut redis_conn = self.redis_conn.clone();
-        let event = serde_json::to_string(&event)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:auth_token_requested", event)
-            .await?;
-        Ok(())
+        self.publish_to_channel(CHANNEL_AUTH_TOKEN_REQUESTED, event)
+            .await
     }
 
     async fn publish_auth_token_succeeded(
         &self,
         event: AuthTokenSucceeded,
     ) -> Result<(), anyhow::Error> {
-        let mut redis_conn = self.redis_conn.clone();
-        let event = serde_json::to_string(&event)?;
-        redis_conn
-            .publish::<'_, _, _, ()>("bbs:event:auth_token_succeeded", event)
-            .await?;
-        Ok(())
+        self.publish_to_channel(CHANNEL_AUTH_TOKEN_SUCCEEDED, event)
+            .await
     }
 }
