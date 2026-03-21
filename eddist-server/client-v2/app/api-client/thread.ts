@@ -64,7 +64,7 @@ export const fetchThread = async (
     for (const [k, v] of _threadCache!) {
       if (v.expiresAt <= Date.now()) _threadCache?.delete(k);
     }
-    if (_threadCache?.size >= THREAD_CACHE_MAX) {
+    if ((_threadCache?.size ?? 0) >= THREAD_CACHE_MAX) {
       const oldestKey = _threadCache?.keys().next().value;
       if (oldestKey) _threadCache?.delete(oldestKey);
     }
