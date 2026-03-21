@@ -37,7 +37,7 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
+          <p className="text-gray-600 text-sm mt-2">
             {new Date(notice.published_at).toLocaleDateString("ja-JP", {
               year: "numeric",
               month: "long",
@@ -59,9 +59,9 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
+        className="py-2 text-center bg-white border-t border-gray-300"
       >
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-gray-500">
           This BBS is powered by{" "}
           <a
             href="https://github.com/edginer/eddist"

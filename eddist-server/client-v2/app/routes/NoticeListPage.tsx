@@ -50,7 +50,7 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
             {noticeData.notices.map((notice: NoticeListItem) => (
               <li
                 key={notice.slug}
-                className="border-b dark:border-gray-700 pb-4"
+                className="border-b pb-4"
               >
                 <Link
                   to={`/notices/${notice.slug}`}
@@ -58,7 +58,7 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
                 >
                   {notice.title}
                 </Link>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                <p className="text-gray-600 text-sm mt-1">
                   {new Date(notice.published_at).toLocaleDateString("ja-JP", {
                     year: "numeric",
                     month: "2-digit",
@@ -97,9 +97,9 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
+        className="py-2 text-center bg-white border-t border-gray-300"
       >
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-gray-500">
           This BBS is powered by{" "}
           <a
             href="https://github.com/edginer/eddist"

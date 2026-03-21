@@ -31,12 +31,12 @@ function TermsPage({ loaderData }: Route.ComponentProps) {
   const { eddistData, terms } = loaderData;
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900">
+    <div className="bg-gray-50">
       <Meta bbsName={eddistData.bbsName} />
       <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto p-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8 text-center">
+          <div className="bg-white rounded-lg shadow-sm border p-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
               利用規約
             </h1>
             <div className="space-y-6">{parseMarkdown(terms.content)}</div>

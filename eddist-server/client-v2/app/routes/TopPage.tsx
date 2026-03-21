@@ -3,7 +3,6 @@ import type { Route } from "./+types/TopPage";
 import { fetchBoards, type Board } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
@@ -99,7 +98,7 @@ function TopPage({
             <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
               {notices.map((notice: NoticeListItem) => (
                 <li key={notice.slug}>
-                  <span className="text-gray-500 dark:text-gray-400 mr-2">
+                  <span className="text-gray-500 mr-2">
                     {new Date(notice.published_at).toLocaleDateString("ja-JP", {
                       year: "numeric",
                       month: "2-digit",
@@ -123,24 +122,18 @@ function TopPage({
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
+        className="py-2 text-center bg-white border-t border-gray-300"
       >
-        <div className="flex justify-center items-center gap-3">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            This BBS is powered by{" "}
-            <a
-              href="https://github.com/edginer/eddist"
-              className="text-blue-500 underline"
-            >
-              Eddist
-            </a>
-            .
-          </p>
-          <ThemeToggleButton
-            className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            iconClassName="w-3.5 h-3.5"
-          />
-        </div>
+        <p className="text-xs text-gray-500">
+          This BBS is powered by{" "}
+          <a
+            href="https://github.com/edginer/eddist"
+            className="text-blue-500 underline"
+          >
+            Eddist
+          </a>
+          .
+        </p>
       </footer>
     </div>
   );
