@@ -193,15 +193,12 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Start application server with 0.0.0.0:8080");
 
+    describe_counter!("token_request", "token request count from bbs.cgi by state");
     describe_counter!(
-        "token_request",
-        "token request count from bbs.cgi by state"
+        "auth_code_request",
+        "auth code request count from auth-code endpoint"
     );
-    describe_counter!("auth_code_request", "auth code request count from auth-code endpoint");
-    describe_counter!(
-        "auth_code_failure",
-        "auth code failure count by reason"
-    );
+    describe_counter!("auth_code_failure", "auth code failure count by reason");
     describe_counter!("auth_code_success", "auth code success count");
     describe_counter!("response_creation", "response creation count if success");
     describe_counter!("thread_creation", "thread creation count if success");

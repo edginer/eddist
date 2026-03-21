@@ -13,7 +13,6 @@ use serde_json::json;
 
 use crate::{
     AppState,
-    utils::{get_asn_num, get_origin_ip, get_ua},
     services::{
         AppService,
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
@@ -27,6 +26,7 @@ use crate::{
         user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
     },
+    utils::{get_asn_num, get_origin_ip, get_ua},
 };
 
 pub fn user_routes() -> Router<AppState> {
