@@ -33,6 +33,7 @@ pub struct AuthTokenInitiated {
 pub struct AuthTokenRequested {
     pub origin_ip: String,
     pub user_agent: String,
+    pub asn_num: u32,
     pub auth_code: String,
 }
 

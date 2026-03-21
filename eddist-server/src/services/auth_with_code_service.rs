@@ -104,6 +104,7 @@ impl<T: BbsRepository, E: CreationEventRepository>
             let event = AuthTokenRequested {
                 origin_ip: input.origin_ip.clone(),
                 user_agent: input.user_agent.clone(),
+                asn_num: input.asn_num,
                 auth_code: input.code.clone(),
             };
             tokio::spawn(async move {
@@ -287,6 +288,7 @@ pub struct AuthWithCodeServiceInput {
     pub code: String,
     pub origin_ip: String,
     pub user_agent: String,
+    pub asn_num: u32,
     pub captcha_like_configs: Vec<CaptchaProviderConfig>,
     pub responses: HashMap<String, String>,
     pub rate_limit_token: Option<String>,

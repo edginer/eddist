@@ -21,7 +21,7 @@ use crate::{
         bind_token_to_user_service::BindTokenToUserServiceInput,
         captcha_config_cache::get_cached_captcha_configs,
     },
-    utils::{get_origin_ip, get_ua},
+    utils::{get_asn_num, get_origin_ip, get_ua},
 };
 
 /// Script to be loaded for a captcha widget
@@ -125,6 +125,7 @@ pub async fn post_auth_code(
             code: form["auth-code"].to_string(),
             origin_ip: get_origin_ip(&headers).to_string(),
             user_agent: get_ua(&headers).to_string(),
+            asn_num: get_asn_num(&headers),
             captcha_like_configs: captcha_configs,
             responses: form,
             rate_limit_token,
