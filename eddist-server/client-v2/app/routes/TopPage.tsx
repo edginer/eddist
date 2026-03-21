@@ -40,7 +40,7 @@ function TopPage({
   loaderData: { eddistData, boards, notices },
 }: Route.ComponentProps) {
   return (
-    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
@@ -98,7 +98,7 @@ function TopPage({
             <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
               {notices.map((notice: NoticeListItem) => (
                 <li key={notice.slug}>
-                  <span className="text-gray-500 mr-2">
+                  <span className="text-gray-500 dark:text-gray-400 mr-2">
                     {new Date(notice.published_at).toLocaleDateString("ja-JP", {
                       year: "numeric",
                       month: "2-digit",
@@ -122,9 +122,9 @@ function TopPage({
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white border-t border-gray-300"
+        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
       >
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           This BBS is powered by{" "}
           <a
             href="https://github.com/edginer/eddist"

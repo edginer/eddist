@@ -42,7 +42,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           }}
         />
       </head>
-      <body>
+      <body className="dark:bg-gray-900">
         {children}
         <ScrollRestoration />
         <Scripts />

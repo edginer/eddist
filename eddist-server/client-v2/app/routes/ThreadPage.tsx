@@ -17,7 +17,6 @@ import {
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 import React from "react";
 
 const LazyPostResponseModal = lazy(
@@ -295,7 +294,7 @@ const ThreadPage = ({
   }
 
   return (
-    <div className={twMerge("flex flex-col")}>
+    <div className={twMerge("flex flex-col min-h-screen dark:bg-gray-900 dark:text-gray-100")}>
       {/* Pull-to-refresh indicator at bottom */}
       {(isPulling || isPullRefreshing) && (
         <div
@@ -386,7 +385,6 @@ const ThreadPage = ({
         >
           <FaCog className="w-4 h-4" />
         </button>
-        <ThemeToggleButton className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center" />
         <Button
           onClick={() => {
             hasEverOpenedResponse.current = true;

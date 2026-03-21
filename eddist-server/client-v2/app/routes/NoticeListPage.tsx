@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/NoticeListPage";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
+import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
@@ -36,21 +37,24 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
   const totalPages = Math.ceil(noticeData.total / noticeData.limit);
 
   return (
-    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
-        <header>
-          <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>
-          <Link to="/" className="text-blue-500 text-sm">
-            ← トップページに戻る
-          </Link>
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>
+            <Link to="/" className="text-blue-500 text-sm">
+              ← トップページに戻る
+            </Link>
+          </div>
+          <ThemeToggleButton />
         </header>
         <section className="py-4 pt-8">
           <ul className="space-y-4">
             {noticeData.notices.map((notice: NoticeListItem) => (
               <li
                 key={notice.slug}
-                className="border-b pb-4"
+                className="border-b border-gray-300 dark:border-gray-700 pb-4"
               >
                 <Link
                   to={`/notices/${notice.slug}`}
@@ -58,7 +62,7 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
                 >
                   {notice.title}
                 </Link>
-                <p className="text-gray-600 text-sm mt-1">
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
                   {new Date(notice.published_at).toLocaleDateString("ja-JP", {
                     year: "numeric",
                     month: "2-digit",
@@ -97,9 +101,9 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white border-t border-gray-300"
+        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
       >
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           This BBS is powered by{" "}
           <a
             href="https://github.com/edginer/eddist"

@@ -108,7 +108,7 @@ export const NGRuleSection = ({
   };
 
   return (
-    <div className="mb-6 border-b pb-4 last:border-b-0">
+    <div className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0 dark:text-gray-100">
       <h3 className="text-lg font-semibold mb-3">{title}</h3>
 
       {/* Add new rule */}
@@ -147,7 +147,7 @@ export const NGRuleSection = ({
 
             {/* Hide mode (only for response rules) */}
             {isResponseRule && (
-              <div className="flex gap-3 pl-4 border-l border-gray-300">
+              <div className="flex gap-3 pl-4 border-l border-gray-300 dark:border-gray-600">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="radio"
@@ -186,7 +186,7 @@ export const NGRuleSection = ({
           {rules.map((rule) => (
             <li
               key={rule.id}
-              className="bg-gray-50 p-3 rounded hover:bg-gray-100 transition-colors"
+              className="bg-gray-50 dark:bg-gray-700 p-3 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               {editingId === rule.id ? (
                 /* Edit mode */
@@ -222,7 +222,7 @@ export const NGRuleSection = ({
 
                     {/* Hide mode (only for response rules) */}
                     {isResponseRule && (
-                      <div className="flex gap-3 pl-4 border-l border-gray-300">
+                      <div className="flex gap-3 pl-4 border-l border-gray-300 dark:border-gray-600">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
@@ -277,7 +277,7 @@ export const NGRuleSection = ({
                       >
                         {rule.pattern}
                       </span>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         (
                         {rule.matchType === "partial" ? "部分一致" : "正規表現"}
                         )
@@ -293,7 +293,7 @@ export const NGRuleSection = ({
                   <div className="flex gap-1 ml-2 shrink-0">
                     <button
                       onClick={() => handleStartEdit(rule)}
-                      className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 transition-colors"
+                      className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
                       type="button"
                       title="編集"
                     >
@@ -301,7 +301,7 @@ export const NGRuleSection = ({
                     </button>
                     <button
                       onClick={() => onRemove(rule.id)}
-                      className="text-red-500 hover:text-red-700 text-sm px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                      className="text-red-500 hover:text-red-700 text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900 transition-colors"
                       type="button"
                     >
                       削除

@@ -21,7 +21,6 @@ import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
 const LazyNGWordsSettingsModal = lazy(() =>
@@ -212,7 +211,7 @@ const ThreadListPage = ({
   }, [sortedThreadList, shouldFilterThread]);
 
   return (
-    <div className="relative pt-16">
+    <div className="relative pt-16 min-h-screen dark:bg-gray-900 dark:text-gray-100">
       {/* Pull-to-refresh indicator */}
       {(isPulling || isPullRefreshing) && (
         <div
@@ -317,7 +316,6 @@ const ThreadListPage = ({
               : "ソート順"}
           </span>
         </button>
-        <ThemeToggleButton className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center" />
         <Button
           onClick={() => {
             hasEverOpenedThread.current = true;

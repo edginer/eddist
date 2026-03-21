@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { parseMarkdown } from "~/utils/markdown";
+import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
@@ -32,12 +33,15 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
   const { eddistData, notice } = loaderData;
 
   return (
-    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta title={notice.title} bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
-          <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
-          <p className="text-gray-600 text-sm mt-2">
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
+            <ThemeToggleButton />
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
             {new Date(notice.published_at).toLocaleDateString("ja-JP", {
               year: "numeric",
               month: "long",
@@ -59,9 +63,9 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
       </article>
       <footer
         id="footer"
-        className="py-2 text-center bg-white border-t border-gray-300"
+        className="py-2 text-center bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700"
       >
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           This BBS is powered by{" "}
           <a
             href="https://github.com/edginer/eddist"

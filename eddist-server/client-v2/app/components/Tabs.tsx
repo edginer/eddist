@@ -41,7 +41,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
   };
 
   return (
-    <div>
+    <div className="dark:text-gray-100">
       {/* Tab headers */}
       <div
         className="flex border-b border-gray-300 dark:border-gray-600"
