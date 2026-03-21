@@ -19,9 +19,12 @@ export function parseMarkdown(content: string): React.ReactNode[] {
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       elements.push(
-        <p key={`p-${key++}`} className="text-gray-700 leading-relaxed mb-3">
+        <p
+          key={`p-${key++}`}
+          className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3"
+        >
           {parseInline(currentParagraph.join("\n"))}
-        </p>
+        </p>,
       );
       currentParagraph = [];
     }
@@ -34,19 +37,19 @@ export function parseMarkdown(content: string): React.ReactNode[] {
         elements.push(
           <ul
             key={`ul-${key++}`}
-            className="list-disc list-inside text-gray-700 mb-3 space-y-1"
+            className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-3 space-y-1"
           >
             {list.items}
-          </ul>
+          </ul>,
         );
       } else {
         elements.push(
           <ol
             key={`ol-${key++}`}
-            className="list-decimal list-inside text-gray-700 mb-3 space-y-1"
+            className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-3 space-y-1"
           >
             {list.items}
-          </ol>
+          </ol>,
         );
       }
       listStack = [];
@@ -55,12 +58,12 @@ export function parseMarkdown(content: string): React.ReactNode[] {
 
   // Header styles mapping
   const headerStyles: Record<number, string> = {
-    1: "text-3xl font-bold text-gray-900 mb-4 mt-6",
-    2: "text-xl font-semibold text-gray-900 mb-3 mt-4",
-    3: "text-lg font-semibold text-gray-900 mb-3 mt-4",
-    4: "text-base font-semibold text-gray-900 mb-2 mt-3",
-    5: "text-sm font-medium text-gray-900 mb-2 mt-3",
-    6: "text-sm font-medium text-gray-900 mb-2 mt-2",
+    1: "text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 mt-6",
+    2: "text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-4",
+    3: "text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-4",
+    4: "text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-3",
+    5: "text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 mt-3",
+    6: "text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 mt-2",
   };
 
   for (const line of lines) {
@@ -75,7 +78,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       elements.push(
         <Tag key={`h-${key++}`} className={headerStyles[level]}>
           {parseInline(text)}
-        </Tag>
+        </Tag>,
       );
       continue;
     }
@@ -92,7 +95,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
         listStack.push({ type: "ul", items: [] });
       }
       listStack[listStack.length - 1].items.push(
-        <li key={`li-${key++}`}>{parseInline(ulMatch[1])}</li>
+        <li key={`li-${key++}`}>{parseInline(ulMatch[1])}</li>,
       );
       continue;
     }
@@ -109,7 +112,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
         listStack.push({ type: "ol", items: [] });
       }
       listStack[listStack.length - 1].items.push(
-        <li key={`li-${key++}`}>{parseInline(olMatch[1])}</li>
+        <li key={`li-${key++}`}>{parseInline(olMatch[1])}</li>,
       );
       continue;
     }
@@ -152,7 +155,7 @@ function parseInline(text: string): React.ReactNode[] {
       elements.push(
         <strong key={`b-${key++}`} className="font-bold">
           {boldMatch[2]}
-        </strong>
+        </strong>,
       );
       remaining = remaining.slice(boldMatch[0].length);
       continue;
@@ -170,7 +173,7 @@ function parseInline(text: string): React.ReactNode[] {
           rel="noopener noreferrer"
         >
           {linkMatch[1]}
-        </a>
+        </a>,
       );
       remaining = remaining.slice(linkMatch[0].length);
       continue;
@@ -188,7 +191,7 @@ function parseInline(text: string): React.ReactNode[] {
           rel="noopener noreferrer"
         >
           {urlMatch[1]}
-        </a>
+        </a>,
       );
       remaining = remaining.slice(urlMatch[0].length);
       continue;

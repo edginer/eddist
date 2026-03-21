@@ -43,7 +43,10 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
   return (
     <div>
       {/* Tab headers */}
-      <div className="flex border-b border-gray-300" role="tablist">
+      <div
+        className="flex border-b border-gray-300 dark:border-gray-600"
+        role="tablist"
+      >
         {tabs.map((tab, index) => {
           const isActive = activeTab === tab.id;
           return (
@@ -64,7 +67,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
                 "px-4 py-2 font-medium transition-colors",
                 isActive
                   ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200",
               )}
             >
               {tab.title}
