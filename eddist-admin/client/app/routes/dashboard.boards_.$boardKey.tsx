@@ -4,8 +4,41 @@ import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
 import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
 import BoardSetting from "~/components/BoardSetting";
+import { Suspense } from "react";
 
 type TabKeys = "threads" | "settings";
+
+const ArchivedThreadsTabContent = ({
+  boardKey,
+  boardId,
+  boardName,
+}: {
+  boardKey: string;
+  boardId: number;
+  boardName: string;
+}) => {
+  const { data: archivedThreads } = getArchivedThreads({
+    params: {
+      path: { board_key: boardKey },
+    },
+  });
+
+  return (
+    <ThreadList
+      threads={
+        archivedThreads!.map((x) => ({
+          threadNumber: Number(x.thread_number),
+          title: x.title,
+          responseCount: Number(x.response_count),
+          lastModified: x.last_modified,
+          boardId,
+        })) ?? []
+      }
+      board={{ boardKey, boardName }}
+      archives
+    />
+  );
+};
 
 const Page = () => {
   const params = useParams();
@@ -22,14 +55,6 @@ const Page = () => {
   });
 
   const { data: threads } = getThreads({
-    params: {
-      path: {
-        board_key: params.boardKey,
-      },
-    },
-  });
-
-  const { data: archivedThreads } = getArchivedThreads({
     params: {
       path: {
         board_key: params.boardKey,
@@ -83,22 +108,13 @@ const Page = () => {
             id: "archived-threads-tab",
             children: (
               <div className="p-2">
-                <ThreadList
-                  threads={
-                    archivedThreads!.map((x) => ({
-                      threadNumber: Number(x.thread_number),
-                      title: x.title,
-                      responseCount: Number(x.response_count),
-                      lastModified: x.last_modified,
-                      boardId: Number(board!.id),
-                    })) ?? []
-                  }
-                  board={{
-                    boardKey: params.boardKey,
-                    boardName: board!.name,
-                  }}
-                  archives
-                />
+                <Suspense fallback={<div>Loading...</div>}>
+                  <ArchivedThreadsTabContent
+                    boardKey={params.boardKey}
+                    boardId={Number(board!.id)}
+                    boardName={board!.name}
+                  />
+                </Suspense>
               </div>
             ),
           },
