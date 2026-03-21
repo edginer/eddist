@@ -3,7 +3,7 @@ use std::{env, sync::OnceLock};
 use chrono::Utc;
 use eddist_core::simple_rate_limiter::RateLimiter;
 use metrics::counter;
-use redis::aio::ConnectionManager;
+use redis::{AsyncCommands, aio::ConnectionManager};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -128,6 +128,17 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                     auth_token: authed_token.token,
                 })
             };
+        }
+
+        // Check temporary suspension flag in Redis
+        let suspension_key = format!("authed_token:suspended:{}", authed_token.id);
+        let mut conn = self.redis_conn.clone();
+        let is_suspended = conn
+            .exists::<_, bool>(&suspension_key)
+            .await
+            .unwrap_or(false);
+        if is_suspended {
+            return Err(BbsCgiError::TemporarilySuspended);
         }
 
         // Check if user registration is required but not linked

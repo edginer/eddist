@@ -6,7 +6,7 @@ use auth::{
 };
 use axum::{
     body::Body,
-    extract::{MatchedPath, Request},
+    extract::{MatchedPath, Request, State},
     http::{HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -105,6 +105,27 @@ async fn ok() -> impl IntoResponse {
     StatusCode::OK
 }
 
+async fn internal_secret_auth(
+    State(state): State<AppState>,
+    req: Request<Body>,
+    next: Next,
+) -> Response {
+    let Some(ref expected) = state.internal_secret else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let provided = req
+        .headers()
+        .get("X-Internal-Secret")
+        .and_then(|v| v.to_str().ok());
+
+    if provided != Some(expected.as_str()) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    next.run(req).await
+}
+
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub oauth2_client: oauth2::basic::BasicClient<
@@ -129,6 +150,7 @@ pub(crate) struct AppState {
     pub captcha_config_repo: Arc<dyn CaptchaConfigRepository>,
     pub server_settings_repo: Arc<dyn ServerSettingsRepository>,
     pub redis_conn: redis::aio::ConnectionManager,
+    pub internal_secret: Option<String>,
 }
 
 #[tokio::main]
@@ -208,6 +230,7 @@ async fn main() {
         .with_expiry(Expiry::OnInactivity(Duration::days(14)));
 
     let api_routes = routes::create_api_routes();
+    let internal_routes = routes::create_internal_routes();
 
     let state = AppState {
         oauth2_client: client,
@@ -230,6 +253,7 @@ async fn main() {
         terms_repo: Arc::new(TermsRepositoryImpl::new(pool.clone())),
         captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
         server_settings_repo: Arc::new(ServerSettingsRepositoryImpl::new(pool)),
+        internal_secret: std::env::var("EDDIST_INTERNAL_SECRET").ok(),
     };
 
     let app = Router::new()
@@ -244,6 +268,13 @@ async fn main() {
             api_routes.layer(axum::middleware::from_fn_with_state(
                 state.clone(),
                 auth_simple_header,
+            )),
+        )
+        .nest(
+            "/internal/api",
+            internal_routes.layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                internal_secret_auth,
             )),
         )
         .nest_service("/dist", serve_dir.clone())

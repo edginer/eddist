@@ -34,8 +34,12 @@ pub fn is_thread_pub_enabled() -> bool {
 }
 
 pub fn is_auth_token_pub_enabled() -> bool {
-    *IS_AUTH_TOKEN_PUB_ENABLED
-        .get_or_init(|| !matches!(std::env::var("ENABLE_AUTH_TOKEN_PUB").as_deref(), Ok("false")))
+    *IS_AUTH_TOKEN_PUB_ENABLED.get_or_init(|| {
+        !matches!(
+            std::env::var("ENABLE_AUTH_TOKEN_PUB").as_deref(),
+            Ok("false")
+        )
+    })
 }
 
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {

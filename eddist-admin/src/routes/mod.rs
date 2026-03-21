@@ -7,12 +7,17 @@ pub mod auth_tokens;
 pub mod boards;
 pub mod captcha;
 pub mod idps;
+pub mod internal;
 pub mod moderation;
 pub mod notices;
 pub mod server_settings;
 pub mod terms;
 pub mod threads;
 pub mod users;
+
+pub fn create_internal_routes() -> Router<AppState> {
+    internal::create_internal_routes()
+}
 
 pub fn create_api_routes() -> Router<AppState> {
     Router::new()
