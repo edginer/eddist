@@ -2,7 +2,6 @@ import { Link } from "react-router";
 import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { parseMarkdown } from "~/utils/markdown";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
@@ -37,10 +36,7 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
       <Meta title={notice.title} bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
-          <div className="flex items-start justify-between gap-4">
-            <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
-            <ThemeToggleButton />
-          </div>
+          <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
             {new Date(notice.published_at).toLocaleDateString("ja-JP", {
               year: "numeric",

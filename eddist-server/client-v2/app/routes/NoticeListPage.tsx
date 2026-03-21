@@ -1,7 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/NoticeListPage";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
@@ -40,14 +39,11 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>
-            <Link to="/" className="text-blue-500 text-sm">
-              ← トップページに戻る
-            </Link>
-          </div>
-          <ThemeToggleButton />
+        <header>
+          <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>
+          <Link to="/" className="text-blue-500 text-sm">
+            ← トップページに戻る
+          </Link>
         </header>
         <section className="py-4 pt-8">
           <ul className="space-y-4">

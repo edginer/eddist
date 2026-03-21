@@ -1,7 +1,6 @@
 import type { Route } from "./+types/TermsPage";
 import { fetchTerms } from "~/api-client/terms";
 import { parseMarkdown } from "~/utils/markdown";
-import { ThemeToggleButton } from "~/components/ThemeToggleButton";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
@@ -37,11 +36,10 @@ function TermsPage({ loaderData }: Route.ComponentProps) {
       <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 text-center flex-1">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 text-center">
                 利用規約
               </h1>
-              <ThemeToggleButton />
             </div>
             <div className="space-y-6 text-gray-900 dark:text-gray-100">
               {parseMarkdown(terms.content)}
