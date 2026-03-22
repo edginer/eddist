@@ -20,6 +20,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "eddist:theme";
 
+function computeDark(theme: Theme, mqMatches: boolean): boolean {
+  return theme === "dark" || (theme === "system" && mqMatches);
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("system");
   const [isDark, setIsDark] = useState(false);
@@ -31,29 +35,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         ? stored
         : "system";
     setThemeState(initial);
-
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const dark = initial === "dark" || (initial === "system" && mq.matches);
+    const dark = computeDark(initial, mq.matches);
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
-
-    if (initial === "system") {
-      const handler = (e: MediaQueryListEvent) => {
-        setIsDark(e.matches);
-        document.documentElement.classList.toggle("dark", e.matches);
-      };
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    }
   }, []);
+
+  useEffect(() => {
+    if (theme !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => {
+      setIsDark(e.matches);
+      document.documentElement.classList.toggle("dark", e.matches);
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme]);
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
     localStorage.setItem(STORAGE_KEY, next);
-    const dark =
-      next === "dark" ||
-      (next === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const dark = computeDark(
+      next,
+      window.matchMedia("(prefers-color-scheme: dark)").matches,
+    );
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
   }, []);
