@@ -84,7 +84,7 @@ const NgWords = () => {
                 {
                   params: {
                     path: {
-                      ng_word_id: modal.editingItem?.id,
+                      ng_word_id: modal.editingItem?.id ?? "",
                     },
                   },
                   body: {

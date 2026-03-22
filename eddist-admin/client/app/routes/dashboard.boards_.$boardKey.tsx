@@ -93,7 +93,7 @@ const Page = () => {
                   }
                   board={{
                     boardKey: params.boardKey,
-                    boardName: board?.name,
+                    boardName: board?.name ?? "",
                   }}
                 />
               </div>
@@ -109,7 +109,7 @@ const Page = () => {
                   <ArchivedThreadsTabContent
                     boardKey={params.boardKey}
                     boardId={Number(board?.id)}
-                    boardName={board?.name}
+                    boardName={board?.name ?? ""}
                   />
                 </Suspense>
               </div>

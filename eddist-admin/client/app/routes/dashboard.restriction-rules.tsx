@@ -73,7 +73,7 @@ const RestrictionRules = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { rule_id: modal.editingItem?.id } },
+                    params: { path: { rule_id: modal.editingItem?.id ?? "" } },
                     body: data,
                   },
                   { onSuccess: () => modal.closeEdit() },

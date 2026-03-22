@@ -248,7 +248,7 @@ const IdPs = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { id: modal.editingItem?.id } },
+                    params: { path: { id: modal.editingItem?.id ?? "" } },
                     body: data as UpdateIdpFormData,
                   },
                   { onSuccess: () => modal.closeEdit() },

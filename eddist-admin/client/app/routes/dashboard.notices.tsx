@@ -100,7 +100,7 @@ const Notices = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { id: modal.editingItem?.id } },
+                    params: { path: { id: modal.editingItem?.id ?? "" } },
                     body: data,
                   },
                   { onSuccess: () => modal.closeEdit() },
