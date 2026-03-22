@@ -211,7 +211,7 @@ const ThreadListPage = ({
   }, [sortedThreadList, shouldFilterThread]);
 
   return (
-    <div className="relative pt-16">
+    <div className="relative pt-16 min-h-screen dark:bg-gray-900 dark:text-gray-100">
       {/* Pull-to-refresh indicator */}
       {(isPulling || isPullRefreshing) && (
         <div
@@ -223,7 +223,7 @@ const ThreadListPage = ({
           }}
         >
           <div
-            className="bg-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+            className="bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
             style={{
               width: "40px",
               height: "40px",
@@ -243,7 +243,7 @@ const ThreadListPage = ({
 
       <header
         className={
-          "fixed top-0 left-0 right-0 z-50 bg-white shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
+          "fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
         }
       >
         <Meta
@@ -270,7 +270,7 @@ const ThreadListPage = ({
           type="button"
           onClick={handleRefresh}
           disabled={isRefreshing || isPullRefreshing}
-          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           title="更新"
         >
           <FaSync
@@ -286,7 +286,7 @@ const ThreadListPage = ({
             hasEverOpenedNGSettings.current = true;
             setShowNGSettings(true);
           }}
-          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-1.5"
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
           title="NG設定"
         >
           <FaCog className="w-4 h-4" />
@@ -298,7 +298,7 @@ const ThreadListPage = ({
             "px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border transition-colors flex items-center gap-1.5",
             sortKey
               ? "bg-blue-600 text-white border-blue-600"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
           )}
         >
           <FaSort className="w-4 h-4" />
@@ -352,7 +352,7 @@ const ThreadListPage = ({
       )}
 
       {showSortControls && (
-        <div className="bg-white border-b border-gray-300 p-3 flex flex-wrap gap-2 items-center">
+        <div className="bg-white dark:bg-gray-900 border-b border-gray-300 dark:border-gray-700 p-3 flex flex-wrap gap-2 items-center">
           <button
             type="button"
             onClick={() => handleSort("lastUpdated")}
@@ -360,7 +360,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "lastUpdated"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
             )}
           >
             <span>更新日時</span>
@@ -375,7 +375,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "responseCount"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
             )}
           >
             <span>レス数</span>
@@ -390,7 +390,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "speed"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
             )}
           >
             <span>勢い</span>
@@ -405,7 +405,7 @@ const ThreadListPage = ({
               "px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5",
               sortKey === "creationTime"
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100",
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
             )}
           >
             <span>作成日時</span>
@@ -419,7 +419,7 @@ const ThreadListPage = ({
               onClick={() => {
                 setSortKey(null);
               }}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
               リセット
             </button>
@@ -431,11 +431,11 @@ const ThreadListPage = ({
         {filteredThreadList.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (
-              <div className="border-b border-gray-400 lg:border-none lg:pt-2"></div>
+              <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
             )}
             <Link
               to={`/${params.boardKey}/${thread.id}`}
-              className="hover:bg-gray-200 cursor-default text-left block w-full bg-gray-100 p-2 lg:p-3 select-none md:select-auto"
+              className="hover:bg-gray-200 dark:hover:bg-gray-700 cursor-default text-left block w-full bg-gray-100 dark:bg-gray-800 p-2 lg:p-3 select-none md:select-auto"
               data-ng-target="title"
               data-ng-thread-id={thread.id}
               {...contextMenuHandlers}

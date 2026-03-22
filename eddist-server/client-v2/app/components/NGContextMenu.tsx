@@ -123,7 +123,7 @@ export const NGContextMenu = ({
   const handleAddToNG = (
     value: string,
     category: NGCategory,
-    hideMode?: "hidden" | "collapsed"
+    hideMode?: "hidden" | "collapsed",
   ) => {
     try {
       addRule(category, {
@@ -146,7 +146,7 @@ export const NGContextMenu = ({
   return (
     <div
       ref={menuRef}
-      className="fixed bg-white rounded shadow-lg border border-gray-200 py-1 z-9999 min-w-60 max-w-[280px]"
+      className="fixed bg-white dark:bg-gray-800 rounded shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-9999 min-w-60 max-w-[280px]"
       style={{
         left: `${adjustedPosition.x}px`,
         top: `${adjustedPosition.y}px`,
@@ -160,9 +160,11 @@ export const NGContextMenu = ({
             target={action.target}
             rel={action.target === "_blank" ? "noopener noreferrer" : undefined}
             onClick={onClose}
-            className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center border-b border-gray-100"
+            className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900">{action.label}</div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">
+              {action.label}
+            </div>
           </a>
         ) : (
           <button
@@ -172,9 +174,11 @@ export const NGContextMenu = ({
               action.onClick?.();
               onClose();
             }}
-            className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center border-b border-gray-100"
+            className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900">{action.label}</div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">
+              {action.label}
+            </div>
           </button>
         ),
       )}
@@ -183,13 +187,15 @@ export const NGContextMenu = ({
           key={idx}
           type="button"
           onClick={item.onClick}
-          className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center justify-between border-b border-gray-100 last:border-b-0"
+          className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between border-b border-gray-100 dark:border-gray-600 last:border-b-0"
         >
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-gray-900 wrap-break-word">
+            <div className="text-sm text-gray-900 dark:text-gray-100 wrap-break-word">
               {item.label}
             </div>
-            <div className="text-xs text-gray-500 mt-1">{item.description}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {item.description}
+            </div>
           </div>
         </button>
       ))}

@@ -13,6 +13,7 @@ import "./app.css";
 import { ThemeInit } from ".flowbite-react/init";
 import { NGWordsProvider } from "~/contexts/NGWordsContext";
 import { ToastProvider } from "~/contexts/ToastContext";
+import { ThemeProvider } from "~/contexts/ThemeContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,8 +36,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('eddist:theme');var d=window.matchMedia('(prefers-color-scheme:dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}})()`,
+          }}
+        />
       </head>
-      <body>
+      <body className="dark:bg-gray-900">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -52,12 +58,14 @@ export default function App() {
   const isFullWidthRoute = FULL_WIDTH_ROUTES.includes(location.pathname);
 
   const content = (
-    <ToastProvider>
-      <NGWordsProvider>
-        <ThemeInit />
-        <Outlet />
-      </NGWordsProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <NGWordsProvider>
+          <ThemeInit />
+          <Outlet />
+        </NGWordsProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 
   if (isFullWidthRoute) {
