@@ -20,6 +20,7 @@ const ErrorModal = (props: ErrorModalProps) => {
         <div className="text-center">
           <FaExclamation className="mx-auto mb-4 h-14 w-14 text-gray-400 dark:text-gray-200" />
           <span
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS error message may contain HTML
             dangerouslySetInnerHTML={{ __html: props.errorMessage }}
             className="mb-5 p-2 text-lg font-normal text-gray-500 dark:text-gray-400"
           ></span>

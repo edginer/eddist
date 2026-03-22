@@ -1,8 +1,9 @@
-import React, { Suspense, useState } from "react";
-import { IoMdMenu } from "react-icons/io";
-import { twMerge } from "tailwind-merge";
 import { Spinner } from "flowbite-react";
+import type React from "react";
+import { Suspense, useState } from "react";
+import { IoMdMenu } from "react-icons/io";
 import { Link, Outlet, useLocation } from "react-router";
+import { twMerge } from "tailwind-merge";
 
 const NAV_ITEMS = [
   { kind: "boards", label: "Boards" },
@@ -25,6 +26,7 @@ const Hamburger = () => (
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
+    aria-hidden="true"
   >
     <path
       strokeLinecap="round"
@@ -44,10 +46,7 @@ const Layout: React.FC = () => {
     <div className="flex h-screen flex-col sm:flex-row">
       <div className="hidden sm:block bg-gray-800 w-64">
         <div className="flex items-center justify-center mt-10">
-          <Link
-            to="/dashboard"
-            className="text-white text-2xl mx-2 font-semibold"
-          >
+          <Link to="/dashboard" className="text-white text-2xl mx-2 font-semibold">
             Eddist Dashboard
           </Link>
         </div>
@@ -58,9 +57,7 @@ const Layout: React.FC = () => {
               to={`/dashboard/${item.kind}`}
               className={twMerge(
                 "flex items-center py-2 px-8 hover:bg-gray-700",
-                navBarSection === item.kind
-                  ? "bg-gray-900 text-gray-400"
-                  : "text-gray-400",
+                navBarSection === item.kind ? "bg-gray-900 text-gray-400" : "text-gray-400",
               )}
             >
               <Hamburger />
@@ -97,14 +94,10 @@ const Layout: React.FC = () => {
                   key={item.kind}
                   className={twMerge(
                     "pl-2 border-slate-400",
-                    idx < NAV_ITEMS.length - 1 &&
-                      "border-b pb-1 border-spacing-y-6",
+                    idx < NAV_ITEMS.length - 1 && "border-b pb-1 border-spacing-y-6",
                   )}
                 >
-                  <Link
-                    to={`/dashboard/${item.kind}`}
-                    onClick={() => setIsNavbarOpen((x) => !x)}
-                  >
+                  <Link to={`/dashboard/${item.kind}`} onClick={() => setIsNavbarOpen((x) => !x)}>
                     {item.label}
                   </Link>
                 </li>

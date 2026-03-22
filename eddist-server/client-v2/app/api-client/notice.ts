@@ -39,9 +39,7 @@ export async function fetchNotices({
   page?: number;
   limit?: number;
 }): Promise<NoticeListResponse> {
-  const response = await fetch(
-    `${baseUrl}/api/notices?page=${page}&limit=${limit}`
-  );
+  const response = await fetch(`${baseUrl}/api/notices?page=${page}&limit=${limit}`);
   if (!response.ok) {
     throw new Error("Failed to fetch notices");
   }

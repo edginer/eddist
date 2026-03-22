@@ -1,11 +1,7 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_TERMS = "/terms/";
@@ -27,9 +23,7 @@ const UPDATE_TERMS = "/terms/";
 export const useUpdateTerms = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_TERMS]["put"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_TERMS]["put"]>) => {
       const { data } = await client.PUT(UPDATE_TERMS, {
         body: args.body,
       });

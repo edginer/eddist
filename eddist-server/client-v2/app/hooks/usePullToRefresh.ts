@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UsePullToRefreshOptions {
   onRefresh: () => Promise<void>;
@@ -15,10 +15,7 @@ interface PullToRefreshState {
 }
 
 // Helper to get scroll position based on target
-const getScrollPosition = (
-  target: "window" | "element",
-  element?: HTMLElement | null
-) => {
+const getScrollPosition = (target: "window" | "element", element?: HTMLElement | null) => {
   if (target === "window") {
     return {
       scrollTop: window.scrollY || document.documentElement.scrollTop,
@@ -26,8 +23,7 @@ const getScrollPosition = (
       clientHeight: window.innerHeight,
     };
   } else {
-    if (!element)
-      return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+    if (!element) return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
     return {
       scrollTop: element.scrollTop,
       scrollHeight: element.scrollHeight,
@@ -59,19 +55,18 @@ export const usePullToRefresh = ({
 
       const { scrollTop, scrollHeight, clientHeight } = getScrollPosition(
         scrollTarget,
-        scrollableRef.current
+        scrollableRef.current,
       );
 
       // Check if at the correct edge for pull-to-refresh
       const atTop = scrollTop <= 1 && direction === "down"; // Allow 1px tolerance
-      const atBottom =
-        scrollTop + clientHeight >= scrollHeight - 5 && direction === "up";
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 5 && direction === "up";
 
       if (atTop || atBottom) {
         touchStartY.current = e.touches[0].clientY;
       }
     },
-    [enabled, direction, state.isRefreshing, scrollTarget]
+    [enabled, direction, state.isRefreshing, scrollTarget],
   );
 
   const handleTouchMove = useCallback(
@@ -81,7 +76,7 @@ export const usePullToRefresh = ({
 
       const { scrollTop, scrollHeight, clientHeight } = getScrollPosition(
         scrollTarget,
-        scrollableRef.current
+        scrollableRef.current,
       );
 
       const currentY = e.touches[0].clientY;
@@ -129,7 +124,7 @@ export const usePullToRefresh = ({
         }
       }
     },
-    [enabled, direction, state.isRefreshing, scrollTarget]
+    [enabled, direction, state.isRefreshing, scrollTarget],
   );
 
   const handleTouchEnd = useCallback(async () => {

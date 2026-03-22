@@ -1,8 +1,8 @@
-import { FaPlus } from "react-icons/fa";
-import BoardItem from "../components/BoardItem";
-import { getBoards } from "~/hooks/queries";
 import { useState } from "react";
+import { FaPlus } from "react-icons/fa";
 import CreateBoardModal from "~/components/CreateBoardModal";
+import { getBoards } from "~/hooks/queries";
+import BoardItem from "../components/BoardItem";
 
 function Page() {
   const { data: boards, refetch } = getBoards({});
@@ -19,6 +19,7 @@ function Page() {
         <div className="flex">
           <h1 className="text-3xl font-bold grow">Boards</h1>
           <button
+            type="button"
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => setOpenCreateBoardModal(true)}
           >
@@ -27,7 +28,7 @@ function Page() {
         </div>
 
         <div className="grid grid-cols-1 p-1 pt-6 gap-4">
-          {boards!.map((board) => (
+          {boards?.map((board) => (
             <BoardItem
               key={board.id}
               boardKey={board.board_key}

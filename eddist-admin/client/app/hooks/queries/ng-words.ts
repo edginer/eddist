@@ -1,18 +1,12 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_NG_WORDS = "/ng_words/";
 
-export const getNgWords = ({
-  params,
-}: UseQueryOptions<paths[typeof GET_NG_WORDS]["get"]>) => {
+export const getNgWords = ({ params }: UseQueryOptions<paths[typeof GET_NG_WORDS]["get"]>) => {
   return useSuspenseQuery({
     queryKey: [GET_NG_WORDS],
     queryFn: async ({ signal }) => {
@@ -43,9 +37,7 @@ const CREATE_NG_WORDS = "/ng_words/";
 export const useCreateNgWord = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_NG_WORDS]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_NG_WORDS]["post"]>) => {
       const { data } = await client.POST(CREATE_NG_WORDS, {
         body: args.body,
       });
@@ -64,9 +56,7 @@ const UPDATE_NG_WORD = "/ng_words/{ng_word_id}/";
 export const useUpdateNgWord = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_NG_WORD]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_NG_WORD]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_NG_WORD, {
         params: args.params,
         body: args.body,
@@ -86,9 +76,7 @@ const DELETE_NG_WORD = "/ng_words/{ng_word_id}/";
 export const useDeleteNgWord = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof DELETE_NG_WORD]["delete"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof DELETE_NG_WORD]["delete"]>) => {
       await client.DELETE(DELETE_NG_WORD, {
         params: args.params,
       });

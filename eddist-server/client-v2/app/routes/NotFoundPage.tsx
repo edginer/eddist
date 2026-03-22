@@ -4,12 +4,8 @@ export default function NotFoundPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <h1 className="mb-4 text-6xl font-semibold text-gray-800 dark:text-gray-200">
-          404
-        </h1>
-        <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">
-          Page not found
-        </p>
+        <h1 className="mb-4 text-6xl font-semibold text-gray-800 dark:text-gray-200">404</h1>
+        <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">Page not found</p>
         <p className="mb-8 text-gray-500 dark:text-gray-500">
           The page you're looking for doesn't exist.
         </p>

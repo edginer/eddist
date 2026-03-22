@@ -14,22 +14,15 @@ import {
   Textarea,
   TextInput,
 } from "flowbite-react";
-import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import { useForm } from "react-hook-form";
-import {
-  getIdps,
-  useCreateIdp,
-  useUpdateIdp,
-  useDeleteIdp,
-} from "~/hooks/queries";
-import type { paths } from "~/openapi/schema";
+import { FaEdit, FaPlus, FaTrash } from "react-icons/fa";
+import { getIdps, useCreateIdp, useDeleteIdp, useUpdateIdp } from "~/hooks/queries";
 import { useCrudModalState } from "~/hooks/useCrudModalState";
+import type { paths } from "~/openapi/schema";
 
-type Idp =
-  paths["/idps/"]["get"]["responses"]["200"]["content"]["application/json"][number];
+type Idp = paths["/idps/"]["get"]["responses"]["200"]["content"]["application/json"][number];
 
-type CreateIdpFormData =
-  paths["/idps/"]["post"]["requestBody"]["content"]["application/json"];
+type CreateIdpFormData = paths["/idps/"]["post"]["requestBody"]["content"]["application/json"];
 
 type UpdateIdpFormData =
   paths["/idps/{id}/"]["patch"]["requestBody"]["content"]["application/json"];
@@ -56,8 +49,7 @@ interface IdpFormProps {
 
 const IdpForm = ({ mode, defaultValues, onSubmit }: IdpFormProps) => {
   const isCreate = mode === "create";
-  const { register, handleSubmit, reset, watch } =
-    useForm<CreateIdpFormData>();
+  const { register, handleSubmit, reset, watch } = useForm<CreateIdpFormData>();
 
   const decodedDefault = decodeBase64Svg(defaultValues?.idp_logo_svg);
   const svgValue = watch("idp_logo_svg", decodedDefault);
@@ -114,11 +106,10 @@ const IdpForm = ({ mode, defaultValues, onSubmit }: IdpFormProps) => {
           {/* Raw render is acceptable here since only trusted admins access this page */}
           {svgValue && (
             <div className="mt-2 p-2 border border-gray-200 rounded bg-white">
-              <Label className="text-xs text-gray-500 mb-1 block">
-                Preview
-              </Label>
+              <Label className="text-xs text-gray-500 mb-1 block">Preview</Label>
               <div
                 className="flex items-center justify-center [&>svg]:max-h-12 [&>svg]:max-w-full"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG preview for trusted admin input
                 dangerouslySetInnerHTML={{ __html: svgValue }}
               />
             </div>
@@ -147,9 +138,7 @@ const IdpForm = ({ mode, defaultValues, onSubmit }: IdpFormProps) => {
           <TextInput
             {...register("client_secret", { required: isCreate })}
             type="password"
-            placeholder={
-              isCreate ? "Client secret" : "Leave empty to keep current"
-            }
+            placeholder={isCreate ? "Client secret" : "Leave empty to keep current"}
             required={isCreate}
           />
         </div>
@@ -209,14 +198,10 @@ const IdPs = () => {
                 </TableCell>
                 <TableCell>{idp.idp_display_name}</TableCell>
                 <TableCell>
-                  <span className="text-sm truncate max-w-xs block">
-                    {idp.oidc_config_url}
-                  </span>
+                  <span className="text-sm truncate max-w-xs block">{idp.oidc_config_url}</span>
                 </TableCell>
                 <TableCell>
-                  <span
-                    className={idp.enabled ? "text-green-500" : "text-red-500"}
-                  >
+                  <span className={idp.enabled ? "text-green-500" : "text-red-500"}>
                     {idp.enabled ? "Yes" : "No"}
                   </span>
                 </TableCell>
@@ -225,11 +210,7 @@ const IdPs = () => {
                     <Button size="xs" onClick={() => modal.openEdit(idp)}>
                       <FaEdit />
                     </Button>
-                    <Button
-                      size="xs"
-                      color="alternative"
-                      onClick={() => handleDelete(idp.id)}
-                    >
+                    <Button size="xs" color="alternative" onClick={() => handleDelete(idp.id)}>
                       <FaTrash />
                     </Button>
                   </div>
@@ -267,7 +248,7 @@ const IdPs = () => {
               onSubmit={(data) => {
                 updateMutation.mutate(
                   {
-                    params: { path: { id: modal.editingItem!.id } },
+                    params: { path: { id: modal.editingItem?.id ?? "" } },
                     body: data as UpdateIdpFormData,
                   },
                   { onSuccess: () => modal.closeEdit() },

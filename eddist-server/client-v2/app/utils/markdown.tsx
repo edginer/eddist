@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 /**
  * Simple markdown parser supporting:
@@ -19,10 +19,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       elements.push(
-        <p
-          key={`p-${key++}`}
-          className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3"
-        >
+        <p key={`p-${key++}`} className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3">
           {parseInline(currentParagraph.join("\n"))}
         </p>,
       );
@@ -87,10 +84,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
     const ulMatch = line.match(/^[-*+]\s+(.+)$/);
     if (ulMatch) {
       flushParagraph();
-      if (
-        listStack.length === 0 ||
-        listStack[listStack.length - 1].type !== "ul"
-      ) {
+      if (listStack.length === 0 || listStack[listStack.length - 1].type !== "ul") {
         flushList();
         listStack.push({ type: "ul", items: [] });
       }
@@ -104,10 +98,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
     const olMatch = line.match(/^\d+\.\s+(.+)$/);
     if (olMatch) {
       flushParagraph();
-      if (
-        listStack.length === 0 ||
-        listStack[listStack.length - 1].type !== "ol"
-      ) {
+      if (listStack.length === 0 || listStack[listStack.length - 1].type !== "ol") {
         flushList();
         listStack.push({ type: "ol", items: [] });
       }

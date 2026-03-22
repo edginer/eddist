@@ -191,10 +191,7 @@ export const NGRuleSection = ({
               {editingId === rule.id ? (
                 /* Edit mode */
                 <div className="space-y-3">
-                  <TextInput
-                    {...editRegister("pattern", { required: true })}
-                    className="w-full"
-                  />
+                  <TextInput {...editRegister("pattern", { required: true })} className="w-full" />
                   <div className="flex flex-wrap gap-4 items-center">
                     {/* Match type */}
                     <div className="flex gap-3">
@@ -270,23 +267,15 @@ export const NGRuleSection = ({
                     <div className="flex-1 min-w-0">
                       <span
                         className={
-                          !rule.enabled
-                            ? "text-gray-400 line-through break-all"
-                            : "break-all"
+                          !rule.enabled ? "text-gray-400 line-through break-all" : "break-all"
                         }
                       >
                         {rule.pattern}
                       </span>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        (
-                        {rule.matchType === "partial" ? "部分一致" : "正規表現"}
-                        )
+                        ({rule.matchType === "partial" ? "部分一致" : "正規表現"})
                         {rule.hideMode &&
-                          ` - ${
-                            rule.hideMode === "collapsed"
-                              ? "折りたたむ"
-                              : "完全非表示"
-                          }`}
+                          ` - ${rule.hideMode === "collapsed" ? "折りたたむ" : "完全非表示"}`}
                       </div>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 import { Button, Modal, ModalBody, ModalHeader } from "flowbite-react";
-import React from "react";
+import type React from "react";
 import { FaExclamation } from "react-icons/fa";
 
 interface AuthCodeModalProps {
@@ -37,10 +37,7 @@ const AuthCodeModal = (props: AuthCodeModalProps) => {
             >
               はい
             </Button>
-            <Button
-              color="gray"
-              onClick={() => props.setOpenAuthCodeModal(false)}
-            >
+            <Button color="gray" onClick={() => props.setOpenAuthCodeModal(false)}>
               キャンセル
             </Button>
           </div>

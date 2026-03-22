@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Button } from "flowbite-react";
+import { useEffect, useState } from "react";
 import { FaBan } from "react-icons/fa";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
@@ -41,9 +41,7 @@ export const FloatingNGButton = () => {
       }
 
       // Check if the selection is within a body text element (data-ng-target="body")
-      const filterableElement = targetElement.closest(
-        '[data-ng-target="body"]'
-      );
+      const filterableElement = targetElement.closest('[data-ng-target="body"]');
       if (!filterableElement) {
         setSelection(null);
         return;
@@ -111,12 +109,7 @@ export const FloatingNGButton = () => {
 
   return (
     <div style={buttonStyle}>
-      <Button
-        size="sm"
-        color="blue"
-        onClick={handleClick}
-        className="shadow-lg"
-      >
+      <Button size="sm" color="blue" onClick={handleClick} className="shadow-lg">
         <FaBan className="mr-1" />
         NGに追加
       </Button>

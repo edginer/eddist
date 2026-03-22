@@ -5,10 +5,7 @@ export const Footer = () => (
   >
     <p className="text-xs text-gray-500 dark:text-gray-400">
       This BBS is powered by{" "}
-      <a
-        href="https://github.com/edginer/eddist"
-        className="text-blue-500 underline"
-      >
+      <a href="https://github.com/edginer/eddist" className="text-blue-500 underline">
         Eddist
       </a>
       .

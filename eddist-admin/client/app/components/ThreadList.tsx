@@ -19,11 +19,7 @@ interface ThreadListProps {
   archives?: boolean;
 }
 
-const ThreadList: React.FC<ThreadListProps> = ({
-  threads,
-  board,
-  archives: isArchives,
-}) => {
+const ThreadList: React.FC<ThreadListProps> = ({ threads, board, archives: isArchives }) => {
   return (
     <div className="rounded border border-black divide-y divide-black">
       {threads.map((thread) => (

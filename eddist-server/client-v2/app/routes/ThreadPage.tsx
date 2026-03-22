@@ -1,27 +1,20 @@
 import { Button } from "flowbite-react";
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { data, Link, useParams } from "react-router";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
-import { twMerge } from "tailwind-merge";
-import { NGContextMenu } from "../components/NGContextMenu";
-import { FloatingNGButton } from "../components/FloatingNGButton";
-import type { Route } from "./+types/ThreadPage";
+import { data, Link, useParams } from "react-router";
 import useSWR from "swr";
-import { fetchBoards, type Board } from "~/api-client/board";
+import { twMerge } from "tailwind-merge";
+import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
-import {
-  fetchThread,
-  type BodyAnchorPart,
-  type Response,
-} from "~/api-client/thread";
+import { type BodyAnchorPart, fetchThread, type Response } from "~/api-client/thread";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
-import React from "react";
+import { FloatingNGButton } from "../components/FloatingNGButton";
+import { NGContextMenu } from "../components/NGContextMenu";
+import type { Route } from "./+types/ThreadPage";
 
-const LazyPostResponseModal = lazy(
-  () => import("../components/PostResponseModal"),
-);
+const LazyPostResponseModal = lazy(() => import("../components/PostResponseModal"));
 const LazyNGWordsSettingsModal = lazy(() =>
   import("../components/NGWordsSettingsModal").then((m) => ({
     default: m.NGWordsSettingsModal,
@@ -29,10 +22,7 @@ const LazyNGWordsSettingsModal = lazy(() =>
 );
 
 export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
-  const responseCount = parseInt(
-    loaderHeaders.get("X-Response-Count") ?? "0",
-    10,
-  );
+  const responseCount = parseInt(loaderHeaders.get("X-Response-Count") ?? "0", 10);
   const sMaxAge = responseCount > 100 ? 300 : 30;
   return {
     "X-Frame-Options": "DENY",
@@ -56,8 +46,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const [thread, boards, clientConfig] = await Promise.all([
     fetchThread(params.boardKey!, params.threadKey!, { baseUrl }),
@@ -117,13 +106,7 @@ const MAX_POPUP_WIDTH_MOBILE = "95vw";
 const MAX_POPUP_HEIGHT_MOBILE = "calc(90vh - 50px)";
 const MOBILE_BREAKPOINT = 768; // Tailwind's default mobile breakpoint
 
-const Meta = ({
-  bbsName,
-  threadName,
-}: {
-  bbsName: string;
-  threadName: string;
-}) => (
+const Meta = ({ bbsName, threadName }: { bbsName: string; threadName: string }) => (
   <>
     <title>{`${threadName} - ${bbsName}`}</title>
     <meta property="og:title" content={`${bbsName} | ${threadName}`} />
@@ -133,9 +116,7 @@ const Meta = ({
   </>
 );
 
-const ThreadPage = ({
-  loaderData: { boards, thread, eddistData },
-}: Route.ComponentProps) => {
+const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.ComponentProps) => {
   const params = useParams();
 
   const [popups, setPopups] = useState<Popup[]>([]);
@@ -203,18 +184,13 @@ const ThreadPage = ({
 
   const [creatingResponse, setCreatingResponse] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
-  const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(
-    new Set(),
-  );
+  const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { shouldFilterResponse } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
-  const [contextMenuResponse, setContextMenuResponse] =
-    useState<Response | null>(null);
-  const [contextMenuType, setContextMenuType] = useState<
-    "authorId" | "name" | null
-  >(null);
+  const [contextMenuResponse, setContextMenuResponse] = useState<Response | null>(null);
+  const [contextMenuType, setContextMenuType] = useState<"authorId" | "name" | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -250,7 +226,7 @@ const ThreadPage = ({
   useEffect(() => {
     setIsHydrated(true);
     mutate();
-  }, []);
+  }, [mutate]);
 
   // Find current board
   const currentBoard = boards?.find(
@@ -269,14 +245,11 @@ const ThreadPage = ({
   );
 
   const allResponses = posts?.responses ?? [];
-  const responsesToRender = isHydrated
-    ? allResponses
-    : allResponses.slice(0, 100);
+  const responsesToRender = isHydrated ? allResponses : allResponses.slice(0, 100);
 
   if (
     thread.redirected &&
-    diffFromNow(lastResponseDate(posts?.responses || []) || new Date(0)) >
-      60 * 60 * 24 * 1
+    diffFromNow(lastResponseDate(posts?.responses || []) || new Date(0)) > 60 * 60 * 24 * 1
   ) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -300,9 +273,7 @@ const ThreadPage = ({
         <div
           className="fixed bottom-0 left-0 right-0 z-40 flex justify-center items-center transition-all duration-200"
           style={{
-            paddingBottom: isPullRefreshing
-              ? "16px"
-              : `${Math.min(pullDistance / 2, 40)}px`,
+            paddingBottom: isPullRefreshing ? "16px" : `${Math.min(pullDistance / 2, 40)}px`,
           }}
         >
           <div
@@ -315,10 +286,7 @@ const ThreadPage = ({
             }}
           >
             <FaSync
-              className={twMerge(
-                "text-blue-600 text-lg",
-                isPullRefreshing && "animate-spin",
-              )}
+              className={twMerge("text-blue-600 text-lg", isPullRefreshing && "animate-spin")}
             />
           </div>
         </div>
@@ -329,37 +297,35 @@ const ThreadPage = ({
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
 
-        <>
-          <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
-          {/* Mobile header - Board name above thread name */}
-          <div className="grow md:hidden">
-            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-              {boardName}
-            </p>
-            <h1
-              className="text-sm line-clamp-2 font-medium break-all"
-              title={threadName}
-              dangerouslySetInnerHTML={{ __html: threadName }}
-            ></h1>
-          </div>
+        <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
+        {/* Mobile header - Board name above thread name */}
+        <div className="grow md:hidden">
+          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{boardName}</p>
+          <h1
+            className="text-sm line-clamp-2 font-medium break-all"
+            title={threadName}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+            dangerouslySetInnerHTML={{ __html: threadName }}
+          ></h1>
+        </div>
 
-          {/* Desktop header - Board name and thread name on same line */}
-          <div className="hidden md:flex items-center grow">
-            <h1 className="text-2xl whitespace-nowrap" title={boardName}>
-              {boardName}
-            </h1>
-            {threadName && (
-              <>
-                <span className="mx-3 ml-4">-</span>
-                <p
-                  className="text-xl line-clamp-2 break-all"
-                  title={threadName}
-                  dangerouslySetInnerHTML={{ __html: threadName }}
-                ></p>
-              </>
-            )}
-          </div>
-        </>
+        {/* Desktop header - Board name and thread name on same line */}
+        <div className="hidden md:flex items-center grow">
+          <h1 className="text-2xl whitespace-nowrap" title={boardName}>
+            {boardName}
+          </h1>
+          {threadName && (
+            <>
+              <span className="mx-3 ml-4">-</span>
+              <p
+                className="text-xl line-clamp-2 break-all"
+                title={threadName}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+                dangerouslySetInnerHTML={{ __html: threadName }}
+              ></p>
+            </>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleRefresh}
@@ -368,10 +334,7 @@ const ThreadPage = ({
           title="更新"
         >
           <FaSync
-            className={twMerge(
-              "w-4 h-4",
-              (isRefreshing || isPullRefreshing) && "animate-spin",
-            )}
+            className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
         <button
@@ -401,10 +364,7 @@ const ThreadPage = ({
 
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal
-              open={showNGSettings}
-              setOpen={setShowNGSettings}
-            />
+            <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
           </Suspense>
         )}
       </header>
@@ -434,11 +394,7 @@ const ThreadPage = ({
               }
 
               // Collapsed with expand option
-              if (
-                filterResult.filtered &&
-                filterResult.hideMode === "collapsed" &&
-                !isExpanded
-              ) {
+              if (filterResult.filtered && filterResult.hideMode === "collapsed" && !isExpanded) {
                 return (
                   <div
                     key={post.id}
@@ -466,13 +422,10 @@ const ThreadPage = ({
 
               // Normal rendering (not filtered or expanded)
               return (
-                <div
-                  key={post.id}
-                  className="border-b border-gray-300 dark:border-gray-700 p-4"
-                >
+                <div key={post.id} className="border-b border-gray-300 dark:border-gray-700 p-4">
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {post.id}{" "}
-                    {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    {post.id} {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: BBS name element with context menu for NG word filtering */}
                     <span
                       className="select-none md:select-auto"
                       onContextMenu={(e) => {
@@ -494,14 +447,10 @@ const ThreadPage = ({
                       {processPostName(post.name)}
                     </span>{" "}
                     {post.date}{" "}
-                    <span
+                    <button
+                      type="button"
                       onClick={(e) =>
-                        openPopup(
-                          e,
-                          posts.authorIdMap
-                            .get(post.authorId)
-                            ?.map(([, i]) => i) ?? [],
-                        )
+                        openPopup(e, posts.authorIdMap.get(post.authorId)?.map(([, i]) => i) ?? [])
                       }
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -524,14 +473,13 @@ const ThreadPage = ({
                       )}`}
                     >
                       ID:{post.authorId}{" "}
-                      {(posts.authorIdMap.get(post.authorId)?.length ?? 0) >
-                        1 && (
+                      {(posts.authorIdMap.get(post.authorId)?.length ?? 0) > 1 && (
                         <span>
                           ({post.authorIdAppearBeforeCount}/
                           {posts.authorIdMap.get(post.authorId)?.length})
                         </span>
                       )}
-                    </span>
+                    </button>
                   </div>
                   <div
                     className="text-gray-800 dark:text-gray-200 mt-2 wrap-break-word"
@@ -560,10 +508,7 @@ const ThreadPage = ({
               left: popup.x,
               maxHeight: isMobile
                 ? MAX_POPUP_HEIGHT_MOBILE
-                : Math.min(
-                    window.innerHeight * 0.9,
-                    window.innerHeight - popup.y - 20,
-                  ),
+                : Math.min(window.innerHeight * 0.9, window.innerHeight - popup.y - 20),
               zIndex: 1 + idx,
             }}
             className={twMerge(
@@ -583,13 +528,10 @@ const ThreadPage = ({
               >
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {p.id}. {p.name} {p.date}{" "}
-                  <span
+                  <button
+                    type="button"
                     onClick={(e) =>
-                      openPopup(
-                        e,
-                        posts.authorIdMap.get(p.authorId)?.map(([, i]) => i) ??
-                          [],
-                      )
+                      openPopup(e, posts.authorIdMap.get(p.authorId)?.map(([, i]) => i) ?? [])
                     }
                     style={{ cursor: "pointer" }}
                     className={authorIdResponseCountToColor(
@@ -599,11 +541,10 @@ const ThreadPage = ({
                     ID:{p.authorId}{" "}
                     {(posts.authorIdMap.get(p.authorId)?.length ?? 0) > 1 && (
                       <span>
-                        ({p.authorIdAppearBeforeCount}/
-                        {posts.authorIdMap.get(p.authorId)?.length})
+                        ({p.authorIdAppearBeforeCount}/{posts.authorIdMap.get(p.authorId)?.length})
                       </span>
                     )}
-                  </span>
+                  </button>
                 </div>
                 <div className="text-gray-800 dark:text-gray-200 mt-1 wrap-break-word">
                   {processPostBody(p.bodyParts, openPopup)}
@@ -667,9 +608,7 @@ const processPostName = (name: string) => {
   return processedParts;
 };
 
-const authorIdResponseCountToColor = (
-  authorIdResponseCount: number,
-): string => {
+const authorIdResponseCountToColor = (authorIdResponseCount: number): string => {
   if (authorIdResponseCount <= 1) {
     return "";
   } else if (authorIdResponseCount <= 5) {
@@ -683,7 +622,8 @@ const constructReferredNum = (
   refs: number[],
   popup: (e: React.MouseEvent, indices: number[]) => void,
 ) => (
-  <span
+  <button
+    type="button"
     onClick={(e) =>
       popup(
         e,
@@ -693,7 +633,7 @@ const constructReferredNum = (
     className="text-blue-400 hover:text-blue-600 cursor-pointer"
   >
     (+{refs.length})
-  </span>
+  </button>
 );
 
 const processPostBody = (
@@ -703,14 +643,16 @@ const processPostBody = (
   <span>
     {bodyParts.map((part, i) =>
       part.isMatch ? (
-        <span
+        <button
+          type="button"
           key={i}
           className="text-blue-400 hover:text-blue-600 cursor-pointer"
-          onClick={(e) => popup(e, [parseInt(part.text.slice(2)) - 1])}
+          onClick={(e) => popup(e, [parseInt(part.text.slice(2), 10) - 1])}
         >
           {part.text}
-        </span>
+        </button>
       ) : (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body HTML content
         <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
       ),
     )}

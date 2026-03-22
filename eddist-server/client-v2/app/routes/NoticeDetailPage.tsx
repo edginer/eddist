@@ -1,16 +1,15 @@
 import { Link } from "react-router";
-import { Footer } from "~/components/Footer";
-import type { Route } from "./+types/NoticeDetailPage";
 import { fetchNoticeBySlug } from "~/api-client/notice";
+import { Footer } from "~/components/Footer";
 import { parseMarkdown } from "~/utils/markdown";
+import type { Route } from "./+types/NoticeDetailPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
 export const loader = async ({ context, params }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const notice = await fetchNoticeBySlug({ baseUrl, slug: params.slug });
 

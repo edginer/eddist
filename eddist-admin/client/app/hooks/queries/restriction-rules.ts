@@ -1,11 +1,7 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_RESTRICTION_RULES = "/restriction_rules";
@@ -62,9 +58,7 @@ const CREATE_RESTRICTION_RULE = "/restriction_rules";
 export const useCreateRestrictionRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_RESTRICTION_RULE]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_RESTRICTION_RULE]["post"]>) => {
       const { data } = await client.POST(CREATE_RESTRICTION_RULE, {
         body: args.body,
       });
@@ -83,9 +77,7 @@ const UPDATE_RESTRICTION_RULE = "/restriction_rules/{rule_id}";
 export const useUpdateRestrictionRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_RESTRICTION_RULE]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_RESTRICTION_RULE]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_RESTRICTION_RULE, {
         params: args.params,
         body: args.body,
@@ -105,9 +97,7 @@ const DELETE_RESTRICTION_RULE = "/restriction_rules/{rule_id}";
 export const useDeleteRestrictionRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof DELETE_RESTRICTION_RULE]["delete"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof DELETE_RESTRICTION_RULE]["delete"]>) => {
       await client.DELETE(DELETE_RESTRICTION_RULE, {
         params: args.params,
       });

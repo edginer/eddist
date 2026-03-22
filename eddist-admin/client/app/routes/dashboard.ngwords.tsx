@@ -15,18 +15,13 @@ import {
   TextInput,
 } from "flowbite-react";
 import { useMemo } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
-import { Controller, useForm } from "react-hook-form";
-import {
-  getBoards,
-  getNgWords,
-  useUpdateNgWord,
-  useDeleteNgWord,
-} from "~/hooks/queries";
-import CreateNgWordModal from "~/components/CreateNgWordModal";
-import { useCrudModalState } from "~/hooks/useCrudModalState";
 import Select from "react-select";
+import CreateNgWordModal from "~/components/CreateNgWordModal";
+import { getBoards, getNgWords, useDeleteNgWord, useUpdateNgWord } from "~/hooks/queries";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
 
 interface NgWord {
   id: string;
@@ -62,7 +57,9 @@ const NgWords = () => {
     <>
       <CreateNgWordModal
         open={modal.isCreateOpen}
-        setOpen={(v) => { if (!v) modal.closeCreate(); }}
+        setOpen={(v) => {
+          if (!v) modal.closeCreate();
+        }}
         refetch={refetch}
       />
       <Modal
@@ -79,7 +76,7 @@ const NgWords = () => {
               console.log(data);
               const boardIds = data.boardKeys.map(
                 (val: BoardSelectOption) =>
-                  boards!.find((board) => board.board_key === val.value)?.id
+                  boards?.find((board) => board.board_key === val.value)?.id,
               );
               console.log(boardIds);
 
@@ -87,7 +84,7 @@ const NgWords = () => {
                 {
                   params: {
                     path: {
-                      ng_word_id: modal.editingItem!.id,
+                      ng_word_id: modal.editingItem?.id ?? "",
                     },
                   },
                   body: {
@@ -101,18 +98,12 @@ const NgWords = () => {
                     modal.closeEdit();
                     reset();
                   },
-                }
+                },
               );
             })}
           >
             <div className="flex flex-col">
-              <input
-                type="hidden"
-                {...(register("id"),
-                {
-                  value: modal.editingItem?.id,
-                })}
-              />
+              <input type="hidden" value={modal.editingItem?.id} />
               <Label>Name</Label>
               <TextInput
                 placeholder="Name..."
@@ -140,10 +131,10 @@ const NgWords = () => {
                 name="boardKeys"
                 control={control}
                 defaultValue={modal.editingItem?.boardIds.map((boardId) => {
-                  const board = boards!.find((b) => b.id === boardId);
+                  const board = boards?.find((b) => b.id === boardId);
                   return {
-                    label: board!.board_key,
-                    value: board!.board_key,
+                    label: board?.board_key,
+                    value: board?.board_key,
                   };
                 })}
                 render={({ field }) => (
@@ -151,11 +142,7 @@ const NgWords = () => {
                     options={boardSelectOptions}
                     value={boardSelectOptions
                       .map((board) => {
-                        if (
-                          field.value?.find(
-                            (v: BoardSelectOption) => v.value === board.value
-                          )
-                        ) {
+                        if (field.value?.find((v: BoardSelectOption) => v.value === board.value)) {
                           return board;
                         }
                         return null;
@@ -179,6 +166,7 @@ const NgWords = () => {
         <div className="flex">
           <h1 className="text-3xl font-bold grow">NG words</h1>
           <button
+            type="button"
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => modal.openCreate()}
           >
@@ -193,7 +181,7 @@ const NgWords = () => {
             <TableHeadCell></TableHeadCell>
           </TableHead>
           <TableBody className="divide-y">
-            {ngWords!.map((ngWord) => (
+            {ngWords?.map((ngWord) => (
               <TableRow className="border-gray-200" key={ngWord.id}>
                 <TableCell>{ngWord.id}</TableCell>
                 <TableCell>{ngWord.name}</TableCell>

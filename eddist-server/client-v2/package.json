@@ -6,6 +6,10 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "node server.js",
+    "lint": "biome lint --write ./app",
+    "format": "biome format --write ./app",
+    "check": "biome check --write ./app",
+    "ci:check": "biome check ./app",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {

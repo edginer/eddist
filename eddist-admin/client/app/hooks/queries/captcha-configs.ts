@@ -1,11 +1,7 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_CAPTCHA_CONFIGS = "/captcha-configs/";
@@ -46,9 +42,7 @@ const CREATE_CAPTCHA_CONFIG = "/captcha-configs/";
 export const useCreateCaptchaConfig = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_CAPTCHA_CONFIG]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_CAPTCHA_CONFIG]["post"]>) => {
       const { data } = await client.POST(CREATE_CAPTCHA_CONFIG, {
         body: args.body,
       });
@@ -70,9 +64,7 @@ const UPDATE_CAPTCHA_CONFIG = "/captcha-configs/{id}/";
 export const useUpdateCaptchaConfig = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_CAPTCHA_CONFIG]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_CAPTCHA_CONFIG]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_CAPTCHA_CONFIG, {
         params: args.params,
         body: args.body,
@@ -95,9 +87,7 @@ const DELETE_CAPTCHA_CONFIG = "/captcha-configs/{id}/";
 export const useDeleteCaptchaConfig = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof DELETE_CAPTCHA_CONFIG]["delete"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof DELETE_CAPTCHA_CONFIG]["delete"]>) => {
       await client.DELETE(DELETE_CAPTCHA_CONFIG, {
         params: args.params,
       });

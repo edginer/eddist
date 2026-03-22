@@ -1,18 +1,12 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_IDPS = "/idps/";
 
-export const getIdps = ({
-  reactQuery,
-}: UseQueryOptions<paths[typeof GET_IDPS]["get"]>) => {
+export const getIdps = ({ reactQuery }: UseQueryOptions<paths[typeof GET_IDPS]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
     queryKey: [GET_IDPS],
@@ -27,10 +21,7 @@ export const getIdps = ({
 
 const GET_IDP = "/idps/{id}/";
 
-export const getIdp = ({
-  params,
-  reactQuery,
-}: UseQueryOptions<paths[typeof GET_IDP]["get"]>) => {
+export const getIdp = ({ params, reactQuery }: UseQueryOptions<paths[typeof GET_IDP]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
     queryKey: [GET_IDP, params.path.id],
@@ -49,9 +40,7 @@ const CREATE_IDP = "/idps/";
 export const useCreateIdp = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_IDP]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_IDP]["post"]>) => {
       const { data } = await client.POST(CREATE_IDP, {
         body: args.body,
       });
@@ -73,9 +62,7 @@ const UPDATE_IDP = "/idps/{id}/";
 export const useUpdateIdp = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_IDP]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_IDP]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_IDP, {
         params: args.params,
         body: args.body,
@@ -98,9 +85,7 @@ const DELETE_IDP = "/idps/{id}/";
 export const useDeleteIdp = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof DELETE_IDP]["delete"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof DELETE_IDP]["delete"]>) => {
       await client.DELETE(DELETE_IDP, {
         params: args.params,
       });

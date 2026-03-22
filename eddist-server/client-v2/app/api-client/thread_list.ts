@@ -10,8 +10,7 @@ const convertSubjectTextToThreadList = (text: string): Thread[] => {
   const threadList = lines
     .map((line) => {
       const lineRegex = /^(\d{9,10}\.dat)<>(.*) \((\d{1,5})\)$/;
-      const lineRegexWithId =
-        /^(\d{9,10}\.dat)<>(.*) \[(.{4,13})★\] \((\d{1,5})\)$/;
+      const lineRegexWithId = /^(\d{9,10}\.dat)<>(.*) \[(.{4,13})★\] \((\d{1,5})\)$/;
       const match = line.match(lineRegexWithId);
       if (match == null) {
         const match2 = line.match(lineRegex);
@@ -19,9 +18,9 @@ const convertSubjectTextToThreadList = (text: string): Thread[] => {
           return undefined;
         }
 
-        const id = parseInt(match2[1].split(".")[0]);
+        const id = parseInt(match2[1].split(".")[0], 10);
         const title = match2[2];
-        const responseCount = parseInt(match2[3]);
+        const responseCount = parseInt(match2[3], 10);
 
         return {
           title,
@@ -30,10 +29,10 @@ const convertSubjectTextToThreadList = (text: string): Thread[] => {
           authorId: undefined,
         };
       }
-      const id = parseInt(match[1].split(".")[0]);
+      const id = parseInt(match[1].split(".")[0], 10);
       const title = match[2];
       const authorId = match[3];
-      const responseCount = parseInt(match[4]);
+      const responseCount = parseInt(match[4], 10);
 
       return {
         title,
@@ -52,17 +51,15 @@ export const fetchThreadList = async (
     | {
         baseUrl: string;
       }
-    | undefined
+    | undefined,
 ) => {
   const res = await fetch(
-    `${
-      (import.meta.env.SSR && options?.baseUrl) || ""
-    }/${boardKey}/subject-metadent.txt`,
+    `${(import.meta.env.SSR && options?.baseUrl) || ""}/${boardKey}/subject-metadent.txt`,
     {
       headers: {
         "Content-Type": "text/plain; charset=shift_jis",
       },
-    }
+    },
   );
   const sjisText = await res.blob();
   const arrayBuffer = await sjisText.arrayBuffer();
