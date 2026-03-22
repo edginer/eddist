@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { Footer } from "~/components/Footer";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
@@ -37,7 +38,7 @@ const Meta = ({ bbsName }: { bbsName: string }) => (
 
 function TopPage({ loaderData: { eddistData, boards, notices } }: Route.ComponentProps) {
   return (
-    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
@@ -87,7 +88,7 @@ function TopPage({ loaderData: { eddistData, boards, notices } }: Route.Componen
             <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
               {notices.map((notice: NoticeListItem) => (
                 <li key={notice.slug}>
-                  <span className="text-gray-500 mr-2">
+                  <span className="text-gray-500 dark:text-gray-400 mr-2">
                     {new Date(notice.published_at).toLocaleDateString("ja-JP", {
                       year: "numeric",
                       month: "2-digit",
@@ -106,15 +107,7 @@ function TopPage({ loaderData: { eddistData, boards, notices } }: Route.Componen
           </section>
         )}
       </article>
-      <footer id="footer" className="py-2 text-center bg-white border-t border-gray-300">
-        <p className="text-xs text-gray-500">
-          This BBS is powered by{" "}
-          <a href="https://github.com/edginer/eddist" className="text-blue-500 underline">
-            Eddist
-          </a>
-          .
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }

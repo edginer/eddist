@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { Footer } from "~/components/Footer";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { parseMarkdown } from "~/utils/markdown";
 import type { Route } from "./+types/NoticeDetailPage";
@@ -31,12 +32,12 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
   const { eddistData, notice } = loaderData;
 
   return (
-    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
       <Meta title={notice.title} bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>
-          <p className="text-gray-600 text-sm mt-2">
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
             {new Date(notice.published_at).toLocaleDateString("ja-JP", {
               year: "numeric",
               month: "long",
@@ -56,15 +57,7 @@ function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
           <div className="max-w-none">{parseMarkdown(notice.content)}</div>
         </section>
       </article>
-      <footer id="footer" className="py-2 text-center bg-white border-t border-gray-300">
-        <p className="text-xs text-gray-500">
-          This BBS is powered by{" "}
-          <a href="https://github.com/edginer/eddist" className="text-blue-500 underline">
-            Eddist
-          </a>
-          .
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }

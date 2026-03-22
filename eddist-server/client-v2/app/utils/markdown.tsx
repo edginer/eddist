@@ -19,7 +19,10 @@ export function parseMarkdown(content: string): React.ReactNode[] {
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       elements.push(
-        <p key={`p-${key++}`} className="text-gray-700 leading-relaxed mb-3">
+        <p
+          key={`p-${key++}`}
+          className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3"
+        >
           {parseInline(currentParagraph.join("\n"))}
         </p>,
       );
@@ -32,13 +35,19 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       const list = listStack[listStack.length - 1];
       if (list.type === "ul") {
         elements.push(
-          <ul key={`ul-${key++}`} className="list-disc list-inside text-gray-700 mb-3 space-y-1">
+          <ul
+            key={`ul-${key++}`}
+            className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-3 space-y-1"
+          >
             {list.items}
           </ul>,
         );
       } else {
         elements.push(
-          <ol key={`ol-${key++}`} className="list-decimal list-inside text-gray-700 mb-3 space-y-1">
+          <ol
+            key={`ol-${key++}`}
+            className="list-decimal list-inside text-gray-700 dark:text-gray-300 mb-3 space-y-1"
+          >
             {list.items}
           </ol>,
         );
@@ -49,12 +58,12 @@ export function parseMarkdown(content: string): React.ReactNode[] {
 
   // Header styles mapping
   const headerStyles: Record<number, string> = {
-    1: "text-3xl font-bold text-gray-900 mb-4 mt-6",
-    2: "text-xl font-semibold text-gray-900 mb-3 mt-4",
-    3: "text-lg font-semibold text-gray-900 mb-3 mt-4",
-    4: "text-base font-semibold text-gray-900 mb-2 mt-3",
-    5: "text-sm font-medium text-gray-900 mb-2 mt-3",
-    6: "text-sm font-medium text-gray-900 mb-2 mt-2",
+    1: "text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 mt-6",
+    2: "text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-4",
+    3: "text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-4",
+    4: "text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-3",
+    5: "text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 mt-3",
+    6: "text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 mt-2",
   };
 
   for (const line of lines) {

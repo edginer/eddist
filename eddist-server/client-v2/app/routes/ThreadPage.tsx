@@ -253,10 +253,12 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
   ) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-gray-400">
           このスレッドはしばらく前にdat落ちしたため、Webブラウザからは閲覧できません。
         </p>
-        <p className="text-gray-600">専用ブラウザなどを使用して閲覧してください。</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          専用ブラウザなどを使用して閲覧してください。
+        </p>
         <Link to={`/${params.boardKey}`} className="mt-4 text-blue-500">
           戻る
         </Link>
@@ -265,7 +267,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
   }
 
   return (
-    <div className={twMerge("flex flex-col")}>
+    <div className={twMerge("flex flex-col min-h-screen dark:bg-gray-900 dark:text-gray-100")}>
       {/* Pull-to-refresh indicator at bottom */}
       {(isPulling || isPullRefreshing) && (
         <div
@@ -275,7 +277,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
           }}
         >
           <div
-            className="bg-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+            className="bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
             style={{
               width: "40px",
               height: "40px",
@@ -290,45 +292,47 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-5 bg-white shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
+      <header className="fixed top-0 left-0 right-0 z-5 bg-white dark:bg-gray-900 shadow-md transition-transform duration-300 flex items-center p-3 lg:p-4 h-18 lg:h-16">
         <Link to={`/${params.boardKey}`}>
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
 
-        <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
-        {/* Mobile header - Board name above thread name */}
-        <div className="grow md:hidden">
-          <p className="text-xs text-gray-600 truncate">{boardName}</p>
-          <h1
-            className="text-sm line-clamp-2 font-medium break-all"
-            title={threadName}
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-            dangerouslySetInnerHTML={{ __html: threadName }}
-          ></h1>
-        </div>
+        <>
+          <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
+          {/* Mobile header - Board name above thread name */}
+          <div className="grow md:hidden">
+            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{boardName}</p>
+            <h1
+              className="text-sm line-clamp-2 font-medium break-all"
+              title={threadName}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+              dangerouslySetInnerHTML={{ __html: threadName }}
+            ></h1>
+          </div>
 
-        {/* Desktop header - Board name and thread name on same line */}
-        <div className="hidden md:flex items-center grow">
-          <h1 className="text-2xl whitespace-nowrap" title={boardName}>
-            {boardName}
-          </h1>
-          {threadName && (
-            <>
-              <span className="mx-3 ml-4">-</span>
-              <p
-                className="text-xl line-clamp-2 break-all"
-                title={threadName}
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-                dangerouslySetInnerHTML={{ __html: threadName }}
-              ></p>
-            </>
-          )}
-        </div>
+          {/* Desktop header - Board name and thread name on same line */}
+          <div className="hidden md:flex items-center grow">
+            <h1 className="text-2xl whitespace-nowrap" title={boardName}>
+              {boardName}
+            </h1>
+            {threadName && (
+              <>
+                <span className="mx-3 ml-4">-</span>
+                <p
+                  className="text-xl line-clamp-2 break-all"
+                  title={threadName}
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+                  dangerouslySetInnerHTML={{ __html: threadName }}
+                ></p>
+              </>
+            )}
+          </div>
+        </>
         <button
           type="button"
           onClick={handleRefresh}
           disabled={isRefreshing || isPullRefreshing}
-          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors items-center disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden lg:flex px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors items-center disabled:opacity-50 disabled:cursor-not-allowed"
           title="更新"
         >
           <FaSync
@@ -341,7 +345,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             hasEverOpenedNGSettings.current = true;
             setShowNGSettings(true);
           }}
-          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="NG設定"
         >
           <FaCog className="w-4 h-4" />
@@ -381,7 +385,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
       <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-white border border-gray-300 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-md">
             {responsesToRender.map((post) => {
               const filterResult = filterResults[post.id - 1];
               const isExpanded = expandedNGPosts.has(post.id);
@@ -394,8 +398,11 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
               // Collapsed with expand option
               if (filterResult.filtered && filterResult.hideMode === "collapsed" && !isExpanded) {
                 return (
-                  <div key={post.id} className="border-b border-gray-300 p-4 bg-gray-50">
-                    <div className="text-sm text-gray-400 flex justify-between items-center">
+                  <div
+                    key={post.id}
+                    className="border-b border-gray-300 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800"
+                  >
+                    <div className="text-sm text-gray-400 dark:text-gray-500 flex justify-between items-center">
                       <span>{post.id}. このレスはNG設定により非表示</span>
                       <button
                         onClick={() =>
@@ -405,7 +412,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                             return newSet;
                           })
                         }
-                        className="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                        className="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
                         type="button"
                       >
                         表示
@@ -417,10 +424,13 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
               // Normal rendering (not filtered or expanded)
               return (
-                <div key={post.id} className="border-b border-gray-300 p-4">
-                  <div className="text-sm text-gray-500">
-                    {post.id} {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: BBS name element with context menu for NG word filtering */}
+                <div
+                  key={post.id}
+                  className="border-b border-gray-300 dark:border-gray-700 p-4"
+                >
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {post.id}{" "}
+                    {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
                     <span
                       className="select-none md:select-auto"
                       onContextMenu={(e) => {
@@ -477,7 +487,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                     </button>
                   </div>
                   <div
-                    className="text-gray-800 mt-2 wrap-break-word"
+                    className="text-gray-800 dark:text-gray-200 mt-2 wrap-break-word"
                     data-ng-target="body"
                     data-ng-response-id={post.id}
                   >
@@ -507,7 +517,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
               zIndex: 1 + idx,
             }}
             className={twMerge(
-              "bg-white border border-gray-300 rounded-lg shadow-md p-2 fixed whitespace-normal",
+              "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-md p-2 fixed whitespace-normal",
               isMobile
                 ? `max-w-[${MAX_POPUP_WIDTH_MOBILE}px] w-[${MAX_POPUP_WIDTH_MOBILE}px]`
                 : `max-w-[${MAX_POPUP_WIDTH_DESKTOP}px] w-auto`,
@@ -519,9 +529,9 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             {popup.posts.map((p) => (
               <div
                 key={p.id}
-                className="border-b border-gray-200 mb-2 pb-2 last:border-none last:mb-0 last:pb-0"
+                className="border-b border-gray-200 dark:border-gray-600 mb-2 pb-2 last:border-none last:mb-0 last:pb-0"
               >
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   {p.id}. {p.name} {p.date}{" "}
                   <button
                     type="button"
@@ -541,7 +551,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                     )}
                   </button>
                 </div>
-                <div className="text-gray-800 mt-1 wrap-break-word">
+                <div className="text-gray-800 dark:text-gray-200 mt-1 wrap-break-word">
                   {processPostBody(p.bodyParts, openPopup)}
                 </div>
               </div>
@@ -594,7 +604,7 @@ const processPostName = (name: string) => {
       return part;
     } else {
       return (
-        <span key={index} className=" text-cyan-700">
+        <span key={index} className="text-cyan-700 dark:text-cyan-400">
           {part}
         </span>
       );
