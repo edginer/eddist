@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { Footer } from "~/components/Footer";
 import { fetchNoticeBySlug } from "~/api-client/notice";
+import { Footer } from "~/components/Footer";
 import { parseMarkdown } from "~/utils/markdown";
 import type { Route } from "./+types/NoticeDetailPage";
 

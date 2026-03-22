@@ -1,6 +1,6 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader, Tooltip } from "flowbite-react";
+import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
-import { FaMoon, FaSun, FaDesktop } from "react-icons/fa";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
 import { NGRuleSection } from "./NGRuleSection";
@@ -43,10 +43,7 @@ const ThemeTab = () => {
   );
 };
 
-export const NGWordsSettingsModal = ({
-  open,
-  setOpen,
-}: NGWordsSettingsModalProps) => {
+export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
   return (

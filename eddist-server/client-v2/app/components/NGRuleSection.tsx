@@ -273,9 +273,7 @@ export const NGRuleSection = ({
                         {rule.pattern}
                       </span>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        (
-                        {rule.matchType === "partial" ? "部分一致" : "正規表現"}
-                        )
+                        ({rule.matchType === "partial" ? "部分一致" : "正規表現"})
                         {rule.hideMode &&
                           ` - ${rule.hideMode === "collapsed" ? "折りたたむ" : "完全非表示"}`}
                       </div>

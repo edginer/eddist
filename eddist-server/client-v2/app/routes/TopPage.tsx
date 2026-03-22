@@ -1,8 +1,8 @@
 import { Link } from "react-router";
-import { Footer } from "~/components/Footer";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
+import { Footer } from "~/components/Footer";
 import type { Route } from "./+types/TopPage";
 
 export const headers = () => ({

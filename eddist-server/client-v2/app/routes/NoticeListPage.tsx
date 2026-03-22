@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router";
-import { Footer } from "~/components/Footer";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
+import { Footer } from "~/components/Footer";
 import type { Route } from "./+types/NoticeListPage";
 
 export const headers = () => ({
@@ -48,10 +48,7 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
         <section className="py-4 pt-8">
           <ul className="space-y-4">
             {noticeData.notices.map((notice: NoticeListItem) => (
-              <li
-                key={notice.slug}
-                className="border-b border-gray-300 dark:border-gray-700 pb-4"
-              >
+              <li key={notice.slug} className="border-b border-gray-300 dark:border-gray-700 pb-4">
                 <Link
                   to={`/notices/${notice.slug}`}
                   className="text-blue-500 text-xl hover:underline"

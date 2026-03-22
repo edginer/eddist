@@ -154,9 +154,7 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
             onClick={onClose}
             className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900 dark:text-gray-100">
-              {action.label}
-            </div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">{action.label}</div>
           </a>
         ) : (
           <button
@@ -168,9 +166,7 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
             }}
             className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900 dark:text-gray-100">
-              {action.label}
-            </div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">{action.label}</div>
           </button>
         ),
       )}
@@ -185,9 +181,7 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
             <div className="text-sm text-gray-900 dark:text-gray-100 wrap-break-word">
               {item.label}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {item.description}
-            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</div>
           </div>
         </button>
       ))}

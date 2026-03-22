@@ -19,10 +19,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
       elements.push(
-        <p
-          key={`p-${key++}`}
-          className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3"
-        >
+        <p key={`p-${key++}`} className="text-gray-700 dark:text-gray-300 leading-relaxed mb-3">
           {parseInline(currentParagraph.join("\n"))}
         </p>,
       );

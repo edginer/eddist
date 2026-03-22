@@ -297,37 +297,35 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
 
-        <>
-          <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
-          {/* Mobile header - Board name above thread name */}
-          <div className="grow md:hidden">
-            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{boardName}</p>
-            <h1
-              className="text-sm line-clamp-2 font-medium break-all"
-              title={threadName}
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-              dangerouslySetInnerHTML={{ __html: threadName }}
-            ></h1>
-          </div>
+        <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
+        {/* Mobile header - Board name above thread name */}
+        <div className="grow md:hidden">
+          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{boardName}</p>
+          <h1
+            className="text-sm line-clamp-2 font-medium break-all"
+            title={threadName}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+            dangerouslySetInnerHTML={{ __html: threadName }}
+          ></h1>
+        </div>
 
-          {/* Desktop header - Board name and thread name on same line */}
-          <div className="hidden md:flex items-center grow">
-            <h1 className="text-2xl whitespace-nowrap" title={boardName}>
-              {boardName}
-            </h1>
-            {threadName && (
-              <>
-                <span className="mx-3 ml-4">-</span>
-                <p
-                  className="text-xl line-clamp-2 break-all"
-                  title={threadName}
-                  // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-                  dangerouslySetInnerHTML={{ __html: threadName }}
-                ></p>
-              </>
-            )}
-          </div>
-        </>
+        {/* Desktop header - Board name and thread name on same line */}
+        <div className="hidden md:flex items-center grow">
+          <h1 className="text-2xl whitespace-nowrap" title={boardName}>
+            {boardName}
+          </h1>
+          {threadName && (
+            <>
+              <span className="mx-3 ml-4">-</span>
+              <p
+                className="text-xl line-clamp-2 break-all"
+                title={threadName}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
+                dangerouslySetInnerHTML={{ __html: threadName }}
+              ></p>
+            </>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleRefresh}
@@ -424,13 +422,10 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
               // Normal rendering (not filtered or expanded)
               return (
-                <div
-                  key={post.id}
-                  className="border-b border-gray-300 dark:border-gray-700 p-4"
-                >
+                <div key={post.id} className="border-b border-gray-300 dark:border-gray-700 p-4">
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {post.id}{" "}
-                    {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    {post.id} {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: BBS name element with context menu for NG word filtering */}
                     <span
                       className="select-none md:select-auto"
                       onContextMenu={(e) => {

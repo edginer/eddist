@@ -12,8 +12,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { ThemeInit } from ".flowbite-react/init";
 import { NGWordsProvider } from "~/contexts/NGWordsContext";
-import { ToastProvider } from "~/contexts/ToastContext";
 import { ThemeProvider } from "~/contexts/ThemeContext";
+import { ToastProvider } from "~/contexts/ToastContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -37,6 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
         <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: inline theme initialization script
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem('eddist:theme');var d=window.matchMedia('(prefers-color-scheme:dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}})()`,
           }}
