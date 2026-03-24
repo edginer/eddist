@@ -49,7 +49,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const [thread, boards, clientConfig] = await Promise.all([
-    fetchThread(params.boardKey!, params.threadKey!, { baseUrl }),
+    fetchThread(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
@@ -215,7 +215,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
   const { data: posts, mutate } = useSWR(
     `${params.boardKey}/dat/${params.threadKey}.dat`,
-    () => fetchThread(params.boardKey!, params.threadKey!),
+    () => fetchThread(params.boardKey ?? "", params.threadKey ?? ""),
     {
       fallbackData: thread,
       revalidateOnMount: false,
@@ -374,8 +374,8 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
           <LazyPostResponseModal
             open={creatingResponse}
             setOpen={setCreatingResponse}
-            boardKey={params.boardKey!}
-            threadKey={params.threadKey!}
+            boardKey={params.boardKey ?? ""}
+            threadKey={params.threadKey ?? ""}
             refetchThread={mutate}
           />
         </Suspense>
@@ -601,6 +601,7 @@ const processPostName = (name: string) => {
       return part;
     } else {
       return (
+        // biome-ignore lint/suspicious/noArrayIndexKey: text segments from regex split have no stable IDs
         <span key={index} className="text-cyan-700 dark:text-cyan-400">
           {part}
         </span>
@@ -646,9 +647,9 @@ const processPostBody = (
   <span>
     {bodyParts.map((part, i) =>
       part.isMatch ? (
-        // biome-ignore lint/a11y/noStaticElementInteractions: anchor link span, not a button
-        // biome-ignore lint/a11y/useKeyWithClickEvents: anchor link span, not a button
+        // biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: body parts from parsed BBS post have no stable IDs
         <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: body parts from parsed BBS post have no stable IDs
           key={i}
           className="text-blue-400 hover:text-blue-600 cursor-pointer"
           onClick={(e) => popup(e, [parseInt(part.text.slice(2), 10) - 1])}
@@ -656,7 +657,7 @@ const processPostBody = (
           {part.text}
         </span>
       ) : (
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body HTML content
+        // biome-ignore lint/suspicious/noArrayIndexKey lint/security/noDangerouslySetInnerHtml: body parts from parsed BBS post have no stable IDs
         <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>
       ),
     )}

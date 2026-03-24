@@ -33,7 +33,7 @@ export const useUpdateTerms = () => {
       queryClient.invalidateQueries({ queryKey: [GET_TERMS] });
       toast.success("Terms updated successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to update terms";
       toast.error(message);
     },

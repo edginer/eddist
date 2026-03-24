@@ -6,8 +6,6 @@ import Tab from "../components/Tab";
 import ThreadList from "../components/ThreadList";
 import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
 
-type TabKeys = "threads" | "settings";
-
 const ArchivedThreadsTabContent = ({
   boardKey,
   boardId,
@@ -119,7 +117,7 @@ const Page = () => {
             tabKey: "settings",
             tabLabel: "Settings",
             id: "settings-tab",
-            children: <BoardSetting board={board!} refetchBoard={refetch} />,
+            children: board ? <BoardSetting board={board} refetchBoard={refetch} /> : null,
           },
         ]}
       />

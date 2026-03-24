@@ -95,7 +95,7 @@ const ResponseList = ({
             <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
-                onClickDeleteAuthedToken(response.authed_token_id!);
+                onClickDeleteAuthedToken(response.authed_token_id ?? "");
               }}
             >
               Delete authed token
@@ -103,7 +103,7 @@ const ResponseList = ({
             <DropdownItem
               disabled={response.authed_token_id == null}
               onClick={() => {
-                onClickDeleteAuthedTokensAssociatedWithIp(response.authed_token_id!);
+                onClickDeleteAuthedTokensAssociatedWithIp(response.authed_token_id ?? "");
               }}
             >
               Delete authed token associated with writing origin ip of authed token

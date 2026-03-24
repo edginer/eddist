@@ -50,7 +50,7 @@ export const useCreateIdp = () => {
       queryClient.invalidateQueries({ queryKey: [GET_IDPS] });
       toast.success("IdP created successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to create IdP";
       toast.error(message);
     },
@@ -73,7 +73,7 @@ export const useUpdateIdp = () => {
       queryClient.invalidateQueries({ queryKey: [GET_IDPS] });
       toast.success("IdP updated successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to update IdP";
       toast.error(message);
     },

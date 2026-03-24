@@ -65,8 +65,8 @@ const UserSearchPage = () => {
 
       setUserData(data[0]);
       setUserIdpBindings(data[0].idp_bindings || []);
-    } catch (error: any) {
-      setSearchError(error.message);
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : String(error));
       setUserData(undefined);
       setUserIdpBindings([]);
     }
@@ -113,8 +113,8 @@ const UserSearchPage = () => {
       });
 
       setActionMessage(`User ${newEnabledStatus ? "enabled" : "disabled"} successfully`);
-    } catch (error: any) {
-      setActionMessage(`Error: ${error.message}`);
+    } catch (error) {
+      setActionMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsUpdating(false);
       setShowConfirmModal(false);

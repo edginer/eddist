@@ -61,7 +61,7 @@ export const fetchThread = async (
 
   if (import.meta.env.SSR) {
     const key = `${boardKey}:${threadKey}`;
-    for (const [k, v] of _threadCache!) {
+    for (const [k, v] of _threadCache ?? []) {
       if (v.expiresAt <= Date.now()) _threadCache?.delete(k);
     }
     if ((_threadCache?.size ?? 0) >= THREAD_CACHE_MAX) {
@@ -120,7 +120,7 @@ const convertThreadTextToResponseList = (text: string) => {
     }
 
     if (authorIdAppearBeforeCountMap.has(authorId)) {
-      const count = authorIdAppearBeforeCountMap.get(authorId)!;
+      const count = authorIdAppearBeforeCountMap.get(authorId) ?? 0;
       authorIdAppearBeforeCountMap.set(authorId, count + 1);
     } else {
       authorIdAppearBeforeCountMap.set(authorId, 1);
@@ -140,7 +140,7 @@ const convertThreadTextToResponseList = (text: string) => {
       date,
       authorId,
       id: idx + 1,
-      authorIdAppearBeforeCount: authorIdAppearBeforeCountMap.get(authorId)!,
+      authorIdAppearBeforeCount: authorIdAppearBeforeCountMap.get(authorId) ?? 0,
       bodyParts,
     };
 

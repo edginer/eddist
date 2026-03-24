@@ -57,7 +57,7 @@ export const useCreateNotice = () => {
       queryClient.invalidateQueries({ queryKey: [GET_NOTICES] });
       toast.success("Notice created successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to create notice";
       toast.error(message);
     },
@@ -80,7 +80,7 @@ export const useUpdateNotice = () => {
       queryClient.invalidateQueries({ queryKey: [GET_NOTICES] });
       toast.success("Notice updated successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to update notice";
       toast.error(message);
     },

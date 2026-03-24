@@ -144,10 +144,10 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
         top: `${adjustedPosition.y}px`,
       }}
     >
-      {actions.map((action, idx) =>
+      {actions.map((action) =>
         action.href ? (
           <a
-            key={`action-${idx}`}
+            key={action.label}
             href={action.href}
             target={action.target}
             rel={action.target === "_blank" ? "noopener noreferrer" : undefined}
@@ -158,7 +158,7 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
           </a>
         ) : (
           <button
-            key={`action-${idx}`}
+            key={action.label}
             type="button"
             onClick={() => {
               action.onClick?.();
@@ -170,9 +170,9 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
           </button>
         ),
       )}
-      {menuItems.map((item, idx) => (
+      {menuItems.map((item) => (
         <button
-          key={idx}
+          key={item.label}
           type="button"
           onClick={item.onClick}
           className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between border-b border-gray-100 dark:border-gray-600 last:border-b-0"

@@ -31,7 +31,7 @@ export const useUpsertServerSetting = () => {
       queryClient.invalidateQueries({ queryKey: [SERVER_SETTINGS] });
       toast.success("Server setting saved successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to save server setting";
       toast.error(message);
     },

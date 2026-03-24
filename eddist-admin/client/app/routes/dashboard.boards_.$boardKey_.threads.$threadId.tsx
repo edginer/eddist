@@ -79,8 +79,8 @@ const Page = () => {
       updateResponseMutation.mutate({
         params: {
           path: {
-            board_key: params.boardKey!,
-            thread_id: Number(params.threadId!),
+            board_key: params.boardKey ?? "",
+            thread_id: Number(params.threadId ?? ""),
             res_id: resId,
           },
         },
@@ -164,7 +164,9 @@ const Page = () => {
           </Button>
           <Button
             onClick={() => {
-              updateResp(selectedEditingRes!, selectedEditingRes?.id ?? "");
+              if (selectedEditingRes) {
+                updateResp(selectedEditingRes, selectedEditingRes.id ?? "");
+              }
               setSelectedEditingRes(undefined);
             }}
           >

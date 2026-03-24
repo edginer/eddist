@@ -9,6 +9,7 @@ const Breadcrumb = ({ children }: Props) => {
     <nav className="text-black font-bold my-2 ml-4" aria-label="Breadcrumb">
       <ol className="list-none p-0 inline-flex">
         {children.map((child, idx) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumb children are React nodes with no stable IDs
           <li key={idx} className="flex items-center">
             {child}
             {idx !== children.length - 1 && (

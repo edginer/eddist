@@ -352,13 +352,15 @@ const BoardSetting = ({
     await refetchBoardInfo();
   };
 
+  if (!boardInfo) return null;
+
   return (
     <div>
-      <GeneralSetting board={board} boardInfo={boardInfo!} refetch={refetch} />
+      <GeneralSetting board={board} boardInfo={boardInfo} refetch={refetch} />
       <hr className="bg-gray-500 border-0 h-px my-4" />
-      <PostRestrictionSetting board={board} boardInfo={boardInfo!} refetch={refetch} />
+      <PostRestrictionSetting board={board} boardInfo={boardInfo} refetch={refetch} />
       <hr className="bg-gray-500 border-0 h-px my-4" />
-      <ThreadsArchiveSetting board={board} boardInfo={boardInfo!} refetch={refetch} />
+      <ThreadsArchiveSetting board={board} boardInfo={boardInfo} refetch={refetch} />
     </div>
   );
 };

@@ -63,7 +63,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const [threadList, boards, clientConfig] = await Promise.all([
-    fetchThreadList(params.boardKey!, { baseUrl }),
+    fetchThreadList(params.boardKey ?? "", { baseUrl }),
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
@@ -106,7 +106,7 @@ const ThreadListPage = ({
 
   const { data: threadList, mutate } = useSWR(
     `${params.boardKey}/subject.txt`,
-    () => fetchThreadList(params.boardKey!),
+    () => fetchThreadList(params.boardKey ?? ""),
     {
       fallbackData: data,
       revalidateOnMount: false,
@@ -306,7 +306,7 @@ const ThreadListPage = ({
       {hasEverOpenedThread.current && (
         <Suspense fallback={null}>
           <LazyPostThreadModal
-            boardKey={params.boardKey!}
+            boardKey={params.boardKey ?? ""}
             open={creatingThread}
             setOpen={setCreatingThread}
             refetchThreadList={mutate}

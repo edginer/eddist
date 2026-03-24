@@ -52,7 +52,7 @@ export const useCreateCaptchaConfig = () => {
       queryClient.invalidateQueries({ queryKey: [GET_CAPTCHA_CONFIGS] });
       toast.success("Captcha config created successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to create captcha config";
       toast.error(message);
     },
@@ -75,7 +75,7 @@ export const useUpdateCaptchaConfig = () => {
       queryClient.invalidateQueries({ queryKey: [GET_CAPTCHA_CONFIGS] });
       toast.success("Captcha config updated successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to update captcha config";
       toast.error(message);
     },

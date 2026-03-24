@@ -20,7 +20,7 @@ const Page = () => {
   const archivedThread = getDatArcvhiedThread({
     params: {
       path: {
-        board_key: params.boardKey,
+        board_key: params.boardKey ?? "",
         thread_number: Number(params.threadId),
       },
     },
@@ -29,7 +29,7 @@ const Page = () => {
   const adminArchivedThread = getDatAdminArchivedThread({
     params: {
       path: {
-        board_key: params.boardKey,
+        board_key: params.boardKey ?? "",
         thread_number: Number(params.threadId),
       },
     },
@@ -128,7 +128,7 @@ const Page = () => {
                   {
                     params: {
                       path: {
-                        board_key: params.boardKey!,
+                        board_key: params.boardKey ?? "",
                         thread_number: Number(params.threadId),
                       },
                     },
@@ -137,7 +137,7 @@ const Page = () => {
                         author_name: editRespState.author_name,
                         email: editRespState.email,
                         body: editRespState.body,
-                        res_order: onEditResponseOrder!,
+                        res_order: onEditResponseOrder ?? 0,
                       },
                     ],
                   },
@@ -204,7 +204,7 @@ const Page = () => {
             deleteDatResponseMutation.mutate({
               params: {
                 path: {
-                  board_key: params.boardKey!,
+                  board_key: params.boardKey ?? "",
                   thread_number: Number(params.threadId),
                   res_order: idx,
                 },
