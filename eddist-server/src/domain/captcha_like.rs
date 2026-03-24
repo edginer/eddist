@@ -48,8 +48,8 @@ pub struct TurnstileResponse {
     pub success: bool,
     #[serde(rename = "error-codes")]
     pub error_codes: Vec<String>,
-    pub challenge_ts: String,
-    pub hostname: String,
+    pub challenge_ts: Option<String>,
+    pub hostname: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

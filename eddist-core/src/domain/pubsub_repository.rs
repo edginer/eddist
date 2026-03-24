@@ -24,6 +24,7 @@ pub struct CreatingRes {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthTokenInitiated {
+    pub authed_token_id: Uuid,
     pub origin_ip: String,
     pub user_agent: String,
     pub asn_num: u32,
@@ -31,6 +32,7 @@ pub struct AuthTokenInitiated {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthTokenRequested {
+    pub authed_token_id: Option<Uuid>,
     pub origin_ip: String,
     pub user_agent: String,
     pub asn_num: u32,
