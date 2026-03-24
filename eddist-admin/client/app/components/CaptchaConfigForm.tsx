@@ -146,19 +146,11 @@ const CaptchaConfigForm = (props: Props) => {
         </div>
 
         <div>
-          <Label>
-            {currentProvider === "recaptcha_enterprise"
-              ? "Google Cloud Project ID"
-              : "Base URL (optional)"}
-          </Label>
+          <Label>Base URL (optional)</Label>
           <TextInput
             {...register("base_url")}
             defaultValue={defaults?.base_url ?? ""}
-            placeholder={
-              currentProvider === "recaptcha_enterprise"
-                ? "your-gcloud-project-id"
-                : "https://example.com (for self-hosted providers)"
-            }
+            placeholder="https://example.com (for self-hosted providers)"
           />
         </div>
 
@@ -232,17 +224,27 @@ const CaptchaConfigForm = (props: Props) => {
           <div className="border-t pt-4 mt-2">
             <h3 className="font-semibold mb-2">Verification Configuration</h3>
             {currentProvider === "recaptcha_enterprise" ? (
-              <div>
-                <Label>Score Threshold (0.0–1.0, default 0.5)</Label>
-                <TextInput
-                  {...register("verification.score_threshold", { valueAsNumber: true })}
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="1"
-                  defaultValue={defaults?.verification?.score_threshold ?? 0.5}
-                  placeholder="0.5"
-                />
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label>Google Cloud Project ID</Label>
+                  <TextInput
+                    {...register("verification.project_id")}
+                    defaultValue={defaults?.verification?.project_id ?? ""}
+                    placeholder="your-gcloud-project-id"
+                  />
+                </div>
+                <div>
+                  <Label>Score Threshold (0.0–1.0, default 0.5)</Label>
+                  <TextInput
+                    {...register("verification.score_threshold", { valueAsNumber: true })}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                    defaultValue={defaults?.verification?.score_threshold ?? 0.5}
+                    placeholder="0.5"
+                  />
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4">

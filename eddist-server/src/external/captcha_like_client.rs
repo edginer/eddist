@@ -51,7 +51,11 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
             name,
             config.secret.clone(),
             config.site_key.clone(),
-            config.base_url.clone().unwrap_or_default(),
+            config
+                .verification
+                .as_ref()
+                .and_then(|v| v.project_id.clone())
+                .unwrap_or_default(),
             config
                 .verification
                 .as_ref()

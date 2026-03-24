@@ -2567,6 +2567,12 @@
           "negate_success": {
             "type": "boolean"
           },
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "request_format": {
             "$ref": "#/components/schemas/RequestFormat"
           },

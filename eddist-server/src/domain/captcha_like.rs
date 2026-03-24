@@ -160,6 +160,9 @@ pub struct CaptchaVerificationConfig {
     /// Defaults to 0.5 when None.
     #[serde(default)]
     pub score_threshold: Option<f64>,
+    /// Google Cloud project ID for reCAPTCHA Enterprise.
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 fn default_success_path() -> String {

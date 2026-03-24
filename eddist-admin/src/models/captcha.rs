@@ -54,6 +54,8 @@ pub struct CaptchaVerificationConfig {
     pub negate_success: bool,
     #[serde(default)]
     pub score_threshold: Option<f64>,
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 fn default_success_path() -> String {

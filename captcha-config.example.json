@@ -35,9 +35,9 @@
         "provider": "recaptcha_enterprise",
         "site_key": "YOUR_RECAPTCHA_SITE_KEY",
         "secret": "YOUR_GOOGLE_CLOUD_API_KEY",
-        "base_url": "your-gcloud-project-id",
         "capture_fields": ["riskAnalysis.score"],
         "verification": {
+            "project_id": "your-gcloud-project-id",
             "score_threshold": 0.5
         },
         "widget": {
