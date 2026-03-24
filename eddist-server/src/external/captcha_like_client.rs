@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        CaptchaProviderConfig, CaptchaVerificationConfig, HCAPTCHA_URL, HCaptchaResponse,
-        HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver, RequestFormat,
-        TURNSTILE_URL, TurnstileResponse,
+        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_URL, HCAPTCHA_URL,
+        HCaptchaResponse, HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver,
+        RequestFormat, TURNSTILE_URL, TurnstileResponse,
     },
     utils::SimpleSecret,
 };
@@ -45,6 +45,18 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
         "monocle" => Box::new(MonocleClient::new(
             name,
             config.secret.clone(),
+            config.capture_fields.clone(),
+        )),
+        "recaptcha_enterprise" => Box::new(RecaptchaEnterpriseClient::new(
+            name,
+            config.secret.clone(),
+            config.site_key.clone(),
+            config.base_url.clone().unwrap_or_default(),
+            config
+                .verification
+                .as_ref()
+                .and_then(|v| v.score_threshold)
+                .unwrap_or(0.5),
             config.capture_fields.clone(),
         )),
         // For other providers, use the generic client
@@ -317,6 +329,140 @@ impl CaptchaClient for MonocleClient {
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)
         } else {
             CaptchaLikeResult::Success
+        };
+
+        Ok(CaptchaVerificationOutput {
+            result,
+            captured_data,
+            provider: self.name.clone(),
+        })
+    }
+}
+
+pub struct RecaptchaEnterpriseClient {
+    name: String,
+    client: reqwest::Client,
+    api_key: SimpleSecret,
+    site_key: String,
+    project_id: String,
+    score_threshold: f64,
+    capture_fields: Vec<String>,
+}
+
+impl RecaptchaEnterpriseClient {
+    pub fn new(
+        name: String,
+        api_key: String,
+        site_key: String,
+        project_id: String,
+        score_threshold: f64,
+        capture_fields: Vec<String>,
+    ) -> Self {
+        Self {
+            name,
+            client: reqwest::Client::new(),
+            api_key: SimpleSecret::new(&api_key),
+            site_key,
+            project_id,
+            score_threshold,
+            capture_fields,
+        }
+    }
+
+    fn extract_captured_data(&self, resp: &serde_json::Value) -> Option<serde_json::Value> {
+        if self.capture_fields.is_empty() {
+            return None;
+        }
+
+        let mut captured = serde_json::Map::new();
+        for field in &self.capture_fields {
+            if let Ok(results) = resp.query(&format!("$.{field}")) {
+                if let Some(value) = results.first() {
+                    captured.insert(field.clone(), (*value).clone());
+                }
+            }
+        }
+
+        if captured.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(captured))
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl CaptchaClient for RecaptchaEnterpriseClient {
+    async fn verify_captcha(
+        &self,
+        response: &str,
+        ip_addr: &str,
+    ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
+        let url = format!(
+            "{}?key={}",
+            GRECAPTCHA_ENTERPRISE_URL.replace("{PROJECT_ID}", &self.project_id),
+            self.api_key.get()
+        );
+
+        let body = serde_json::json!({
+            "event": {
+                "token": response,
+                "siteKey": self.site_key,
+                "userIpAddress": ip_addr,
+                "expectedAction": "SUBMIT",
+                "userAgent": "",
+            }
+        });
+
+        let res = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(CaptchaVerificationError::Request)?;
+
+        let response_text = res
+            .text()
+            .await
+            .map_err(CaptchaVerificationError::Request)?;
+
+        let resp: serde_json::Value = match serde_json::from_str(&response_text) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "Failed to parse reCAPTCHA Enterprise response: {e}, body: {response_text}"
+                );
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data: None,
+                    provider: self.name.clone(),
+                });
+            }
+        };
+
+        let captured_data = self.extract_captured_data(&resp);
+
+        let valid = resp
+            .get("tokenProperties")
+            .and_then(|p| p.get("valid"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let score = resp
+            .get("riskAnalysis")
+            .and_then(|r| r.get("score"))
+            .and_then(|s| s.as_f64())
+            .unwrap_or(0.0);
+
+        let result = if valid && score >= self.score_threshold {
+            CaptchaLikeResult::Success
+        } else {
+            log::info!(
+                "reCAPTCHA Enterprise response: valid={valid}, score={score}, threshold={}",
+                self.score_threshold
+            );
+            CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
 
         Ok(CaptchaVerificationOutput {

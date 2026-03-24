@@ -81,6 +81,8 @@ struct StoredVerificationConfig {
     pub include_ip: bool,
     #[serde(default)]
     pub negate_success: bool,
+    #[serde(default)]
+    pub score_threshold: Option<f64>,
 }
 
 fn default_success_path() -> String {
@@ -132,6 +134,7 @@ impl From<StoredVerificationConfig> for CaptchaVerificationConfig {
             success_path: stored.success_path,
             include_ip: stored.include_ip,
             negate_success: stored.negate_success,
+            score_threshold: stored.score_threshold,
         }
     }
 }

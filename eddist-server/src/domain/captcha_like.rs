@@ -156,6 +156,10 @@ pub struct CaptchaVerificationConfig {
     /// Whether the success condition is negated
     #[serde(default)]
     pub negate_success: bool,
+    /// Score threshold for providers that return a risk score (e.g., reCAPTCHA Enterprise).
+    /// Defaults to 0.5 when None.
+    #[serde(default)]
+    pub score_threshold: Option<f64>,
 }
 
 fn default_success_path() -> String {

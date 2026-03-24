@@ -52,6 +52,8 @@ pub struct CaptchaVerificationConfig {
     pub include_ip: bool,
     #[serde(default)]
     pub negate_success: bool,
+    #[serde(default)]
+    pub score_threshold: Option<f64>,
 }
 
 fn default_success_path() -> String {

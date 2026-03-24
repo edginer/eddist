@@ -2570,6 +2570,13 @@
           "request_format": {
             "$ref": "#/components/schemas/RequestFormat"
           },
+          "score_threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "success_path": {
             "type": "string"
           },

@@ -32,6 +32,22 @@
         }
     },
     {
+        "provider": "recaptcha_enterprise",
+        "site_key": "YOUR_RECAPTCHA_SITE_KEY",
+        "secret": "YOUR_GOOGLE_CLOUD_API_KEY",
+        "base_url": "your-gcloud-project-id",
+        "capture_fields": ["riskAnalysis.score"],
+        "verification": {
+            "score_threshold": 0.5
+        },
+        "widget": {
+            "form_field_name": "g-recaptcha-response",
+            "script_url": "https://www.google.com/recaptcha/enterprise.js?render={{site_key}}",
+            "widget_html": "<input type=\"hidden\" name=\"g-recaptcha-response\" id=\"g-recaptcha-response\">",
+            "script_handler": "grecaptcha.enterprise.ready(function() { document.forms[0].addEventListener('submit', function(e) { e.preventDefault(); var form = this; grecaptcha.enterprise.execute('{{site_key}}', {action: 'SUBMIT'}).then(function(token) { document.getElementById('g-recaptcha-response').value = token; form.submit(); }); }); });"
+        }
+    },
+    {
         "provider": "cap",
         "site_key": "YOUR_SITE_KEY",
         "secret": "YOUR_SECRET",

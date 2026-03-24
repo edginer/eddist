@@ -670,6 +670,8 @@ export interface components {
             method?: components["schemas"]["HttpMethod"];
             negate_success?: boolean;
             request_format?: components["schemas"]["RequestFormat"];
+            /** Format: double */
+            score_threshold?: number | null;
             success_path?: string;
             url: string;
         };
