@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_URL, HCAPTCHA_URL,
-        HCaptchaResponse, HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver,
-        RequestFormat, TURNSTILE_URL, TurnstileResponse,
+        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_URL,
+        GrecaptchaEnterpriseRequest, GrecaptchaEnterpriseResponse, HCAPTCHA_URL, HCaptchaResponse,
+        HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver, RequestFormat,
+        TURNSTILE_URL, TurnstileResponse,
     },
     utils::SimpleSecret,
 };
@@ -408,20 +409,19 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             self.api_key.get()
         );
 
-        let body = serde_json::json!({
-            "event": {
-                "token": response,
-                "siteKey": self.site_key,
-                "userIpAddress": ip_addr,
-                "expectedAction": "SUBMIT",
-                "userAgent": "",
-            }
-        });
+        let event = GrecaptchaEnterpriseRequest {
+            token: response.to_string(),
+            site_key: self.site_key.clone(),
+            user_agent: String::new(),
+            user_ip_address: ip_addr.to_string(),
+            ja3: None,
+            expected_action: "SUBMIT".to_string(),
+        };
 
         let res = self
             .client
             .post(&url)
-            .json(&body)
+            .json(&serde_json::json!({ "event": event }))
             .send()
             .await
             .map_err(CaptchaVerificationError::Request)?;
@@ -431,7 +431,7 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             .await
             .map_err(CaptchaVerificationError::Request)?;
 
-        let resp: serde_json::Value = match serde_json::from_str(&response_text) {
+        let resp: GrecaptchaEnterpriseResponse = match serde_json::from_str(&response_text) {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -445,19 +445,11 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             }
         };
 
-        let captured_data = self.extract_captured_data(&resp);
+        let resp_json = serde_json::to_value(&resp).unwrap_or_default();
+        let captured_data = self.extract_captured_data(&resp_json);
 
-        let valid = resp
-            .get("tokenProperties")
-            .and_then(|p| p.get("valid"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        let score = resp
-            .get("riskAnalysis")
-            .and_then(|r| r.get("score"))
-            .and_then(|s| s.as_f64())
-            .unwrap_or(0.0);
+        let valid = resp.token_properties.valid;
+        let score = resp.risk_analysis.score;
 
         let result = if valid && score >= self.score_threshold {
             CaptchaLikeResult::Success
