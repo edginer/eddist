@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "codegen": "gql-gen --config codegen.yml"
+    "codegen": "gql-gen --config codegen.yml",
+    "check": "biome check ."
   },
   "keywords": [],
   "author": "",
@@ -17,16 +18,10 @@
     "react-router": "^7.12.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@biomejs/biome": "^2.4.8",
     "@types/node": "^18.19.130",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.48.0"
+    "typescript": "^5.9.3"
   }
 }

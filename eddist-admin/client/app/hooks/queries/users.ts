@@ -1,9 +1,6 @@
-import {
-  useMutation,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
-import type { paths } from "~/openapi/schema";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_USER_SEARCH = "/users/search/";
@@ -27,9 +24,7 @@ const UPDATE_USER_STATUS = "/users/{user_id}/status/";
 
 export const useUpdateUserStatus = () => {
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_USER_STATUS]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_USER_STATUS]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_USER_STATUS, {
         params: args.params,
         body: args.body,

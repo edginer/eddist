@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Alert,
   Badge,
@@ -17,14 +23,8 @@ import {
   TableRow,
   TextInput,
 } from "flowbite-react";
-import {
-  type ColumnDef,
-  type SortingState,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { listAuthedTokens, useDeleteAuthedToken } from "~/hooks/queries";
 import client from "~/openapi/client";
 import type { components } from "~/openapi/schema";
@@ -87,9 +87,7 @@ const Page = () => {
   // Pagination & sorting
   const [page, setPage] = useState(1);
   const [perPage] = useState(50);
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "created_at", desc: true },
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
 
   // Detail modal
   const [selectedToken, setSelectedToken] = useState<AuthedToken | null>(null);
@@ -121,13 +119,7 @@ const Page = () => {
     if (validityFilter !== "") filters.validity = validityFilter === "true";
     setAppliedFilters(filters);
     setPage(1);
-  }, [
-    originIpFilter,
-    writingUaFilter,
-    authedUaFilter,
-    asnNumFilter,
-    validityFilter,
-  ]);
+  }, [originIpFilter, writingUaFilter, authedUaFilter, asnNumFilter, validityFilter]);
 
   const handleRevokeToken = useCallback(() => {
     if (!selectedToken?.id) return;
@@ -160,9 +152,7 @@ const Page = () => {
         size: 120,
         enableSorting: false,
         cell: (info) => (
-          <span className="font-mono text-xs">
-            {(info.getValue() as string).slice(0, 8)}...
-          </span>
+          <span className="font-mono text-xs">{(info.getValue() as string).slice(0, 8)}...</span>
         ),
       },
       {
@@ -170,9 +160,7 @@ const Page = () => {
         header: "Origin IP",
         size: 140,
         enableSorting: false,
-        cell: (info) => (
-          <span className="font-mono text-xs">{info.getValue() as string}</span>
-        ),
+        cell: (info) => <span className="font-mono text-xs">{info.getValue() as string}</span>,
       },
       {
         accessorKey: "asn_num",
@@ -359,19 +347,12 @@ const Page = () => {
                 {headerGroup.headers.map((header) => (
                   <TableHeadCell
                     key={header.id}
-                    className={
-                      header.column.getCanSort()
-                        ? "cursor-pointer select-none"
-                        : ""
-                    }
+                    className={header.column.getCanSort() ? "cursor-pointer select-none" : ""}
                     onClick={header.column.getToggleSortingHandler()}
                     style={{ width: header.getSize() }}
                   >
                     <div className="flex items-center gap-1">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
+                      {flexRender(header.column.columnDef.header, header.getContext())}
                       {{
                         asc: " \u2191",
                         desc: " \u2193",
@@ -385,20 +366,14 @@ const Page = () => {
           <TableBody className="divide-y">
             {virtualizer.getVirtualItems().length === 0 && !isLoading && (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="text-center py-8 text-gray-500"
-                >
+                <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
                   No tokens found.
                 </TableCell>
               </TableRow>
             )}
             {isLoading && (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="text-center py-8 text-gray-500"
-                >
+                <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
                   Loading...
                 </TableCell>
               </TableRow>
@@ -424,10 +399,7 @@ const Page = () => {
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -439,8 +411,7 @@ const Page = () => {
                 <td
                   style={{
                     height:
-                      virtualizer.getTotalSize() -
-                      (virtualizer.getVirtualItems().at(-1)?.end ?? 0),
+                      virtualizer.getTotalSize() - (virtualizer.getVirtualItems().at(-1)?.end ?? 0),
                   }}
                   colSpan={columns.length}
                 />
@@ -493,10 +464,7 @@ const Page = () => {
           <div className="flex items-center gap-3">
             <span>Token Details</span>
             {selectedToken && (
-              <Badge
-                color={selectedToken.validity ? "success" : "failure"}
-                size="sm"
-              >
+              <Badge color={selectedToken.validity ? "success" : "failure"} size="sm">
                 {selectedToken.validity ? "Valid" : "Revoked"}
               </Badge>
             )}
@@ -517,29 +485,19 @@ const Page = () => {
                   </h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Token
-                      </dt>
-                      <dd className="font-mono text-sm break-all">
-                        {selectedToken.token}
-                      </dd>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Token</dt>
+                      <dd className="font-mono text-sm break-all">{selectedToken.token}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Created At
-                      </dt>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Created At</dt>
                       <dd>{formatDateTime(selectedToken.created_at)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Authed At
-                      </dt>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Authed At</dt>
                       <dd>{formatDateTime(selectedToken.authed_at)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Last Wrote At
-                      </dt>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Last Wrote At</dt>
                       <dd>{formatDateTime(selectedToken.last_wrote_at)}</dd>
                     </div>
                   </dl>
@@ -552,26 +510,18 @@ const Page = () => {
                   </h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Origin IP
-                      </dt>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Origin IP</dt>
                       <dd className="font-mono">{selectedToken.origin_ip}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500 dark:text-gray-400">
                         Reduced Origin IP
                       </dt>
-                      <dd className="font-mono">
-                        {selectedToken.reduced_origin_ip}
-                      </dd>
+                      <dd className="font-mono">{selectedToken.reduced_origin_ip}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        ASN Number
-                      </dt>
-                      <dd className="font-mono">
-                        {selectedToken.asn_num ?? "N/A"}
-                      </dd>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">ASN Number</dt>
+                      <dd className="font-mono">{selectedToken.asn_num ?? "N/A"}</dd>
                     </div>
                   </dl>
                 </div>
@@ -583,20 +533,12 @@ const Page = () => {
                   </h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Writing UA
-                      </dt>
-                      <dd className="text-sm break-all">
-                        {selectedToken.writing_ua}
-                      </dd>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Writing UA</dt>
+                      <dd className="text-sm break-all">{selectedToken.writing_ua}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Authed UA
-                      </dt>
-                      <dd className="text-sm break-all">
-                        {selectedToken.authed_ua ?? "N/A"}
-                      </dd>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Authed UA</dt>
+                      <dd className="text-sm break-all">{selectedToken.authed_ua ?? "N/A"}</dd>
                     </div>
                   </dl>
                 </div>
@@ -610,9 +552,7 @@ const Page = () => {
                     <div>
                       <button
                         type="button"
-                        onClick={() =>
-                          setShowAdditionalInfo(!showAdditionalInfo)
-                        }
+                        onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
                         className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                       >
                         <svg
@@ -622,6 +562,7 @@ const Page = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
+                          aria-hidden="true"
                         >
                           <path
                             strokeLinecap="round"
@@ -634,11 +575,7 @@ const Page = () => {
                       </button>
                       {showAdditionalInfo && (
                         <pre className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm overflow-auto max-h-64">
-                          {JSON.stringify(
-                            selectedToken.additional_info,
-                            null,
-                            2,
-                          )}
+                          {JSON.stringify(selectedToken.additional_info, null, 2)}
                         </pre>
                       )}
                     </div>

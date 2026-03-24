@@ -8,12 +8,12 @@ import {
   TableHeadCell,
   TableRow,
 } from "flowbite-react";
-import { useCrudModalState } from "~/hooks/useCrudModalState";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
 import CreateCapModal from "~/components/CreateCapModal";
 import EditCapModal from "~/components/EditCapModal";
 import { getCaps, useDeleteCap } from "~/hooks/queries";
+import { useCrudModalState } from "~/hooks/useCrudModalState";
 import { formatDateTime } from "~/utils/format";
 
 export interface Cap {
@@ -34,7 +34,9 @@ const CapPage = () => {
     <>
       <CreateCapModal
         open={modal.isCreateOpen}
-        setOpen={(v) => { if (!v) modal.closeCreate(); }}
+        setOpen={(v) => {
+          if (!v) modal.closeCreate();
+        }}
         refetch={refetch}
       />
 
@@ -42,7 +44,9 @@ const CapPage = () => {
         <EditCapModal
           open={modal.isEditOpen}
           selectedCap={modal.editingItem}
-          setOpen={(v) => { if (!v) modal.closeEdit(); }}
+          setOpen={(v) => {
+            if (!v) modal.closeEdit();
+          }}
           refetch={refetch}
         />
       )}
@@ -51,6 +55,7 @@ const CapPage = () => {
         <div className="flex">
           <h1 className="text-3xl font-bold grow">Caps</h1>
           <button
+            type="button"
             className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
             onClick={() => modal.openCreate()}
           >

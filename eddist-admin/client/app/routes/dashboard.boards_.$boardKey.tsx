@@ -1,12 +1,10 @@
-import ThreadList from "../components/ThreadList";
+import { Suspense } from "react";
 import { Link, useParams } from "react-router";
+import BoardSetting from "~/components/BoardSetting";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
+import ThreadList from "../components/ThreadList";
 import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
-import BoardSetting from "~/components/BoardSetting";
-import { Suspense } from "react";
-
-type TabKeys = "threads" | "settings";
 
 const ArchivedThreadsTabContent = ({
   boardKey,
@@ -26,7 +24,7 @@ const ArchivedThreadsTabContent = ({
   return (
     <ThreadList
       threads={
-        archivedThreads!.map((x) => ({
+        archivedThreads?.map((x) => ({
           threadNumber: Number(x.thread_number),
           title: x.title,
           responseCount: Number(x.response_count),
@@ -66,14 +64,11 @@ const Page = () => {
     <div className="p-4">
       <h1 className="text-3xl font-bold">Threads: {params.boardKey}</h1>
       <Breadcrumb>
-        <Link
-          to="/dashboard/boards"
-          className="text-gray-500 hover:text-gray-700"
-        >
+        <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
           Boards
         </Link>
         <span className="text-gray-500" aria-current="page">
-          Threads: {board!.name} ({params.boardKey})
+          Threads: {board?.name} ({params.boardKey})
         </span>
       </Breadcrumb>
       <Tab
@@ -86,17 +81,17 @@ const Page = () => {
               <div className="p-2">
                 <ThreadList
                   threads={
-                    threads!.map((x) => ({
+                    threads?.map((x) => ({
                       threadNumber: Number(x.thread_number),
                       title: x.title,
                       responseCount: Number(x.response_count),
                       lastModified: x.last_modified,
-                      boardId: Number(board!.id),
+                      boardId: Number(board?.id),
                     })) ?? []
                   }
                   board={{
                     boardKey: params.boardKey,
-                    boardName: board!.name,
+                    boardName: board?.name ?? "",
                   }}
                 />
               </div>
@@ -111,8 +106,8 @@ const Page = () => {
                 <Suspense fallback={<div>Loading...</div>}>
                   <ArchivedThreadsTabContent
                     boardKey={params.boardKey}
-                    boardId={Number(board!.id)}
-                    boardName={board!.name}
+                    boardId={Number(board?.id)}
+                    boardName={board?.name ?? ""}
                   />
                 </Suspense>
               </div>
@@ -122,7 +117,7 @@ const Page = () => {
             tabKey: "settings",
             tabLabel: "Settings",
             id: "settings-tab",
-            children: <BoardSetting board={board!} refetchBoard={refetch} />,
+            children: board ? <BoardSetting board={board} refetchBoard={refetch} /> : null,
           },
         ]}
       />

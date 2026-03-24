@@ -1,20 +1,14 @@
-import { Link, useParams } from "react-router";
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-} from "flowbite-react";
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
 import { useState } from "react";
+import { Link, useParams } from "react-router";
 import Breadcrumb from "~/components/Breadcrumb";
 import DatArchiveResponseList from "~/components/DatArchiveResponseList";
 import {
   getDatAdminArchivedThread,
   getDatArcvhiedThread,
-  useUpdateDatArchivedResponse,
-  useDeleteDatArchivedResponse,
   useDeleteAuthedToken,
+  useDeleteDatArchivedResponse,
+  useUpdateDatArchivedResponse,
 } from "~/hooks/queries";
 
 const Page = () => {
@@ -26,7 +20,7 @@ const Page = () => {
   const archivedThread = getDatArcvhiedThread({
     params: {
       path: {
-        board_key: params.boardKey,
+        board_key: params.boardKey ?? "",
         thread_number: Number(params.threadId),
       },
     },
@@ -35,19 +29,15 @@ const Page = () => {
   const adminArchivedThread = getDatAdminArchivedThread({
     params: {
       path: {
-        board_key: params.boardKey,
+        board_key: params.boardKey ?? "",
         thread_number: Number(params.threadId),
       },
     },
   });
   const thread = adminArchivedThread.data;
 
-  const [selectedResponsesOrder, setSelectedResponsesOrder] = useState<
-    number[]
-  >([]);
-  const [onEditResponseOrder, setOnEditResponseOrder] = useState<
-    number | undefined
-  >();
+  const [selectedResponsesOrder, setSelectedResponsesOrder] = useState<number[]>([]);
+  const [onEditResponseOrder, setOnEditResponseOrder] = useState<number | undefined>();
 
   const [editRespState, setEditRespState] = useState<
     | {
@@ -65,10 +55,7 @@ const Page = () => {
 
   return (
     <>
-      <Modal
-        show={onEditResponseOrder != null}
-        onClose={() => setOnEditResponseOrder(undefined)}
-      >
+      <Modal show={onEditResponseOrder != null} onClose={() => setOnEditResponseOrder(undefined)}>
         <ModalHeader>Edit Response</ModalHeader>
         <ModalBody>
           <div className="flex flex-row">
@@ -141,7 +128,7 @@ const Page = () => {
                   {
                     params: {
                       path: {
-                        board_key: params.boardKey!!,
+                        board_key: params.boardKey ?? "",
                         thread_number: Number(params.threadId),
                       },
                     },
@@ -150,7 +137,7 @@ const Page = () => {
                         author_name: editRespState.author_name,
                         email: editRespState.email,
                         body: editRespState.body,
-                        res_order: onEditResponseOrder!!,
+                        res_order: onEditResponseOrder ?? 0,
                       },
                     ],
                   },
@@ -171,13 +158,10 @@ const Page = () => {
 
       <div className="p-4">
         <h1 className="text-3xl font-bold">
-          Thread: {thread!.title} ({params.threadId})
+          Thread: {thread?.title} ({params.threadId})
         </h1>
         <Breadcrumb>
-          <Link
-            to="/dashboard/boards"
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
             Boards
           </Link>
           <Link
@@ -190,7 +174,7 @@ const Page = () => {
             to={`/dashboard/boards/${params.boardKey}/archives/${params.threadId}`}
             className="text-gray-500 hover:text-gray-700"
           >
-            {adminArchivedThread!!.data!!.title}
+            {adminArchivedThread?.data?.title}
           </Link>
           <span className="text-gray-500" aria-current="page">
             (dat archive)
@@ -198,7 +182,7 @@ const Page = () => {
         </Breadcrumb>
         <DatArchiveResponseList
           responses={archivedThread.data?.responses}
-          adminResponses={adminArchivedThread.data?.responses!!}
+          adminResponses={adminArchivedThread.data?.responses ?? []}
           selectedResponsesOrder={selectedResponsesOrder}
           setSelectedResponsesOrder={setSelectedResponsesOrder}
           onClickDeleteAuthedToken={(token) =>
@@ -210,9 +194,9 @@ const Page = () => {
           onClickEditResponse={(idx) => {
             setOnEditResponseOrder(idx);
             setEditRespState({
-              author_name: adminArchivedThread.data?.responses[idx].name!!,
-              body: adminArchivedThread.data?.responses[idx].body!!,
-              email: adminArchivedThread.data?.responses[idx].mail!!,
+              author_name: adminArchivedThread.data?.responses[idx].name ?? "",
+              body: adminArchivedThread.data?.responses[idx].body ?? "",
+              email: adminArchivedThread.data?.responses[idx].mail ?? "",
               res_order: idx,
             });
           }}
@@ -220,7 +204,7 @@ const Page = () => {
             deleteDatResponseMutation.mutate({
               params: {
                 path: {
-                  board_key: params.boardKey!!,
+                  board_key: params.boardKey ?? "",
                   thread_number: Number(params.threadId),
                   res_order: idx,
                 },

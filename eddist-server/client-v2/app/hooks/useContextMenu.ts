@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 interface ContextMenuState {
   x: number;
@@ -31,7 +31,7 @@ export const useContextMenu = () => {
       e.stopPropagation();
       openMenu(e.clientX, e.clientY);
     },
-    [openMenu]
+    [openMenu],
   );
 
   // Mobile: long-press handlers
@@ -58,7 +58,7 @@ export const useContextMenu = () => {
         }
       }, 500);
     },
-    [openMenu]
+    [openMenu],
   );
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {

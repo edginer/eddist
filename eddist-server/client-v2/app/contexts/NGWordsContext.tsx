@@ -1,14 +1,14 @@
 import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
   type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
-import type { Thread } from "~/api-client/thread_list";
 import type { Response } from "~/api-client/thread";
+import type { Thread } from "~/api-client/thread_list";
 
 const STORAGE_KEY = "eddist:ng-words:config";
 const DEBOUNCE_DELAY = 300;
@@ -49,11 +49,7 @@ interface FilterResult {
 interface NGWordsContextValue {
   config: NGWordsConfig;
   addRule: (category: NGCategory, rule: Omit<NGRule, "id">) => void;
-  updateRule: (
-    category: NGCategory,
-    ruleId: string,
-    updates: Partial<Omit<NGRule, "id">>
-  ) => void;
+  updateRule: (category: NGCategory, ruleId: string, updates: Partial<Omit<NGRule, "id">>) => void;
   removeRule: (category: NGCategory, ruleId: string) => void;
   toggleRule: (category: NGCategory, ruleId: string) => void;
   clearAllRules: () => void;
@@ -92,7 +88,7 @@ const CATEGORY_MAP: Record<NGCategory, CategoryConfig> = {
 const updateRulesByCategory = (
   prev: NGWordsConfig,
   category: NGCategory,
-  transform: (rules: NGRule[]) => NGRule[]
+  transform: (rules: NGRule[]) => NGRule[],
 ): NGWordsConfig => {
   const { scope, field } = CATEGORY_MAP[category];
   const scopeConfig = prev[scope];
@@ -101,9 +97,7 @@ const updateRulesByCategory = (
     ...prev,
     [scope]: {
       ...scopeConfig,
-      [field]: transform(
-        scopeConfig[field as keyof typeof scopeConfig] as NGRule[]
-      ),
+      [field]: transform(scopeConfig[field as keyof typeof scopeConfig] as NGRule[]),
     },
   };
 };
@@ -163,10 +157,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
           isExternalUpdateRef.current = true;
           setConfig(newConfig);
         } catch (error) {
-          console.error(
-            "[NGWordsProvider] Failed to parse storage change:",
-            error
-          );
+          console.error("[NGWordsProvider] Failed to parse storage change:", error);
         }
       }
     };
@@ -206,55 +197,42 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
   }, [config]);
 
   // Clear regex cache when config changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: config is intentionally watched to trigger cache clear on change
   useEffect(() => {
     regexCache.current.clear();
   }, [config]);
 
-  const addRule = useCallback(
-    (category: NGCategory, rule: Omit<NGRule, "id">) => {
-      const newRule: NGRule = {
-        ...rule,
-        id:
-          isBrowser && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random()}`,
-      };
+  const addRule = useCallback((category: NGCategory, rule: Omit<NGRule, "id">) => {
+    const newRule: NGRule = {
+      ...rule,
+      id: isBrowser && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    };
 
-      setConfig((prev) =>
-        updateRulesByCategory(prev, category, (rules) => [...rules, newRule])
-      );
-    },
-    []
-  );
+    setConfig((prev) => updateRulesByCategory(prev, category, (rules) => [...rules, newRule]));
+  }, []);
 
   const updateRule = useCallback(
-    (
-      category: NGCategory,
-      ruleId: string,
-      updates: Partial<Omit<NGRule, "id">>
-    ) => {
+    (category: NGCategory, ruleId: string, updates: Partial<Omit<NGRule, "id">>) => {
       setConfig((prev) =>
         updateRulesByCategory(prev, category, (rules) =>
-          rules.map((r) => (r.id === ruleId ? { ...r, ...updates } : r))
-        )
+          rules.map((r) => (r.id === ruleId ? { ...r, ...updates } : r)),
+        ),
       );
     },
-    []
+    [],
   );
 
   const removeRule = useCallback((category: NGCategory, ruleId: string) => {
     setConfig((prev) =>
-      updateRulesByCategory(prev, category, (rules) =>
-        rules.filter((r) => r.id !== ruleId)
-      )
+      updateRulesByCategory(prev, category, (rules) => rules.filter((r) => r.id !== ruleId)),
     );
   }, []);
 
   const toggleRule = useCallback((category: NGCategory, ruleId: string) => {
     setConfig((prev) =>
       updateRulesByCategory(prev, category, (rules) =>
-        rules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r))
-      )
+        rules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r)),
+      ),
     );
   }, []);
 
@@ -309,7 +287,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
 
       return false;
     },
-    [config, matchesRule]
+    [config, matchesRule],
   );
 
   const shouldFilterResponse = useCallback(
@@ -353,7 +331,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
         hideMode: null,
       };
     },
-    [config, matchesRule]
+    [config, matchesRule],
   );
 
   const value: NGWordsContextValue = {
@@ -367,9 +345,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
     shouldFilterResponse,
   };
 
-  return (
-    <NGWordsContext.Provider value={value}>{children}</NGWordsContext.Provider>
-  );
+  return <NGWordsContext.Provider value={value}>{children}</NGWordsContext.Provider>;
 };
 
 export const useNGWords = (): NGWordsContextValue => {

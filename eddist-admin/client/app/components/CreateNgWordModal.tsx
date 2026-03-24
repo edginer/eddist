@@ -1,11 +1,4 @@
-import {
-  Button,
-  Label,
-  Modal,
-  ModalBody,
-  ModalHeader,
-  TextInput,
-} from "flowbite-react";
+import { Button, Label, Modal, ModalBody, ModalHeader, TextInput } from "flowbite-react";
 import { useForm } from "react-hook-form";
 import { useCreateNgWord } from "~/hooks/queries";
 
@@ -15,11 +8,7 @@ interface CreateNgWordModalProps {
   refetch: () => Promise<unknown>;
 }
 
-const CreateNgWordModal = ({
-  setOpen,
-  refetch,
-  open,
-}: CreateNgWordModalProps) => {
+const CreateNgWordModal = ({ setOpen, refetch, open }: CreateNgWordModalProps) => {
   const { register, handleSubmit } = useForm();
 
   const createNgWordMutation = useCreateNgWord();

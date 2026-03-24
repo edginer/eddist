@@ -1,12 +1,7 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 
 const LIST_AUTHED_TOKENS = "/authed_tokens";
 
@@ -31,10 +26,7 @@ const DELETE_AUTHED_TOKEN = "/authed_tokens/{authed_token_id}/";
 export const useDeleteAuthedToken = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (args: {
-      authedTokenId: string;
-      usingOriginIp: boolean;
-    }) => {
+    mutationFn: async (args: { authedTokenId: string; usingOriginIp: boolean }) => {
       await client.DELETE(DELETE_AUTHED_TOKEN, {
         params: {
           path: { authed_token_id: args.authedTokenId },

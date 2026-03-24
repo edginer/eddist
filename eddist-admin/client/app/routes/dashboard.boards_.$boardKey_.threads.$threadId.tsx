@@ -1,16 +1,10 @@
-import { useState, useCallback } from "react";
-import ResponseList from "../components/ResponseList";
-import { Link, useParams } from "react-router";
-import Breadcrumb from "../components/Breadcrumb";
 import clsx from "clsx";
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-} from "flowbite-react";
-import { getResponses, getThread, useUpdateResponse, useDeleteAuthedToken } from "~/hooks/queries";
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
+import { useCallback, useState } from "react";
+import { Link, useParams } from "react-router";
+import { getResponses, getThread, useDeleteAuthedToken, useUpdateResponse } from "~/hooks/queries";
+import Breadcrumb from "../components/Breadcrumb";
+import ResponseList from "../components/ResponseList";
 
 export interface ResInput {
   author_name?: string;
@@ -56,9 +50,7 @@ const Page = () => {
     throw new Error("Page not found");
   }
 
-  const [selectedEditingRes, setSelectedEditingRes] = useState<
-    ResInput | undefined
-  >(undefined);
+  const [selectedEditingRes, setSelectedEditingRes] = useState<ResInput | undefined>(undefined);
   const [selectedResponses, setSelectedResponses] = useState<ResInput[]>([]);
   const [showingFloatingDetail, setShowingFloatingDetail] = useState(false);
 
@@ -87,8 +79,8 @@ const Page = () => {
       updateResponseMutation.mutate({
         params: {
           path: {
-            board_key: params.boardKey!,
-            thread_id: Number(params.threadId!),
+            board_key: params.boardKey ?? "",
+            thread_id: Number(params.threadId ?? ""),
             res_id: resId,
           },
         },
@@ -105,10 +97,7 @@ const Page = () => {
 
   return (
     <>
-      <Modal
-        show={selectedEditingRes != null}
-        onClose={() => setSelectedEditingRes(undefined)}
-      >
+      <Modal show={selectedEditingRes != null} onClose={() => setSelectedEditingRes(undefined)}>
         <ModalHeader>Edit Response</ModalHeader>
         <ModalBody>
           <div className="flex flex-row">
@@ -175,7 +164,9 @@ const Page = () => {
           </Button>
           <Button
             onClick={() => {
-              updateResp(selectedEditingRes!!, selectedEditingRes?.id ?? "");
+              if (selectedEditingRes) {
+                updateResp(selectedEditingRes, selectedEditingRes.id ?? "");
+              }
               setSelectedEditingRes(undefined);
             }}
           >
@@ -185,13 +176,10 @@ const Page = () => {
       </Modal>
       <div className="p-4">
         <h1 className="text-3xl font-bold">
-          Thread: {thread!.title} ({thread!.thread_number})
+          Thread: {thread?.title} ({thread?.thread_number})
         </h1>
         <Breadcrumb>
-          <Link
-            to="/dashboard/boards"
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
             Boards
           </Link>
           <Link
@@ -201,12 +189,12 @@ const Page = () => {
             {params.boardKey}
           </Link>
           <span className="text-gray-500" aria-current="page">
-            {thread!.title}
+            {thread?.title}
           </span>
         </Breadcrumb>
         <ResponseList
           onClickAbon={async (responseId) => {
-            const res = responses!.find((res) => res.id === responseId);
+            const res = responses?.find((res) => res.id === responseId);
             console.log(res?.id, responseId);
             if (res) {
               const abonedRes = {
@@ -225,13 +213,13 @@ const Page = () => {
           onClickEditResponse={(response) => {
             setSelectedEditingRes(response);
           }}
-          responses={responses!.filter((r) => r != null) ?? []}
+          responses={responses?.filter((r) => r != null) ?? []}
           {...{ selectedResponses, setSelectedResponses }}
         />
       </div>
       <div className="fixed bottom-8 right-8 z-10">
         <div className={clsx(showingFloatingDetail ? "block" : "hidden")}>
-          <button>
+          <button type="button">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -240,11 +228,12 @@ const Page = () => {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              aria-hidden="true"
             >
               <path d="M3 6h18M6 6v-.01M9 6v-.01M12 6v-.01M15 6v-.01M18 6v-.01M6 6a2 2 0 012-2h8a2 2 0 012 2v.01M16 10v6a2 2 0 01-2 2H10a2 2 0 01-2-2v-6M14 3v-.01M10 3v-.01" />
             </svg>
           </button>
-          <button>
+          <button type="button">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -254,16 +243,11 @@ const Page = () => {
               strokeLinecap="round"
               strokeLinejoin="round"
               className="feather feather-trash-2"
+              aria-hidden="true"
             >
               <path d="M3 6h18M16 10v6a2 2 0 01-2 2H10a2 2 0 01-2-2v-6M5 6h14l-1.5 12A2 2 0 0115.5 20h-7a2 2 0 01-1.96-1.56L5 6z"></path>
               <rect x="15" y="15" width="6" height="6" rx="1"></rect>
-              <text
-                x="19"
-                y="20"
-                fontSize="10"
-                textAnchor="middle"
-                fill="currentColor"
-              >
+              <text x="19" y="20" fontSize="10" textAnchor="middle" fill="currentColor">
                 ALL
               </text>
               <rect
@@ -280,6 +264,7 @@ const Page = () => {
           </button>
         </div>
         <button
+          type="button"
           className="rounded-full shadow-xl border-2 border-gray-200 bg-blue-500 hover:bg-blue-700 w-14 h-14 items-center flex justify-center"
           onClick={() => setShowingFloatingDetail(!showingFloatingDetail)}
         >
@@ -292,6 +277,7 @@ const Page = () => {
               stroke="currentColor"
               width="24"
               height="24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -309,6 +295,7 @@ const Page = () => {
               stroke="currentColor"
               width="24"
               height="24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"

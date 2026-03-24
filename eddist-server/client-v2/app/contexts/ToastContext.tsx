@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
 import { Toast } from "flowbite-react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { HiCheck, HiX } from "react-icons/hi";
 
 type ToastType = "success" | "error";

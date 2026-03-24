@@ -1,12 +1,4 @@
-import {
-  Button,
-  Label,
-  Modal,
-  ModalBody,
-  ModalHeader,
-  TextInput,
-} from "flowbite-react";
-import React from "react";
+import { Button, Label, Modal, ModalBody, ModalHeader, TextInput } from "flowbite-react";
 import { useForm } from "react-hook-form";
 import { useCreateCap } from "~/hooks/queries";
 

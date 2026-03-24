@@ -1,11 +1,7 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const GET_BOARDS = "/boards/";
@@ -130,11 +126,7 @@ export const getArchivedThread = ({
 }: UseQueryOptions<paths[typeof GET_ARCHIVED_THREAD]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
-    queryKey: [
-      GET_ARCHIVED_THREAD,
-      params.path.board_key,
-      params.path.thread_id,
-    ],
+    queryKey: [GET_ARCHIVED_THREAD, params.path.board_key, params.path.thread_id],
     queryFn: async ({ signal }) => {
       const { data } = await client.GET(GET_ARCHIVED_THREAD, {
         params,
@@ -164,8 +156,7 @@ export const getResponses = ({
   });
 };
 
-const GET_ARCHIVED_RESPONSES =
-  "/boards/{board_key}/archives/{thread_id}/responses/";
+const GET_ARCHIVED_RESPONSES = "/boards/{board_key}/archives/{thread_id}/responses/";
 
 export const getArchivedResponses = ({
   params,
@@ -173,11 +164,7 @@ export const getArchivedResponses = ({
 }: UseQueryOptions<paths[typeof GET_ARCHIVED_RESPONSES]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
-    queryKey: [
-      GET_ARCHIVED_RESPONSES,
-      params.path.board_key,
-      params.path.thread_id,
-    ],
+    queryKey: [GET_ARCHIVED_RESPONSES, params.path.board_key, params.path.thread_id],
     queryFn: async ({ signal }) => {
       const { data } = await client.GET(GET_ARCHIVED_RESPONSES, {
         params,
@@ -188,8 +175,7 @@ export const getArchivedResponses = ({
   });
 };
 
-const GET_DAT_ARCHIVED_THREAD =
-  "/boards/{board_key}/dat-archives/{thread_number}/";
+const GET_DAT_ARCHIVED_THREAD = "/boards/{board_key}/dat-archives/{thread_number}/";
 
 export const getDatArcvhiedThread = ({
   params,
@@ -197,11 +183,7 @@ export const getDatArcvhiedThread = ({
 }: UseQueryOptions<paths[typeof GET_DAT_ARCHIVED_THREAD]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
-    queryKey: [
-      GET_DAT_ARCHIVED_THREAD,
-      params.path.board_key,
-      params.path.thread_number,
-    ],
+    queryKey: [GET_DAT_ARCHIVED_THREAD, params.path.board_key, params.path.thread_number],
     queryFn: async ({ signal }) => {
       const { data } = await client.GET(GET_DAT_ARCHIVED_THREAD, {
         params,
@@ -212,8 +194,7 @@ export const getDatArcvhiedThread = ({
   });
 };
 
-const GET_DAT_ADMIN_ARCHIVED_THREAD =
-  "/boards/{board_key}/admin-dat-archives/{thread_number}/";
+const GET_DAT_ADMIN_ARCHIVED_THREAD = "/boards/{board_key}/admin-dat-archives/{thread_number}/";
 
 export const getDatAdminArchivedThread = ({
   params,
@@ -221,11 +202,7 @@ export const getDatAdminArchivedThread = ({
 }: UseQueryOptions<paths[typeof GET_DAT_ADMIN_ARCHIVED_THREAD]["get"]>) => {
   return useSuspenseQuery({
     ...reactQuery,
-    queryKey: [
-      GET_DAT_ADMIN_ARCHIVED_THREAD,
-      params.path.board_key,
-      params.path.thread_number,
-    ],
+    queryKey: [GET_DAT_ADMIN_ARCHIVED_THREAD, params.path.board_key, params.path.thread_number],
     queryFn: async ({ signal }) => {
       const { data } = await client.GET(GET_DAT_ADMIN_ARCHIVED_THREAD, {
         params,
@@ -243,9 +220,7 @@ const UPDATE_BOARD = "/boards/{board_key}/";
 export const useUpdateBoard = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_BOARD]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_BOARD]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_BOARD, {
         params: args.params,
         body: args.body,
@@ -267,9 +242,7 @@ const CREATE_BOARD = "/boards/";
 export const useCreateBoard = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof CREATE_BOARD]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof CREATE_BOARD]["post"]>) => {
       const { data } = await client.POST(CREATE_BOARD, {
         body: args.body,
       });
@@ -283,15 +256,12 @@ export const useCreateBoard = () => {
   });
 };
 
-const UPDATE_RESPONSE =
-  "/boards/{board_key}/threads/{thread_id}/responses/{res_id}/";
+const UPDATE_RESPONSE = "/boards/{board_key}/threads/{thread_id}/responses/{res_id}/";
 
 export const useUpdateResponse = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof UPDATE_RESPONSE]["patch"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof UPDATE_RESPONSE]["patch"]>) => {
       const { data } = await client.PATCH(UPDATE_RESPONSE, {
         params: args.params,
         body: args.body,
@@ -306,16 +276,13 @@ export const useUpdateResponse = () => {
   });
 };
 
-const UPDATE_DAT_ARCHIVED_RESPONSE =
-  "/boards/{board_key}/dat-archives/{thread_number}/responses/";
+const UPDATE_DAT_ARCHIVED_RESPONSE = "/boards/{board_key}/dat-archives/{thread_number}/responses/";
 
 export const useUpdateDatArchivedResponse = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      args: UseQueryOptions<
-        paths[typeof UPDATE_DAT_ARCHIVED_RESPONSE]["patch"]
-      >,
+      args: UseQueryOptions<paths[typeof UPDATE_DAT_ARCHIVED_RESPONSE]["patch"]>,
     ) => {
       const { data } = await client.PATCH(UPDATE_DAT_ARCHIVED_RESPONSE, {
         params: args.params,
@@ -343,9 +310,7 @@ export const useDeleteDatArchivedResponse = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      args: UseQueryOptions<
-        paths[typeof DELETE_DAT_ARCHIVED_RESPONSE]["delete"]
-      >,
+      args: UseQueryOptions<paths[typeof DELETE_DAT_ARCHIVED_RESPONSE]["delete"]>,
     ) => {
       const { data } = await client.DELETE(DELETE_DAT_ARCHIVED_RESPONSE, {
         params: args.params,
@@ -365,8 +330,7 @@ export const useDeleteDatArchivedResponse = () => {
   });
 };
 
-const DELETE_DAT_ARCHIVED_THREAD =
-  "/boards/{board_key}/dat-archives/{thread_number}/";
+const DELETE_DAT_ARCHIVED_THREAD = "/boards/{board_key}/dat-archives/{thread_number}/";
 
 export const useDeleteDatArchivedThread = () => {
   const queryClient = useQueryClient();
@@ -397,9 +361,7 @@ const COMPACT_THREAD = "/boards/{board_key}/threads-compaction/";
 export const useCompactThread = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof COMPACT_THREAD]["post"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof COMPACT_THREAD]["post"]>) => {
       const { data } = await client.POST(COMPACT_THREAD, {
         params: args.params,
         body: args.body,

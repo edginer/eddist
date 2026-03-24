@@ -1,14 +1,13 @@
-import type { Route } from "./+types/TermsPage";
 import { fetchTerms } from "~/api-client/terms";
 import { parseMarkdown } from "~/utils/markdown";
+import type { Route } from "./+types/TermsPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const terms = await fetchTerms({ baseUrl });
 

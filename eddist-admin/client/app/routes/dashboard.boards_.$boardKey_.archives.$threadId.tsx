@@ -1,11 +1,7 @@
-import ResponseList from "../components/ResponseList";
 import { Link, useParams } from "react-router";
+import { getArchivedResponses, getArchivedThread, useDeleteAuthedToken } from "~/hooks/queries";
 import Breadcrumb from "../components/Breadcrumb";
-import {
-  getArchivedResponses,
-  getArchivedThread,
-  useDeleteAuthedToken,
-} from "~/hooks/queries";
+import ResponseList from "../components/ResponseList";
 
 const Page = () => {
   const params = useParams();
@@ -33,45 +29,40 @@ const Page = () => {
   const deleteAuthedTokenMutation = useDeleteAuthedToken();
 
   return (
-    <>
-      <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          Thread: {thread!.title} ({thread!.thread_number})
-        </h1>
-        <div className="flex justify-between">
-          <Breadcrumb>
-            <Link
-              to="/dashboard/boards"
-              className="text-gray-500 hover:text-gray-700"
-            >
-              Boards
-            </Link>
-            <Link
-              to={`/dashboard/boards/${params.boardKey}`}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              {params.boardKey}
-            </Link>
-            <span className="text-gray-500" aria-current="page">
-              {thread!.title}
-            </span>
-          </Breadcrumb>
-          <Link className="my-2 mr-4 underline underline-offset-1" to={"./dat"}>
-            Go to archive dat page
+    <div className="p-4">
+      <h1 className="text-3xl font-bold">
+        Thread: {thread?.title} ({thread?.thread_number})
+      </h1>
+      <div className="flex justify-between">
+        <Breadcrumb>
+          <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
+            Boards
           </Link>
-        </div>
-
-        <ResponseList
-          onClickDeleteAuthedToken={(token) => {
-            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: false });
-          }}
-          onClickDeleteAuthedTokensAssociatedWithIp={(token) => {
-            deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: true });
-          }}
-          responses={responses!.filter((r) => r != null) ?? []}
-        />
+          <Link
+            to={`/dashboard/boards/${params.boardKey}`}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            {params.boardKey}
+          </Link>
+          <span className="text-gray-500" aria-current="page">
+            {thread?.title}
+          </span>
+        </Breadcrumb>
+        <Link className="my-2 mr-4 underline underline-offset-1" to={"./dat"}>
+          Go to archive dat page
+        </Link>
       </div>
-    </>
+
+      <ResponseList
+        onClickDeleteAuthedToken={(token) => {
+          deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: false });
+        }}
+        onClickDeleteAuthedTokensAssociatedWithIp={(token) => {
+          deleteAuthedTokenMutation.mutate({ authedTokenId: token, usingOriginIp: true });
+        }}
+        responses={responses?.filter((r) => r != null) ?? []}
+      />
+    </div>
   );
 };
 

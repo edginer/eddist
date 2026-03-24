@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNGWords, type NGCategory } from "~/contexts/NGWordsContext";
+import { type NGCategory, useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
 
 interface NGContextMenuProps {
@@ -20,13 +20,7 @@ interface NGContextMenuProps {
   }[];
 }
 
-export const NGContextMenu = ({
-  x,
-  y,
-  onClose,
-  options,
-  actions = [],
-}: NGContextMenuProps) => {
+export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { addRule } = useNGWords();
   const { showToast } = useToast();
@@ -34,7 +28,7 @@ export const NGContextMenu = ({
   // Truncate long text for display
   const truncateText = (text: string, maxLength: number = 100): string => {
     if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + "...";
+    return `${text.slice(0, maxLength)}...`;
   };
 
   // Build flat menu items
@@ -45,8 +39,7 @@ export const NGContextMenu = ({
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
           description: "NGに追加 (折りたたむ)",
-          onClick: () =>
-            handleAddToNG(option.value, option.category, "collapsed"),
+          onClick: () => handleAddToNG(option.value, option.category, "collapsed"),
         },
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
@@ -60,8 +53,7 @@ export const NGContextMenu = ({
         {
           label: `${option.label}: ${truncateText(option.value, 30)}`,
           description: "NGに追加",
-          onClick: () =>
-            handleAddToNG(option.value, option.category, undefined),
+          onClick: () => handleAddToNG(option.value, option.category, undefined),
         },
       ];
     }
@@ -152,23 +144,21 @@ export const NGContextMenu = ({
         top: `${adjustedPosition.y}px`,
       }}
     >
-      {actions.map((action, idx) =>
+      {actions.map((action) =>
         action.href ? (
           <a
-            key={`action-${idx}`}
+            key={action.label}
             href={action.href}
             target={action.target}
             rel={action.target === "_blank" ? "noopener noreferrer" : undefined}
             onClick={onClose}
             className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900 dark:text-gray-100">
-              {action.label}
-            </div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">{action.label}</div>
           </a>
         ) : (
           <button
-            key={`action-${idx}`}
+            key={action.label}
             type="button"
             onClick={() => {
               action.onClick?.();
@@ -176,15 +166,13 @@ export const NGContextMenu = ({
             }}
             className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center border-b border-gray-100 dark:border-gray-600"
           >
-            <div className="text-sm text-gray-900 dark:text-gray-100">
-              {action.label}
-            </div>
+            <div className="text-sm text-gray-900 dark:text-gray-100">{action.label}</div>
           </button>
         ),
       )}
-      {menuItems.map((item, idx) => (
+      {menuItems.map((item) => (
         <button
-          key={idx}
+          key={item.label}
           type="button"
           onClick={item.onClick}
           className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between border-b border-gray-100 dark:border-gray-600 last:border-b-0"
@@ -193,9 +181,7 @@ export const NGContextMenu = ({
             <div className="text-sm text-gray-900 dark:text-gray-100 wrap-break-word">
               {item.label}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {item.description}
-            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</div>
           </div>
         </button>
       ))}

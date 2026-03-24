@@ -1,15 +1,14 @@
 import { Link, useSearchParams } from "react-router";
+import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
 import { Footer } from "~/components/Footer";
 import type { Route } from "./+types/NoticeListPage";
-import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
 });
 
 export const loader = async ({ context, request }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "0", 10);
@@ -49,10 +48,7 @@ function NoticeListPage({ loaderData }: Route.ComponentProps) {
         <section className="py-4 pt-8">
           <ul className="space-y-4">
             {noticeData.notices.map((notice: NoticeListItem) => (
-              <li
-                key={notice.slug}
-                className="border-b border-gray-300 dark:border-gray-700 pb-4"
-              >
+              <li key={notice.slug} className="border-b border-gray-300 dark:border-gray-700 pb-4">
                 <Link
                   to={`/notices/${notice.slug}`}
                   className="text-blue-500 text-xl hover:underline"

@@ -1,26 +1,18 @@
 import { Button } from "flowbite-react";
-import { useMemo, useState, useRef, lazy, Suspense } from "react";
-import {
-  FaArrowLeft,
-  FaCog,
-  FaPen,
-  FaSort,
-  FaSortDown,
-  FaSortUp,
-  FaSync,
-} from "react-icons/fa";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
 import { Link, useParams } from "react-router";
-import { twMerge } from "tailwind-merge";
 import useSWR from "swr";
-import { NGContextMenu } from "../components/NGContextMenu";
-import type { Route } from "./+types/ThreadListPage";
-import { fetchBoards, type Board } from "~/api-client/board";
+import { twMerge } from "tailwind-merge";
+import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
+import { NGContextMenu } from "../components/NGContextMenu";
+import type { Route } from "./+types/ThreadListPage";
 
 const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
 const LazyNGWordsSettingsModal = lazy(() =>
@@ -68,11 +60,10 @@ const calculateThreadSpeed = (
 };
 
 export const loader = async ({ params, context }: Route.LoaderArgs) => {
-  const baseUrl =
-    context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+  const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const [threadList, boards, clientConfig] = await Promise.all([
-    fetchThreadList(params.boardKey!, { baseUrl }),
+    fetchThreadList(params.boardKey ?? "", { baseUrl }),
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
@@ -98,13 +89,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
   };
 };
 
-const Meta = ({
-  bbsName,
-  boardName,
-}: {
-  bbsName: string;
-  boardName: string;
-}) => (
+const Meta = ({ bbsName, boardName }: { bbsName: string; boardName: string }) => (
   <>
     <title>{`${boardName} - ${bbsName}`}</title>
     <meta property="og:title" content={`${bbsName} | ${boardName}`} />
@@ -121,7 +106,7 @@ const ThreadListPage = ({
 
   const { data: threadList, mutate } = useSWR(
     `${params.boardKey}/subject.txt`,
-    () => fetchThreadList(params.boardKey!),
+    () => fetchThreadList(params.boardKey ?? ""),
     {
       fallbackData: data,
       revalidateOnMount: false,
@@ -139,12 +124,8 @@ const ThreadListPage = ({
 
   const { shouldFilterThread } = useNGWords();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
-  const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(
-    null,
-  );
-  const [selectedTitleText, setSelectedTitleText] = useState<string | null>(
-    null,
-  );
+  const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(null);
+  const [selectedTitleText, setSelectedTitleText] = useState<string | null>(null);
   const capturedSelectionRef = useRef<string | null>(null);
 
   const handleRefresh = async () => {
@@ -217,9 +198,7 @@ const ThreadListPage = ({
         <div
           className="fixed top-16 left-0 right-0 z-40 flex justify-center items-center transition-all duration-200"
           style={{
-            paddingTop: isPullRefreshing
-              ? "16px"
-              : `${Math.min(pullDistance / 2, 40)}px`,
+            paddingTop: isPullRefreshing ? "16px" : `${Math.min(pullDistance / 2, 40)}px`,
           }}
         >
           <div
@@ -232,10 +211,7 @@ const ThreadListPage = ({
             }}
           >
             <FaSync
-              className={twMerge(
-                "text-blue-600 text-lg",
-                isPullRefreshing && "animate-spin",
-              )}
+              className={twMerge("text-blue-600 text-lg", isPullRefreshing && "animate-spin")}
             />
           </div>
         </div>
@@ -249,10 +225,8 @@ const ThreadListPage = ({
         <Meta
           bbsName={eddistData.bbsName}
           boardName={
-            boards?.find(
-              (board: { board_key: string }) =>
-                board.board_key === params.boardKey,
-            )?.name ?? "スレッド一覧"
+            boards?.find((board: { board_key: string }) => board.board_key === params.boardKey)
+              ?.name ?? "スレッド一覧"
           }
         />
         <Link to="/">
@@ -260,10 +234,8 @@ const ThreadListPage = ({
         </Link>
         <h1 className="text-2xl lg:text-4xl grow truncate">
           {
-            boards?.find(
-              (board: { board_key: string }) =>
-                board.board_key === params.boardKey,
-            )?.name
+            boards?.find((board: { board_key: string }) => board.board_key === params.boardKey)
+              ?.name
           }
         </h1>
         <button
@@ -274,10 +246,7 @@ const ThreadListPage = ({
           title="更新"
         >
           <FaSync
-            className={twMerge(
-              "w-4 h-4",
-              (isRefreshing || isPullRefreshing) && "animate-spin",
-            )}
+            className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
         <button
@@ -321,10 +290,7 @@ const ThreadListPage = ({
             hasEverOpenedThread.current = true;
             setCreatingThread(true);
           }}
-          className={twMerge(
-            "px-4 py-2 lg:px-6 lg:py-3 mx-2",
-            params.boardKey || "hidden",
-          )}
+          className={twMerge("px-4 py-2 lg:px-6 lg:py-3 mx-2", params.boardKey || "hidden")}
         >
           <FaPen className="lg:mr-3" />
           <span className="lg:block hidden">スレッド作成</span>
@@ -332,10 +298,7 @@ const ThreadListPage = ({
 
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal
-              open={showNGSettings}
-              setOpen={setShowNGSettings}
-            />
+            <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
           </Suspense>
         )}
       </header>
@@ -343,7 +306,7 @@ const ThreadListPage = ({
       {hasEverOpenedThread.current && (
         <Suspense fallback={null}>
           <LazyPostThreadModal
-            boardKey={params.boardKey!}
+            boardKey={params.boardKey ?? ""}
             open={creatingThread}
             setOpen={setCreatingThread}
             refetchThreadList={mutate}
@@ -364,8 +327,7 @@ const ThreadListPage = ({
             )}
           >
             <span>更新日時</span>
-            {sortKey === "lastUpdated" &&
-              (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
+            {sortKey === "lastUpdated" && (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
             {sortKey !== "lastUpdated" && <FaSort className="opacity-30" />}
           </button>
           <button
@@ -379,8 +341,7 @@ const ThreadListPage = ({
             )}
           >
             <span>レス数</span>
-            {sortKey === "responseCount" &&
-              (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
+            {sortKey === "responseCount" && (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
             {sortKey !== "responseCount" && <FaSort className="opacity-30" />}
           </button>
           <button
@@ -394,8 +355,7 @@ const ThreadListPage = ({
             )}
           >
             <span>勢い</span>
-            {sortKey === "speed" &&
-              (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
+            {sortKey === "speed" && (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
             {sortKey !== "speed" && <FaSort className="opacity-30" />}
           </button>
           <button
@@ -409,8 +369,7 @@ const ThreadListPage = ({
             )}
           >
             <span>作成日時</span>
-            {sortKey === "creationTime" &&
-              (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
+            {sortKey === "creationTime" && (sortOrder === "asc" ? <FaSortUp /> : <FaSortDown />)}
             {sortKey !== "creationTime" && <FaSort className="opacity-30" />}
           </button>
           {sortKey && (
@@ -443,9 +402,7 @@ const ThreadListPage = ({
                 // Capture selection before it gets cleared by right-click
                 if (e.button === 2) {
                   // Right mouse button
-                  capturedSelectionRef.current = getSelectedTextInElement(
-                    e.currentTarget,
-                  );
+                  capturedSelectionRef.current = getSelectedTextInElement(e.currentTarget);
                 }
               }}
               onContextMenu={(e) => {
@@ -466,6 +423,7 @@ const ThreadListPage = ({
               <div>
                 <span
                   className="break-all"
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread title rendered as HTML
                   dangerouslySetInnerHTML={{
                     __html: thread.title,
                   }}
@@ -476,11 +434,7 @@ const ThreadListPage = ({
                 <span>{convertLinuxTimeToDateString(thread.id)}</span>
                 {thread.authorId && <span>ID:{thread.authorId}</span>}
                 <span className="text-blue-600 font-semibold">
-                  {calculateThreadSpeed(
-                    thread.id,
-                    thread.responseCount,
-                    currentTime,
-                  )}
+                  {calculateThreadSpeed(thread.id, thread.responseCount, currentTime)}
                   /day
                 </span>
               </div>
@@ -503,9 +457,7 @@ const ThreadListPage = ({
           ]}
           options={[
             {
-              label: selectedTitleText
-                ? "選択したテキスト"
-                : "スレッドタイトル",
+              label: selectedTitleText ? "選択したテキスト" : "スレッドタイトル",
               value: selectedTitleText || contextMenuThread.title,
               category: "thread.titles",
             },

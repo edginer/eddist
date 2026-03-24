@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -31,9 +24,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     const initial: Theme =
-      stored === "light" || stored === "dark" || stored === "system"
-        ? stored
-        : "system";
+      stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
     setThemeState(initial);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const dark = computeDark(initial, mq.matches);
@@ -55,10 +46,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
     localStorage.setItem(STORAGE_KEY, next);
-    const dark = computeDark(
-      next,
-      window.matchMedia("(prefers-color-scheme: dark)").matches,
-    );
+    const dark = computeDark(next, window.matchMedia("(prefers-color-scheme: dark)").matches);
     setIsDark(dark);
     document.documentElement.classList.toggle("dark", dark);
   }, []);

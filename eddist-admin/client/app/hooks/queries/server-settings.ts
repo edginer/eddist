@@ -1,11 +1,7 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import type { paths } from "~/openapi/schema";
 import client from "~/openapi/client";
+import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
 const SERVER_SETTINGS = "/server-settings/";
@@ -25,9 +21,7 @@ export const getServerSettings = () => {
 export const useUpsertServerSetting = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      args: UseQueryOptions<paths[typeof SERVER_SETTINGS]["put"]>,
-    ) => {
+    mutationFn: async (args: UseQueryOptions<paths[typeof SERVER_SETTINGS]["put"]>) => {
       const { data } = await client.PUT(SERVER_SETTINGS, {
         body: args.body,
       });
@@ -37,7 +31,7 @@ export const useUpsertServerSetting = () => {
       queryClient.invalidateQueries({ queryKey: [SERVER_SETTINGS] });
       toast.success("Server setting saved successfully");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error?.message || "Failed to save server setting";
       toast.error(message);
     },

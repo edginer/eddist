@@ -1,17 +1,9 @@
-import {
-  Button,
-  Label,
-  Modal,
-  ModalBody,
-  ModalHeader,
-  Textarea,
-  TextInput,
-} from "flowbite-react";
+import { Button, Label, Modal, ModalBody, ModalHeader, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
-import ErrorModal from "./ErrorModal";
-import AuthCodeModal from "./AuthCodeModal";
-import { postThread } from "./utils";
 import { useForm } from "react-hook-form";
+import AuthCodeModal from "./AuthCodeModal";
+import ErrorModal from "./ErrorModal";
+import { postThread } from "./utils";
 
 interface PostThreadModalProps {
   open: boolean;
@@ -88,21 +80,13 @@ const PostThreadModal = (props: PostThreadModalProps) => {
                 <div className="mb-2 block">
                   <Label htmlFor="modal-name">名前</Label>
                 </div>
-                <TextInput
-                  id="modal-name"
-                  placeholder="名前..."
-                  {...register("name")}
-                />
+                <TextInput id="modal-name" placeholder="名前..." {...register("name")} />
               </div>
               <div className="grow ml-2">
                 <div className="mb-2 block">
                   <Label htmlFor="modal-email">メール</Label>
                 </div>
-                <TextInput
-                  id="modal-email"
-                  placeholder="メール..."
-                  {...register("mail")}
-                />
+                <TextInput id="modal-email" placeholder="メール..." {...register("mail")} />
               </div>
             </div>
             <div>

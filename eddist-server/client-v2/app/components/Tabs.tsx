@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { twMerge } from "tailwind-merge";
 
 export interface Tab {
@@ -43,10 +43,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
   return (
     <div className="dark:text-gray-100">
       {/* Tab headers */}
-      <div
-        className="flex border-b border-gray-300 dark:border-gray-600"
-        role="tablist"
-      >
+      <div className="flex border-b border-gray-300 dark:border-gray-600" role="tablist">
         {tabs.map((tab, index) => {
           const isActive = activeTab === tab.id;
           return (
