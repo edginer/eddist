@@ -447,8 +447,9 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                       {processPostName(post.name)}
                     </span>{" "}
                     {post.date}{" "}
-                    <button
-                      type="button"
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: clickable author ID, styled span not a button */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: clickable author ID, styled span not a button */}
+                    <span
                       onClick={(e) =>
                         openPopup(e, posts.authorIdMap.get(post.authorId)?.map(([, i]) => i) ?? [])
                       }
@@ -479,7 +480,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                           {posts.authorIdMap.get(post.authorId)?.length})
                         </span>
                       )}
-                    </button>
+                    </span>
                   </div>
                   <div
                     className="text-gray-800 dark:text-gray-200 mt-2 wrap-break-word"
@@ -528,8 +529,9 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
               >
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {p.id}. {p.name} {p.date}{" "}
-                  <button
-                    type="button"
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: clickable author ID, styled span not a button */}
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: clickable author ID, styled span not a button */}
+                  <span
                     onClick={(e) =>
                       openPopup(e, posts.authorIdMap.get(p.authorId)?.map(([, i]) => i) ?? [])
                     }
@@ -544,7 +546,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
                         ({p.authorIdAppearBeforeCount}/{posts.authorIdMap.get(p.authorId)?.length})
                       </span>
                     )}
-                  </button>
+                  </span>
                 </div>
                 <div className="text-gray-800 dark:text-gray-200 mt-1 wrap-break-word">
                   {processPostBody(p.bodyParts, openPopup)}
@@ -622,8 +624,9 @@ const constructReferredNum = (
   refs: number[],
   popup: (e: React.MouseEvent, indices: number[]) => void,
 ) => (
-  <button
-    type="button"
+  // biome-ignore lint/a11y/noStaticElementInteractions: clickable ref count, styled span not a button
+  // biome-ignore lint/a11y/useKeyWithClickEvents: clickable ref count, styled span not a button
+  <span
     onClick={(e) =>
       popup(
         e,
@@ -633,7 +636,7 @@ const constructReferredNum = (
     className="text-blue-400 hover:text-blue-600 cursor-pointer"
   >
     (+{refs.length})
-  </button>
+  </span>
 );
 
 const processPostBody = (
@@ -643,14 +646,15 @@ const processPostBody = (
   <span>
     {bodyParts.map((part, i) =>
       part.isMatch ? (
-        <button
-          type="button"
+        // biome-ignore lint/a11y/noStaticElementInteractions: anchor link span, not a button
+        // biome-ignore lint/a11y/useKeyWithClickEvents: anchor link span, not a button
+        <span
           key={i}
           className="text-blue-400 hover:text-blue-600 cursor-pointer"
           onClick={(e) => popup(e, [parseInt(part.text.slice(2), 10) - 1])}
         >
           {part.text}
-        </button>
+        </span>
       ) : (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body HTML content
         <span key={i} dangerouslySetInnerHTML={{ __html: part.text }}></span>

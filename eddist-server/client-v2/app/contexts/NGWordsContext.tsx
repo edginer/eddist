@@ -197,9 +197,10 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
   }, [config]);
 
   // Clear regex cache when config changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: config is intentionally watched to trigger cache clear on change
   useEffect(() => {
     regexCache.current.clear();
-  }, []);
+  }, [config]);
 
   const addRule = useCallback((category: NGCategory, rule: Omit<NGRule, "id">) => {
     const newRule: NGRule = {

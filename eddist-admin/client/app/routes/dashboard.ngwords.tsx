@@ -103,7 +103,7 @@ const NgWords = () => {
             })}
           >
             <div className="flex flex-col">
-              <input type="hidden" value={modal.editingItem?.id} />
+              <input type="hidden" {...register("id")} value={modal.editingItem?.id} />
               <Label>Name</Label>
               <TextInput
                 placeholder="Name..."

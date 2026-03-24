@@ -29,7 +29,12 @@ const Tab = <TKey extends string>({ tabItems, onSelectedTabChange }: Props<TKey>
   return (
     <div className="sm:px-4 pt-4">
       <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
-        <ul className="flex flex-wrap -mb-px text-sm font-medium text-center" id="default-tab">
+        <ul
+          className="flex flex-wrap -mb-px text-sm font-medium text-center"
+          id="default-tab"
+          // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: standard ARIA tablist pattern
+          role="tablist"
+        >
           {tabItems.map((tabItem) => {
             return (
               <li className="mr-2" role="presentation" key={tabItem.tabKey}>
