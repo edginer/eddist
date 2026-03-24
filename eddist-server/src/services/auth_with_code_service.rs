@@ -70,47 +70,33 @@ impl<T: BbsRepository, E: CreationEventRepository>
             counter!("auth_code_failure", "reason" => "rate_limited").increment(1);
             return Err(BbsPostAuthWithCodeError::RateLimited.into());
         }
-        let clients_responses = input
-            .captcha_like_configs
-            .iter()
-            .filter_map(|config| {
-                // Get the form field name from config
-                let form_field_name = &config.widget.form_field_name;
-
-                // Get the response for this captcha from the form data
-                let response = match input.responses.get(form_field_name) {
-                    Some(r) => r.clone(),
-                    None => {
-                        error_span!(
-                            "captcha response not found in form",
-                            provider = %config.provider,
-                            field = %form_field_name
-                        );
-                        return None;
-                    }
-                };
-
-                let provider_type = config.provider.to_lowercase();
-                Some((
-                    create_captcha_client(config),
-                    (response, input.origin_ip.clone()),
-                    provider_type,
-                ))
-            })
-            .collect::<Vec<_>>();
-        counter!("auth_code_request").increment(1);
-        if is_auth_token_pub_enabled() {
-            let event_repo = self.event_repo.clone();
-            let event = AuthTokenRequested {
-                origin_ip: input.origin_ip.clone(),
-                user_agent: input.user_agent.clone(),
-                asn_num: input.asn_num,
-                auth_code: input.code.clone(),
+        let mut clients_responses = Vec::new();
+        for config in &input.captcha_like_configs {
+            let form_field_name = &config.widget.form_field_name;
+            let response = match input.responses.get(form_field_name) {
+                Some(r) => r.clone(),
+                None => {
+                    counter!("auth_code_failure", "reason" => "missing_captcha_response")
+                        .increment(1);
+                    tracing::error!(
+                        provider = %config.provider,
+                        field = %form_field_name,
+                        "captcha response not found in form"
+                    );
+                    return Err(BbsPostAuthWithCodeError::CaptchaError(
+                        CaptchaLikeError::FailedToVerifyCaptcha,
+                    )
+                    .into());
+                }
             };
-            tokio::spawn(async move {
-                let _ = event_repo.publish_auth_token_requested(event).await;
-            });
+            let provider_type = config.provider.to_lowercase();
+            clients_responses.push((
+                create_captcha_client(config),
+                (response, input.origin_ip.clone()),
+                provider_type,
+            ));
         }
+        counter!("auth_code_request").increment(1);
 
         // Get all unauthed tokens with the auth code (non-IP checking)
         let candidate_tokens = self
@@ -123,6 +109,27 @@ impl<T: BbsRepository, E: CreationEventRepository>
             .into_iter()
             .filter(|token| token.authed_at.is_none()) // Only include tokens that are not yet authed
             .collect();
+
+        // Determine the token ID for event publishing (Some only when exactly one token found)
+        let event_token_id = if unauthed_tokens.len() == 1 {
+            Some(unauthed_tokens[0].id)
+        } else {
+            None
+        };
+
+        if is_auth_token_pub_enabled() {
+            let event_repo = self.event_repo.clone();
+            let event = AuthTokenRequested {
+                authed_token_id: event_token_id,
+                origin_ip: input.origin_ip.clone(),
+                user_agent: input.user_agent.clone(),
+                asn_num: input.asn_num,
+                auth_code: input.code.clone(),
+            };
+            tokio::spawn(async move {
+                let _ = event_repo.publish_auth_token_requested(event).await;
+            });
+        }
 
         // Handle auth_code collisions - if multiple unauthed tokens exist, delete them and return error
         if unauthed_tokens.len() > 1 {

@@ -39,12 +39,19 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         }
     }
 
-    fn publish_initiated(&self, origin_ip: String, user_agent: String, asn_num: u32) {
+    fn publish_initiated(
+        &self,
+        authed_token_id: uuid::Uuid,
+        origin_ip: String,
+        user_agent: String,
+        asn_num: u32,
+    ) {
         if is_auth_token_pub_enabled() {
             let event_repo = self.event_repo.clone();
             tokio::spawn(async move {
                 let _ = event_repo
                     .publish_auth_token_initiated(AuthTokenInitiated {
+                        authed_token_id,
                         origin_ip,
                         user_agent,
                         asn_num,
@@ -79,7 +86,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                 })
                 .await?;
             counter!("token_request", "state" => "created").increment(1);
-            self.publish_initiated(ip_addr, user_agent, asn_num as u32);
+            self.publish_initiated(authed_token.id, ip_addr, user_agent, asn_num as u32);
 
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
@@ -114,7 +121,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                     })
                     .await?;
                 counter!("token_request", "state" => "created").increment(1);
-                self.publish_initiated(ip_addr, user_agent, asn_num as u32);
+                self.publish_initiated(authed_token.id, ip_addr, user_agent, asn_num as u32);
 
                 return Err(BbsCgiError::Unauthenticated {
                     auth_code: authed_token.auth_code,

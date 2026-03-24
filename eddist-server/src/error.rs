@@ -242,6 +242,7 @@ impl From<InsufficientParamType> for BbsCgiError {
 pub enum InvalidParamType {
     Submit,
     Key,
+    Body,
 }
 
 impl Display for InvalidParamType {
@@ -252,6 +253,7 @@ impl Display for InvalidParamType {
             match self {
                 InvalidParamType::Key => "key",
                 InvalidParamType::Submit => "submit",
+                InvalidParamType::Body => "body",
             }
         )
     }

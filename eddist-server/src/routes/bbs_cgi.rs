@@ -28,7 +28,9 @@ pub async fn post_bbs_cgi(
     State(state): State<AppState>,
     body: String,
 ) -> Response {
-    let form = shift_jis_url_encodeded_body_to_vec(&body).unwrap();
+    let Ok(form) = shift_jis_url_encodeded_body_to_vec(&body) else {
+        return BbsCgiError::from(InvalidParamType::Body).into_response();
+    };
     let is_thread = {
         let Some(submit) = form.get("submit") else {
             return BbsCgiError::from(InsufficientParamType::Submit).into_response();
