@@ -15,7 +15,10 @@ pub struct GrecaptchaEnterpriseRequest {
     pub site_key: String,
     pub user_agent: String,
     pub user_ip_address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ja3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ja4: Option<String>,
     pub expected_action: String,
 }
 
@@ -32,15 +35,28 @@ pub struct GrecaptchaEnterpriseResponse {
 #[serde(rename_all = "camelCase")]
 pub struct GrecaptchaEnterpriseTokenProperties {
     pub valid: bool,
-    pub hostname: String,
-    pub action: String,
-    pub create_time: String,
+    /// Reason for invalidity when valid=false
+    #[serde(default)]
+    pub invalid_reason: Option<String>,
+    /// Hostname of the page where the token was generated (web keys only)
+    #[serde(default)]
+    pub hostname: Option<String>,
+    /// Action name provided at token generation
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default)]
+    pub create_time: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GrecaptchaEnterpriseRiskAnalysis {
     pub score: f64,
+    #[serde(default)]
     pub reasons: Vec<String>,
+    /// Extended verdict reasons (Enterprise tier only)
+    #[serde(default)]
+    pub extended_verdict_reasons: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

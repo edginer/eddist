@@ -415,6 +415,7 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             user_agent: String::new(),
             user_ip_address: ip_addr.to_string(),
             ja3: None,
+            ja4: None,
             expected_action: "SUBMIT".to_string(),
         };
 
@@ -455,8 +456,10 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             CaptchaLikeResult::Success
         } else {
             log::info!(
-                "reCAPTCHA Enterprise response: valid={valid}, score={score}, threshold={}",
-                self.score_threshold
+                "reCAPTCHA Enterprise response: valid={valid}, invalid_reason={:?}, score={score}, threshold={}, reasons={:?}",
+                resp.token_properties.invalid_reason,
+                self.score_threshold,
+                resp.risk_analysis.reasons,
             );
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
