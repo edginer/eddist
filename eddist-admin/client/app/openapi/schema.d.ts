@@ -674,7 +674,7 @@ export interface components {
             /** Format: double */
             score_threshold?: number | null;
             success_path?: string;
-            url: string;
+            url?: string | null;
         };
         /** @description Widget configuration for frontend rendering */
         CaptchaWidgetConfig: {

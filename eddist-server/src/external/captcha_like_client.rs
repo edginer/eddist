@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_URL,
-        GrecaptchaEnterpriseRequest, GrecaptchaEnterpriseResponse, HCAPTCHA_URL, HCaptchaResponse,
-        HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver, RequestFormat,
-        TURNSTILE_URL, TurnstileResponse,
+        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION,
+        GRECAPTCHA_ENTERPRISE_URL, GrecaptchaEnterpriseRequest, GrecaptchaEnterpriseResponse,
+        HCAPTCHA_URL, HCaptchaResponse, HttpMethod, MONOCLE_URL, MonocleResponse,
+        PlaceholderResolver, RequestFormat, TURNSTILE_URL, TurnstileResponse,
     },
     utils::SimpleSecret,
 };
@@ -403,6 +403,18 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
         response: &str,
         ip_addr: &str,
     ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
+        if self.project_id.is_empty() {
+            log::error!(
+                "reCAPTCHA Enterprise project_id is not configured for '{}'",
+                self.name
+            );
+            return Ok(CaptchaVerificationOutput {
+                result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                captured_data: None,
+                provider: self.name.clone(),
+            });
+        }
+
         let url = format!(
             "{}?key={}",
             GRECAPTCHA_ENTERPRISE_URL.replace("{PROJECT_ID}", &self.project_id),
@@ -416,7 +428,7 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             user_ip_address: ip_addr.to_string(),
             ja3: None,
             ja4: None,
-            expected_action: "SUBMIT".to_string(),
+            expected_action: GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION.to_string(),
         };
 
         let res = self
@@ -455,8 +467,8 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
         let result = if valid && score >= self.score_threshold {
             CaptchaLikeResult::Success
         } else {
-            log::info!(
-                "reCAPTCHA Enterprise response: valid={valid}, invalid_reason={:?}, score={score}, threshold={}, reasons={:?}",
+            log::debug!(
+                "reCAPTCHA Enterprise verification failed: valid={valid}, invalid_reason={:?}, score={score}, threshold={}, reasons={:?}",
                 resp.token_properties.invalid_reason,
                 self.score_threshold,
                 resp.risk_analysis.reasons,

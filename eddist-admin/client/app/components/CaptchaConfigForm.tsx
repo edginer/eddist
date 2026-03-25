@@ -253,7 +253,7 @@ const CaptchaConfigForm = (props: Props) => {
                     <Label>Verification URL</Label>
                     <TextInput
                       {...register("verification.url")}
-                      defaultValue={defaults?.verification?.url}
+                      defaultValue={defaults?.verification?.url ?? undefined}
                       placeholder="{{base_url}}/api/verify"
                     />
                   </div>

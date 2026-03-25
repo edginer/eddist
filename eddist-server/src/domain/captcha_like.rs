@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub const GRECAPTCHA_ENTERPRISE_URL: &str =
     "https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments";
+pub const GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION: &str = "SUBMIT";
 pub const TURNSTILE_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const HCAPTCHA_URL: &str = "https://api.hcaptcha.com/siteverify";
 pub const MONOCLE_URL: &str = "https://decrypt.mcl.spur.us/api/v1/assessment";
@@ -150,6 +151,8 @@ pub struct CaptchaWidgetMetadata {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CaptchaVerificationConfig {
     /// Verification API URL (supports {{base_url}}, {{site_key}} placeholders)
+    /// Not used by reCAPTCHA Enterprise (which derives its URL from project_id).
+    #[serde(default)]
     pub url: String,
     /// HTTP method (defaults to POST)
     #[serde(default)]

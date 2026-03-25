@@ -38,7 +38,9 @@ pub struct CaptchaWidgetConfig {
 /// Verification API configuration for custom providers
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
 pub struct CaptchaVerificationConfig {
-    pub url: String,
+    /// Not required for reCAPTCHA Enterprise (which derives its URL from project_id).
+    #[serde(default)]
+    pub url: Option<String>,
     #[serde(default)]
     pub method: HttpMethod,
     #[serde(default)]

@@ -67,6 +67,7 @@ fn get_default_widget_config(
 /// Verification config as stored in JSON
 #[derive(Debug, Clone, serde::Deserialize)]
 struct StoredVerificationConfig {
+    #[serde(default)]
     pub url: String,
     #[serde(default)]
     pub method: StoredHttpMethod,
