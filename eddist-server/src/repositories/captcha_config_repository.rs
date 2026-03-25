@@ -47,7 +47,7 @@ fn get_default_widget_config(
         }),
         "hcaptcha" => Some(CaptchaWidgetMetadata {
             form_field_name: "h-captcha-response".to_string(),
-            script_url: "https://js.hcaptcha.com/1/api.js".to_string(),
+            script_url: "https://js.hcaptcha.com/1/api.js?recaptchacompat=off".to_string(),
             widget_html: format!(
                 r#"<div class="h-captcha" data-sitekey="{}"></div>"#,
                 site_key
