@@ -1,16 +1,16 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, patch, post},
-    Json, Router,
 };
 use eddist_core::domain::res::ResView;
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::{Res, Thread, ThreadCompactionInput, UpdateResInput},
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

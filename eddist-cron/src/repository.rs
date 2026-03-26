@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use sqlx::{types::Json, MySqlPool};
+use sqlx::{MySqlPool, types::Json};
 use uuid::Uuid;
 
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};

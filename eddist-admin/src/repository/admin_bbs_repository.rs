@@ -1,6 +1,6 @@
 use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
-use sqlx::{types::Json, FromRow};
+use sqlx::{FromRow, types::Json};
 
 /// Shared selection types used by admin_board_repository, admin_thread_repository,
 /// and admin_response_repository.

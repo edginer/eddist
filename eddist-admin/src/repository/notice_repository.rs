@@ -1,6 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use eddist_core::domain::notice::Notice;
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]

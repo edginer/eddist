@@ -74,7 +74,7 @@ impl TestContext {
         println!("Redis is ready.");
 
         let app = eddist::create_test_app(pool.clone(), redis_conn);
-        let mut server = TestServer::new(app).expect("Failed to create test server");
+        let mut server = TestServer::new(app);
         server.add_header("CF-Connecting-IP", "localhost");
         server.add_header("X-ASN-Num", "1");
 

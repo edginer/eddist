@@ -1,4 +1,4 @@
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};

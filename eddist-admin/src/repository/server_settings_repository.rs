@@ -1,5 +1,5 @@
 use chrono::Utc;
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::server_settings::{ServerSetting, UpsertServerSettingInput};

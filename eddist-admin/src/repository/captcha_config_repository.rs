@@ -1,5 +1,5 @@
 use chrono::Utc;
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::{
@@ -9,11 +9,7 @@ use crate::models::{
 
 /// Convert empty strings to None (for storing NULL in database)
 fn empty_to_none(s: String) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
-    }
+    if s.is_empty() { None } else { Some(s) }
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]

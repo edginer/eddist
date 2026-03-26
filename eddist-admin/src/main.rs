@@ -5,13 +5,13 @@ use auth::{
     post_native_session,
 };
 use axum::{
+    Router, ServiceExt,
     body::Body,
     extract::{MatchedPath, Request},
     http::{HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router, ServiceExt,
 };
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use oauth2::{AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl, TokenUrl};
@@ -32,7 +32,7 @@ use s3::creds::Credentials;
 use time::Duration;
 use tokio::net::TcpListener;
 use tower_layer::Layer;
-use tower_sessions::{cookie::SameSite, Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer, cookie::SameSite};
 
 use tower_http::{
     normalize_path::NormalizePathLayer,

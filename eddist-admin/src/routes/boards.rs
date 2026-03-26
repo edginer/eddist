@@ -1,14 +1,14 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, patch, post},
-    Json, Router,
 };
 use eddist_core::domain::board::validate_board_key;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::{Board, BoardInfo, CreateBoardInput, EditBoardInput},
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

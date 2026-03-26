@@ -1,8 +1,8 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, patch, post},
-    Json, Router,
 };
 use eddist_core::domain::user_restriction::{
     CreateUserRestrictionRuleInput, UpdateUserRestrictionRuleInput, UserRestrictionRule,
@@ -10,13 +10,13 @@ use eddist_core::domain::user_restriction::{
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     auth::AdminEmail,
     error::ApiError,
     models::{
         Cap, CreateRestrictionRuleRequest, CreationCapInput, CreationNgWordInput, NgWord,
         UpdateCapInput, UpdateNgWordInput, UpdateRestrictionRuleRequest,
     },
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
-use rand::{Rng, distr::Alphanumeric};
+use rand::{RngExt, distr::Alphanumeric};
 use redis::{AsyncCommands, aio::ConnectionManager};
 use sqlx::MySql;
 use uuid::Uuid;

@@ -1,14 +1,14 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     routing::{get, patch},
-    Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::{User, UserSearchQuery, UserStatusUpdateInput},
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

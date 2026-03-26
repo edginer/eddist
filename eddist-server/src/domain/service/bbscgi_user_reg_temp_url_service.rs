@@ -1,4 +1,4 @@
-use rand::{Rng, distr::Uniform};
+use rand::{RngExt, distr::Uniform};
 use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{

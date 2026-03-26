@@ -1,6 +1,6 @@
 use base64::Engine;
-use chacha20poly1305::{aead::Aead, KeyInit};
-use sqlx::{query, query_as, MySqlPool};
+use chacha20poly1305::{KeyInit, aead::Aead};
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::idp::{CreateIdpInput, Idp, UpdateIdpInput};
