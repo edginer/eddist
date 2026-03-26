@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub const GRECAPTCHA_ENTERPRISE_URL: &str =
     "https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments";
+pub const GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION: &str = "SUBMIT";
 pub const TURNSTILE_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const HCAPTCHA_URL: &str = "https://api.hcaptcha.com/siteverify";
 pub const MONOCLE_URL: &str = "https://decrypt.mcl.spur.us/api/v1/assessment";
@@ -15,7 +16,10 @@ pub struct GrecaptchaEnterpriseRequest {
     pub site_key: String,
     pub user_agent: String,
     pub user_ip_address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ja3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ja4: Option<String>,
     pub expected_action: String,
 }
 
@@ -32,15 +36,28 @@ pub struct GrecaptchaEnterpriseResponse {
 #[serde(rename_all = "camelCase")]
 pub struct GrecaptchaEnterpriseTokenProperties {
     pub valid: bool,
-    pub hostname: String,
-    pub action: String,
-    pub create_time: String,
+    /// Reason for invalidity when valid=false
+    #[serde(default)]
+    pub invalid_reason: Option<String>,
+    /// Hostname of the page where the token was generated (web keys only)
+    #[serde(default)]
+    pub hostname: Option<String>,
+    /// Action name provided at token generation
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default)]
+    pub create_time: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GrecaptchaEnterpriseRiskAnalysis {
     pub score: f64,
+    #[serde(default)]
     pub reasons: Vec<String>,
+    /// Extended verdict reasons (Enterprise tier only)
+    #[serde(default)]
+    pub extended_verdict_reasons: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -134,7 +151,9 @@ pub struct CaptchaWidgetMetadata {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CaptchaVerificationConfig {
     /// Verification API URL (supports {{base_url}}, {{site_key}} placeholders)
-    pub url: String,
+    /// Not used by reCAPTCHA Enterprise (which derives its URL from project_id).
+    #[serde(default)]
+    pub url: Option<String>,
     /// HTTP method (defaults to POST)
     #[serde(default)]
     pub method: HttpMethod,
@@ -156,6 +175,13 @@ pub struct CaptchaVerificationConfig {
     /// Whether the success condition is negated
     #[serde(default)]
     pub negate_success: bool,
+    /// Score threshold for providers that return a risk score (e.g., reCAPTCHA Enterprise).
+    /// Defaults to 0.5 when None.
+    #[serde(default)]
+    pub score_threshold: Option<f64>,
+    /// Google Cloud project ID for reCAPTCHA Enterprise.
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 fn default_success_path() -> String {

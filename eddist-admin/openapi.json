@@ -2539,9 +2539,6 @@
       "CaptchaVerificationConfig": {
         "type": "object",
         "description": "Verification API configuration for custom providers",
-        "required": [
-          "url"
-        ],
         "properties": {
           "body_template": {
             "type": [
@@ -2567,14 +2564,30 @@
           "negate_success": {
             "type": "boolean"
           },
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "request_format": {
             "$ref": "#/components/schemas/RequestFormat"
+          },
+          "score_threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           },
           "success_path": {
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

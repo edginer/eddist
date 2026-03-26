@@ -9,7 +9,7 @@ type CreateCaptchaConfigInput =
 type UpdateCaptchaConfigInput =
   paths["/captcha-configs/{id}/"]["patch"]["requestBody"]["content"]["application/json"];
 
-const KNOWN_PROVIDERS = ["turnstile", "hcaptcha", "monocle", "custom"];
+const KNOWN_PROVIDERS = ["turnstile", "hcaptcha", "monocle", "recaptcha_enterprise", "custom"];
 const FIRST_CLASS_PROVIDERS = ["turnstile", "hcaptcha", "monocle"];
 
 type Props =
@@ -40,7 +40,8 @@ const CaptchaConfigForm = (props: Props) => {
     provider ? FIRST_CLASS_PROVIDERS.includes(provider) : false;
 
   const showWidgetConfig = !isFirstClassProvider(currentProvider);
-  const showVerificationConfig = currentProvider === "custom";
+  const showVerificationConfig =
+    currentProvider === "custom" || currentProvider === "recaptcha_enterprise";
 
   const transformCaptureFields = (captureFields: string | string[] | undefined) => {
     if (typeof captureFields === "string") {
@@ -222,86 +223,111 @@ const CaptchaConfigForm = (props: Props) => {
         {showVerificationConfig && (
           <div className="border-t pt-4 mt-2">
             <h3 className="font-semibold mb-2">Verification Configuration</h3>
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
+            {currentProvider === "recaptcha_enterprise" ? (
+              <div className="flex flex-col gap-4">
                 <div>
-                  <Label>Verification URL</Label>
+                  <Label>Google Cloud Project ID</Label>
                   <TextInput
-                    {...register("verification.url")}
-                    defaultValue={defaults?.verification?.url}
-                    placeholder="{{base_url}}/api/verify"
+                    {...register("verification.project_id")}
+                    defaultValue={defaults?.verification?.project_id ?? ""}
+                    placeholder="your-gcloud-project-id"
                   />
                 </div>
                 <div>
-                  <Label>Method</Label>
-                  <Select
-                    {...register("verification.method")}
-                    defaultValue={defaults?.verification?.method}
-                  >
-                    <option value="Post">POST</option>
-                    <option value="Get">GET</option>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Request Format</Label>
-                  <Select
-                    {...register("verification.request_format")}
-                    defaultValue={defaults?.verification?.request_format}
-                  >
-                    <option value="Form">Form</option>
-                    <option value="Json">JSON</option>
-                    <option value="PlainText">Plain Text</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Success Path</Label>
+                  <Label>Score Threshold (0.0–1.0, default 0.5)</Label>
                   <TextInput
-                    {...register("verification.success_path")}
-                    defaultValue={defaults?.verification?.success_path ?? "success"}
-                    placeholder="success"
+                    {...register("verification.score_threshold", { valueAsNumber: true })}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                    defaultValue={defaults?.verification?.score_threshold ?? 0.5}
+                    placeholder="0.5"
                   />
                 </div>
               </div>
-              <div>
-                <Label>Body Template (for PlainText)</Label>
-                <Textarea
-                  {...register("verification.body_template")}
-                  defaultValue={defaults?.verification?.body_template ?? ""}
-                  placeholder="{{response}}"
-                  rows={2}
-                />
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Verification URL</Label>
+                    <TextInput
+                      {...register("verification.url")}
+                      defaultValue={defaults?.verification?.url ?? undefined}
+                      placeholder="{{base_url}}/api/verify"
+                    />
+                  </div>
+                  <div>
+                    <Label>Method</Label>
+                    <Select
+                      {...register("verification.method")}
+                      defaultValue={defaults?.verification?.method}
+                    >
+                      <option value="Post">POST</option>
+                      <option value="Get">GET</option>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Request Format</Label>
+                    <Select
+                      {...register("verification.request_format")}
+                      defaultValue={defaults?.verification?.request_format}
+                    >
+                      <option value="Form">Form</option>
+                      <option value="Json">JSON</option>
+                      <option value="PlainText">Plain Text</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Success Path</Label>
+                    <TextInput
+                      {...register("verification.success_path")}
+                      defaultValue={defaults?.verification?.success_path ?? "success"}
+                      placeholder="success"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Body Template (for PlainText)</Label>
+                  <Textarea
+                    {...register("verification.body_template")}
+                    defaultValue={defaults?.verification?.body_template ?? ""}
+                    placeholder="{{response}}"
+                    rows={2}
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <Controller
+                    name="verification.include_ip"
+                    control={control}
+                    defaultValue={defaults?.verification?.include_ip ?? false}
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <Checkbox id="include_ip" checked={field.value} onChange={field.onChange} />
+                        <Label htmlFor="include_ip">Include IP</Label>
+                      </div>
+                    )}
+                  />
+                  <Controller
+                    name="verification.negate_success"
+                    control={control}
+                    defaultValue={defaults?.verification?.negate_success ?? false}
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="negate_success"
+                          checked={field.value}
+                          onChange={field.onChange}
+                        />
+                        <Label htmlFor="negate_success">Negate Success</Label>
+                      </div>
+                    )}
+                  />
+                </div>
               </div>
-              <div className="flex gap-4">
-                <Controller
-                  name="verification.include_ip"
-                  control={control}
-                  defaultValue={defaults?.verification?.include_ip ?? false}
-                  render={({ field }) => (
-                    <div className="flex items-center gap-2">
-                      <Checkbox id="include_ip" checked={field.value} onChange={field.onChange} />
-                      <Label htmlFor="include_ip">Include IP</Label>
-                    </div>
-                  )}
-                />
-                <Controller
-                  name="verification.negate_success"
-                  control={control}
-                  defaultValue={defaults?.verification?.negate_success ?? false}
-                  render={({ field }) => (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="negate_success"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                      <Label htmlFor="negate_success">Negate Success</Label>
-                    </div>
-                  )}
-                />
-              </div>
-            </div>
+            )}
           </div>
         )}
 

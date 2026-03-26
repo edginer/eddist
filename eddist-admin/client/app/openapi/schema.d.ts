@@ -669,9 +669,12 @@ export interface components {
             include_ip?: boolean;
             method?: components["schemas"]["HttpMethod"];
             negate_success?: boolean;
+            project_id?: string | null;
             request_format?: components["schemas"]["RequestFormat"];
+            /** Format: double */
+            score_threshold?: number | null;
             success_path?: string;
-            url: string;
+            url?: string | null;
         };
         /** @description Widget configuration for frontend rendering */
         CaptchaWidgetConfig: {

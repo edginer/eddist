@@ -47,7 +47,7 @@ fn get_default_widget_config(
         }),
         "hcaptcha" => Some(CaptchaWidgetMetadata {
             form_field_name: "h-captcha-response".to_string(),
-            script_url: "https://js.hcaptcha.com/1/api.js".to_string(),
+            script_url: "https://js.hcaptcha.com/1/api.js?recaptchacompat=off".to_string(),
             widget_html: format!(
                 r#"<div class="h-captcha" data-sitekey="{}"></div>"#,
                 site_key
@@ -67,7 +67,8 @@ fn get_default_widget_config(
 /// Verification config as stored in JSON
 #[derive(Debug, Clone, serde::Deserialize)]
 struct StoredVerificationConfig {
-    pub url: String,
+    #[serde(default)]
+    pub url: Option<String>,
     #[serde(default)]
     pub method: StoredHttpMethod,
     #[serde(default)]
@@ -81,6 +82,10 @@ struct StoredVerificationConfig {
     pub include_ip: bool,
     #[serde(default)]
     pub negate_success: bool,
+    #[serde(default)]
+    pub score_threshold: Option<f64>,
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 fn default_success_path() -> String {
@@ -132,6 +137,8 @@ impl From<StoredVerificationConfig> for CaptchaVerificationConfig {
             success_path: stored.success_path,
             include_ip: stored.include_ip,
             negate_success: stored.negate_success,
+            score_threshold: stored.score_threshold,
+            project_id: stored.project_id,
         }
     }
 }

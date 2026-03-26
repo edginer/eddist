@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     captcha_like::{
-        CaptchaProviderConfig, CaptchaVerificationConfig, HCAPTCHA_URL, HCaptchaResponse,
-        HttpMethod, MONOCLE_URL, MonocleResponse, PlaceholderResolver, RequestFormat,
-        TURNSTILE_URL, TurnstileResponse,
+        CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION,
+        GRECAPTCHA_ENTERPRISE_URL, GrecaptchaEnterpriseRequest, GrecaptchaEnterpriseResponse,
+        HCAPTCHA_URL, HCaptchaResponse, HttpMethod, MONOCLE_URL, MonocleResponse,
+        PlaceholderResolver, RequestFormat, TURNSTILE_URL, TurnstileResponse,
     },
     utils::SimpleSecret,
 };
@@ -45,6 +46,22 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
         "monocle" => Box::new(MonocleClient::new(
             name,
             config.secret.clone(),
+            config.capture_fields.clone(),
+        )),
+        "recaptcha_enterprise" => Box::new(RecaptchaEnterpriseClient::new(
+            name,
+            config.secret.clone(),
+            config.site_key.clone(),
+            config
+                .verification
+                .as_ref()
+                .and_then(|v| v.project_id.clone())
+                .unwrap_or_default(),
+            config
+                .verification
+                .as_ref()
+                .and_then(|v| v.score_threshold)
+                .unwrap_or(0.5),
             config.capture_fields.clone(),
         )),
         // For other providers, use the generic client
@@ -327,6 +344,146 @@ impl CaptchaClient for MonocleClient {
     }
 }
 
+pub struct RecaptchaEnterpriseClient {
+    name: String,
+    client: reqwest::Client,
+    api_key: SimpleSecret,
+    site_key: String,
+    project_id: String,
+    score_threshold: f64,
+    capture_fields: Vec<String>,
+}
+
+impl RecaptchaEnterpriseClient {
+    pub fn new(
+        name: String,
+        api_key: String,
+        site_key: String,
+        project_id: String,
+        score_threshold: f64,
+        capture_fields: Vec<String>,
+    ) -> Self {
+        Self {
+            name,
+            client: reqwest::Client::new(),
+            api_key: SimpleSecret::new(&api_key),
+            site_key,
+            project_id,
+            score_threshold,
+            capture_fields,
+        }
+    }
+
+    fn extract_captured_data(&self, resp: &serde_json::Value) -> Option<serde_json::Value> {
+        if self.capture_fields.is_empty() {
+            return None;
+        }
+
+        let mut captured = serde_json::Map::new();
+        for field in &self.capture_fields {
+            if let Ok(results) = resp.query(&format!("$.{field}")) {
+                if let Some(value) = results.first() {
+                    captured.insert(field.clone(), (*value).clone());
+                }
+            }
+        }
+
+        if captured.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(captured))
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl CaptchaClient for RecaptchaEnterpriseClient {
+    async fn verify_captcha(
+        &self,
+        response: &str,
+        ip_addr: &str,
+    ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
+        if self.project_id.is_empty() {
+            log::error!(
+                "reCAPTCHA Enterprise project_id is not configured for '{}'",
+                self.name
+            );
+            return Ok(CaptchaVerificationOutput {
+                result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                captured_data: None,
+                provider: self.name.clone(),
+            });
+        }
+
+        let url = format!(
+            "{}?key={}",
+            GRECAPTCHA_ENTERPRISE_URL.replace("{PROJECT_ID}", &self.project_id),
+            self.api_key.get()
+        );
+
+        let event = GrecaptchaEnterpriseRequest {
+            token: response.to_string(),
+            site_key: self.site_key.clone(),
+            user_agent: String::new(),
+            user_ip_address: ip_addr.to_string(),
+            ja3: None,
+            ja4: None,
+            expected_action: GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION.to_string(),
+        };
+
+        let res = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "event": event }))
+            .send()
+            .await
+            .map_err(CaptchaVerificationError::Request)?;
+
+        let response_text = res
+            .text()
+            .await
+            .map_err(CaptchaVerificationError::Request)?;
+
+        let resp: GrecaptchaEnterpriseResponse = match serde_json::from_str(&response_text) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "Failed to parse reCAPTCHA Enterprise response: {e}, body: {response_text}"
+                );
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data: None,
+                    provider: self.name.clone(),
+                });
+            }
+        };
+
+        let resp_json = serde_json::to_value(&resp).unwrap_or_default();
+        let captured_data = self.extract_captured_data(&resp_json);
+
+        let valid = resp.token_properties.valid;
+        let score = resp.risk_analysis.score;
+
+        let result = if valid && score >= self.score_threshold {
+            CaptchaLikeResult::Success
+        } else {
+            log::debug!(
+                "reCAPTCHA Enterprise verification failed: valid={valid}, invalid_reason={:?}, score={score}, threshold={}, reasons={:?}",
+                resp.token_properties.invalid_reason,
+                self.score_threshold,
+                resp.risk_analysis.reasons,
+            );
+            CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
+        };
+
+        Ok(CaptchaVerificationOutput {
+            result,
+            captured_data,
+            provider: self.name.clone(),
+        })
+    }
+}
+
 /// Generic captcha client that handles all providers via configuration
 pub struct GenericCaptchaClient {
     client: reqwest::Client,
@@ -397,9 +554,11 @@ impl CaptchaClient for GenericCaptchaClient {
         ip_addr: &str,
     ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
         let cfg = self.verification();
-        let url = self
-            .config
-            .resolve_placeholders(&cfg.url, response, ip_addr);
+        let url = self.config.resolve_placeholders(
+            cfg.url.as_deref().unwrap_or_default(),
+            response,
+            ip_addr,
+        );
 
         let mut req = match cfg.method {
             HttpMethod::Post => self.client.post(&url),
