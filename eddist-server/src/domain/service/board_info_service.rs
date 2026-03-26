@@ -51,10 +51,10 @@ impl<T: BbsRepository + Clone> BoardInfoService<T> {
 
         match cache.read() {
             Ok(cache) => {
-                if let Some(cache) = cache.get(&board_id) {
-                    if cache.expired_at() > chrono::Utc::now().timestamp() as u64 {
-                        return Ok(Some(cache.get().clone()));
-                    }
+                if let Some(cache) = cache.get(&board_id)
+                    && cache.expired_at() > chrono::Utc::now().timestamp() as u64
+                {
+                    return Ok(Some(cache.get().clone()));
                 }
             }
             Err(e) => return Err(anyhow::anyhow!("failed to read cache: {e:?}")),

@@ -39,6 +39,18 @@ impl From<AuthedTokenRow> for AuthedToken {
     }
 }
 
+pub struct ListAuthedTokensParams<'a> {
+    pub offset: u64,
+    pub limit: u32,
+    pub origin_ip: Option<&'a str>,
+    pub writing_ua: Option<&'a str>,
+    pub authed_ua: Option<&'a str>,
+    pub asn_num: Option<i32>,
+    pub validity: Option<bool>,
+    pub sort_column: &'a str,
+    pub sort_asc: bool,
+}
+
 #[async_trait::async_trait]
 pub trait AuthedTokenRepository: Send + Sync {
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken>;
@@ -46,15 +58,7 @@ pub trait AuthedTokenRepository: Send + Sync {
     async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<()>;
     async fn list_authed_tokens(
         &self,
-        offset: u64,
-        limit: u32,
-        origin_ip: Option<&str>,
-        writing_ua: Option<&str>,
-        authed_ua: Option<&str>,
-        asn_num: Option<i32>,
-        validity: Option<bool>,
-        sort_column: &str,
-        sort_asc: bool,
+        params: ListAuthedTokensParams<'_>,
     ) -> anyhow::Result<(Vec<AuthedToken>, u64)>;
 }
 
@@ -146,16 +150,19 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
 
     async fn list_authed_tokens(
         &self,
-        offset: u64,
-        limit: u32,
-        origin_ip: Option<&str>,
-        writing_ua: Option<&str>,
-        authed_ua: Option<&str>,
-        asn_num: Option<i32>,
-        validity: Option<bool>,
-        sort_column: &str,
-        sort_asc: bool,
+        params: ListAuthedTokensParams<'_>,
     ) -> anyhow::Result<(Vec<AuthedToken>, u64)> {
+        let ListAuthedTokensParams {
+            offset,
+            limit,
+            origin_ip,
+            writing_ua,
+            authed_ua,
+            asn_num,
+            validity,
+            sort_column,
+            sort_asc,
+        } = params;
         let mut count_builder: QueryBuilder<MySql> =
             QueryBuilder::new("SELECT COUNT(*) as cnt FROM authed_tokens WHERE 1=1");
         let mut data_builder: QueryBuilder<MySql> = QueryBuilder::new(

@@ -101,7 +101,7 @@ pub fn create_test_app(
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
 
-    let _ = refresh_server_settings_cache(&pool);
+    drop(refresh_server_settings_cache(&pool));
     start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
     start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
 
