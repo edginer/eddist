@@ -29,11 +29,9 @@
     "allowJs": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "~/*": [
-        "./app/*"
-      ]
+      "~/*": ["./app/*"],
+      ".flowbite-react/*": ["./.flowbite-react/*"]
     },
     "rootDirs": [
       ".",

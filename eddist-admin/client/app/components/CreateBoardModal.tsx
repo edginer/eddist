@@ -16,7 +16,6 @@ import {
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useCreateBoard } from "~/hooks/queries";
-import type { components } from "~/openapi/schema";
 
 interface CreateBoardModalProps {
   open: boolean;
@@ -76,7 +75,7 @@ const CreateBoardModal = ({ open, setOpen, refetch }: CreateBoardModalProps) => 
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<components["schemas"]["CreateBoardInput"]>({
+  } = useForm<z.infer<typeof boardCreationSchema>>({
     resolver: zodResolver(boardCreationSchema),
   });
 

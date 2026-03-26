@@ -1,3 +1,6 @@
 packages:
   - "eddist-server/client-v2"
   - "eddist-admin/client"
+
+settings:
+  minimumReleaseAge: 10080

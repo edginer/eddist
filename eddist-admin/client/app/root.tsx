@@ -4,7 +4,7 @@ import "./tailwind.css";
 import { Suspense, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import "react-toastify/ReactToastify.css";
 import { ThemeInit } from ".flowbite-react/init";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -57,7 +57,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={reactQueryClient}>
-      <ErrorBoundary fallbackRender={(p) => <div>Error: {p.error.message}</div>}>
+      <ErrorBoundary fallbackRender={(p) => <div>Error: {(p.error as Error).message}</div>}>
         <ThemeInit />
         <Suspense fallback={<Spinner size="xl" className="fixed inset-0 m-auto" />}>
           <Outlet />

@@ -84,7 +84,7 @@ const UserSearchPage = () => {
   };
 
   const handleToggleEnabled = async () => {
-    if (!userData || !userData.id) {
+    if (!userData?.id) {
       setActionMessage("No user selected to update");
       return;
     }

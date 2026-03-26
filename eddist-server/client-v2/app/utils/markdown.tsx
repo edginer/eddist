@@ -71,7 +71,7 @@ export function parseMarkdown(content: string): React.ReactNode[] {
       flushList();
       const level = headerMatch[1].length as 1 | 2 | 3 | 4 | 5 | 6;
       const text = headerMatch[2];
-      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+      const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
       elements.push(
         <Tag key={`h-${key++}`} className={headerStyles[level]}>
           {parseInline(text)}
