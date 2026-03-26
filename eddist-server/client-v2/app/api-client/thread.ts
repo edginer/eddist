@@ -127,7 +127,7 @@ const convertThreadTextToResponseList = (text: string) => {
     }
 
     const [bodyParts, refs] = buildAnchorPartedBody(body);
-    for (const ref of refs) {
+    for (const ref of new Set(refs)) {
       if (!referredMap.has(ref)) {
         referredMap.set(ref, []);
       }
