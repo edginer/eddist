@@ -4,7 +4,7 @@ use chrono::Utc;
 use futures::future::join_all;
 use metrics::counter;
 use redis::{AsyncCommands, aio::ConnectionManager};
-use tracing::{error_span, info_span};
+use tracing::info_span;
 
 use crate::{
     domain::{

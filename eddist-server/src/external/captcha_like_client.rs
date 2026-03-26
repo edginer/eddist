@@ -381,10 +381,10 @@ impl RecaptchaEnterpriseClient {
 
         let mut captured = serde_json::Map::new();
         for field in &self.capture_fields {
-            if let Ok(results) = resp.query(&format!("$.{field}")) {
-                if let Some(value) = results.first() {
-                    captured.insert(field.clone(), (*value).clone());
-                }
+            if let Ok(results) = resp.query(&format!("$.{field}"))
+                && let Some(value) = results.first()
+            {
+                captured.insert(field.clone(), (*value).clone());
             }
         }
 
@@ -513,10 +513,10 @@ impl GenericCaptchaClient {
 
         let mut captured = serde_json::Map::new();
         for field in &self.config.capture_fields {
-            if let Ok(results) = resp.query(&format!("$.{field}")) {
-                if let Some(value) = results.first() {
-                    captured.insert(field.clone(), (*value).clone());
-                }
+            if let Ok(results) = resp.query(&format!("$.{field}"))
+                && let Some(value) = results.first()
+            {
+                captured.insert(field.clone(), (*value).clone());
             }
         }
 

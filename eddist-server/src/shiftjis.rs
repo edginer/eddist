@@ -220,10 +220,10 @@ impl SJisResponseBuilder {
         }
 
         for (key, value) in self.headers {
-            if let Ok(header_name) = HeaderName::try_from(key) {
-                if let Ok(header_value) = HeaderValue::from_str(&value) {
-                    headers.append(header_name, header_value);
-                }
+            if let Ok(header_name) = HeaderName::try_from(key)
+                && let Ok(header_value) = HeaderValue::from_str(&value)
+            {
+                headers.append(header_name, header_value);
             }
         }
 

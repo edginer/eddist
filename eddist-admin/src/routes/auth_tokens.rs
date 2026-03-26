@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     error::ApiError,
     models::{DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
+    repository::authed_token_repository::ListAuthedTokensParams,
     AppState,
 };
 
@@ -55,17 +56,17 @@ pub async fn list_authed_tokens(
 
     let (items, total) = state
         .authed_token_repo
-        .list_authed_tokens(
+        .list_authed_tokens(ListAuthedTokensParams {
             offset,
-            per_page,
-            query.origin_ip.as_deref(),
-            query.writing_ua.as_deref(),
-            query.authed_ua.as_deref(),
-            query.asn_num,
-            query.validity,
+            limit: per_page,
+            origin_ip: query.origin_ip.as_deref(),
+            writing_ua: query.writing_ua.as_deref(),
+            authed_ua: query.authed_ua.as_deref(),
+            asn_num: query.asn_num,
+            validity: query.validity,
             sort_column,
             sort_asc,
-        )
+        })
         .await?;
 
     let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;

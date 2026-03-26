@@ -12,8 +12,8 @@ use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower_http::{
-    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass,
-    compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer,
+    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
+    trace::TraceLayer,
 };
 use tracing::{Span, info_span};
 
