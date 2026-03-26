@@ -554,9 +554,11 @@ impl CaptchaClient for GenericCaptchaClient {
         ip_addr: &str,
     ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
         let cfg = self.verification();
-        let url = self
-            .config
-            .resolve_placeholders(&cfg.url, response, ip_addr);
+        let url = self.config.resolve_placeholders(
+            cfg.url.as_deref().unwrap_or_default(),
+            response,
+            ip_addr,
+        );
 
         let mut req = match cfg.method {
             HttpMethod::Post => self.client.post(&url),

@@ -153,7 +153,7 @@ pub struct CaptchaVerificationConfig {
     /// Verification API URL (supports {{base_url}}, {{site_key}} placeholders)
     /// Not used by reCAPTCHA Enterprise (which derives its URL from project_id).
     #[serde(default)]
-    pub url: String,
+    pub url: Option<String>,
     /// HTTP method (defaults to POST)
     #[serde(default)]
     pub method: HttpMethod,
