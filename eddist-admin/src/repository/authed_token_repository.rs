@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use sqlx::{query, query_as, FromRow, MySql, QueryBuilder, Row};
+use sqlx::{FromRow, MySql, QueryBuilder, Row, query, query_as};
 use uuid::Uuid;
 
 use crate::models::AuthedToken;

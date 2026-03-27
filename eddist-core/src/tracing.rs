@@ -1,7 +1,7 @@
 use metrics::{counter, describe_counter};
 use tracing::field::Field;
 use tracing_subscriber::{
-    fmt::format::FmtSpan, layer::SubscriberExt as _, util::SubscriberInitExt as _, EnvFilter, Layer,
+    EnvFilter, Layer, fmt::format::FmtSpan, layer::SubscriberExt as _, util::SubscriberInitExt as _,
 };
 
 pub fn init_tracing() {

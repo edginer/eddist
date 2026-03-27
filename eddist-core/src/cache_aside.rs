@@ -1,5 +1,5 @@
-use redis::{aio::ConnectionLike, Value};
-use serde::{de::DeserializeOwned, Serialize};
+use redis::{Value, aio::ConnectionLike};
+use serde::{Serialize, de::DeserializeOwned};
 
 pub trait AsCache<T> {
     fn expired_at(&self) -> u64;

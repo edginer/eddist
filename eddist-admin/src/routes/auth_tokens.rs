@@ -1,16 +1,16 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get},
-    Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::{DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
     repository::authed_token_repository::ListAuthedTokensParams,
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

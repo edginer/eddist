@@ -1,13 +1,13 @@
 use axum::{
+    Json, Router,
     extract::State,
     routing::{get, put},
-    Json, Router,
 };
 
 use crate::{
+    AppState,
     error::ApiError,
     models::server_settings::{ServerSetting, UpsertServerSettingInput},
-    AppState,
 };
 
 use eddist_core::server_settings::ServerSettingKey;

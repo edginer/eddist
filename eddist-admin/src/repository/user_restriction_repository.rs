@@ -168,24 +168,24 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         .fetch_optional(&self.pool)
         .await?;
 
-        if let Some(row) = row {
-            if let Some(id_str) = row.id {
-                let rule_type = row
-                    .rule_type
-                    .parse::<RestrictionRuleType>()
-                    .map_err(|e| anyhow::anyhow!("Invalid rule type '{}': {}", row.rule_type, e))?;
+        if let Some(row) = row
+            && let Some(id_str) = row.id
+        {
+            let rule_type = row
+                .rule_type
+                .parse::<RestrictionRuleType>()
+                .map_err(|e| anyhow::anyhow!("Invalid rule type '{}': {}", row.rule_type, e))?;
 
-                return Ok(Some(UserRestrictionRule {
-                    id: Uuid::parse_str(&id_str)?,
-                    name: row.name,
-                    rule_type,
-                    rule_value: row.rule_value,
-                    expires_at: row.expires_at.map(|dt| dt.and_utc()),
-                    created_at: row.created_at.and_utc(),
-                    updated_at: row.updated_at.and_utc(),
-                    created_by_email: row.created_by_email,
-                }));
-            }
+            return Ok(Some(UserRestrictionRule {
+                id: Uuid::parse_str(&id_str)?,
+                name: row.name,
+                rule_type,
+                rule_value: row.rule_value,
+                expires_at: row.expires_at.map(|dt| dt.and_utc()),
+                created_at: row.created_at.and_utc(),
+                updated_at: row.updated_at.and_utc(),
+                created_by_email: row.created_by_email,
+            }));
         }
 
         Ok(None)

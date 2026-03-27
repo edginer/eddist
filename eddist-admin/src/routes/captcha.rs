@@ -1,16 +1,16 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, patch, post},
-    Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     auth::AdminEmail,
     error::ApiError,
     models::{CaptchaConfig, CreateCaptchaConfigInput, UpdateCaptchaConfigInput},
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

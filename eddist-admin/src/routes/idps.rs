@@ -1,15 +1,15 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, patch, post},
-    Json, Router,
 };
 use uuid::Uuid;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::idp::{CreateIdpInput, Idp, UpdateIdpInput},
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

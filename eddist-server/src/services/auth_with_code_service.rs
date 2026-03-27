@@ -25,7 +25,7 @@ use eddist_core::{
     },
     utils::is_auth_token_pub_enabled,
 };
-use rand::{Rng, distr::Uniform};
+use rand::{RngExt, distr::Uniform};
 use uuid::Uuid;
 
 use super::{

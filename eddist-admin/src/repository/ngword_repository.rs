@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use sqlx::{query, query_as, Executor, MySqlPool};
+use sqlx::{Executor, MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::NgWord;

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
 use md5::{self, Digest};
-use rand::Rng;
+use rand::RngExt;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]

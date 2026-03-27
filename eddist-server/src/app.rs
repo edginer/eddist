@@ -288,7 +288,10 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
                 .body(Body::from("Internal Server Error"))
                 .unwrap()
         }))
-        .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(10),
+        ))
         // NOTE: comment out for now (is is not confirmed in twinkle environment)
         // .layer(CompressionLayer::new())
         .layer(

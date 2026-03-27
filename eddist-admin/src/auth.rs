@@ -3,23 +3,23 @@ use std::env;
 use axum::{
     body::Body,
     extract::{FromRequestParts, State},
-    http::{self, request::Parts, HeaderValue, Request, StatusCode},
+    http::{self, HeaderValue, Request, StatusCode, request::Parts},
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
 use chrono::{TimeDelta, Utc};
 use jsonwebtoken::errors::ErrorKind;
 use oauth2::{
-    reqwest, AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RefreshToken,
-    Scope, TokenResponse,
+    AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RefreshToken, Scope,
+    TokenResponse, reqwest,
 };
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use tracing::info_span;
 
 use crate::{
-    models::auth::{NativeSessionRequest, NativeSessionResponse, NativeUserInfo},
     AppState,
+    models::auth::{NativeSessionRequest, NativeSessionResponse, NativeUserInfo},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,12 +142,12 @@ pub async fn auth_simple_header(
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
-    if let Some(userinfo) = admin_session.userinfo {
-        if admin_session.next_refresh_at > Utc::now() {
-            log::info!("no need to retrieve userinfo");
-            req.extensions_mut().insert(userinfo);
-            return next.run(req).await;
-        }
+    if let Some(userinfo) = admin_session.userinfo
+        && admin_session.next_refresh_at > Utc::now()
+    {
+        log::info!("no need to retrieve userinfo");
+        req.extensions_mut().insert(userinfo);
+        return next.run(req).await;
     }
     if let Some(access_token) = &admin_session.access_token {
         let is_native = req

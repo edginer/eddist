@@ -1,18 +1,18 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, patch},
-    Json, Router,
 };
 use chrono::{TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
 
 use crate::{
+    AppState,
     error::ApiError,
     models::{Res, Thread},
     repository::admin_archive_repository::ArchivedResUpdate,
-    AppState,
 };
 
 pub fn routes() -> Router<AppState> {

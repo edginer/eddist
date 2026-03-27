@@ -6,10 +6,10 @@ use eddist_core::{
     utils::is_prod,
 };
 use futures::StreamExt;
-use hyper::{server::conn::http1, service::service_fn, Response};
+use hyper::{Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
-use sqlx::{query, Connection, QueryBuilder};
+use sqlx::{Connection, QueryBuilder, query};
 use tokio::net::TcpListener;
 use tokio::{join, select, time::sleep};
 use tracing::{error_span, info_span};

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use chrono::{DateTime, Utc};
 use eddist_core::domain::client_info::ClientInfo;
 use md5::{Digest, Md5};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 pub const METADENT_RESET_PERIOD_DAYS: u64 = 7;

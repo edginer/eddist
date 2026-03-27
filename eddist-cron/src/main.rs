@@ -3,7 +3,7 @@ use std::{env, str::FromStr, time::Duration};
 use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
-use s3::{creds::Credentials, Bucket};
+use s3::{Bucket, creds::Credentials};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::time::sleep;
 
@@ -85,7 +85,12 @@ async fn main() {
                         .unwrap();
 
                     if executed_time != next {
-                        log::info!("`inactivate` Cronjob for board: {} is not executed, current time: {}, next time: {}", b.board_key, executed_time, next);
+                        log::info!(
+                            "`inactivate` Cronjob for board: {} is not executed, current time: {}, next time: {}",
+                            b.board_key,
+                            executed_time,
+                            next
+                        );
                         continue;
                     }
 
@@ -485,8 +490,8 @@ async fn retry(
         retry_delay *= 2;
         match result {
             Ok(result) => {
-                if result.status_code() == 200 {
-                    if let Ok((_, code)) = s3_client
+                if result.status_code() == 200
+                    && let Ok((_, code)) = s3_client
                         .head_object(format!(
                             "{}/{}/{}.dat",
                             board_key,
@@ -494,10 +499,9 @@ async fn retry(
                             thread_number
                         ))
                         .await
-                    {
-                        if code != 404 {
-                            is_err = false;
-                        }
+                {
+                    if code != 404 {
+                        is_err = false;
                     }
                 }
             }
@@ -520,11 +524,7 @@ async fn retry(
         );
     }
 
-    if is_err {
-        Err(())
-    } else {
-        Ok(())
-    }
+    if is_err { Err(()) } else { Ok(()) }
 }
 
 #[cfg(test)]

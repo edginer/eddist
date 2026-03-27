@@ -1,12 +1,12 @@
 use axum::{
+    Json, Router,
     extract::State,
     routing::{get, put},
-    Json, Router,
 };
 
 use crate::{
-    auth::AdminEmail, error::ApiError, models::Terms,
-    repository::terms_repository::UpdateTermsInput, AppState,
+    AppState, auth::AdminEmail, error::ApiError, models::Terms,
+    repository::terms_repository::UpdateTermsInput,
 };
 
 pub fn routes() -> Router<AppState> {

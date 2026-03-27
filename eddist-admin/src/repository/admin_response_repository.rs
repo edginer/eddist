@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
-use sqlx::{query_as, types::Json, MySqlPool};
+use sqlx::{MySqlPool, query_as, types::Json};
 use uuid::Uuid;
 
 use crate::models::Res;
