@@ -40,6 +40,7 @@ const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps
         setOpen(false);
         reset();
       }}
+      dismissible
     >
       <ModalHeader className="border-gray-200">Edit Cap</ModalHeader>
       <ModalBody>

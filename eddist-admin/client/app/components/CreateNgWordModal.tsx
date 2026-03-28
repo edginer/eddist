@@ -15,7 +15,7 @@ const CreateNgWordModal = ({ setOpen, refetch, open }: CreateNgWordModalProps) =
 
   return (
     <div>
-      <Modal show={open} onClose={() => setOpen(false)}>
+      <Modal show={open} onClose={() => setOpen(false)} dismissible>
         <ModalHeader className="border-gray-200">Create NG Word</ModalHeader>
         <ModalBody>
           <form

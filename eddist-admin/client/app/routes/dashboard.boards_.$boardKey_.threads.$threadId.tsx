@@ -97,7 +97,11 @@ const Page = () => {
 
   return (
     <>
-      <Modal show={selectedEditingRes != null} onClose={() => setSelectedEditingRes(undefined)}>
+      <Modal
+        show={selectedEditingRes != null}
+        onClose={() => setSelectedEditingRes(undefined)}
+        dismissible
+      >
         <ModalHeader>Edit Response</ModalHeader>
         <ModalBody>
           <div className="flex flex-row">

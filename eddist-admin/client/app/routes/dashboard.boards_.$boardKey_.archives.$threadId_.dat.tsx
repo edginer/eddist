@@ -55,7 +55,11 @@ const Page = () => {
 
   return (
     <>
-      <Modal show={onEditResponseOrder != null} onClose={() => setOnEditResponseOrder(undefined)}>
+      <Modal
+        show={onEditResponseOrder != null}
+        onClose={() => setOnEditResponseOrder(undefined)}
+        dismissible
+      >
         <ModalHeader>Edit Response</ModalHeader>
         <ModalBody>
           <div className="flex flex-row">

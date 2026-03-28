@@ -82,7 +82,7 @@ const CreateBoardModal = ({ open, setOpen, refetch }: CreateBoardModalProps) => 
   const createBoardMutation = useCreateBoard();
 
   return (
-    <Modal show={open} onClose={() => setOpen(false)}>
+    <Modal show={open} onClose={() => setOpen(false)} dismissible>
       <ModalHeader className="border-gray-200">Create Board</ModalHeader>
 
       <ModalBody>

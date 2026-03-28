@@ -459,6 +459,7 @@ const Page = () => {
           setShowAdditionalInfo(false);
         }}
         size="4xl"
+        dismissible
       >
         <ModalHeader className="border-gray-200">
           <div className="flex items-center gap-3">
