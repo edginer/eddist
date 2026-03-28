@@ -95,6 +95,9 @@ pub enum BbsCgiError {
     #[error("このブラウザではメール欄にトークンを入力しての認証は1回しかできません")]
     EmailAuthenticatedUnsupportedUserAgent,
 
+    #[error("このアカウントは規約違反を繰り返したため、一時的に凍結されています")]
+    TemporarilySuspended,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -125,6 +128,7 @@ impl BbsCgiError {
             BbsCgiError::UserAlreadyRegistered => StatusCode::OK,
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
+            BbsCgiError::TemporarilySuspended => StatusCode::FORBIDDEN,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -156,6 +160,7 @@ impl BbsCgiError {
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => {
                 "EmailAuthenticatedUnsupportedUserAgent"
             }
+            BbsCgiError::TemporarilySuspended => "TemporarilySuspended",
             BbsCgiError::Other(_) => "InternalError",
         }
     }
