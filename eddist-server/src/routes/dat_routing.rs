@@ -26,7 +26,9 @@ pub async fn get_dat_txt(
     if thread_id_with_dat.len() != 14 {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
-    let thread_number = thread_id_with_dat.replace(".dat", "");
+    let Some(thread_number) = thread_id_with_dat.strip_suffix(".dat") else {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    };
     let Ok(thread_number_num) = thread_number.parse::<i64>() else {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     };
@@ -140,14 +142,16 @@ pub async fn get_kako_dat_txt(
     if validate_board_key(&board_key).is_err() {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
-    let thread_number = thread_id_with_dat.replace(".dat", "");
+    let Some(thread_number) = thread_id_with_dat.strip_suffix(".dat") else {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    };
 
     let svc = state.get_container().kako_thread_retrieval();
 
     let result = match svc
         .execute(KakoThreadRetrievalServiceInput {
             board_key: board_key.clone(),
-            thread_number: thread_number.clone(),
+            thread_number: thread_number.to_owned(),
         })
         .await
     {

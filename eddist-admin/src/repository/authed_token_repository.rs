@@ -219,7 +219,11 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         }
 
         let direction = if sort_asc { " ASC" } else { " DESC" };
-        data_builder.push(format!(" ORDER BY {sort_column}{direction}"));
+        let safe_column = match sort_column {
+            "created_at" | "authed_at" | "last_wrote_at" => sort_column,
+            _ => anyhow::bail!("invalid sort column: {sort_column}"),
+        };
+        data_builder.push(format!(" ORDER BY {safe_column}{direction}"));
         data_builder.push(" LIMIT ");
         data_builder.push_bind(limit as i64);
         data_builder.push(" OFFSET ");
