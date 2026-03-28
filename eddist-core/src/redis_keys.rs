@@ -1,4 +1,3 @@
-// Redis key helpers
 pub fn csrf_key(key: &str) -> String {
     format!("csrf-token:{key}")
 }
@@ -59,7 +58,6 @@ pub fn authed_token_suspended_key(authed_token_id: &str) -> String {
     format!("authed_token:suspended:{authed_token_id}")
 }
 
-// Channel constants
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
 pub const CHANNEL_THREAD_CREATED: &str = "bbs:event:thread_created";
 pub use crate::domain::pubsub_repository::{

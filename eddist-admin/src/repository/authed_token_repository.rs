@@ -137,8 +137,8 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         .fetch_all(&self.0)
         .await?
         .into_iter()
-        .map(|r| Uuid::from_slice(&r.id).unwrap())
-        .collect::<Vec<_>>();
+        .map(|r| Uuid::from_slice(&r.id).map_err(anyhow::Error::from))
+        .collect::<Result<Vec<_>, _>>()?;
 
         query!(
             r#"

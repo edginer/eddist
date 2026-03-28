@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
 use s3::creds::Credentials;
@@ -8,19 +9,43 @@ use uuid::Uuid;
 
 const CONCURRENCY: usize = 16;
 
+#[derive(Parser)]
+#[command(name = "eddist-cli")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Manage authed tokens
+    AuthedTokens {
+        #[command(subcommand)]
+        command: AuthedTokensCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuthedTokensCommand {
+    /// Backup valid tokens from MySQL to S3
+    Backup,
+    /// Restore tokens from S3 into MySQL
+    Recover,
+    /// Show differences between DB and S3
+    Validate,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
-    let command = std::env::args().nth(1);
-    match command.as_deref() {
-        Some("backup") => backup().await,
-        Some("recover") => recover().await,
-        Some("validate") => validate().await,
-        _ => {
-            eprintln!("Usage: eddist-cli <backup|recover|validate>");
-            std::process::exit(1);
-        }
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::AuthedTokens { command } => match command {
+            AuthedTokensCommand::Backup => backup().await,
+            AuthedTokensCommand::Recover => recover().await,
+            AuthedTokensCommand::Validate => validate().await,
+        },
     }
 }
 
@@ -104,16 +129,14 @@ async fn validate() -> Result<()> {
             .into_iter()
             .collect::<HashSet<_>>();
 
+    let prefix = format!("{AUTHED_TOKENS_S3_PREFIX}/");
     let s3_ids = bucket
-        .list(format!("{AUTHED_TOKENS_S3_PREFIX}/"), None)
+        .list(prefix.clone(), None)
         .await?
         .into_iter()
         .flat_map(|page| page.contents)
         .filter_map(|obj| {
-            let name = obj
-                .key
-                .strip_prefix(&format!("{AUTHED_TOKENS_S3_PREFIX}/"))?
-                .strip_suffix(".json")?;
+            let name = obj.key.strip_prefix(&prefix)?.strip_suffix(".json")?;
             Uuid::parse_str(name).ok()
         })
         .collect::<HashSet<_>>();

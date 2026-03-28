@@ -97,6 +97,9 @@ metrics = "0.24.3"
 metrics-exporter-prometheus = "0.18.1"
 axum-prometheus = "0.10.0"
 
+# CLI
+clap = { version = "4", features = ["derive"] }
+
 # Misc
 jsonpath-rust = "1.0.4"
 regex = "1.12.3"

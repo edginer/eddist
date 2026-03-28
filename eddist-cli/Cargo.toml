@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+clap.workspace = true
 eddist-core.workspace = true
 futures.workspace = true
 chrono.workspace = true
