@@ -120,7 +120,7 @@ pub fn create_test_app(
         ),
         notice_repo,
         terms_repo,
-        template_engine: load_template_engine(),
+        template_engine: std::sync::Arc::new(load_template_engine()),
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::now_v7().as_bytes())
             .to_string(),
