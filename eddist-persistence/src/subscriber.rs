@@ -70,10 +70,7 @@ impl SubRepository for RedisSubRepository {
 
                 // Apply exponential backoff
                 let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
-                error!(
-                    seconds = backoff_secs,
-                    "Backing off before retry"
-                );
+                error!(seconds = backoff_secs, "Backing off before retry");
                 sleep(std::time::Duration::from_secs(backoff_secs)).await;
                 error_count = error_count.saturating_add(1);
 

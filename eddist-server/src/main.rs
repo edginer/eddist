@@ -155,6 +155,7 @@ async fn main() -> anyhow::Result<()> {
         .unwrap(),
     )
     .unwrap();
+    s3::set_retries(0);
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
