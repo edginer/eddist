@@ -297,8 +297,8 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         ))
         .layer(
             CompressionLayer::new()
-                .gzip(true)
-                .br(false)
+                .gzip(false)
+                .br(true)
                 .quality(tower_http::CompressionLevel::Fastest),
         )
         .layer(
