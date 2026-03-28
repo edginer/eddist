@@ -92,6 +92,8 @@ jobs:
         run: pnpm -F eddist-admin-client build
 
       - name: Rust release build
+        env:
+          RUSTFLAGS: "-C force-frame-pointers=yes"
         run: cargo build --release
 
       - name: Remove .dockerignore
