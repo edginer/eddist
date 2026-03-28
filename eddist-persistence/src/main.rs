@@ -16,7 +16,7 @@ use hyper::{Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
 use s3::creds::Credentials;
-use sqlx::{Connection, QueryBuilder, Row, query};
+use sqlx::{Connection, QueryBuilder, query};
 use tokio::net::TcpListener;
 use tokio::{join, select, time::sleep};
 use tracing::{error_span, info_span, warn};
@@ -583,31 +583,26 @@ async fn backup_token(
     bucket: &s3::Bucket,
     token_id: Uuid,
 ) -> anyhow::Result<()> {
-    let row = sqlx::query(
-        "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, \
-         auth_code, created_at, authed_at, last_wrote_at, additional_info \
-         FROM authed_tokens WHERE id = ?",
+    let backup = sqlx::query_as!(
+        AuthedTokenBackup,
+        r#"SELECT
+            id AS "id!: Uuid",
+            token,
+            origin_ip,
+            reduced_origin_ip,
+            asn_num,
+            writing_ua,
+            authed_ua,
+            auth_code,
+            created_at,
+            authed_at,
+            last_wrote_at,
+            additional_info AS "additional_info: serde_json::Value"
+        FROM authed_tokens WHERE id = ?"#,
+        token_id.as_bytes().to_vec()
     )
-    .bind(token_id.as_bytes().to_vec())
     .fetch_one(pool)
     .await?;
-
-    let backup = AuthedTokenBackup {
-        id: token_id.to_string(),
-        token: row.try_get("token")?,
-        origin_ip: row.try_get("origin_ip")?,
-        reduced_origin_ip: row.try_get("reduced_origin_ip")?,
-        asn_num: row.try_get("asn_num")?,
-        writing_ua: row.try_get("writing_ua")?,
-        authed_ua: row.try_get("authed_ua")?,
-        auth_code: row.try_get("auth_code")?,
-        created_at: row.try_get("created_at")?,
-        authed_at: row.try_get("authed_at")?,
-        last_wrote_at: row.try_get("last_wrote_at")?,
-        additional_info: row
-            .try_get::<Option<serde_json::Value>, _>("additional_info")
-            .unwrap_or_default(),
-    };
 
     let bytes = serde_json::to_vec(&backup)?;
     bucket

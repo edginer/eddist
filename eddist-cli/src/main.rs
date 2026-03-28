@@ -3,8 +3,7 @@ use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTo
 use futures::StreamExt;
 use s3::creds::Credentials;
 use sha2::Digest;
-use sqlx::Row;
-use std::{env, sync::Arc};
+use std::{collections::HashSet, env, sync::Arc};
 use uuid::Uuid;
 
 const CONCURRENCY: usize = 16;
@@ -17,8 +16,9 @@ async fn main() -> Result<()> {
     match command.as_deref() {
         Some("backup") => backup().await,
         Some("recover") => recover().await,
+        Some("validate") => validate().await,
         _ => {
-            eprintln!("Usage: eddist-cli <backup|recover>");
+            eprintln!("Usage: eddist-cli <backup|recover|validate>");
             std::process::exit(1);
         }
     }
@@ -44,10 +44,22 @@ async fn backup() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
     let bucket = make_bucket()?;
 
-    let rows = sqlx::query(
-        "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, \
-         auth_code, created_at, authed_at, last_wrote_at, additional_info \
-         FROM authed_tokens WHERE validity = 1",
+    let rows = sqlx::query_as!(
+        AuthedTokenBackup,
+        r#"SELECT
+            id AS "id!: Uuid",
+            token,
+            origin_ip,
+            reduced_origin_ip,
+            asn_num,
+            writing_ua,
+            authed_ua,
+            auth_code,
+            created_at,
+            authed_at,
+            last_wrote_at,
+            additional_info AS "additional_info: serde_json::Value"
+        FROM authed_tokens WHERE validity = 1"#
     )
     .fetch_all(&pool)
     .await?;
@@ -56,34 +68,16 @@ async fn backup() -> Result<()> {
     println!("Backing up {total} valid tokens...");
 
     let results = futures::stream::iter(rows)
-        .map(|row| {
+        .map(|token| {
             let bucket = bucket.clone();
             async move {
-                let id_bytes: Vec<u8> = row.try_get("id")?;
-                let uuid = Uuid::from_slice(&id_bytes)?;
-
-                let token = AuthedTokenBackup {
-                    id: uuid.to_string(),
-                    token: row.try_get("token")?,
-                    origin_ip: row.try_get("origin_ip")?,
-                    reduced_origin_ip: row.try_get("reduced_origin_ip")?,
-                    asn_num: row.try_get("asn_num")?,
-                    writing_ua: row.try_get("writing_ua")?,
-                    authed_ua: row.try_get("authed_ua")?,
-                    auth_code: row.try_get("auth_code")?,
-                    created_at: row.try_get("created_at")?,
-                    authed_at: row.try_get("authed_at")?,
-                    last_wrote_at: row.try_get("last_wrote_at")?,
-                    additional_info: row
-                        .try_get::<Option<serde_json::Value>, _>("additional_info")
-                        .unwrap_or_default(),
-                };
-
                 let bytes = serde_json::to_vec(&token)?;
                 bucket
-                    .put_object(format!("{AUTHED_TOKENS_S3_PREFIX}/{uuid}.json"), &bytes)
+                    .put_object(
+                        format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id),
+                        &bytes,
+                    )
                     .await?;
-
                 anyhow::Ok(())
             }
         })
@@ -96,6 +90,62 @@ async fn backup() -> Result<()> {
         eprintln!("{errors} tokens failed to backup");
     }
     println!("Done. Backed up {}/{total} tokens.", total - errors);
+    Ok(())
+}
+
+async fn validate() -> Result<()> {
+    let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let bucket = make_bucket()?;
+
+    let db_ids =
+        sqlx::query_scalar!(r#"SELECT id AS "id!: Uuid" FROM authed_tokens WHERE validity = 1"#)
+            .fetch_all(&pool)
+            .await?
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+    let s3_ids = bucket
+        .list(format!("{AUTHED_TOKENS_S3_PREFIX}/"), None)
+        .await?
+        .into_iter()
+        .flat_map(|page| page.contents)
+        .filter_map(|obj| {
+            let name = obj
+                .key
+                .strip_prefix(&format!("{AUTHED_TOKENS_S3_PREFIX}/"))?
+                .strip_suffix(".json")?;
+            Uuid::parse_str(name).ok()
+        })
+        .collect::<HashSet<_>>();
+
+    println!("DB valid tokens: {}", db_ids.len());
+    println!("S3 objects:      {}", s3_ids.len());
+
+    let mut missing_from_s3 = db_ids.difference(&s3_ids).collect::<Vec<_>>();
+    let mut orphaned_in_s3 = s3_ids.difference(&db_ids).collect::<Vec<_>>();
+    missing_from_s3.sort();
+    orphaned_in_s3.sort();
+
+    if missing_from_s3.is_empty() && orphaned_in_s3.is_empty() {
+        println!("No differences found.");
+    } else {
+        if !missing_from_s3.is_empty() {
+            println!("\nMissing from S3 ({}):", missing_from_s3.len());
+            for id in &missing_from_s3 {
+                println!("  {id}");
+            }
+        }
+        if !orphaned_in_s3.is_empty() {
+            println!(
+                "\nIn S3 but not in DB or invalidated ({}):",
+                orphaned_in_s3.len()
+            );
+            for id in &orphaned_in_s3 {
+                println!("  {id}");
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -122,7 +172,6 @@ async fn recover() -> Result<()> {
                 let data = bucket.get_object(&key).await?;
                 let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
 
-                let uuid = Uuid::parse_str(&token.id)?;
                 // author_id_seed is not stored in the backup; recompute from reduced_origin_ip
                 // to match the formula in the add_author_id_generation_col migration.
                 let author_id_seed = sha2::Sha512::digest(token.reduced_origin_ip.as_bytes());
@@ -135,7 +184,7 @@ async fn recover() -> Result<()> {
                       author_id_seed, additional_info) \
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
                 )
-                .bind(uuid.as_bytes().to_vec())
+                .bind(token.id.as_bytes().to_vec())
                 .bind(&token.token)
                 .bind(&token.origin_ip)
                 .bind(&token.reduced_origin_ip)

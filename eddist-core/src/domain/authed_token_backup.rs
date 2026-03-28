@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// S3 key prefix for authed token backups.
 pub const AUTHED_TOKENS_S3_PREFIX: &str = "authed_tokens";
@@ -8,7 +9,7 @@ pub const AUTHED_TOKENS_S3_PREFIX: &str = "authed_tokens";
 /// that predate the field being included.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthedTokenBackup {
-    pub id: String,
+    pub id: Uuid,
     pub token: String,
     pub origin_ip: String,
     pub reduced_origin_ip: String,
