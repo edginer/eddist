@@ -61,7 +61,7 @@ const GeneralSetting: React.FC<{
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<components["schemas"]["EditBoardInput"]>({
+  } = useForm<z.infer<typeof boardGeneralSettingSchema>>({
     resolver: zodResolver(boardGeneralSettingSchema),
   });
 
@@ -157,7 +157,7 @@ const PostRestrictionSetting: React.FC<{
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<components["schemas"]["EditBoardInput"]>({
+  } = useForm<z.infer<typeof boardPostRestrictionSettingSchema>>({
     resolver: zodResolver(boardPostRestrictionSettingSchema),
   });
 
@@ -279,7 +279,7 @@ const ThreadsArchiveSetting: React.FC<{
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<components["schemas"]["EditBoardInput"]>({
+  } = useForm<z.infer<typeof boardThreadsArchiveSettingSchema>>({
     resolver: zodResolver(boardThreadsArchiveSettingSchema),
   });
 

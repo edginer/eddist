@@ -84,7 +84,7 @@ const UserSearchPage = () => {
   };
 
   const handleToggleEnabled = async () => {
-    if (!userData || !userData.id) {
+    if (!userData?.id) {
       setActionMessage("No user selected to update");
       return;
     }
@@ -278,7 +278,7 @@ const UserSearchPage = () => {
       </div>
 
       {/* Confirmation Modal */}
-      <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
+      <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)} dismissible>
         <ModalHeader>{newEnabledStatus ? "Enable User" : "Disable User"}</ModalHeader>
         <ModalBody>
           {newEnabledStatus ? (

@@ -68,6 +68,7 @@ const NgWords = () => {
           reset();
           modal.closeEdit();
         }}
+        dismissible
       >
         <ModalHeader className="border-gray-200">Edit NG Word</ModalHeader>
         <ModalBody>

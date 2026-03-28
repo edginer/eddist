@@ -51,7 +51,7 @@ const RestrictionRules = () => {
 
   return (
     <>
-      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()}>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} dismissible>
         <ModalHeader className="border-gray-200">Create Restriction Rule</ModalHeader>
         <ModalBody>
           <RestrictionRuleForm
@@ -64,7 +64,7 @@ const RestrictionRules = () => {
       </Modal>
 
       {modal.editingItem && (
-        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()}>
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} dismissible>
           <ModalHeader className="border-gray-200">Edit Restriction Rule</ModalHeader>
           <ModalBody>
             <RestrictionRuleForm

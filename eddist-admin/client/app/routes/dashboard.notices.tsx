@@ -77,7 +77,7 @@ const Notices = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()}>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} dismissible>
         <ModalHeader className="border-gray-200">Create Notice</ModalHeader>
         <ModalBody>
           <NoticeForm
@@ -91,7 +91,7 @@ const Notices = () => {
 
       {/* Edit Modal */}
       {modal.editingItem && (
-        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()}>
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} dismissible>
           <ModalHeader className="border-gray-200">Edit Notice</ModalHeader>
           <ModalBody>
             <NoticeForm

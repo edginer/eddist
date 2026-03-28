@@ -28,6 +28,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
       size="5xl"
       onClose={() => props.setOpen(false)}
       className={props.className}
+      dismissible
     >
       <AuthCodeModal
         openAuthCodeModal={openAuthCodeModal}

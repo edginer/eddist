@@ -222,7 +222,7 @@ const IdPs = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()}>
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} dismissible>
         <ModalHeader className="border-gray-200">Create IdP</ModalHeader>
         <ModalBody>
           <IdpForm
@@ -239,7 +239,7 @@ const IdPs = () => {
 
       {/* Edit Modal */}
       {modal.editingItem && (
-        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()}>
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} dismissible>
           <ModalHeader className="border-gray-200">Edit IdP</ModalHeader>
           <ModalBody>
             <IdpForm

@@ -16,7 +16,6 @@ import {
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useCreateBoard } from "~/hooks/queries";
-import type { components } from "~/openapi/schema";
 
 interface CreateBoardModalProps {
   open: boolean;
@@ -76,14 +75,14 @@ const CreateBoardModal = ({ open, setOpen, refetch }: CreateBoardModalProps) => 
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<components["schemas"]["CreateBoardInput"]>({
+  } = useForm<z.infer<typeof boardCreationSchema>>({
     resolver: zodResolver(boardCreationSchema),
   });
 
   const createBoardMutation = useCreateBoard();
 
   return (
-    <Modal show={open} onClose={() => setOpen(false)}>
+    <Modal show={open} onClose={() => setOpen(false)} dismissible>
       <ModalHeader className="border-gray-200">Create Board</ModalHeader>
 
       <ModalBody>

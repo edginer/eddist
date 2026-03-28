@@ -108,7 +108,7 @@ const CaptchaConfigs = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} size="xl">
+      <Modal show={modal.isCreateOpen} onClose={() => modal.closeCreate()} size="xl" dismissible>
         <ModalHeader className="border-gray-200">Create Captcha Config</ModalHeader>
         <ModalBody>
           <CaptchaConfigForm
@@ -122,7 +122,7 @@ const CaptchaConfigs = () => {
 
       {/* Edit Modal */}
       {modal.editingItem && (
-        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} size="xl">
+        <Modal show={modal.isEditOpen} onClose={() => modal.closeEdit()} size="xl" dismissible>
           <ModalHeader className="border-gray-200">Edit Captcha Config</ModalHeader>
           <ModalBody>
             <CaptchaConfigForm

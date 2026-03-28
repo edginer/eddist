@@ -21,6 +21,7 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
           setOpen(false);
           reset();
         }}
+        dismissible
       >
         <ModalHeader className="border-gray-200">Create Cap</ModalHeader>
         <ModalBody>
