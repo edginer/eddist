@@ -5,7 +5,7 @@ use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
 
 use super::bbs_repository::CreatingThread;
-use crate::utils::redis::{
+use eddist_core::redis_keys::{
     CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_SUCCEEDED,
     CHANNEL_RES_CREATED, CHANNEL_THREAD_CREATED,
 };

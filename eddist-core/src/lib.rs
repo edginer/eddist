@@ -1,4 +1,5 @@
 pub mod domain {
+    pub mod authed_token_backup;
     pub mod board;
     pub mod cap;
     pub mod client_info;
@@ -13,6 +14,7 @@ pub mod domain {
 }
 
 pub mod cache_aside;
+pub mod redis_keys;
 pub mod server_settings;
 pub mod simple_rate_limiter;
 pub mod tracing;

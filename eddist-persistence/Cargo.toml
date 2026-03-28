@@ -18,3 +18,5 @@ tracing.workspace = true
 hyper = { workspace = true, features = ["server", "http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
 log.workspace = true
+rust-s3.workspace = true
+uuid.workspace = true

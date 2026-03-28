@@ -1,12 +1,15 @@
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
+use eddist_core::{redis_keys::authed_token_suspended_key, utils::is_authed_token_backup_enabled};
 use redis::AsyncCommands;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::{error::ApiError, AppState};
+use crate::{AppState, error::ApiError};
 
 pub fn create_internal_routes() -> Router<AppState> {
-    Router::new().route("/authed-tokens/suspend", post(suspend_authed_token))
+    Router::new()
+        .route("/authed-tokens/suspend", post(suspend_authed_token))
+        .route("/authed-tokens/revoke", post(revoke_authed_token))
 }
 
 #[derive(Deserialize)]
@@ -41,11 +44,33 @@ pub async fn suspend_authed_token(
         ));
     }
 
-    let key = format!("authed_token:suspended:{}", input.authed_token_id);
+    let key = authed_token_suspended_key(&input.authed_token_id.to_string());
     let mut conn = state.redis_conn.clone();
     conn.set_ex::<_, _, ()>(&key, "1", input.ttl_seconds)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+pub struct RevokeAuthedTokenInput {
+    pub authed_token_id: Uuid,
+}
+
+pub async fn revoke_authed_token(
+    State(state): State<AppState>,
+    Json(input): Json<RevokeAuthedTokenInput>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .authed_token_repo
+        .delete_authed_token(input.authed_token_id)
+        .await?;
+
+    if is_authed_token_backup_enabled() {
+        let mut conn = state.redis_conn.clone();
+        super::auth_tokens::publish_token_revoked(&mut conn, input.authed_token_id).await;
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

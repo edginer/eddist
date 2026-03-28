@@ -122,7 +122,7 @@ pub fn create_test_app(
         terms_repo,
         template_engine: load_template_engine(),
         tinker_secret: base64::engine::general_purpose::STANDARD
-            .encode(Uuid::new_v4().as_bytes())
+            .encode(Uuid::now_v7().as_bytes())
             .to_string(),
     };
 
@@ -177,7 +177,7 @@ pub mod test_helpers {
         auth_code: &str,
     ) -> (Uuid, String) {
         let token_id = Uuid::now_v7();
-        let token = format!("test-token-{}", Uuid::new_v4());
+        let token = format!("test-token-{}", Uuid::now_v7());
 
         sqlx::query(
             r#"

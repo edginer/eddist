@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT id FROM authed_tokens\n            WHERE validity = 1\n              AND origin_ip IN (\n                SELECT origin_ip FROM (\n                    SELECT origin_ip FROM authed_tokens WHERE id = ?\n                ) tmp\n              )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ad8190475ef76d4efa010c8c684455e3a78fab3d593d7d8c197310a6b53b1b9c"
+}

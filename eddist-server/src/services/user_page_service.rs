@@ -1,9 +1,7 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{
-    domain::user::User, repositories::user_repository::UserRepository,
-    utils::redis::user_session_key,
-};
+use crate::{domain::user::User, repositories::user_repository::UserRepository};
+use eddist_core::redis_keys::user_session_key;
 
 use super::AppService;
 

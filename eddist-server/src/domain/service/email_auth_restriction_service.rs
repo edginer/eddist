@@ -1,6 +1,7 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{error::BbsCgiError, utils::redis::email_auth_used_key};
+use crate::error::BbsCgiError;
+use eddist_core::redis_keys::email_auth_used_key;
 
 pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] = &[
     "2chMate",

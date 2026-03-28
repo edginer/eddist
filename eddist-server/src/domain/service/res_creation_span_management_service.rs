@@ -1,6 +1,6 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::utils::redis::{
+use eddist_core::redis_keys::{
     res_creation_long_restrict_key, res_creation_penalty_key, res_creation_span_ip_key,
     res_creation_span_key, thread_creation_span_ip_key, thread_creation_span_key,
 };

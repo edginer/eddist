@@ -4,6 +4,12 @@ use axum::{
     http::StatusCode,
     routing::{delete, get},
 };
+use eddist_core::{
+    domain::pubsub_repository::{AuthTokenRevoked, CHANNEL_AUTH_TOKEN_REVOKED},
+    utils::is_authed_token_backup_enabled,
+};
+use redis::AsyncCommands;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -117,16 +123,37 @@ pub async fn delete_authed_token(
     Path(authed_token_id): Path<Uuid>,
     Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
 ) -> Result<StatusCode, ApiError> {
-    if !using_origin_ip {
+    let affected_ids = if !using_origin_ip {
         state
             .authed_token_repo
             .delete_authed_token(authed_token_id)
             .await?;
+        vec![authed_token_id]
     } else {
         state
             .authed_token_repo
             .delete_authed_token_by_origin_ip(authed_token_id)
-            .await?;
+            .await?
+    };
+    if is_authed_token_backup_enabled() {
+        let mut conn = state.redis_conn.clone();
+        for id in affected_ids {
+            publish_token_revoked(&mut conn, id).await;
+        }
     }
     Ok(StatusCode::OK)
+}
+
+pub(crate) async fn publish_token_revoked(
+    conn: &mut redis::aio::ConnectionManager,
+    authed_token_id: Uuid,
+) {
+    match serde_json::to_string(&AuthTokenRevoked { authed_token_id }) {
+        Ok(payload) => {
+            let _: Result<(), _> = conn.publish(CHANNEL_AUTH_TOKEN_REVOKED, payload).await;
+        }
+        Err(e) => {
+            warn!("Failed to serialize AuthTokenRevoked for {authed_token_id}: {e}");
+        }
+    }
 }

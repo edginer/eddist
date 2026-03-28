@@ -2,75 +2,11 @@ use std::env;
 
 use ::redis::AsyncCommands as _;
 use base64::Engine;
+use eddist_core::redis_keys::csrf_key;
 use eddist_core::{domain::tinker::Tinker, utils::is_prod};
 use http::HeaderMap;
-use redis::csrf_key;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
-
-pub(crate) mod redis {
-    pub fn csrf_key(key: &str) -> String {
-        format!("csrf-token:{key}")
-    }
-
-    pub fn thread_cache_key(board_key: &str, thread_number: u64) -> String {
-        format!("thread:{board_key}:{thread_number}")
-    }
-
-    pub fn res_creation_span_key(authed_token: &str) -> String {
-        format!("res_creation_span:{authed_token}")
-    }
-
-    pub fn res_creation_span_ip_key(ip: &str) -> String {
-        format!("res_creation_span_ip:{ip}")
-    }
-
-    pub fn thread_creation_span_key(authed_token: &str) -> String {
-        format!("thread_creation_span:{authed_token}")
-    }
-
-    pub fn thread_creation_span_ip_key(ip: &str) -> String {
-        format!("thread_creation_span_ip:{ip}")
-    }
-
-    pub fn res_creation_penalty_key(authed_token: &str) -> String {
-        format!("res_creation_penalty:{authed_token}")
-    }
-
-    pub fn res_creation_long_restrict_key(authed_token: &str) -> String {
-        format!("res_creation_long_restrict:{authed_token}")
-    }
-
-    pub fn user_session_key(user_sid: &str) -> String {
-        format!("user:session:{user_sid}")
-    }
-
-    pub fn user_reg_temp_url_register_key(temp_url_query: &str) -> String {
-        format!("userreg:tempurl:register:{temp_url_query}")
-    }
-
-    pub fn user_reg_oauth2_state_key(state_id: &str) -> String {
-        format!("userreg:oauth2:state:{state_id}")
-    }
-
-    pub fn user_reg_oauth2_authreq_key(state_id: &str) -> String {
-        format!("userreg:oauth2:authreq:{state_id}")
-    }
-
-    pub fn user_login_oauth2_authreq_key(state_id: &str) -> String {
-        format!("userlogin:oauth2:authreq:{state_id}")
-    }
-
-    pub fn email_auth_used_key(token: &str) -> String {
-        format!("resp:email_auth_used:{token}")
-    }
-
-    pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
-    pub const CHANNEL_THREAD_CREATED: &str = "bbs:event:thread_created";
-    pub const CHANNEL_AUTH_TOKEN_INITIATED: &str = "bbs:event:auth_token_initiated";
-    pub const CHANNEL_AUTH_TOKEN_REQUESTED: &str = "bbs:event:auth_token_requested";
-    pub const CHANNEL_AUTH_TOKEN_SUCCEEDED: &str = "bbs:event:auth_token_succeeded";
-}
 
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
     let origin_ip = headers
