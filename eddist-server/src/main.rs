@@ -1,7 +1,7 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use std::{convert::Infallible, env, time::Duration};
+use std::{convert::Infallible, env, sync::Arc, time::Duration};
 
 use axum::{
     ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
@@ -179,7 +179,7 @@ async fn main() -> anyhow::Result<()> {
         ),
         notice_repo,
         terms_repo,
-        template_engine,
+        template_engine: Arc::new(template_engine),
         tinker_secret,
     };
 

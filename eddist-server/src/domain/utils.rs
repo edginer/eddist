@@ -2,6 +2,7 @@ use regex::Regex;
 use std::{collections::HashSet, fmt::Debug, sync::OnceLock};
 
 static ANCHOR_REGEX: OnceLock<Regex> = OnceLock::new();
+static SANITIZE_NUM_REFS_REGEX: OnceLock<Regex> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct SimpleSecret(String);
@@ -35,7 +36,7 @@ pub fn sanitize_base(input: &str, is_body: bool) -> String {
 
 pub fn sanitize_num_refs(input: &str) -> String {
     // Delete all of semicolon closing \n character references
-    let re = Regex::new(r"&#([Xx]0*[aA]|0*10);").unwrap();
+    let re = SANITIZE_NUM_REFS_REGEX.get_or_init(|| Regex::new(r"&#([Xx]0*[aA]|0*10);").unwrap());
     let rn_sanitized = re.replace_all(input, "");
 
     sanitize_ascii_numeric_character_reference(&sanitize_non_semi_closing_num_char_refs(

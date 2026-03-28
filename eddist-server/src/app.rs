@@ -1,4 +1,4 @@
-use std::{env, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 use axum::{
     Extension, Json, Router,
@@ -58,7 +58,7 @@ pub struct AppState {
     >,
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
-    pub template_engine: Handlebars<'static>,
+    pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
 }
 
