@@ -144,7 +144,10 @@ pub async fn delete_authed_token(
     Ok(StatusCode::OK)
 }
 
-async fn publish_token_revoked(conn: &mut redis::aio::ConnectionManager, authed_token_id: Uuid) {
+pub(crate) async fn publish_token_revoked(
+    conn: &mut redis::aio::ConnectionManager,
+    authed_token_id: Uuid,
+) {
     match serde_json::to_string(&AuthTokenRevoked { authed_token_id }) {
         Ok(payload) => {
             let _: Result<(), _> = conn.publish(CHANNEL_AUTH_TOKEN_REVOKED, payload).await;

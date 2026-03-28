@@ -18,7 +18,8 @@ use crate::{
     },
 };
 use eddist_core::{
-    domain::pubsub_repository::AuthTokenInitiated, utils::is_auth_token_pub_enabled,
+    domain::pubsub_repository::AuthTokenInitiated, redis_keys::authed_token_suspended_key,
+    utils::is_auth_token_pub_enabled,
 };
 
 pub static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
@@ -138,7 +139,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         }
 
         // Check temporary suspension flag in Redis
-        let suspension_key = format!("authed_token:suspended:{}", authed_token.id);
+        let suspension_key = authed_token_suspended_key(&authed_token.id.to_string());
         let mut conn = self.redis_conn.clone();
         let is_suspended = conn
             .exists::<_, bool>(&suspension_key)
