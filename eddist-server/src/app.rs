@@ -12,7 +12,10 @@ use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
 use tower_http::{
-    catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
+    catch_panic::CatchPanicLayer,
+    classify::ServerErrorsFailureClass,
+    compression::CompressionLayer,
+    timeout::TimeoutLayer,
     trace::TraceLayer,
 };
 use tracing::{Span, info_span};
@@ -292,8 +295,12 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(10),
         ))
-        // NOTE: comment out for now (is is not confirmed in twinkle environment)
-        // .layer(CompressionLayer::new())
+        .layer(
+            CompressionLayer::new()
+                .gzip(true)
+                .br(false)
+                .quality(tower_http::CompressionLevel::Fastest),
+        )
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
