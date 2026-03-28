@@ -55,7 +55,7 @@ pub struct ListAuthedTokensParams<'a> {
 pub trait AuthedTokenRepository: Send + Sync {
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken>;
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()>;
-    async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<()>;
+    async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<Vec<Uuid>>;
     async fn list_authed_tokens(
         &self,
         params: ListAuthedTokensParams<'_>,
@@ -121,8 +121,26 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         Ok(())
     }
 
-    async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<()> {
-        let query = query!(
+    async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+        let affected_ids = query!(
+            r#"
+            SELECT id FROM authed_tokens
+            WHERE validity = 1
+              AND origin_ip IN (
+                SELECT origin_ip FROM (
+                    SELECT origin_ip FROM authed_tokens WHERE id = ?
+                ) tmp
+              )
+            "#,
+            id.as_bytes().to_vec(),
+        )
+        .fetch_all(&self.0)
+        .await?
+        .into_iter()
+        .map(|r| Uuid::from_slice(&r.id).unwrap())
+        .collect::<Vec<_>>();
+
+        query!(
             r#"
             UPDATE
                 authed_tokens
@@ -141,11 +159,11 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
                 )
         "#,
             id.as_bytes().to_vec(),
-        );
+        )
+        .execute(&self.0)
+        .await?;
 
-        query.execute(&self.0).await?;
-
-        Ok(())
+        Ok(affected_ids)
     }
 
     async fn list_authed_tokens(

@@ -3,8 +3,8 @@ use redis::{AsyncCommands, aio::ConnectionManager};
 use crate::{
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
     repositories::idp_repository::IdpRepository,
-    utils::redis::{user_reg_oauth2_authreq_key, user_reg_oauth2_state_key},
 };
+use eddist_core::redis_keys::{user_reg_oauth2_authreq_key, user_reg_oauth2_state_key};
 
 use super::AppService;
 

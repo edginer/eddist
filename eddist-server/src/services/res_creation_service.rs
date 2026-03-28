@@ -42,8 +42,8 @@ use crate::{
         bbs_repository::BbsRepository,
         user_repository::UserRepository,
     },
-    utils::redis::thread_cache_key,
 };
+use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
     BbsCgiService,

@@ -20,10 +20,10 @@ use crate::{
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
-    utils::{
-        TransactionRepository,
-        redis::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
-    },
+    utils::TransactionRepository,
+};
+use eddist_core::redis_keys::{
+    user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key,
 };
 
 use super::AppService;

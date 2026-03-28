@@ -1,6 +1,6 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::utils::redis::user_session_key;
+use eddist_core::redis_keys::user_session_key;
 
 use super::AppService;
 

@@ -6,8 +6,8 @@ use crate::{
         service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
     },
     repositories::idp_repository::IdpRepository,
-    utils::redis::user_login_oauth2_authreq_key,
 };
+use eddist_core::redis_keys::user_login_oauth2_authreq_key;
 
 use super::AppService;
 

@@ -1,10 +1,8 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
 
-use crate::{
-    repositories::{idp_repository::IdpRepository, user_repository::UserRepository},
-    utils::redis::user_session_key,
-};
+use crate::repositories::{idp_repository::IdpRepository, user_repository::UserRepository};
+use eddist_core::redis_keys::user_session_key;
 
 use super::AppService;
 

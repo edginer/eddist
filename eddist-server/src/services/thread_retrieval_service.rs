@@ -1,10 +1,8 @@
 use anyhow::anyhow;
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{
-    domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,
-    utils::redis::thread_cache_key,
-};
+use crate::{domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository};
+use eddist_core::redis_keys::thread_cache_key;
 
 use super::AppService;
 

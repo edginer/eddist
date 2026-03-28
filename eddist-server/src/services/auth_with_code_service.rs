@@ -16,13 +16,13 @@ use crate::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
     repositories::{bbs_pubsub_repository::CreationEventRepository, bbs_repository::BbsRepository},
-    utils::redis::user_reg_temp_url_register_key,
 };
 use eddist_core::{
     domain::{
         ip_addr::ReducedIpAddr,
         pubsub_repository::{AuthTokenRequested, AuthTokenSucceeded},
     },
+    redis_keys::user_reg_temp_url_register_key,
     utils::is_auth_token_pub_enabled,
 };
 use rand::{RngExt, distr::Uniform};

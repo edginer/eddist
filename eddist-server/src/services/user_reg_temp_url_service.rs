@@ -12,10 +12,10 @@ use crate::{
         bbs_repository::BbsRepository, idp_repository::IdpRepository,
         user_repository::UserRepository,
     },
-    utils::{
-        TransactionRepository,
-        redis::{user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key},
-    },
+    utils::TransactionRepository,
+};
+use eddist_core::redis_keys::{
+    user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key,
 };
 
 use super::AppService;

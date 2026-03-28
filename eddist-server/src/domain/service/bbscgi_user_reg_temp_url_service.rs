@@ -1,13 +1,11 @@
 use rand::{RngExt, distr::Uniform};
 use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{
-    domain::{
-        authed_token::AuthedToken,
-        user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
-    },
-    utils::redis::user_reg_temp_url_register_key,
+use crate::domain::{
+    authed_token::AuthedToken,
+    user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
 };
+use eddist_core::redis_keys::user_reg_temp_url_register_key;
 
 pub const USER_REG_TEMP_URL_LEN: usize = 5;
 

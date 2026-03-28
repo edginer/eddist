@@ -1,18 +1,39 @@
 use std::{convert::Infallible, env};
 
 use eddist_core::{
-    domain::pubsub_repository::{CreatingRes, PubSubItem},
+    domain::pubsub_repository::{
+        AuthTokenRevoked, AuthTokenSucceeded, CHANNEL_AUTH_TOKEN_REVOKED,
+        CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, CreatingRes, PubSubItem,
+    },
     tracing::init_tracing,
-    utils::is_prod,
+    utils::{is_authed_token_backup_enabled, is_prod},
 };
 use futures::StreamExt;
 use hyper::{Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
-use sqlx::{Connection, QueryBuilder, query};
+use s3::creds::Credentials;
+use serde::Serialize;
+use sqlx::{Connection, QueryBuilder, Row, query};
 use tokio::net::TcpListener;
 use tokio::{join, select, time::sleep};
-use tracing::{error_span, info_span};
+use tracing::{error_span, info_span, warn};
+use uuid::Uuid;
+
+#[derive(Serialize)]
+struct BackupToken {
+    id: String,
+    token: String,
+    origin_ip: String,
+    reduced_origin_ip: String,
+    asn_num: i32,
+    writing_ua: String,
+    authed_ua: Option<String>,
+    created_at: chrono::NaiveDateTime,
+    authed_at: Option<chrono::NaiveDateTime>,
+    last_wrote_at: Option<chrono::NaiveDateTime>,
+    additional_info: Option<serde_json::Value>,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,6 +72,30 @@ async fn main() -> anyhow::Result<()> {
         ctrl_c_tx.send(()).unwrap();
     });
 
+    let s3_bucket = if is_authed_token_backup_enabled() {
+        Some(std::sync::Arc::from(s3::bucket::Bucket::new(
+            env::var("S3_BUCKET_NAME").unwrap().trim(),
+            s3::Region::R2 {
+                account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
+            },
+            Credentials::new(
+                Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
+                Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
+                None,
+                None,
+                None,
+            )?,
+        )?))
+    } else {
+        None
+    };
+
+    let db_pool = if is_authed_token_backup_enabled() {
+        Some(sqlx::MySqlPool::connect(&env::var("DATABASE_URL").unwrap()).await?)
+    } else {
+        None
+    };
+
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let pubsub_conn = client.get_async_pubsub().await?;
     let conn = client.get_connection_manager().await?;
@@ -59,6 +104,8 @@ async fn main() -> anyhow::Result<()> {
         pubsub_conn,
         conn: conn.clone(),
         cancel: ctrl_c_sub_sub,
+        s3_bucket,
+        db_pool,
     };
 
     let subscribe_handle = tokio::spawn(async move { sub_repo.subscribe().await });
@@ -275,7 +322,7 @@ async fn insert_multiple_res(
                 r#"
             WITH response_count AS (
                 SELECT COUNT(*) AS cnt
-                FROM responses     
+                FROM responses
                 WHERE thread_id = ?
             ) UPDATE threads
             SET response_count = (SELECT cnt FROM response_count),
@@ -299,6 +346,8 @@ struct RedisSubRepository {
     pubsub_conn: redis::aio::PubSub,
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
+    s3_bucket: Option<std::sync::Arc<s3::Bucket>>,
+    db_pool: Option<sqlx::MySqlPool>,
 }
 
 trait SubRepository {
@@ -309,10 +358,21 @@ impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         let mut error_count = 0u32;
         let redis_url = env::var("REDIS_URL").unwrap();
+        let backup_enabled = self.s3_bucket.is_some();
+        let channels: Vec<&str> = if backup_enabled {
+            vec![
+                CHANNEL_PUBSUB_ITEM,
+                CHANNEL_AUTH_TOKEN_SUCCEEDED,
+                CHANNEL_AUTH_TOKEN_REVOKED,
+            ]
+        } else {
+            vec![CHANNEL_PUBSUB_ITEM]
+        };
 
         loop {
-            // (Re)subscribe to the channel
-            if let Err(e) = self.pubsub_conn.subscribe("bbs:pubsubitem").await {
+            let subscribe_result = self.pubsub_conn.subscribe(channels.as_slice()).await;
+
+            if let Err(e) = subscribe_result {
                 error_span!(
                     "Failed to subscribe to Redis pubsub",
                     error = e.to_string().as_str()
@@ -404,7 +464,7 @@ impl SubRepository for RedisSubRepository {
             }
         }
 
-        let _ = self.pubsub_conn.unsubscribe("bbs:pubsubitem").await;
+        let _ = self.pubsub_conn.unsubscribe(channels.as_slice()).await;
 
         Ok(())
     }
@@ -428,6 +488,8 @@ impl RedisSubRepository {
                 return Ok(false);
             };
 
+            let channel = msg.get_channel::<String>().unwrap_or_default();
+
             info_span!(
                 "received pubsub message",
                 payload = msg.get_payload::<String>().unwrap_or_default().as_str()
@@ -444,37 +506,132 @@ impl RedisSubRepository {
                 }
             };
 
-            let item = match serde_json::from_str::<PubSubItem>(&payload) {
-                Ok(i) => i,
-                Err(e) => {
-                    error_span!(
-                        "Failed to parse pubsub item",
-                        error = e.to_string().as_str()
-                    );
-                    continue;
-                }
-            };
+            match channel.as_str() {
+                ch if ch == CHANNEL_PUBSUB_ITEM => {
+                    let item = match serde_json::from_str::<PubSubItem>(&payload) {
+                        Ok(i) => i,
+                        Err(e) => {
+                            error_span!(
+                                "Failed to parse pubsub item",
+                                error = e.to_string().as_str()
+                            );
+                            continue;
+                        }
+                    };
 
-            match item {
-                PubSubItem::CreatingRes(res) => {
-                    let mut conn = self.conn.clone();
-                    let res = serde_json::to_string(&res)?;
+                    match item {
+                        PubSubItem::CreatingRes(res) => {
+                            let mut conn = self.conn.clone();
+                            let res = serde_json::to_string(&res)?;
 
-                    if let Err(e) = conn
-                        .rpush::<'_, _, _, ()>("bbs:db_failed_cache:res", res)
-                        .await
-                    {
-                        error_span!(
-                            "Failed to push to Redis cache",
-                            error = e.to_string().as_str()
-                        );
-                        return Ok(false); // Connection likely lost
+                            if let Err(e) = conn
+                                .rpush::<'_, _, _, ()>("bbs:db_failed_cache:res", res)
+                                .await
+                            {
+                                error_span!(
+                                    "Failed to push to Redis cache",
+                                    error = e.to_string().as_str()
+                                );
+                                return Ok(false); // Connection likely lost
+                            }
+                        }
+                        PubSubItem::Shutdown => {
+                            return Ok(true); // Shutdown requested
+                        }
                     }
                 }
-                PubSubItem::Shutdown => {
-                    return Ok(true); // Shutdown requested
+                ch if ch == CHANNEL_AUTH_TOKEN_SUCCEEDED => {
+                    let event = match serde_json::from_str::<AuthTokenSucceeded>(&payload) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            error_span!(
+                                "Failed to parse AuthTokenSucceeded",
+                                error = e.to_string().as_str()
+                            );
+                            continue;
+                        }
+                    };
+                    let token_id = event.authed_token_id;
+                    if let (Some(pool), Some(bucket)) =
+                        (self.db_pool.as_ref(), self.s3_bucket.as_ref())
+                    {
+                        let pool = pool.clone();
+                        let bucket = bucket.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = backup_token(&pool, &bucket, token_id).await {
+                                warn!("Failed to backup token {token_id}: {e}");
+                            }
+                        });
+                    }
                 }
+                ch if ch == CHANNEL_AUTH_TOKEN_REVOKED => {
+                    let event = match serde_json::from_str::<AuthTokenRevoked>(&payload) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            error_span!(
+                                "Failed to parse AuthTokenRevoked",
+                                error = e.to_string().as_str()
+                            );
+                            continue;
+                        }
+                    };
+                    let token_id = event.authed_token_id;
+                    if let Some(bucket) = self.s3_bucket.as_ref() {
+                        let bucket = bucket.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = remove_token_backup(&bucket, token_id).await {
+                                warn!("Failed to remove token backup {token_id}: {e}");
+                            }
+                        });
+                    }
+                }
+                _ => {}
             }
         }
     }
+}
+
+async fn backup_token(
+    pool: &sqlx::MySqlPool,
+    bucket: &s3::Bucket,
+    token_id: Uuid,
+) -> anyhow::Result<()> {
+    let row = sqlx::query(
+        "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, \
+         created_at, authed_at, last_wrote_at, additional_info \
+         FROM authed_tokens WHERE id = ?",
+    )
+    .bind(token_id.as_bytes().to_vec())
+    .fetch_one(pool)
+    .await?;
+
+    let backup = BackupToken {
+        id: token_id.to_string(),
+        token: row.try_get("token")?,
+        origin_ip: row.try_get("origin_ip")?,
+        reduced_origin_ip: row.try_get("reduced_origin_ip")?,
+        asn_num: row.try_get("asn_num")?,
+        writing_ua: row.try_get("writing_ua")?,
+        authed_ua: row.try_get("authed_ua")?,
+        created_at: row.try_get("created_at")?,
+        authed_at: row.try_get("authed_at")?,
+        last_wrote_at: row.try_get("last_wrote_at")?,
+        additional_info: row
+            .try_get::<Option<serde_json::Value>, _>("additional_info")
+            .unwrap_or_default(),
+    };
+
+    let bytes = serde_json::to_vec(&backup)?;
+    bucket
+        .put_object(format!("authed_tokens/{token_id}.json"), &bytes)
+        .await?;
+
+    Ok(())
+}
+
+async fn remove_token_backup(bucket: &s3::Bucket, token_id: Uuid) -> anyhow::Result<()> {
+    bucket
+        .delete_object(format!("authed_tokens/{token_id}.json"))
+        .await?;
+    Ok(())
 }

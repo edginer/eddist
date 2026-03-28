@@ -42,6 +42,13 @@ pub fn is_auth_token_pub_enabled() -> bool {
     })
 }
 
+pub fn is_authed_token_backup_enabled() -> bool {
+    matches!(
+        std::env::var("ENABLE_AUTHED_TOKEN_BACKUP").as_deref(),
+        Ok("true")
+    )
+}
+
 pub fn to_ja_datetime(datetime: DateTime<chrono::Utc>) -> String {
     let datetime = datetime.checked_add_signed(TimeDelta::hours(9)).unwrap();
     let weekday = datetime.weekday();
