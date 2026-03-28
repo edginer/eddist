@@ -1311,6 +1311,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "eddist-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dotenvy",
+ "eddist-core",
+ "futures",
+ "rust-s3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "eddist-core"
 version = "0.1.0"
 dependencies = [

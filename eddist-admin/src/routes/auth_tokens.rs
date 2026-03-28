@@ -123,24 +123,22 @@ pub async fn delete_authed_token(
     Path(authed_token_id): Path<Uuid>,
     Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
 ) -> Result<StatusCode, ApiError> {
-    if !using_origin_ip {
+    let affected_ids = if !using_origin_ip {
         state
             .authed_token_repo
             .delete_authed_token(authed_token_id)
             .await?;
-        if is_authed_token_backup_enabled() {
-            publish_token_revoked(&mut state.redis_conn.clone(), authed_token_id).await;
-        }
+        vec![authed_token_id]
     } else {
-        let affected_ids = state
+        state
             .authed_token_repo
             .delete_authed_token_by_origin_ip(authed_token_id)
-            .await?;
-        if is_authed_token_backup_enabled() {
-            let mut conn = state.redis_conn.clone();
-            for id in affected_ids {
-                publish_token_revoked(&mut conn, id).await;
-            }
+            .await?
+    };
+    if is_authed_token_backup_enabled() {
+        let mut conn = state.redis_conn.clone();
+        for id in affected_ids {
+            publish_token_revoked(&mut conn, id).await;
         }
     }
     Ok(StatusCode::OK)

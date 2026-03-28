@@ -1,4 +1,5 @@
 pub mod domain {
+    pub mod authed_token_backup;
     pub mod board;
     pub mod cap;
     pub mod client_info;

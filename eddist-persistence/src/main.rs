@@ -1,9 +1,12 @@
 use std::{convert::Infallible, env};
 
 use eddist_core::{
-    domain::pubsub_repository::{
-        AuthTokenRevoked, AuthTokenSucceeded, CHANNEL_AUTH_TOKEN_REVOKED,
-        CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, CreatingRes, PubSubItem,
+    domain::{
+        authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup},
+        pubsub_repository::{
+            AuthTokenRevoked, AuthTokenSucceeded, CHANNEL_AUTH_TOKEN_REVOKED,
+            CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, CreatingRes, PubSubItem,
+        },
     },
     tracing::init_tracing,
     utils::{is_authed_token_backup_enabled, is_prod},
@@ -13,27 +16,11 @@ use hyper::{Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use redis::AsyncCommands;
 use s3::creds::Credentials;
-use serde::Serialize;
 use sqlx::{Connection, QueryBuilder, Row, query};
 use tokio::net::TcpListener;
 use tokio::{join, select, time::sleep};
 use tracing::{error_span, info_span, warn};
 use uuid::Uuid;
-
-#[derive(Serialize)]
-struct BackupToken {
-    id: String,
-    token: String,
-    origin_ip: String,
-    reduced_origin_ip: String,
-    asn_num: i32,
-    writing_ua: String,
-    authed_ua: Option<String>,
-    created_at: chrono::NaiveDateTime,
-    authed_at: Option<chrono::NaiveDateTime>,
-    last_wrote_at: Option<chrono::NaiveDateTime>,
-    additional_info: Option<serde_json::Value>,
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -598,14 +585,14 @@ async fn backup_token(
 ) -> anyhow::Result<()> {
     let row = sqlx::query(
         "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, \
-         created_at, authed_at, last_wrote_at, additional_info \
+         auth_code, created_at, authed_at, last_wrote_at, additional_info \
          FROM authed_tokens WHERE id = ?",
     )
     .bind(token_id.as_bytes().to_vec())
     .fetch_one(pool)
     .await?;
 
-    let backup = BackupToken {
+    let backup = AuthedTokenBackup {
         id: token_id.to_string(),
         token: row.try_get("token")?,
         origin_ip: row.try_get("origin_ip")?,
@@ -613,6 +600,7 @@ async fn backup_token(
         asn_num: row.try_get("asn_num")?,
         writing_ua: row.try_get("writing_ua")?,
         authed_ua: row.try_get("authed_ua")?,
+        auth_code: row.try_get("auth_code")?,
         created_at: row.try_get("created_at")?,
         authed_at: row.try_get("authed_at")?,
         last_wrote_at: row.try_get("last_wrote_at")?,
@@ -623,7 +611,7 @@ async fn backup_token(
 
     let bytes = serde_json::to_vec(&backup)?;
     bucket
-        .put_object(format!("authed_tokens/{token_id}.json"), &bytes)
+        .put_object(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"), &bytes)
         .await?;
 
     Ok(())
@@ -631,7 +619,7 @@ async fn backup_token(
 
 async fn remove_token_backup(bucket: &s3::Bucket, token_id: Uuid) -> anyhow::Result<()> {
     bucket
-        .delete_object(format!("authed_tokens/{token_id}.json"))
+        .delete_object(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"))
         .await?;
     Ok(())
 }
