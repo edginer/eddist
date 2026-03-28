@@ -60,14 +60,18 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let s3_bucket = if is_authed_token_backup_enabled() {
+        let bucket_name = env::var("S3_BUCKET_NAME")?;
+        let account_id = env::var("R2_ACCOUNT_ID")?;
+        let access_key = env::var("S3_ACCESS_KEY")?;
+        let secret_key = env::var("S3_ACCESS_SECRET_KEY")?;
         Some(std::sync::Arc::from(s3::bucket::Bucket::new(
-            env::var("S3_BUCKET_NAME").unwrap().trim(),
+            bucket_name.trim(),
             s3::Region::R2 {
-                account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
+                account_id: account_id.trim().to_string(),
             },
             Credentials::new(
-                Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
-                Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
+                Some(access_key.trim()),
+                Some(secret_key.trim()),
                 None,
                 None,
                 None,
@@ -78,7 +82,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let db_pool = if is_authed_token_backup_enabled() {
-        Some(sqlx::MySqlPool::connect(&env::var("DATABASE_URL").unwrap()).await?)
+        let database_url = env::var("DATABASE_URL")?;
+        Some(sqlx::MySqlPool::connect(&database_url).await?)
     } else {
         None
     };
@@ -597,7 +602,8 @@ async fn backup_token(
             created_at,
             authed_at,
             last_wrote_at,
-            additional_info AS "additional_info: serde_json::Value"
+            additional_info AS "additional_info: serde_json::Value",
+            author_id_seed AS "author_id_seed!: Vec<u8>"
         FROM authed_tokens WHERE id = ?"#,
         token_id.as_bytes().to_vec()
     )

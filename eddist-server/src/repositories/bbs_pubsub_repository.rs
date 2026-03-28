@@ -1,14 +1,13 @@
 use eddist_core::domain::pubsub_repository::{
-    AuthTokenInitiated, AuthTokenRequested, AuthTokenRevoked, AuthTokenSucceeded, CreatingRes,
-    PubSubItem,
+    AuthTokenInitiated, AuthTokenRequested, AuthTokenSucceeded, CreatingRes, PubSubItem,
 };
 use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
 
 use super::bbs_repository::CreatingThread;
 use eddist_core::redis_keys::{
-    CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_REVOKED,
-    CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_RES_CREATED, CHANNEL_THREAD_CREATED,
+    CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_SUCCEEDED,
+    CHANNEL_RES_CREATED, CHANNEL_THREAD_CREATED,
 };
 
 #[derive(Clone)]
@@ -77,10 +76,6 @@ pub trait CreationEventRepository: Clone + 'static + Send + Sync {
         &self,
         event: AuthTokenSucceeded,
     ) -> Result<(), anyhow::Error>;
-    async fn publish_auth_token_revoked(
-        &self,
-        event: AuthTokenRevoked,
-    ) -> Result<(), anyhow::Error>;
 }
 
 #[async_trait::async_trait]
@@ -114,14 +109,6 @@ impl CreationEventRepository for RedisCreationEventRepository {
         event: AuthTokenSucceeded,
     ) -> Result<(), anyhow::Error> {
         self.publish_to_channel(CHANNEL_AUTH_TOKEN_SUCCEEDED, event)
-            .await
-    }
-
-    async fn publish_auth_token_revoked(
-        &self,
-        event: AuthTokenRevoked,
-    ) -> Result<(), anyhow::Error> {
-        self.publish_to_channel(CHANNEL_AUTH_TOKEN_REVOKED, event)
             .await
     }
 }

@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
 use s3::creds::Credentials;
-use sha2::Digest;
 use std::{collections::HashSet, env, sync::Arc};
 use uuid::Uuid;
 
@@ -83,7 +82,8 @@ async fn backup() -> Result<()> {
             created_at,
             authed_at,
             last_wrote_at,
-            additional_info AS "additional_info: serde_json::Value"
+            additional_info AS "additional_info: serde_json::Value",
+            author_id_seed AS "author_id_seed!: Vec<u8>"
         FROM authed_tokens WHERE validity = 1"#
     )
     .fetch_all(&pool)
@@ -195,31 +195,28 @@ async fn recover() -> Result<()> {
                 let data = bucket.get_object(&key).await?;
                 let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
 
-                // author_id_seed is not stored in the backup; recompute from reduced_origin_ip
-                // to match the formula in the add_author_id_generation_col migration.
-                let author_id_seed = sha2::Sha512::digest(token.reduced_origin_ip.as_bytes());
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
 
-                let result = sqlx::query(
-                    "INSERT IGNORE INTO authed_tokens \
-                     (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, \
-                      auth_code, created_at, authed_at, validity, last_wrote_at, \
-                      author_id_seed, additional_info) \
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+                let result = sqlx::query!(
+                    r#"INSERT IGNORE INTO authed_tokens
+                       (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+                        auth_code, created_at, authed_at, validity, last_wrote_at,
+                        author_id_seed, additional_info)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)"#,
+                    token.id.as_bytes().as_ref(),
+                    token.token,
+                    token.origin_ip,
+                    token.reduced_origin_ip,
+                    token.asn_num,
+                    token.writing_ua,
+                    token.authed_ua,
+                    auth_code,
+                    token.created_at,
+                    token.authed_at,
+                    token.last_wrote_at,
+                    token.author_id_seed,
+                    token.additional_info,
                 )
-                .bind(token.id.as_bytes().to_vec())
-                .bind(&token.token)
-                .bind(&token.origin_ip)
-                .bind(&token.reduced_origin_ip)
-                .bind(token.asn_num)
-                .bind(&token.writing_ua)
-                .bind(&token.authed_ua)
-                .bind(auth_code)
-                .bind(token.created_at)
-                .bind(token.authed_at)
-                .bind(token.last_wrote_at)
-                .bind(author_id_seed.as_slice())
-                .bind(&token.additional_info)
                 .execute(&pool)
                 .await?;
 
