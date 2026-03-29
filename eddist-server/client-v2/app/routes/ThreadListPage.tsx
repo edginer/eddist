@@ -1,6 +1,16 @@
 import { Button } from "flowbite-react";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaBookmark,
+  FaCog,
+  FaHistory,
+  FaPen,
+  FaSort,
+  FaSortDown,
+  FaSortUp,
+  FaSync,
+} from "react-icons/fa";
 import { Link, useParams } from "react-router";
 import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
@@ -8,6 +18,8 @@ import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
+import { useThreadHistory } from "~/contexts/ThreadHistoryContext";
+import { useUISettings } from "~/contexts/UISettingsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { getSelectedTextInElement } from "~/utils/selection";
@@ -19,6 +31,9 @@ const LazyNGWordsSettingsModal = lazy(() =>
   import("../components/NGWordsSettingsModal").then((m) => ({
     default: m.NGWordsSettingsModal,
   })),
+);
+const LazyHistoryModal = lazy(() =>
+  import("../components/HistoryModal").then((m) => ({ default: m.HistoryModal })),
 );
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
@@ -121,8 +136,12 @@ const ThreadListPage = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasEverOpenedThread = useRef(false);
   const hasEverOpenedNGSettings = useRef(false);
+  const hasEverOpenedHistory = useRef(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const { shouldFilterThread } = useNGWords();
+  const { getHistoryEntry, isFavorite } = useThreadHistory();
+  const { settings: uiSettings } = useUISettings();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(null);
   const [selectedTitleText, setSelectedTitleText] = useState<string | null>(null);
@@ -249,6 +268,20 @@ const ThreadListPage = ({
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
+        {uiSettings.showHistoryButtons &&
+          (uiSettings.enableFavorites || uiSettings.enableReadHistory) && (
+            <button
+              type="button"
+              onClick={() => {
+                hasEverOpenedHistory.current = true;
+                setShowHistory(true);
+              }}
+              className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+              title="履歴・お気に入り"
+            >
+              <FaHistory className="w-4 h-4" />
+            </button>
+          )}
         <button
           type="button"
           onClick={() => {
@@ -256,7 +289,7 @@ const ThreadListPage = ({
             setShowNGSettings(true);
           }}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
-          title="NG設定"
+          title="設定"
         >
           <FaCog className="w-4 h-4" />
         </button>
@@ -299,6 +332,11 @@ const ThreadListPage = ({
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
             <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
+          </Suspense>
+        )}
+        {hasEverOpenedHistory.current && (
+          <Suspense fallback={null}>
+            <LazyHistoryModal open={showHistory} setOpen={setShowHistory} />
           </Suspense>
         )}
       </header>
@@ -387,60 +425,77 @@ const ThreadListPage = ({
       )}
 
       <div className="flex flex-col lg:grow">
-        {filteredThreadList.map((thread, i) => (
-          <div key={thread.id} className="block">
-            {i !== 0 && (
-              <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
-            )}
-            <Link
-              to={`/${params.boardKey}/${thread.id}`}
-              className="hover:bg-gray-200 dark:hover:bg-gray-700 cursor-default text-left block w-full bg-gray-100 dark:bg-gray-800 p-2 lg:p-3 select-none md:select-auto"
-              data-ng-target="title"
-              data-ng-thread-id={thread.id}
-              {...contextMenuHandlers}
-              onMouseDown={(e) => {
-                // Capture selection before it gets cleared by right-click
-                if (e.button === 2) {
-                  // Right mouse button
-                  capturedSelectionRef.current = getSelectedTextInElement(e.currentTarget);
-                }
-              }}
-              onContextMenu={(e) => {
-                // Use captured selection from mousedown
-                const selectedText = capturedSelectionRef.current;
-                capturedSelectionRef.current = null; // Clear after use
-                contextMenuHandlers.onContextMenu(e);
-                setContextMenuThread(thread);
-                setSelectedTitleText(selectedText);
-              }}
-              onTouchStart={(e) => {
-                const selectedText = getSelectedTextInElement(e.currentTarget);
-                contextMenuHandlers.onTouchStart(e);
-                setContextMenuThread(thread);
-                setSelectedTitleText(selectedText);
-              }}
-            >
-              <div>
-                <span
-                  className="break-all"
-                  // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread title rendered as HTML
-                  dangerouslySetInnerHTML={{
-                    __html: thread.title,
-                  }}
-                />
-                <span> ({thread.responseCount})</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>{convertLinuxTimeToDateString(thread.id)}</span>
-                {thread.authorId && <span>ID:{thread.authorId}</span>}
-                <span className="text-blue-600 font-semibold">
-                  {calculateThreadSpeed(thread.id, thread.responseCount, currentTime)}
-                  /day
-                </span>
-              </div>
-            </Link>
-          </div>
-        ))}
+        {filteredThreadList.map((thread, i) => {
+          const historyEntry = getHistoryEntry(params.boardKey ?? "", thread.id.toString());
+          const unread = historyEntry ? thread.responseCount - historyEntry.lastReadCount : null;
+          return (
+            <div key={thread.id} className="block">
+              {i !== 0 && (
+                <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
+              )}
+              <Link
+                to={`/${params.boardKey}/${thread.id}`}
+                className={twMerge(
+                  "hover:bg-gray-200 dark:hover:bg-gray-700 cursor-default text-left block w-full bg-gray-100 dark:bg-gray-800 p-2 lg:p-3 select-none md:select-auto border-l-4",
+                  unread === null
+                    ? "border-transparent"
+                    : unread > 0
+                      ? "border-blue-500"
+                      : "border-green-400 dark:border-green-500",
+                )}
+                data-ng-target="title"
+                data-ng-thread-id={thread.id}
+                {...contextMenuHandlers}
+                onMouseDown={(e) => {
+                  // Capture selection before it gets cleared by right-click
+                  if (e.button === 2) {
+                    // Right mouse button
+                    capturedSelectionRef.current = getSelectedTextInElement(e.currentTarget);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  // Use captured selection from mousedown
+                  const selectedText = capturedSelectionRef.current;
+                  capturedSelectionRef.current = null; // Clear after use
+                  contextMenuHandlers.onContextMenu(e);
+                  setContextMenuThread(thread);
+                  setSelectedTitleText(selectedText);
+                }}
+                onTouchStart={(e) => {
+                  const selectedText = getSelectedTextInElement(e.currentTarget);
+                  contextMenuHandlers.onTouchStart(e);
+                  setContextMenuThread(thread);
+                  setSelectedTitleText(selectedText);
+                }}
+              >
+                <div>
+                  <span
+                    className="break-all"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread title rendered as HTML
+                    dangerouslySetInnerHTML={{
+                      __html: thread.title,
+                    }}
+                  />
+                  <span> ({thread.responseCount})</span>
+                  {unread !== null && unread > 0 && (
+                    <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">+{unread}</span>
+                  )}
+                  {isFavorite(params.boardKey ?? "", thread.id.toString()) && (
+                    <FaBookmark className="inline-block ml-1.5 mb-0.5 text-yellow-400" size={11} />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{convertLinuxTimeToDateString(thread.id)}</span>
+                  {thread.authorId && <span>ID:{thread.authorId}</span>}
+                  <span className="text-blue-600 font-semibold">
+                    {calculateThreadSpeed(thread.id, thread.responseCount, currentTime)}
+                    /day
+                  </span>
+                </div>
+              </Link>
+            </div>
+          );
+        })}
       </div>
 
       {menuState.isOpen && contextMenuThread && (
