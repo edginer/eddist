@@ -6,8 +6,6 @@ node_modules/
 .idea/
 .pnpm-store/
 
-# Claude Code files
-.claude/
-.cursor/
-CLAUDE.md
-.serena/
+tmp/
+
+.claude/settings.local.json
