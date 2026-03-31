@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use metrics::counter;
 use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository};
@@ -33,8 +34,12 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
             )
             .await
         {
-            Ok(sjis_result) if !sjis_result.is_empty() => Ok(ThreadResListRaw { raw: sjis_result }),
+            Ok(sjis_result) if !sjis_result.is_empty() => {
+                counter!("dat_retrieval", "source" => "cache").increment(1);
+                Ok(ThreadResListRaw { raw: sjis_result })
+            }
             _ => {
+                counter!("dat_retrieval", "source" => "db").increment(1);
                 let Some(board) = self.0.get_board(&input.board_key).await? else {
                     return Err(anyhow!("failed to find board"));
                 };

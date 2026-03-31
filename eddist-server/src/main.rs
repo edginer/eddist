@@ -203,6 +203,10 @@ async fn main() -> anyhow::Result<()> {
     describe_counter!("auth_code_success", "auth code success count");
     describe_counter!("response_creation", "response creation count if success");
     describe_counter!("thread_creation", "thread creation count if success");
+    describe_counter!(
+        "dat_retrieval",
+        "dat file retrieval count by source (cache or db)"
+    );
 
     let app = create_app(app_state, conn_mgr);
 
