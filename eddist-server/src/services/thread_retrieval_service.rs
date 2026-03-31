@@ -27,16 +27,18 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
         let mut redis_conn = self.1.clone();
 
         match redis_conn
-            .lrange::<_, Vec<u8>>(
+            .lrange::<_, Vec<Vec<u8>>>(
                 thread_cache_key(&input.board_key, input.thread_number),
                 0,
                 -1,
             )
             .await
         {
-            Ok(sjis_result) if !sjis_result.is_empty() => {
+            Ok(chunks) if !chunks.is_empty() => {
                 counter!("dat_retrieval", "source" => "cache").increment(1);
-                Ok(ThreadResListRaw { raw: sjis_result })
+                Ok(ThreadResListRaw {
+                    raw: chunks.into_iter().flatten().collect(),
+                })
             }
             _ => {
                 counter!("dat_retrieval", "source" => "db").increment(1);
