@@ -3,7 +3,9 @@ mod common;
 use axum::body::Bytes;
 use common::TestContext;
 use eddist::test_helpers::*;
+use eddist_core::redis_keys::thread_cache_key;
 use http::{HeaderName, HeaderValue};
+use redis::AsyncCommands;
 
 /// Test 1: GET thread list via HTTP
 #[tokio::test]
@@ -302,4 +304,104 @@ async fn test_auth_code_with_create_response() {
     })
     .await
     .expect("Failed to get correct DAT response");
+}
+
+/// Test 6: Cache and DB return identical dat bytes
+#[tokio::test]
+async fn test_dat_cache_and_db_parity() {
+    let mut ctx = TestContext::new().await;
+
+    let board_key = "test6";
+    let _board_id = create_test_board(&ctx.pool, board_key, "テスト板6").await;
+    let (_token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.6", "code-test6").await;
+
+    // Create a thread with multiple responses via bbs.cgi so Redis cache is populated
+    let form_data = encode_sjis_form(&[
+        ("bbs", board_key),
+        ("submit", "新規スレッド作成"),
+        ("subject", "キャッシュ整合性テスト"),
+        ("FROM", "テスト太郎"),
+        ("mail", ""),
+        ("MESSAGE", "1番目のレスポンス"),
+    ]);
+    ctx.server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={}", token)).unwrap(),
+        )
+        .bytes(Bytes::from(form_data.into_bytes()))
+        .await;
+
+    // Fetch the thread number from MySQL (thread_number = unix timestamp set at creation)
+    let row: (i64,) = sqlx::query_as("SELECT thread_number FROM threads WHERE board_id = (SELECT id FROM boards WHERE board_key = ?) LIMIT 1")
+        .bind(board_key)
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("Failed to fetch thread number");
+    let thread_number = row.0 as u64;
+
+    // Add more responses so the cache list has multiple items
+    for (i, body) in ["2番目のレスポンス", "3番目のレスポンス"]
+        .iter()
+        .enumerate()
+    {
+        let form_data = encode_sjis_form(&[
+            ("bbs", board_key),
+            ("submit", "書き込む"),
+            ("key", &thread_number.to_string()),
+            ("FROM", &format!("ユーザー{}", i + 2)),
+            ("mail", ""),
+            ("MESSAGE", body),
+        ]);
+        ctx.server
+            .post("/test/bbs.cgi")
+            .content_type("application/x-www-form-urlencoded")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_str(&format!("edge-token={}", token)).unwrap(),
+            )
+            .bytes(Bytes::from(form_data.into_bytes()))
+            .await;
+    }
+
+    // Fetch from cache (Redis key should be populated by bbs.cgi writes)
+    let cache_response = ctx
+        .server
+        .get(&format!("/{board_key}/dat/{thread_number}.dat"))
+        .await;
+    assert_eq!(cache_response.status_code(), 200);
+    let cache_bytes = cache_response.as_bytes().to_vec();
+
+    // Verify cache was actually used: the Redis key must exist
+    let key = thread_cache_key(board_key, thread_number);
+    let list_len: usize = ctx
+        .redis_conn
+        .llen(&key)
+        .await
+        .expect("Failed to check Redis key");
+    assert!(
+        list_len > 0,
+        "Redis cache key should exist after bbs.cgi writes"
+    );
+
+    // Delete the Redis key to force the next request through the DB path
+    ctx.redis_conn
+        .del::<_, ()>(&key)
+        .await
+        .expect("Failed to delete Redis key");
+
+    // Fetch from DB (cache miss)
+    let db_response = ctx
+        .server
+        .get(&format!("/{board_key}/dat/{thread_number}.dat"))
+        .await;
+    assert_eq!(db_response.status_code(), 200);
+    let db_bytes = db_response.as_bytes().to_vec();
+
+    assert_eq!(
+        cache_bytes, db_bytes,
+        "Cache and DB must return identical dat bytes"
+    );
 }
