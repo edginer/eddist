@@ -12,6 +12,7 @@ pub struct TestContext {
     pub _redis_container: ContainerAsync<Redis>,
     pub pool: Pool<MySql>,
     pub server: TestServer,
+    pub redis_conn: redis::aio::ConnectionManager,
 }
 
 impl TestContext {
@@ -73,7 +74,7 @@ impl TestContext {
 
         println!("Redis is ready.");
 
-        let app = eddist::create_test_app(pool.clone(), redis_conn);
+        let app = eddist::create_test_app(pool.clone(), redis_conn.clone());
         let mut server = TestServer::new(app);
         server.add_header("CF-Connecting-IP", "localhost");
         server.add_header("X-ASN-Num", "1");
@@ -83,6 +84,7 @@ impl TestContext {
             _redis_container: redis_container,
             pool,
             server,
+            redis_conn,
         }
     }
 
