@@ -38,6 +38,17 @@ impl TestContext {
         let database_url = format!("mysql://root@127.0.0.1:{mysql_port}/test");
 
         let pool = MySqlPoolOptions::new()
+            .after_connect(|conn, _| {
+                use sqlx::Executor;
+                Box::pin(async move {
+                    conn.execute(
+                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                    )
+                    .await
+                    .unwrap();
+                    Ok(())
+                })
+            })
             .max_connections(5)
             .acquire_timeout(Duration::from_secs(10))
             .connect(&database_url)
