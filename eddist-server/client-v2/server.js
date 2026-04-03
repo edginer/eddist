@@ -1,3 +1,4 @@
+import "./instrumentation.js";
 import compression from "compression";
 import express from "express";
 import morgan from "morgan";

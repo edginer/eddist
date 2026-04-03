@@ -5,7 +5,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "start": "node --import ./instrumentation.js server.js",
+    "start": "node server.js",
     "lint": "biome lint --write ./app",
     "format": "biome format --write ./app",
     "check": "biome check --write ./app",

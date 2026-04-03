@@ -20,4 +20,4 @@ COPY server.js instrumentation.js /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build
 WORKDIR /app
-CMD ["node", "--import", "./instrumentation.js", "server.js"]
+CMD ["node", "server.js"]
