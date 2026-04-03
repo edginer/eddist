@@ -32,7 +32,7 @@ COPY --from=dependencies /app/eddist-server/client-v2/node_modules /app/eddist-s
 
 # Copy application files (pre-built from CI)
 COPY eddist-server/client-v2/package.json /app/eddist-server/client-v2/
-COPY eddist-server/client-v2/server.js /app/eddist-server/client-v2/
+COPY eddist-server/client-v2/server.js eddist-server/client-v2/instrumentation.js /app/eddist-server/client-v2/
 COPY eddist-server/client-v2/build /app/eddist-server/client-v2/build
 
 CMD ["pnpm", "-F", "eddist-client-v2", "start"]
