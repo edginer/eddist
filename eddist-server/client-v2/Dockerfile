@@ -16,7 +16,8 @@ RUN npm run build
 
 FROM node:22-bookworm-slim
 COPY ./package.json package-lock.json /app/
+COPY server.js instrumentation.js /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build
 WORKDIR /app
-CMD ["npm", "run", "start"]
+CMD ["node", "--import", "./instrumentation.js", "server.js"]

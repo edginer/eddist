@@ -5,7 +5,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "start": "node server.js",
+    "start": "node --import ./instrumentation.js server.js",
     "lint": "biome lint --write ./app",
     "format": "biome format --write ./app",
     "check": "biome check --write ./app",
@@ -13,6 +13,9 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@opentelemetry/sdk-node": "^0.214.0",
     "@react-router/express": "^7.13.2",
     "@react-router/node": "^7.13.2",
     "@react-router/serve": "^7.13.2",
