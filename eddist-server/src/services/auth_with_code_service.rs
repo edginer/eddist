@@ -91,7 +91,7 @@ impl<T: BbsRepository, E: CreationEventRepository>
             };
             let provider_type = config.provider.to_lowercase();
             clients_responses.push((
-                create_captcha_client(config),
+                create_captcha_client(config, self.redis_conn.clone()),
                 (response, input.origin_ip.clone()),
                 provider_type,
             ));

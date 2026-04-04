@@ -5,12 +5,13 @@ use aes_gcm::{
     aead::{Aead, Payload},
 };
 use base64::Engine;
-use eddist_core::{domain::ip_addr::ReducedIpAddr, utils::is_prod};
+use eddist_core::{domain::ip_addr::ReducedIpAddr, redis_keys::tripwire_uuid_seen_key, utils::is_prod};
 use jsonpath_rust::JsonPath;
 use p256::{
     PublicKey as P256PublicKey, SecretKey as P256SecretKey, ecdh::diffie_hellman,
     pkcs8::DecodePrivateKey,
 };
+use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions, aio::ConnectionManager};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -62,7 +63,10 @@ fn extract_fields(source: &impl Serialize, fields: &[String]) -> Option<serde_js
 }
 
 /// Factory function to create the appropriate captcha client based on provider config
-pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaClient> {
+pub fn create_captcha_client(
+    config: &CaptchaProviderConfig,
+    redis_conn: ConnectionManager,
+) -> Box<dyn CaptchaClient> {
     let name = config.name.clone();
     match config.provider.to_lowercase().as_str() {
         "turnstile" => Box::new(TurnstileClient::new(name, config.secret.clone())),
@@ -96,6 +100,7 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
             name,
             config.secret.clone(),
             config.capture_fields.clone(),
+            redis_conn,
         )),
         // For other providers, use the generic client
         _ => Box::new(GenericCaptchaClient::new(config.clone())),
@@ -343,16 +348,26 @@ impl CaptchaClient for MonocleClient {
 
 pub struct Layer3IntelTripwireClient {
     name: String,
-    private_key_pem: SimpleSecret,
+    private_key: P256SecretKey,
     capture_fields: Vec<String>,
+    redis_conn: ConnectionManager,
 }
 
 impl Layer3IntelTripwireClient {
-    pub fn new(name: String, private_key_pem: String, capture_fields: Vec<String>) -> Self {
+    pub fn new(
+        name: String,
+        private_key_pem: String,
+        capture_fields: Vec<String>,
+        redis_conn: ConnectionManager,
+    ) -> Self {
+        let pem = private_key_pem.replace("\\n", "\n");
+        let private_key = P256SecretKey::from_pkcs8_pem(&pem)
+            .expect("layer3intel_tripwire: invalid PKCS8 EC P-256 private key in config");
         Self {
             name,
-            private_key_pem: SimpleSecret::new(&private_key_pem),
+            private_key,
             capture_fields,
+            redis_conn,
         }
     }
 
@@ -391,16 +406,7 @@ impl Layer3IntelTripwireClient {
             .and_then(|v| v.as_str())
             .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
 
-        // 3. Parse server private key from PKCS8 PEM
-        // Normalize literal \n sequences that appear when the key is stored via a single-line
-        // form input or JSON string (e.g. "-----BEGIN PRIVATE KEY-----\nMIG..." with backslash-n).
-        let pem = self.private_key_pem.get().replace("\\n", "\n");
-        let server_sk = P256SecretKey::from_pkcs8_pem(&pem).map_err(|e| {
-            log::error!("Tripwire: failed to parse private key: {e}");
-            CaptchaLikeError::FailedToVerifyCaptcha
-        })?;
-
-        // 4. Reconstruct ephemeral public key: 0x04 || x (32 bytes) || y (32 bytes)
+        // 3. Reconstruct ephemeral public key: 0x04 || x (32 bytes) || y (32 bytes)
         let x_bytes = engine
             .decode(x_b64)
             .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
@@ -417,12 +423,12 @@ impl Layer3IntelTripwireClient {
         let epk_pk = P256PublicKey::from_sec1_bytes(&uncompressed)
             .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
 
-        // 5. ECDH → 32-byte shared secret Z
-        let scalar = server_sk.to_nonzero_scalar();
+        // 4. ECDH → 32-byte shared secret Z
+        let scalar = self.private_key.to_nonzero_scalar();
         let shared = diffie_hellman(&scalar, epk_pk.as_affine());
         let z_bytes = shared.raw_secret_bytes();
 
-        // 6. ConcatKDF (RFC 7518 §4.6.2) — single SHA-256 round → 32-byte CEK
+        // 5. ConcatKDF (RFC 7518 §4.6.2) — single SHA-256 round → 32-byte CEK
         //    SHA-256(0x00000001 || Z || len32("A256GCM") || "A256GCM" || 0x00000000 || 0x00000000 || 0x00000100)
         let alg_id = b"A256GCM";
         let mut hasher = Sha256::new();
@@ -435,7 +441,7 @@ impl Layer3IntelTripwireClient {
         hasher.update(256u32.to_be_bytes()); // keydatalen = 256 bits
         let cek = hasher.finalize();
 
-        // 7. AES-256-GCM decrypt (AAD = raw base64url protected header bytes)
+        // 6. AES-256-GCM decrypt (AAD = raw base64url protected header bytes)
         let iv = engine
             .decode(b64_iv)
             .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
@@ -540,6 +546,28 @@ impl CaptchaClient for Layer3IntelTripwireClient {
                 .unwrap_or(0);
             if (now - ts).abs() > 300 {
                 log::info!("Tripwire assessment timestamp out of range: ts={ts}, now={now}");
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data,
+                    provider: self.name.clone(),
+                });
+            }
+        }
+
+        // Rule 5: replay prevention — atomically claim the UUID (SET NX EX 600)
+        if let Some(uuid) = assessment.uuid.as_deref() {
+            let key = tripwire_uuid_seen_key(uuid);
+            let opts = SetOptions::default()
+                .conditional_set(ExistenceCheck::NX)
+                .with_expiration(SetExpiry::EX(600));
+            let newly_set: Option<String> = self
+                .redis_conn
+                .clone()
+                .set_options(&key, 1u8, opts)
+                .await
+                .unwrap_or(Some("OK".to_string())); // on Redis error, allow through
+            if newly_set.is_none() {
+                log::info!("Tripwire: replayed UUID detected: {uuid}");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data,

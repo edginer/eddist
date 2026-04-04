@@ -58,6 +58,10 @@ pub fn authed_token_suspended_key(authed_token_id: &str) -> String {
     format!("authed_token:suspended:{authed_token_id}")
 }
 
+pub fn tripwire_uuid_seen_key(uuid: &str) -> String {
+    format!("captcha:tripwire:uuid:{uuid}")
+}
+
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
