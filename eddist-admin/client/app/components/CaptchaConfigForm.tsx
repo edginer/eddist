@@ -9,8 +9,15 @@ type CreateCaptchaConfigInput =
 type UpdateCaptchaConfigInput =
   paths["/captcha-configs/{id}/"]["patch"]["requestBody"]["content"]["application/json"];
 
-const KNOWN_PROVIDERS = ["turnstile", "hcaptcha", "monocle", "recaptcha_enterprise", "custom"];
-const FIRST_CLASS_PROVIDERS = ["turnstile", "hcaptcha", "monocle"];
+const KNOWN_PROVIDERS = [
+  "turnstile",
+  "hcaptcha",
+  "monocle",
+  "layer3intel_tripwire",
+  "recaptcha_enterprise",
+  "custom",
+];
+const FIRST_CLASS_PROVIDERS = ["turnstile", "hcaptcha", "monocle", "layer3intel_tripwire"];
 
 type Props =
   | {

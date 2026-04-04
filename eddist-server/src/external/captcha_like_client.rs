@@ -1,15 +1,25 @@
 use std::collections::HashMap;
 
+use aes_gcm::{
+    Aes256Gcm, KeyInit,
+    aead::{Aead, Payload},
+};
+use base64::Engine;
 use eddist_core::{domain::ip_addr::ReducedIpAddr, utils::is_prod};
 use jsonpath_rust::JsonPath;
+use p256::{
+    PublicKey as P256PublicKey, SecretKey as P256SecretKey, ecdh::diffie_hellman,
+    pkcs8::DecodePrivateKey,
+};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::domain::{
     captcha_like::{
         CaptchaProviderConfig, CaptchaVerificationConfig, GRECAPTCHA_ENTERPRISE_DEFAULT_ACTION,
         GRECAPTCHA_ENTERPRISE_URL, GrecaptchaEnterpriseRequest, GrecaptchaEnterpriseResponse,
         HCAPTCHA_URL, HCaptchaResponse, HttpMethod, MONOCLE_URL, MonocleResponse,
-        PlaceholderResolver, RequestFormat, TURNSTILE_URL, TurnstileResponse,
+        PlaceholderResolver, RequestFormat, TURNSTILE_URL, TripwireAssessment, TurnstileResponse,
     },
     utils::SimpleSecret,
 };
@@ -31,6 +41,24 @@ pub struct CaptchaVerificationOutput {
     pub captured_data: Option<serde_json::Value>,
     /// Provider name for aggregation
     pub provider: String,
+}
+
+fn extract_fields(source: &impl Serialize, fields: &[String]) -> Option<serde_json::Value> {
+    if fields.is_empty() {
+        return None;
+    }
+    let json = serde_json::to_value(source).ok()?;
+    let mut captured = serde_json::Map::new();
+    for field in fields {
+        if let Some(value) = json.get(field) {
+            captured.insert(field.clone(), value.clone());
+        }
+    }
+    if captured.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(captured))
+    }
 }
 
 /// Factory function to create the appropriate captcha client based on provider config
@@ -62,6 +90,11 @@ pub fn create_captcha_client(config: &CaptchaProviderConfig) -> Box<dyn CaptchaC
                 .as_ref()
                 .and_then(|v| v.score_threshold)
                 .unwrap_or(0.5),
+            config.capture_fields.clone(),
+        )),
+        "layer3intel_tripwire" => Box::new(Layer3IntelTripwireClient::new(
+            name,
+            config.secret.clone(),
             config.capture_fields.clone(),
         )),
         // For other providers, use the generic client
@@ -159,25 +192,7 @@ impl HCaptchaClient {
     }
 
     fn extract_captured_data(&self, resp: &HCaptchaResponse) -> Option<serde_json::Value> {
-        if self.capture_fields.is_empty() {
-            return None;
-        }
-
-        // Convert HCaptchaResponse to JSON for field extraction
-        let resp_json = serde_json::to_value(resp).ok()?;
-
-        let mut captured = serde_json::Map::new();
-        for field in &self.capture_fields {
-            if let Some(value) = resp_json.get(field) {
-                captured.insert(field.clone(), value.clone());
-            }
-        }
-
-        if captured.is_empty() {
-            None
-        } else {
-            Some(serde_json::Value::Object(captured))
-        }
+        extract_fields(resp, &self.capture_fields)
     }
 }
 
@@ -244,25 +259,7 @@ impl MonocleClient {
     }
 
     fn extract_captured_data(&self, resp: &MonocleResponse) -> Option<serde_json::Value> {
-        if self.capture_fields.is_empty() {
-            return None;
-        }
-
-        // Convert MonocleResponse to JSON for field extraction
-        let resp_json = serde_json::to_value(resp).ok()?;
-
-        let mut captured = serde_json::Map::new();
-        for field in &self.capture_fields {
-            if let Some(value) = resp_json.get(field) {
-                captured.insert(field.clone(), value.clone());
-            }
-        }
-
-        if captured.is_empty() {
-            None
-        } else {
-            Some(serde_json::Value::Object(captured))
-        }
+        extract_fields(resp, &self.capture_fields)
     }
 }
 
@@ -338,6 +335,221 @@ impl CaptchaClient for MonocleClient {
 
         Ok(CaptchaVerificationOutput {
             result,
+            captured_data,
+            provider: self.name.clone(),
+        })
+    }
+}
+
+pub struct Layer3IntelTripwireClient {
+    name: String,
+    private_key_pem: SimpleSecret,
+    capture_fields: Vec<String>,
+}
+
+impl Layer3IntelTripwireClient {
+    pub fn new(name: String, private_key_pem: String, capture_fields: Vec<String>) -> Self {
+        Self {
+            name,
+            private_key_pem: SimpleSecret::new(&private_key_pem),
+            capture_fields,
+        }
+    }
+
+    fn extract_captured_data(&self, assessment: &TripwireAssessment) -> Option<serde_json::Value> {
+        extract_fields(assessment, &self.capture_fields)
+    }
+
+    /// Decrypt a JWE compact serialization (ECDH-ES + A256GCM) using the configured private key.
+    fn decrypt_jwe(&self, jwe: &str) -> Result<Vec<u8>, CaptchaLikeError> {
+        let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+        // 1. Split into 5 base64url parts
+        let parts = jwe.splitn(6, '.').collect::<Vec<&str>>();
+        if parts.len() != 5 {
+            log::info!("Tripwire JWE: expected 5 parts, got {}", parts.len());
+            return Err(CaptchaLikeError::FailedToVerifyCaptcha);
+        }
+        let (b64_header, _b64_enc_key, b64_iv, b64_ciphertext, b64_tag) =
+            (parts[0], parts[1], parts[2], parts[3], parts[4]);
+
+        // 2. Decode header JSON → extract epk x/y coords
+        let header_bytes = engine
+            .decode(b64_header)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let header: serde_json::Value = serde_json::from_slice(&header_bytes)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let epk = header
+            .get("epk")
+            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let x_b64 = epk
+            .get("x")
+            .and_then(|v| v.as_str())
+            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let y_b64 = epk
+            .get("y")
+            .and_then(|v| v.as_str())
+            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+        // 3. Parse server private key from PKCS8 PEM
+        // Normalize literal \n sequences that appear when the key is stored via a single-line
+        // form input or JSON string (e.g. "-----BEGIN PRIVATE KEY-----\nMIG..." with backslash-n).
+        let pem = self.private_key_pem.get().replace("\\n", "\n");
+        let server_sk = P256SecretKey::from_pkcs8_pem(&pem).map_err(|e| {
+            log::error!("Tripwire: failed to parse private key: {e}");
+            CaptchaLikeError::FailedToVerifyCaptcha
+        })?;
+
+        // 4. Reconstruct ephemeral public key: 0x04 || x (32 bytes) || y (32 bytes)
+        let x_bytes = engine
+            .decode(x_b64)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let y_bytes = engine
+            .decode(y_b64)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        if x_bytes.len() != 32 || y_bytes.len() != 32 {
+            return Err(CaptchaLikeError::FailedToVerifyCaptcha);
+        }
+        let mut uncompressed = Vec::with_capacity(65);
+        uncompressed.push(0x04u8);
+        uncompressed.extend_from_slice(&x_bytes);
+        uncompressed.extend_from_slice(&y_bytes);
+        let epk_pk = P256PublicKey::from_sec1_bytes(&uncompressed)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+        // 5. ECDH → 32-byte shared secret Z
+        let scalar = server_sk.to_nonzero_scalar();
+        let shared = diffie_hellman(&scalar, epk_pk.as_affine());
+        let z_bytes = shared.raw_secret_bytes();
+
+        // 6. ConcatKDF (RFC 7518 §4.6.2) — single SHA-256 round → 32-byte CEK
+        //    SHA-256(0x00000001 || Z || len32("A256GCM") || "A256GCM" || 0x00000000 || 0x00000000 || 0x00000100)
+        let alg_id = b"A256GCM";
+        let mut hasher = Sha256::new();
+        hasher.update(1u32.to_be_bytes());
+        hasher.update(z_bytes);
+        hasher.update((alg_id.len() as u32).to_be_bytes());
+        hasher.update(alg_id);
+        hasher.update(0u32.to_be_bytes()); // PartyUInfo: empty
+        hasher.update(0u32.to_be_bytes()); // PartyVInfo: empty
+        hasher.update(256u32.to_be_bytes()); // keydatalen = 256 bits
+        let cek = hasher.finalize();
+
+        // 7. AES-256-GCM decrypt (AAD = raw base64url protected header bytes)
+        let iv = engine
+            .decode(b64_iv)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let ciphertext = engine
+            .decode(b64_ciphertext)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let tag = engine
+            .decode(b64_tag)
+            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+        let mut ct_with_tag = ciphertext;
+        ct_with_tag.extend_from_slice(&tag);
+
+        let cipher =
+            Aes256Gcm::new_from_slice(&cek).map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+        let nonce = aes_gcm::Nonce::from_slice(&iv);
+
+        cipher
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: &ct_with_tag,
+                    aad: b64_header.as_bytes(),
+                },
+            )
+            .map_err(|_| {
+                log::info!(
+                    "Tripwire JWE: AES-GCM decryption failed (tag mismatch or corrupt token)"
+                );
+                CaptchaLikeError::FailedToVerifyCaptcha
+            })
+    }
+}
+
+#[async_trait::async_trait]
+impl CaptchaClient for Layer3IntelTripwireClient {
+    async fn verify_captcha(
+        &self,
+        response: &str,
+        ip_addr: &str,
+    ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
+        // Rule 1: local JWE decryption
+        let plaintext = match self.decrypt_jwe(response) {
+            Ok(b) => b,
+            Err(e) => {
+                log::info!("Tripwire: JWE decryption failed: {e:?}");
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(e),
+                    captured_data: None,
+                    provider: self.name.clone(),
+                });
+            }
+        };
+
+        let assessment: TripwireAssessment = match serde_json::from_slice(&plaintext) {
+            Ok(a) => a,
+            Err(e) => {
+                log::error!("Tripwire: failed to parse assessment JSON: {e}");
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data: None,
+                    provider: self.name.clone(),
+                });
+            }
+        };
+
+        let captured_data = self.extract_captured_data(&assessment);
+
+        // Rule 2: proxy check
+        if matches!(assessment.proxy, Some(true)) {
+            log::info!("Tripwire assessment: {assessment:?}");
+            return Ok(CaptchaVerificationOutput {
+                result: CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess),
+                captured_data,
+                provider: self.name.clone(),
+            });
+        }
+
+        // Rule 3: IP check (prod only, same guard as MonocleClient)
+        if is_prod() {
+            let client_reduced = ReducedIpAddr::from(ip_addr.to_string());
+            let ip_matches = assessment
+                .source_ip
+                .as_deref()
+                .map(|s| ReducedIpAddr::from(s.to_string()) == client_reduced)
+                .unwrap_or(false);
+            if !ip_matches {
+                log::info!("Tripwire assessment: {assessment:?}");
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress),
+                    captured_data,
+                    provider: self.name.clone(),
+                });
+            }
+        }
+
+        // Rule 4: timestamp freshness (±300 s)
+        if let Some(ts) = assessment.timestamp {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            if (now - ts).abs() > 300 {
+                log::info!("Tripwire assessment timestamp out of range: ts={ts}, now={now}");
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data,
+                    provider: self.name.clone(),
+                });
+            }
+        }
+
+        Ok(CaptchaVerificationOutput {
+            result: CaptchaLikeResult::Success,
             captured_data,
             provider: self.name.clone(),
         })

@@ -60,6 +60,36 @@ fn get_default_widget_config(
             widget_html: String::new(),
             script_handler: None,
         }),
+        "layer3intel_tripwire" => Some(CaptchaWidgetMetadata {
+            form_field_name: "tripwire_token".to_string(),
+            script_url: format!(
+                "https://cdn.layer3intel.com/tripwire.min.js?key={}",
+                site_key
+            ),
+            widget_html: String::new(),
+            // Intercept form submission manually so token injection is not sensitive
+            // to when the async script finishes loading relative to DOMContentLoaded.
+            script_handler: Some(
+                r#"(function() {
+  var form = document.getElementById('login-form');
+  form.addEventListener('submit', function(e) {
+    if (document.querySelector('input[name="tripwire_token"]')) return;
+    if (typeof window.Tripwire === 'undefined') return;
+    e.preventDefault();
+    var self = this;
+    window.Tripwire.run().then(function(result) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'tripwire_token';
+      input.value = result.token;
+      self.appendChild(input);
+      self.submit();
+    }).catch(function() { self.submit(); });
+  });
+})();"#
+                    .to_string(),
+            ),
+        }),
         _ => None,
     }
 }

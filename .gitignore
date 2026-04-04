@@ -11,3 +11,5 @@ node_modules/
 .cursor/
 CLAUDE.md
 .serena/
+
+tmp/
