@@ -595,7 +595,7 @@ const Page = () => {
                 </h3>
                 <div className="flex flex-wrap gap-3">
                   <Button
-                    color="failure"
+                    color="red"
                     size="sm"
                     onClick={handleRevokeToken}
                     disabled={selectedToken.validity === false}
@@ -603,7 +603,7 @@ const Page = () => {
                     Revoke This Token
                   </Button>
                   <Button
-                    color="failure"
+                    color="red"
                     size="sm"
                     onClick={handleRevokeAllFromOriginIp}
                     disabled={selectedToken.validity === false}

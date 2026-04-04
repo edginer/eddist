@@ -1,6 +1,8 @@
 import { Button, Label, Modal, ModalBody, ModalHeader, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useThreadHistory } from "~/contexts/ThreadHistoryContext";
+import { useUISettings } from "~/contexts/UISettingsContext";
 import AuthCodeModal from "./AuthCodeModal";
 import ErrorModal from "./ErrorModal";
 import { postResponse } from "./utils";
@@ -10,12 +12,15 @@ interface PostResponseModalProps {
   setOpen: (open: boolean) => void;
   boardKey: string;
   threadKey: string;
+  threadTitle: string;
   className?: string;
   refetchThread: () => Promise<unknown>;
 }
 
 const PostResponseModal = (props: PostResponseModalProps) => {
   const { register, handleSubmit } = useForm();
+  const { recordPost } = useThreadHistory();
+  const { settings } = useUISettings();
 
   const [openAuthCodeModal, setOpenAuthCodeModal] = useState(false);
   const [authCode, setAuthCode] = useState("");
@@ -68,6 +73,17 @@ const PostResponseModal = (props: PostResponseModalProps) => {
                   break;
               }
               return false;
+            }
+
+            if (settings.enablePostHistory) {
+              recordPost(
+                props.boardKey,
+                props.threadKey,
+                props.threadTitle,
+                data.name ?? "",
+                data.mail ?? "",
+                data.body,
+              );
             }
 
             props.setOpen(false);

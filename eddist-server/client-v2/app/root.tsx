@@ -13,7 +13,9 @@ import "./app.css";
 import { ThemeInit } from ".flowbite-react/init";
 import { NGWordsProvider } from "~/contexts/NGWordsContext";
 import { ThemeProvider } from "~/contexts/ThemeContext";
+import { ThreadHistoryProvider } from "~/contexts/ThreadHistoryContext";
 import { ToastProvider } from "~/contexts/ToastContext";
+import { UISettingsProvider } from "~/contexts/UISettingsContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -62,8 +64,12 @@ export default function App() {
     <ThemeProvider>
       <ToastProvider>
         <NGWordsProvider>
-          <ThemeInit />
-          <Outlet />
+          <UISettingsProvider>
+            <ThreadHistoryProvider>
+              <ThemeInit />
+              <Outlet />
+            </ThreadHistoryProvider>
+          </UISettingsProvider>
         </NGWordsProvider>
       </ToastProvider>
     </ThemeProvider>
