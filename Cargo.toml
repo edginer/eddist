@@ -81,6 +81,8 @@ sha1 = { version = "0.10.6", default-features = false }
 md-5 = "0.10.6"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 chacha20poly1305 = "0.10.1"
+p256 = { version = "0.13", features = ["ecdh", "pkcs8", "pem"] }
+aes-gcm = "0.10"
 pwhash = "1.0.0"
 
 # Cloud storage

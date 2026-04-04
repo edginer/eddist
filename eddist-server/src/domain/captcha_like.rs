@@ -94,6 +94,16 @@ pub struct MonocleResponse {
     pub sid: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TripwireAssessment {
+    pub proxy: Option<bool>,
+    pub proxy_type: Option<String>,
+    pub timestamp: Option<i64>,
+    pub source_ip: Option<String>,
+    pub key: Option<String>,
+    pub uuid: Option<String>,
+}
+
 /// Configuration for a captcha provider
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CaptchaProviderConfig {

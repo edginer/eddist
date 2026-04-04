@@ -65,5 +65,18 @@
             "success_path": "success",
             "include_ip": false
         }
+    },
+    {
+        "name": "layer3intel_tripwire",
+        "provider": "layer3intel_tripwire",
+        "site_key": "YOUR_TRIPWIRE_SITE_KEY",
+        "secret": "-----BEGIN PRIVATE KEY-----\nYOUR_PKCS8_EC_P256_PRIVATE_KEY\n-----END PRIVATE KEY-----",
+        "capture_fields": ["proxy", "proxy_type", "source_ip", "uuid"],
+        "widget": {
+            "form_field_name": "tripwire_token",
+            "script_url": "https://cdn.layer3intel.com/tripwire.min.js?key={{site_key}}",
+            "widget_html": "",
+            "script_handler": "(function() {\n  var form = document.getElementById('login-form');\n  form.addEventListener('submit', function(e) {\n    if (document.querySelector('input[name=\"tripwire_token\"]')) return;\n    if (typeof window.Tripwire === 'undefined') return;\n    e.preventDefault();\n    var self = this;\n    window.Tripwire.run().then(function(result) {\n      var input = document.createElement('input');\n      input.type = 'hidden';\n      input.name = 'tripwire_token';\n      input.value = result.token;\n      self.appendChild(input);\n      self.submit();\n    }).catch(function() { self.submit(); });\n  });\n})();"
+        }
     }
 ]

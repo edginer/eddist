@@ -48,6 +48,8 @@ const CaptchaConfigs = () => {
         return "info";
       case "monocle":
         return "purple";
+      case "layer3intel_tripwire":
+        return "green";
       default:
         return "gray";
     }
