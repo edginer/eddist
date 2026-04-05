@@ -52,6 +52,7 @@ mod routes {
     pub mod bbs_cgi;
     pub mod dat_routing;
     pub mod notice;
+    pub mod re_auth;
     pub mod statics;
     pub mod subject_list;
     pub mod terms;

@@ -17,6 +17,7 @@ pub struct AuthedToken {
     pub validity: bool,
     pub last_wrote_at: Option<NaiveDateTime>,
     pub additional_info: Option<serde_json::Value>,
+    pub require_reauth: bool,
 }
 
 #[derive(Debug, Clone, IntoParams, Serialize, Deserialize)]

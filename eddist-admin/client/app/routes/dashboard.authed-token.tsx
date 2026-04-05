@@ -25,7 +25,12 @@ import {
 } from "flowbite-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
-import { listAuthedTokens, useDeleteAuthedToken } from "~/hooks/queries";
+import {
+  listAuthedTokens,
+  useClearReAuth,
+  useDeleteAuthedToken,
+  useRequireReAuth,
+} from "~/hooks/queries";
 import client from "~/openapi/client";
 import type { components } from "~/openapi/schema";
 import { formatDateTime } from "~/utils/format";
@@ -35,6 +40,8 @@ type AuthedToken = components["schemas"]["AuthedToken"];
 const Page = () => {
   const [searchParams] = useSearchParams();
   const deleteAuthedTokenMutation = useDeleteAuthedToken();
+  const requireReAuthMutation = useRequireReAuth();
+  const clearReAuthMutation = useClearReAuth();
 
   // Open detail modal when navigating with ?token=<id> from responses page
   useEffect(() => {
@@ -337,7 +344,7 @@ const Page = () => {
       {/* Table */}
       <div
         ref={tableContainerRef}
-        className="overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg"
+        className="overflow-auto border border-gray-200 rounded-lg"
         style={{ maxHeight: "70vh" }}
       >
         <Table hoverable>
@@ -394,7 +401,7 @@ const Page = () => {
               return (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="cursor-pointer hover:bg-gray-50"
                   onClick={() => setSelectedToken(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -423,7 +430,7 @@ const Page = () => {
 
       {/* Pagination */}
       <div className="flex items-center justify-between mt-4">
-        <span className="text-sm text-gray-700 dark:text-gray-400">
+        <span className="text-sm text-gray-700">
           {data
             ? `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, data.total)} of ${data.total}`
             : ""}
@@ -437,7 +444,7 @@ const Page = () => {
           >
             Prev
           </Button>
-          <span className="text-sm text-gray-700 dark:text-gray-400">
+          <span className="text-sm text-gray-700">
             Page {page} / {totalPages || 1}
           </span>
           <Button
@@ -474,31 +481,27 @@ const Page = () => {
         <ModalBody>
           {selectedToken && (
             <div className="space-y-6">
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                {selectedToken.id}
-              </p>
+              <p className="text-sm text-gray-500 font-mono">{selectedToken.id}</p>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Token Information */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                    Token Information
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">Token Information</h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Token</dt>
+                      <dt className="text-sm text-gray-500">Token</dt>
                       <dd className="font-mono text-sm break-all">{selectedToken.token}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Created At</dt>
+                      <dt className="text-sm text-gray-500">Created At</dt>
                       <dd>{formatDateTime(selectedToken.created_at)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Authed At</dt>
+                      <dt className="text-sm text-gray-500">Authed At</dt>
                       <dd>{formatDateTime(selectedToken.authed_at)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Last Wrote At</dt>
+                      <dt className="text-sm text-gray-500">Last Wrote At</dt>
                       <dd>{formatDateTime(selectedToken.last_wrote_at)}</dd>
                     </div>
                   </dl>
@@ -506,22 +509,18 @@ const Page = () => {
 
                 {/* Network Information */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                    Network Information
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">Network Information</h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Origin IP</dt>
+                      <dt className="text-sm text-gray-500">Origin IP</dt>
                       <dd className="font-mono">{selectedToken.origin_ip}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">
-                        Reduced Origin IP
-                      </dt>
+                      <dt className="text-sm text-gray-500">Reduced Origin IP</dt>
                       <dd className="font-mono">{selectedToken.reduced_origin_ip}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">ASN Number</dt>
+                      <dt className="text-sm text-gray-500">ASN Number</dt>
                       <dd className="font-mono">{selectedToken.asn_num ?? "N/A"}</dd>
                     </div>
                   </dl>
@@ -529,16 +528,16 @@ const Page = () => {
 
                 {/* User Agent Information */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">
                     User Agent Information
                   </h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Writing UA</dt>
+                      <dt className="text-sm text-gray-500">Writing UA</dt>
                       <dd className="text-sm break-all">{selectedToken.writing_ua}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Authed UA</dt>
+                      <dt className="text-sm text-gray-500">Authed UA</dt>
                       <dd className="text-sm break-all">{selectedToken.authed_ua ?? "N/A"}</dd>
                     </div>
                   </dl>
@@ -546,7 +545,7 @@ const Page = () => {
 
                 {/* Additional Info */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">
                     Additional Information
                   </h3>
                   {selectedToken.additional_info ? (
@@ -554,7 +553,7 @@ const Page = () => {
                       <button
                         type="button"
                         onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
-                        className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="flex items-center text-blue-600 hover:text-blue-800"
                       >
                         <svg
                           className={`w-4 h-4 mr-1 transition-transform ${
@@ -575,27 +574,23 @@ const Page = () => {
                         {showAdditionalInfo ? "Hide" : "Show"} JSON Data
                       </button>
                       {showAdditionalInfo && (
-                        <pre className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm overflow-auto max-h-64">
+                        <pre className="mt-3 p-3 bg-gray-100 rounded-lg text-sm overflow-auto max-h-64">
                           {JSON.stringify(selectedToken.additional_info, null, 2)}
                         </pre>
                       )}
                     </div>
                   ) : (
-                    <p className="text-gray-500 dark:text-gray-400">
-                      No additional information available
-                    </p>
+                    <p className="text-gray-500">No additional information available</p>
                   )}
                 </div>
               </div>
 
               {/* Actions */}
               <div>
-                <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-                  Actions
-                </h3>
+                <h3 className="text-lg font-semibold mb-3 text-gray-900">Actions</h3>
                 <div className="flex flex-wrap gap-3">
                   <Button
-                    color="failure"
+                    color="red"
                     size="sm"
                     onClick={handleRevokeToken}
                     disabled={selectedToken.validity === false}
@@ -603,17 +598,50 @@ const Page = () => {
                     Revoke This Token
                   </Button>
                   <Button
-                    color="failure"
+                    color="red"
                     size="sm"
                     onClick={handleRevokeAllFromOriginIp}
                     disabled={selectedToken.validity === false}
                   >
                     Revoke All Tokens from Origin IP
                   </Button>
+                  <Button
+                    color="yellow"
+                    size="sm"
+                    onClick={() => {
+                      if (!selectedToken.id) return;
+                      if (!confirm("Require re-authentication for this token?")) return;
+                      requireReAuthMutation.mutate(selectedToken.id, {
+                        onSuccess: () =>
+                          setSelectedToken({ ...selectedToken, require_reauth: true }),
+                      });
+                    }}
+                    disabled={selectedToken.validity === false || selectedToken.require_reauth}
+                  >
+                    Require Re-Auth
+                  </Button>
+                  {selectedToken.require_reauth && (
+                    <Button
+                      color="gray"
+                      size="sm"
+                      onClick={() => {
+                        if (!selectedToken.id) return;
+                        clearReAuthMutation.mutate(selectedToken.id, {
+                          onSuccess: () =>
+                            setSelectedToken({ ...selectedToken, require_reauth: false }),
+                        });
+                      }}
+                    >
+                      Clear Re-Auth
+                    </Button>
+                  )}
                 </div>
                 {selectedToken.validity === false && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    This token has already been revoked.
+                  <p className="text-sm text-gray-500 mt-2">This token has already been revoked.</p>
+                )}
+                {selectedToken.require_reauth && (
+                  <p className="text-sm text-yellow-600 mt-2">
+                    This token requires re-authentication before posting.
                   </p>
                 )}
               </div>

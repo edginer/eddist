@@ -33,6 +33,7 @@ use crate::{
         bbs_cgi::post_bbs_cgi,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
+        re_auth::{get_re_auth, post_re_auth},
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         terms::get_terms,
         user::user_routes,
@@ -230,6 +231,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         )
         .route("/robots.txt", get(get_robots_txt))
         .route("/auth-code", get(get_auth_code).post(post_auth_code))
+        .route("/re-auth", get(get_re_auth).post(post_re_auth))
         .route("/test/bbs.cgi", post(post_bbs_cgi))
         .route("/{boardKey}/subject.txt", get(get_subject_txt))
         .route(

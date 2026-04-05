@@ -1,4 +1,9 @@
-use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    http::StatusCode,
+    routing::post,
+};
 use eddist_core::{redis_keys::authed_token_suspended_key, utils::is_authed_token_backup_enabled};
 use redis::AsyncCommands;
 use serde::Deserialize;
@@ -10,6 +15,10 @@ pub fn create_internal_routes() -> Router<AppState> {
     Router::new()
         .route("/authed-tokens/suspend", post(suspend_authed_token))
         .route("/authed-tokens/revoke", post(revoke_authed_token))
+        .route(
+            "/authed-tokens/require-reauth/{authedTokenId}",
+            post(internal_require_reauth_token).delete(internal_clear_require_reauth_token),
+        )
 }
 
 #[derive(Deserialize)]
@@ -72,5 +81,27 @@ pub async fn revoke_authed_token(
         super::auth_tokens::publish_token_revoked(&mut conn, input.authed_token_id).await;
     }
 
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn internal_require_reauth_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .authed_token_repo
+        .set_require_reauth(authed_token_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn internal_clear_require_reauth_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .authed_token_repo
+        .clear_require_reauth(authed_token_id)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

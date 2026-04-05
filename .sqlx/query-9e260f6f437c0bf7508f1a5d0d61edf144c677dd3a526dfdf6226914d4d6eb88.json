@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE authed_tokens SET require_reauth = 1 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9e260f6f437c0bf7508f1a5d0d61edf144c677dd3a526dfdf6226914d4d6eb88"
+}

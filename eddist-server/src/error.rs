@@ -98,6 +98,11 @@ pub enum BbsCgiError {
     #[error("このアカウントは規約違反を繰り返したため、一時的に凍結されています")]
     TemporarilySuspended,
 
+    #[error(
+        "認証コード'{auth_code}'を用いて、以下のURLから再認証を行ってください \n {base_url}/re-auth"
+    )]
+    ReAuthRequired { auth_code: String, base_url: String },
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -129,6 +134,7 @@ impl BbsCgiError {
             BbsCgiError::TooManyUserCreationAttempt => StatusCode::OK,
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
             BbsCgiError::TemporarilySuspended => StatusCode::FORBIDDEN,
+            BbsCgiError::ReAuthRequired { .. } => StatusCode::FORBIDDEN,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -161,6 +167,7 @@ impl BbsCgiError {
                 "EmailAuthenticatedUnsupportedUserAgent"
             }
             BbsCgiError::TemporarilySuspended => "TemporarilySuspended",
+            BbsCgiError::ReAuthRequired { .. } => "ReAuthRequired",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

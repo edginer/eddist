@@ -53,6 +53,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/authed_tokens/{authed_token_id}/require-reauth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["require_reauth_token"];
+        delete: operations["clear_require_reauth_token"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/boards/": {
         parameters: {
             query?: never;
@@ -602,6 +618,7 @@ export interface components {
             last_wrote_at?: string | null;
             origin_ip: string;
             reduced_origin_ip: string;
+            require_reauth: boolean;
             token: string;
             validity: boolean;
             writing_ua: string;
@@ -648,6 +665,7 @@ export interface components {
             created_at: string;
             /** Format: int32 */
             display_order: number;
+            endpoint_usage: string;
             /** Format: uuid */
             id: string;
             is_active: boolean;
@@ -674,6 +692,7 @@ export interface components {
             /** Format: double */
             score_threshold?: number | null;
             success_path?: string;
+            /** @description Not required for reCAPTCHA Enterprise (which derives its URL from project_id). */
             url?: string | null;
         };
         /** @description Widget configuration for frontend rendering */
@@ -712,6 +731,7 @@ export interface components {
             capture_fields?: string[];
             /** Format: int32 */
             display_order?: number;
+            endpoint_usage?: string;
             is_active?: boolean;
             name: string;
             provider: string;
@@ -941,6 +961,7 @@ export interface components {
             capture_fields?: string[] | null;
             /** Format: int32 */
             display_order?: number | null;
+            endpoint_usage?: string | null;
             is_active?: boolean | null;
             name?: string | null;
             provider?: string | null;
@@ -1139,6 +1160,48 @@ export interface operations {
         responses: {
             /** @description Delete authed token successfully */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    require_reauth_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Authed token ID */
+                authed_token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Set require re-auth successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    clear_require_reauth_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Authed token ID */
+                authed_token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared require re-auth successfully */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -5,7 +5,9 @@ use aes_gcm::{
     aead::{Aead, Payload},
 };
 use base64::Engine;
-use eddist_core::{domain::ip_addr::ReducedIpAddr, redis_keys::tripwire_uuid_seen_key, utils::is_prod};
+use eddist_core::{
+    domain::ip_addr::ReducedIpAddr, redis_keys::tripwire_uuid_seen_key, utils::is_prod,
+};
 use jsonpath_rust::JsonPath;
 use p256::{
     PublicKey as P256PublicKey, SecretKey as P256SecretKey, ecdh::diffie_hellman,

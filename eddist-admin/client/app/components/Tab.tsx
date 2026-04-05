@@ -28,7 +28,7 @@ const Tab = <TKey extends string>({ tabItems, onSelectedTabChange }: Props<TKey>
 
   return (
     <div className="sm:px-4 pt-4">
-      <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="mb-4 border-b border-gray-200">
         <ul
           className="flex flex-wrap -mb-px text-sm font-medium text-center"
           id="default-tab"
@@ -43,7 +43,7 @@ const Tab = <TKey extends string>({ tabItems, onSelectedTabChange }: Props<TKey>
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     selectedTabKey === tabItem.tabKey
                       ? "border-blue-600"
-                      : "border-gray-200 hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300",
+                      : "border-gray-200 hover:text-gray-600 hover:border-gray-300",
                   )}
                   id={tabItem.id ?? tabItem.tabKey}
                   type="button"

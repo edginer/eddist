@@ -104,6 +104,33 @@ pub struct TripwireAssessment {
     pub uuid: Option<String>,
 }
 
+/// Which endpoint(s) a captcha config is used for
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub enum CaptchaEndpointUsage {
+    #[default]
+    AuthCode,
+    ReAuth,
+    All,
+}
+
+impl CaptchaEndpointUsage {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "re_auth" => Self::ReAuth,
+            "all" => Self::All,
+            _ => Self::AuthCode,
+        }
+    }
+
+    pub fn matches_auth_code(&self) -> bool {
+        matches!(self, Self::AuthCode | Self::All)
+    }
+
+    pub fn matches_reauth(&self) -> bool {
+        matches!(self, Self::ReAuth | Self::All)
+    }
+}
+
 /// Configuration for a captcha provider
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CaptchaProviderConfig {
@@ -120,6 +147,9 @@ pub struct CaptchaProviderConfig {
     pub base_url: Option<String>,
     /// Widget configuration for frontend rendering
     pub widget: CaptchaWidgetMetadata,
+    /// Which endpoint this captcha is used for
+    #[serde(default)]
+    pub endpoint_usage: CaptchaEndpointUsage,
     /// Fields to capture from the response and store in additional_info
     #[serde(default)]
     pub capture_fields: Vec<String>,

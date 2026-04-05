@@ -18,6 +18,7 @@ struct AuthedTokenRow {
     pub validity: bool,
     pub last_wrote_at: Option<NaiveDateTime>,
     pub additional_info: Option<serde_json::Value>,
+    pub require_reauth: bool,
 }
 
 impl From<AuthedTokenRow> for AuthedToken {
@@ -35,6 +36,7 @@ impl From<AuthedTokenRow> for AuthedToken {
             validity: row.validity,
             last_wrote_at: row.last_wrote_at,
             additional_info: row.additional_info,
+            require_reauth: row.require_reauth,
         }
     }
 }
@@ -60,6 +62,8 @@ pub trait AuthedTokenRepository: Send + Sync {
         &self,
         params: ListAuthedTokensParams<'_>,
     ) -> anyhow::Result<(Vec<AuthedToken>, u64)>;
+    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
+    async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]
@@ -74,11 +78,11 @@ impl AuthedTokenRepositoryImpl {
 #[async_trait::async_trait]
 impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken> {
-        let query = query_as!(
-            AuthedToken,
+        let row = query_as!(
+            AuthedTokenRow,
             r#"
             SELECT
-                id AS "id!: Uuid",
+                id,
                 token,
                 origin_ip,
                 reduced_origin_ip,
@@ -89,18 +93,19 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
                 authed_at,
                 validity AS "validity!: bool",
                 last_wrote_at,
-                additional_info AS "additional_info: serde_json::Value"
+                additional_info AS "additional_info: serde_json::Value",
+                require_reauth AS "require_reauth!: bool"
             FROM
                 authed_tokens
             WHERE
                 id = ?
             "#,
             id.as_bytes().to_vec(),
-        );
+        )
+        .fetch_one(&self.0)
+        .await?;
 
-        let authed_token = query.fetch_one(&self.0).await?;
-
-        Ok(authed_token)
+        Ok(AuthedToken::from(row))
     }
 
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()> {
@@ -184,7 +189,7 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         let mut count_builder: QueryBuilder<MySql> =
             QueryBuilder::new("SELECT COUNT(*) as cnt FROM authed_tokens WHERE 1=1");
         let mut data_builder: QueryBuilder<MySql> = QueryBuilder::new(
-            "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, created_at, authed_at, validity, last_wrote_at, additional_info FROM authed_tokens WHERE 1=1",
+            "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, created_at, authed_at, validity, last_wrote_at, additional_info, require_reauth FROM authed_tokens WHERE 1=1",
         );
 
         if let Some(ip) = origin_ip {
@@ -240,5 +245,25 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         let tokens = rows.into_iter().map(AuthedToken::from).collect();
 
         Ok((tokens, total as u64))
+    }
+
+    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        query!(
+            r#"UPDATE authed_tokens SET require_reauth = 1 WHERE id = ?"#,
+            id.as_bytes().to_vec(),
+        )
+        .execute(&self.0)
+        .await?;
+        Ok(())
+    }
+
+    async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        query!(
+            r#"UPDATE authed_tokens SET require_reauth = 0 WHERE id = ?"#,
+            id.as_bytes().to_vec(),
+        )
+        .execute(&self.0)
+        .await?;
+        Ok(())
     }
 }

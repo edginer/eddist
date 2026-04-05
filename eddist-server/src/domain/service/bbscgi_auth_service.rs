@@ -149,6 +149,14 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             return Err(BbsCgiError::TemporarilySuspended);
         }
 
+        // Check require_reauth flag
+        if authed_token.require_reauth {
+            return Err(BbsCgiError::ReAuthRequired {
+                auth_code: authed_token.auth_code.clone(),
+                base_url: env::var("BASE_URL").unwrap(),
+            });
+        }
+
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {

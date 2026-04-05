@@ -2,7 +2,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{delete, get},
+    routing::{delete, get, post},
 };
 use eddist_core::{
     domain::pubsub_repository::{AuthTokenRevoked, CHANNEL_AUTH_TOKEN_REVOKED},
@@ -26,6 +26,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/authed_tokens/{authedTokenId}",
             delete(delete_authed_token),
+        )
+        .route(
+            "/authed_tokens/{authedTokenId}/require-reauth",
+            post(require_reauth_token).delete(clear_require_reauth_token),
         )
 }
 
@@ -142,6 +146,48 @@ pub async fn delete_authed_token(
         }
     }
     Ok(StatusCode::OK)
+}
+
+#[utoipa::path(
+    post,
+    path = "/authed_tokens/{authed_token_id}/require-reauth",
+    responses(
+        (status = 204, description = "Set require re-auth successfully"),
+    ),
+    params(
+        ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
+    ),
+)]
+pub async fn require_reauth_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .authed_token_repo
+        .set_require_reauth(authed_token_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/authed_tokens/{authed_token_id}/require-reauth",
+    responses(
+        (status = 204, description = "Cleared require re-auth successfully"),
+    ),
+    params(
+        ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
+    ),
+)]
+pub async fn clear_require_reauth_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .authed_token_repo
+        .clear_require_reauth(authed_token_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub(crate) async fn publish_token_revoked(
