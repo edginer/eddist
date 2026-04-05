@@ -99,9 +99,9 @@ pub enum BbsCgiError {
     TemporarilySuspended,
 
     #[error(
-        "認証コード'{auth_code}'を用いて、以下のURLから再認証を行ってください \n {base_url}/re-auth"
+        "再認証コード'{temp_key}'を用いて、以下のURLから再認証を行ってください \n {base_url}/re-auth"
     )]
-    ReAuthRequired { auth_code: String, base_url: String },
+    ReAuthRequired { temp_key: String, base_url: String },
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),

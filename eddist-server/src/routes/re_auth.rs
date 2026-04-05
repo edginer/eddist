@@ -15,7 +15,7 @@ use crate::{
         AppService, captcha_config_cache::get_cached_captcha_configs_for_reauth,
         reauth_service::ReAuthServiceInput,
     },
-    utils::{get_asn_num, get_origin_ip, get_ua},
+    utils::get_origin_ip,
 };
 
 use super::auth_code::build_template_variables;
@@ -30,9 +30,8 @@ pub async fn get_re_auth(State(state): State<AppState>) -> impl IntoResponse {
         .unwrap();
 
     let mut resp = Html(html).into_response();
-    let headers = resp.headers_mut();
-    headers.insert("Cache-Control", "private".parse().unwrap());
-
+    resp.headers_mut()
+        .insert("Cache-Control", "private".parse().unwrap());
     resp
 }
 
@@ -42,14 +41,13 @@ pub async fn post_re_auth(
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
     let captcha_configs = get_cached_captcha_configs_for_reauth().await;
+    let temp_key = form.get("temp_key").cloned().unwrap_or_default();
     match state
         .services
         .reauth()
         .execute(ReAuthServiceInput {
-            code: form["auth-code"].to_string(),
+            temp_key,
             origin_ip: get_origin_ip(&headers).to_string(),
-            user_agent: get_ua(&headers).to_string(),
-            asn_num: get_asn_num(&headers),
             captcha_configs,
             responses: form,
         })

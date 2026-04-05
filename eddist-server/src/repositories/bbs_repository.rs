@@ -71,10 +71,6 @@ pub trait BbsRepository: Send + Sync + 'static {
         tx: sqlx::Transaction<'a, sqlx::MySql>,
     ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
 
-    async fn get_authed_token_by_reauth_code(
-        &self,
-        auth_code: &str,
-    ) -> anyhow::Result<Option<AuthedToken>>;
     async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 
@@ -872,55 +868,6 @@ impl BbsRepository for BbsRepositoryImpl {
         query.execute(&mut *tx).await?;
 
         Ok(tx)
-    }
-
-    async fn get_authed_token_by_reauth_code(
-        &self,
-        auth_code: &str,
-    ) -> anyhow::Result<Option<AuthedToken>> {
-        let query = query_as!(
-            SelectionAuthedToken,
-            r#"SELECT
-                id,
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                auth_code,
-                created_at,
-                authed_at,
-                validity,
-                last_wrote_at,
-                author_id_seed,
-                require_user_registration,
-                registered_user_id,
-                require_reauth
-            FROM authed_tokens WHERE auth_code = ? AND require_reauth = 1 AND validity = 1"#,
-            auth_code
-        );
-
-        let authed_token = query.fetch_optional(&self.pool).await?;
-
-        Ok(authed_token.map(|x| AuthedToken {
-            id: x.id.try_into().unwrap(),
-            token: x.token,
-            origin_ip: IpAddr::new(x.origin_ip.clone()),
-            reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
-            asn_num: x.asn_num,
-            writing_ua: x.writing_ua,
-            authed_ua: x.authed_ua,
-            auth_code: x.auth_code,
-            created_at: x.created_at.and_utc(),
-            authed_at: x.authed_at.map(|x| x.and_utc()),
-            validity: x.validity != 0,
-            last_wrote_at: x.last_wrote_at.map(|x| x.and_utc()),
-            author_id_seed: x.author_id_seed,
-            require_user_registration: x.require_user_registration != 0,
-            registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
-            require_reauth: x.require_reauth != 0,
-        }))
     }
 
     async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {

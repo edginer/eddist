@@ -1,5 +1,7 @@
 use std::{env, sync::OnceLock};
 
+use rand::RngExt;
+
 use chrono::Utc;
 use eddist_core::simple_rate_limiter::RateLimiter;
 use metrics::counter;
@@ -18,7 +20,8 @@ use crate::{
     },
 };
 use eddist_core::{
-    domain::pubsub_repository::AuthTokenInitiated, redis_keys::authed_token_suspended_key,
+    domain::pubsub_repository::AuthTokenInitiated,
+    redis_keys::{authed_token_suspended_key, reauth_temp_key},
     utils::is_auth_token_pub_enabled,
 };
 
@@ -149,10 +152,16 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             return Err(BbsCgiError::TemporarilySuspended);
         }
 
-        // Check require_reauth flag
+        // Check require_reauth flag — generate a one-time temp key so the re-auth page
+        // can uniquely identify this token without relying on IP (which may change on mobile).
         if authed_token.require_reauth {
+            let temp_key = gen_reauth_temp_key();
+            let redis_key = reauth_temp_key(&temp_key);
+            conn.set_ex::<_, _, ()>(&redis_key, authed_token.id.to_string(), 3600)
+                .await
+                .unwrap_or(());
             return Err(BbsCgiError::ReAuthRequired {
-                auth_code: authed_token.auth_code.clone(),
+                temp_key,
                 base_url: env::var("BASE_URL").unwrap(),
             });
         }
@@ -183,4 +192,14 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 
         Ok(authed_token)
     }
+}
+
+/// Generates an 8-character Crockford Base32 key (digits + uppercase letters, no I/L/O/U).
+/// 32^8 ≈ 1 trillion combinations — sufficient for a 1-hour TTL key.
+fn gen_reauth_temp_key() -> String {
+    const CHARS: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let mut rng = rand::rng();
+    (0..8)
+        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
+        .collect()
 }

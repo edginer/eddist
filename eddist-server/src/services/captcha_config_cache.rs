@@ -43,20 +43,24 @@ pub async fn get_cached_captcha_configs() -> Vec<CaptchaProviderConfig> {
 
 /// Get cached captcha configs for the /auth-code endpoint
 pub async fn get_cached_captcha_configs_for_auth_code() -> Vec<CaptchaProviderConfig> {
-    get_cached_captcha_configs()
-        .await
-        .into_iter()
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
         .filter(|c| c.endpoint_usage.matches_auth_code())
-        .collect::<Vec<_>>()
+        .cloned()
+        .collect()
 }
 
 /// Get cached captcha configs for the /re-auth endpoint
 pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfig> {
-    get_cached_captcha_configs()
-        .await
-        .into_iter()
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
         .filter(|c| c.endpoint_usage.matches_reauth())
-        .collect::<Vec<_>>()
+        .cloned()
+        .collect()
 }
 
 /// Refresh the cache with new configs from the database
