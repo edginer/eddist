@@ -34,11 +34,33 @@ impl CaptchaConfigCache {
     }
 }
 
-/// Get the cached captcha configs
+/// Get all cached captcha configs (unfiltered)
 pub async fn get_cached_captcha_configs() -> Vec<CaptchaProviderConfig> {
     let global_cache = get_global_cache();
     let cache = global_cache.read().await;
     cache.configs.clone()
+}
+
+/// Get cached captcha configs for the /auth-code endpoint
+pub async fn get_cached_captcha_configs_for_auth_code() -> Vec<CaptchaProviderConfig> {
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
+        .filter(|c| c.endpoint_usage.matches_auth_code())
+        .cloned()
+        .collect()
+}
+
+/// Get cached captcha configs for the /re-auth endpoint
+pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfig> {
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
+        .filter(|c| c.endpoint_usage.matches_reauth())
+        .cloned()
+        .collect()
 }
 
 /// Refresh the cache with new configs from the database

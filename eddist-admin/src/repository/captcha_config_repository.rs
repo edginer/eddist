@@ -28,6 +28,7 @@ struct CaptchaConfigRow {
     verification: Option<serde_json::Value>,
     is_active: bool,
     display_order: i32,
+    endpoint_usage: String,
     created_at: chrono::NaiveDateTime,
     updated_at: chrono::NaiveDateTime,
     updated_by: Option<String>,
@@ -73,6 +74,7 @@ impl From<CaptchaConfigRow> for CaptchaConfig {
             verification,
             is_active: row.is_active,
             display_order: row.display_order,
+            endpoint_usage: row.endpoint_usage,
             created_at: row.created_at,
             updated_at: row.updated_at,
             updated_by: row.updated_by,
@@ -129,6 +131,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
                 verification AS "verification: serde_json::Value",
                 is_active AS "is_active: bool",
                 display_order,
+                endpoint_usage,
                 created_at,
                 updated_at,
                 updated_by
@@ -161,6 +164,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
                 verification AS "verification: serde_json::Value",
                 is_active AS "is_active: bool",
                 display_order,
+                endpoint_usage,
                 created_at,
                 updated_at,
                 updated_by
@@ -194,6 +198,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
                 verification AS "verification: serde_json::Value",
                 is_active AS "is_active: bool",
                 display_order,
+                endpoint_usage,
                 created_at,
                 updated_at,
                 updated_by
@@ -240,9 +245,9 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
                 id, name, provider, site_key, secret, base_url,
                 widget_form_field_name, widget_script_url, widget_html, widget_script_handler,
                 capture_fields, verification,
-                is_active, display_order, created_at, updated_at, updated_by
+                is_active, display_order, endpoint_usage, created_at, updated_at, updated_by
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             id,
             input.name,
@@ -258,6 +263,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             verification_json,
             input.is_active,
             input.display_order,
+            input.endpoint_usage,
             now,
             now,
             updated_by
@@ -277,6 +283,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             verification: input.verification,
             is_active: input.is_active,
             display_order: input.display_order,
+            endpoint_usage: input.endpoint_usage,
             created_at: now,
             updated_at: now,
             updated_by,
@@ -309,6 +316,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         let verification = input.verification.or(current.verification);
         let is_active = input.is_active.unwrap_or(current.is_active);
         let display_order = input.display_order.unwrap_or(current.display_order);
+        let endpoint_usage = input.endpoint_usage.unwrap_or(current.endpoint_usage);
 
         let capture_fields_json = serde_json::to_value(&capture_fields)?;
         let verification_json = verification
@@ -332,7 +340,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             SET name = ?, provider = ?, site_key = ?, secret = ?, base_url = ?,
                 widget_form_field_name = ?, widget_script_url = ?, widget_html = ?, widget_script_handler = ?,
                 capture_fields = ?, verification = ?,
-                is_active = ?, display_order = ?, updated_at = ?, updated_by = ?
+                is_active = ?, display_order = ?, endpoint_usage = ?, updated_at = ?, updated_by = ?
             WHERE id = ?
             "#,
             name,
@@ -348,6 +356,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             verification_json,
             is_active,
             display_order,
+            endpoint_usage,
             now,
             updated_by,
             id
@@ -367,6 +376,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             verification,
             is_active,
             display_order,
+            endpoint_usage,
             created_at: current.created_at,
             updated_at: now,
             updated_by,

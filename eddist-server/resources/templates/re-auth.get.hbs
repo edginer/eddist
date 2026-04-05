@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>再認証画面</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    {{#each captcha_scripts}}
+    <script src="{{this.url}}" async defer></script>
+    {{/each}}
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col max-w-4xl mx-auto p-4">
+        <article class="flex-1">
+            <header class="text-center py-8">
+                <h1 class="text-3xl lg:text-5xl font-bold text-gray-900 mb-4">再認証</h1>
+                <div class="border-b border-gray-300 w-full"></div>
+            </header>
+            <section class="py-8">
+                <div class="bg-white rounded-lg shadow-sm border p-6 lg:p-8 space-y-6">
+                    <div>
+                        <h2 class="text-2xl lg:text-3xl font-semibold text-gray-900 mb-4">再認証手順</h2>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <p class="text-gray-700 lg:text-lg leading-relaxed">
+                                書き込み時に表示された再認証コードを入力し、認証を行ってください
+                            </p>
+                        </div>
+
+                        <form action="/re-auth" method="POST" id="login-form" class="monocle-enriched space-y-6">
+                            {{#each captcha_widgets}}
+                            <div class="flex justify-center">
+                                {{{this.html}}}
+                            </div>
+                            {{/each}}
+
+                            <div class="space-y-2">
+                                <label for="temp_key" class="block text-sm font-medium text-gray-900">再認証コード</label>
+                                <input
+                                    type="text"
+                                    name="temp_key"
+                                    id="temp_key"
+                                    placeholder="再認証コード"
+                                    maxlength="8"
+                                    class="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-mono uppercase"
+                                    required
+                                >
+                            </div>
+
+                            <button
+                                type="submit"
+                                id="submit-btn"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 lg:text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            >
+                                再認証を行う
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </article>
+
+        <footer class="py-6 text-center mt-8">
+            <p class="text-xs text-gray-400">
+                This BBS is powered by
+                <a href="https://github.com/edginer/eddist" class="text-gray-500 hover:text-gray-700 underline">
+                    Eddist
+                </a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {{#each captcha_handlers}}
+            {{{this.code}}}
+            {{/each}}
+        });
+    </script>
+</body>
+</html>

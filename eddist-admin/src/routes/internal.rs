@@ -6,10 +6,16 @@ use uuid::Uuid;
 
 use crate::{AppState, error::ApiError};
 
+use super::auth_tokens::{clear_require_reauth_token, require_reauth_token};
+
 pub fn create_internal_routes() -> Router<AppState> {
     Router::new()
         .route("/authed-tokens/suspend", post(suspend_authed_token))
         .route("/authed-tokens/revoke", post(revoke_authed_token))
+        .route(
+            "/authed-tokens/require-reauth/{authedTokenId}",
+            post(require_reauth_token).delete(clear_require_reauth_token),
+        )
 }
 
 #[derive(Deserialize)]

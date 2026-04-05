@@ -4,6 +4,7 @@ use board_info_service::BoardInfoService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
 use metadent_thread_list_service::MetadentThreadListService;
+use reauth_service::ReAuthService;
 use redis::aio::ConnectionManager;
 use res_creation_service::ResCreationService;
 use s3::Bucket;
@@ -43,6 +44,7 @@ pub(crate) mod captcha_config_cache;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod metadent_thread_list_service;
+pub(crate) mod reauth_service;
 pub(crate) mod res_creation_service;
 pub(crate) mod server_settings_cache;
 pub(crate) mod thread_creation_service;
@@ -79,6 +81,7 @@ pub struct AppServiceContainer<
     E: CreationEventRepository + 'static,
 > {
     auth_with_code: AuthWithCodeService<B, E>,
+    reauth: ReAuthService<B>,
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B, U, P, E>,
@@ -123,6 +126,7 @@ impl<
                 redis_conn.clone(),
                 pubsub.event_repo.clone(),
             ),
+            reauth: ReAuthService::new(bbs_repo.clone(), redis_conn.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
@@ -187,6 +191,10 @@ impl<
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B, E> {
         &self.auth_with_code
+    }
+
+    pub fn reauth(&self) -> &ReAuthService<B> {
+        &self.reauth
     }
 
     pub fn board_info(&self) -> &BoardInfoService<B> {

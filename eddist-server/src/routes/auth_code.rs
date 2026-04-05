@@ -19,7 +19,7 @@ use crate::{
         AppService,
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         bind_token_to_user_service::BindTokenToUserServiceInput,
-        captcha_config_cache::get_cached_captcha_configs,
+        captcha_config_cache::get_cached_captcha_configs_for_auth_code,
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
 };
@@ -50,7 +50,7 @@ fn resolve_placeholders(template: &str, site_key: &str, base_url: Option<&str>) 
 }
 
 /// Build template variables from captcha provider configs
-fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Value {
+pub fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Value {
     let mut scripts = Vec::<CaptchaScript>::new();
     let mut widgets = Vec::<CaptchaWidget>::new();
     let mut handlers = Vec::<CaptchaHandler>::new();
@@ -93,7 +93,7 @@ fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json::Va
 
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    let captcha_configs = get_cached_captcha_configs().await;
+    let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
     let template_vars = build_template_variables(&captcha_configs);
 
     let html = state
@@ -117,7 +117,7 @@ pub async fn post_auth_code(
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
-    let captcha_configs = get_cached_captcha_configs().await;
+    let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
     let (token, authed_token_id, rate_limit_token, user_reg_url) = match state
         .services
         .auth_with_code()

@@ -32,3 +32,15 @@ path = "./resources/templates/login-idp-selection.get.hbs"
 [[template.templates]]
 name = "error-page.get"
 path = "./resources/templates/error-page.get.hbs"
+
+[[template.templates]]
+name = "re-auth.get"
+path = "./resources/templates/re-auth.get.hbs"
+
+[[template.templates]]
+name = "re-auth.post.success"
+path = "./resources/templates/re-auth.post.success.hbs"
+
+[[template.templates]]
+name = "re-auth.post.failed"
+path = "./resources/templates/re-auth.post.failed.hbs"

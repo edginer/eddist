@@ -21,6 +21,7 @@ pub struct CaptchaConfig {
     pub verification: Option<CaptchaVerificationConfig>,
     pub is_active: bool,
     pub display_order: i32,
+    pub endpoint_usage: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub updated_by: Option<String>,
@@ -98,10 +99,16 @@ pub struct CreateCaptchaConfigInput {
     pub is_active: bool,
     #[serde(default)]
     pub display_order: i32,
+    #[serde(default = "default_endpoint_usage")]
+    pub endpoint_usage: String,
 }
 
 fn default_is_active() -> bool {
     true
+}
+
+fn default_endpoint_usage() -> String {
+    "auth_code".to_string()
 }
 
 /// Input for updating an existing captcha config
@@ -117,4 +124,5 @@ pub struct UpdateCaptchaConfigInput {
     pub verification: Option<CaptchaVerificationConfig>,
     pub is_active: Option<bool>,
     pub display_order: Option<i32>,
+    pub endpoint_usage: Option<String>,
 }

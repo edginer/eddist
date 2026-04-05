@@ -71,6 +71,9 @@ pub trait BbsRepository: Send + Sync + 'static {
         tx: sqlx::Transaction<'a, sqlx::MySql>,
     ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
 
+    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
+    async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
+
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
     async fn get_cap_by_board_key(
         &self,
@@ -267,7 +270,8 @@ impl BbsRepository for BbsRepositoryImpl {
                     at.last_wrote_at AS last_wrote_at,
                     at.author_id_seed AS author_id_seed,
                     at.require_user_registration AS "require_user_registration: bool",
-                    at.registered_user_id AS "registered_user_id?: Uuid"
+                    at.registered_user_id AS "registered_user_id?: Uuid",
+                    at.require_reauth AS "require_reauth: bool"
                 FROM
                     threads AS t
                 INNER JOIN
@@ -318,6 +322,7 @@ impl BbsRepository for BbsRepositoryImpl {
                         author_id_seed: x.author_id_seed,
                         require_user_registration: x.require_user_registration,
                         registered_user_id: x.registered_user_id,
+                        require_reauth: x.require_reauth,
                     },
                 )
             })
@@ -407,7 +412,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 last_wrote_at,
                 author_id_seed,
                 require_user_registration,
-                registered_user_id
+                registered_user_id,
+                require_reauth
             FROM authed_tokens WHERE token = ?"#,
             token
         );
@@ -430,6 +436,7 @@ impl BbsRepository for BbsRepositoryImpl {
             author_id_seed: x.author_id_seed,
             require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+            require_reauth: x.require_reauth != 0,
         }))
     }
 
@@ -451,7 +458,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 last_wrote_at,
                 author_id_seed,
                 require_user_registration,
-                registered_user_id
+                registered_user_id,
+                require_reauth
             FROM authed_tokens WHERE id = ?"#,
             id.as_bytes().to_vec()
         );
@@ -474,6 +482,7 @@ impl BbsRepository for BbsRepositoryImpl {
             author_id_seed: x.author_id_seed,
             require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+            require_reauth: x.require_reauth != 0,
         }))
     }
 
@@ -499,7 +508,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 last_wrote_at,
                 author_id_seed,
                 require_user_registration,
-                registered_user_id
+                registered_user_id,
+                require_reauth
             FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
             reduced_ip,
             auth_code
@@ -523,6 +533,7 @@ impl BbsRepository for BbsRepositoryImpl {
             author_id_seed: x.author_id_seed,
             require_user_registration: x.require_user_registration != 0,
             registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+            require_reauth: x.require_reauth != 0,
         }))
     }
 
@@ -547,7 +558,8 @@ impl BbsRepository for BbsRepositoryImpl {
                 last_wrote_at,
                 author_id_seed,
                 require_user_registration,
-                registered_user_id
+                registered_user_id,
+                require_reauth
             FROM authed_tokens WHERE auth_code = ? AND validity = false"#,
             auth_code
         );
@@ -572,6 +584,7 @@ impl BbsRepository for BbsRepositoryImpl {
                 author_id_seed: x.author_id_seed,
                 require_user_registration: x.require_user_registration != 0,
                 registered_user_id: x.registered_user_id.map(|x| x.try_into().unwrap()),
+                require_reauth: x.require_reauth != 0,
             })
             .collect())
     }
@@ -857,6 +870,26 @@ impl BbsRepository for BbsRepositoryImpl {
         Ok(tx)
     }
 
+    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        query!(
+            "UPDATE authed_tokens SET require_reauth = 1 WHERE id = ?",
+            id.as_bytes().to_vec()
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        query!(
+            "UPDATE authed_tokens SET require_reauth = 0 WHERE id = ?",
+            id.as_bytes().to_vec()
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>> {
         let ng_words = sqlx::query_as!(
             NgWord,
@@ -959,6 +992,7 @@ struct SelectionThreadWithMetadent {
     author_id_seed: Vec<u8>,
     require_user_registration: bool,
     registered_user_id: Option<Uuid>,
+    require_reauth: bool,
 }
 
 #[derive(Debug)]
@@ -988,6 +1022,7 @@ struct SelectionAuthedToken {
     author_id_seed: Vec<u8>,
     require_user_registration: i8, // TINYINT
     registered_user_id: Option<Vec<u8>>,
+    require_reauth: i8, // TINYINT
 }
 
 #[derive(Debug, Clone, Copy)]
