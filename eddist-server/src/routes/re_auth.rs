@@ -5,7 +5,7 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
-use http::HeaderMap;
+use http::{HeaderMap, HeaderValue};
 use serde_json::json;
 
 use crate::{
@@ -31,7 +31,7 @@ pub async fn get_re_auth(State(state): State<AppState>) -> impl IntoResponse {
 
     let mut resp = Html(html).into_response();
     resp.headers_mut()
-        .insert("Cache-Control", "private".parse().unwrap());
+        .insert("Cache-Control", HeaderValue::from_static("private"));
     resp
 }
 

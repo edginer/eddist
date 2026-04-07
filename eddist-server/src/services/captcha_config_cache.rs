@@ -34,13 +34,6 @@ impl CaptchaConfigCache {
     }
 }
 
-/// Get all cached captcha configs (unfiltered)
-pub async fn get_cached_captcha_configs() -> Vec<CaptchaProviderConfig> {
-    let global_cache = get_global_cache();
-    let cache = global_cache.read().await;
-    cache.configs.clone()
-}
-
 /// Get cached captcha configs for the /auth-code endpoint
 pub async fn get_cached_captcha_configs_for_auth_code() -> Vec<CaptchaProviderConfig> {
     let cache = get_global_cache().read().await;

@@ -71,7 +71,6 @@ pub trait BbsRepository: Send + Sync + 'static {
         tx: sqlx::Transaction<'a, sqlx::MySql>,
     ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
 
-    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
@@ -868,16 +867,6 @@ impl BbsRepository for BbsRepositoryImpl {
         query.execute(&mut *tx).await?;
 
         Ok(tx)
-    }
-
-    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            "UPDATE authed_tokens SET require_reauth = 1 WHERE id = ?",
-            id.as_bytes().to_vec()
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {

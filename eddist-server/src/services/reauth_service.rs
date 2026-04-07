@@ -32,12 +32,12 @@ impl<T: BbsRepository> ReAuthService<T> {
 #[async_trait::async_trait]
 impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
     async fn execute(&self, input: ReAuthServiceInput) -> anyhow::Result<()> {
-        // Resolve temp key → token ID from Redis (set when require_reauth was triggered)
         let redis_key = reauth_temp_key(&input.temp_key);
+        // Atomically read and delete the temp key — one-time use, closes replay window
         let token_id_str: Option<String> = self
             .redis_conn
             .clone()
-            .get(&redis_key)
+            .get_del(&redis_key)
             .await
             .unwrap_or(None);
         let token_id_str = token_id_str.ok_or_else(|| {
@@ -108,8 +108,6 @@ impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
         }
 
         self.repo.clear_require_reauth(token.id).await?;
-        // Consume the temp key so it cannot be replayed
-        let _: Option<String> = self.redis_conn.clone().get_del(&redis_key).await.ok();
         counter!("reauth_success").increment(1);
 
         Ok(())
