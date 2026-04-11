@@ -1,4 +1,5 @@
 use chrono::Utc;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -101,15 +102,18 @@ pub trait CaptchaConfigRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct CaptchaConfigRepositoryImpl(MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl CaptchaConfigRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<CaptchaConfig>> {

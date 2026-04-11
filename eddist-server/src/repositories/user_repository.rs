@@ -58,8 +58,10 @@ impl UserRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 transaction_repository!(UserRepositoryImpl, pool, Db);
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>> {
@@ -381,6 +383,7 @@ impl UserRepository for UserRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 struct UserIdpSelection {
     pub user_id: Uuid,
     pub user_name: String,

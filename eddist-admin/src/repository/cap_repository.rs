@@ -25,9 +25,11 @@ pub trait CapRepository: Send + Sync {
     ) -> anyhow::Result<Cap>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct CapRepositoryImpl(pub sqlx::MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl CapRepositoryImpl {
     pub fn new(pool: sqlx::MySqlPool) -> Self {
         Self(pool)
@@ -44,6 +46,7 @@ pub struct SelectionCap {
     pub board_id: Option<Uuid>,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl CapRepository for CapRepositoryImpl {
     async fn get_caps(&self) -> anyhow::Result<Vec<Cap>> {

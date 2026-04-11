@@ -15,15 +15,18 @@ pub trait AdminUserRepository: Send + Sync {
     async fn update_user_status(&self, user_id: Uuid, enabled: bool) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AdminUserRepositoryImpl(pub sqlx::MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AdminUserRepositoryImpl {
     pub fn new(pool: sqlx::MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AdminUserRepository for AdminUserRepositoryImpl {
     async fn search_users(
@@ -212,6 +215,7 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct UserIdpsSelection {
     pub user_id: Uuid,

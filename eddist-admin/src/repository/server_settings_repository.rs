@@ -1,4 +1,5 @@
 use chrono::Utc;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -10,15 +11,18 @@ pub trait ServerSettingsRepository: Send + Sync {
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct ServerSettingsRepositoryImpl(MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl ServerSettingsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<ServerSetting>> {

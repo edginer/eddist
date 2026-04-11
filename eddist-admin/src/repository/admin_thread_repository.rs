@@ -1,9 +1,11 @@
 use chrono::Utc;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
 use crate::models::Thread;
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::admin_bbs_repository::SelectionThread;
 
 #[async_trait::async_trait]
@@ -29,15 +31,18 @@ pub trait AdminThreadRepository: Send + Sync {
     async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AdminThreadRepositoryImpl(pub(crate) MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AdminThreadRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 fn selection_thread_to_thread(thread: SelectionThread) -> Thread {
     Thread {
         id: Uuid::from_slice(&thread.id).unwrap(),
@@ -55,6 +60,7 @@ fn selection_thread_to_thread(thread: SelectionThread) -> Thread {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AdminThreadRepository for AdminThreadRepositoryImpl {
     async fn get_threads_by_thread_id(

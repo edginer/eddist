@@ -3,6 +3,7 @@ use eddist_core::domain::user_restriction::{
     CreateUserRestrictionRuleInput, RestrictionRuleType, UpdateUserRestrictionRuleInput,
     UserRestrictionRule,
 };
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySql, Pool};
 use uuid::Uuid;
 
@@ -18,17 +19,20 @@ pub trait UserRestrictionRepository: Send + Sync {
     async fn get_rule_by_id(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct UserRestrictionRepositoryImpl {
     pool: Pool<MySql>,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl UserRestrictionRepositoryImpl {
     pub fn new(pool: Pool<MySql>) -> Self {
         Self { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait]
 impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
     async fn get_all_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {

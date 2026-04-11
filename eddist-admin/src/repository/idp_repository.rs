@@ -1,5 +1,6 @@
 use base64::Engine;
 use chacha20poly1305::{KeyInit, aead::Aead};
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -14,9 +15,11 @@ pub trait IdpAdminRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct IdpAdminRepositoryImpl(MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl IdpAdminRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
@@ -42,6 +45,7 @@ fn encrypt_client_secret(plain_secret: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(&encrypted)
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl IdpAdminRepository for IdpAdminRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<Idp>> {

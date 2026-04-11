@@ -1,8 +1,10 @@
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::admin_bbs_repository::{SelectionBoardInfo, SelectionBoardWithThreadCount};
 
 #[async_trait::async_trait]
@@ -13,15 +15,18 @@ pub trait AdminBoardRepository: Send + Sync {
     async fn edit_board(&self, board_key: &str, board: EditBoardInput) -> anyhow::Result<Board>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AdminBoardRepositoryImpl(pub(crate) MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AdminBoardRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AdminBoardRepository for AdminBoardRepositoryImpl {
     async fn get_boards_by_key(&self, keys: Option<Vec<String>>) -> anyhow::Result<Vec<Board>> {

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use eddist_core::utils::slugify;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
@@ -223,6 +224,7 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
 }
 
 /// Load all active captcha configs from the database
+#[cfg(not(feature = "backend-postgres"))]
 pub async fn get_active_captcha_configs(
     pool: &MySqlPool,
 ) -> anyhow::Result<Vec<CaptchaProviderConfig>> {

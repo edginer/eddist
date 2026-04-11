@@ -1,10 +1,12 @@
 use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{FromRow, types::Json};
 
 /// Shared selection types used by admin_board_repository, admin_thread_repository,
 /// and admin_response_repository.
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, FromRow)]
 pub struct SelectionBoardWithThreadCount {
     pub id: Vec<u8>,
@@ -14,6 +16,7 @@ pub struct SelectionBoardWithThreadCount {
     pub thread_count: i64,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, FromRow)]
 pub struct SelectionBoardInfo {
     pub local_rules: String,
@@ -30,6 +33,7 @@ pub struct SelectionBoardInfo {
     pub force_metadent_type: Option<String>,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, FromRow)]
 pub struct SelectionThread {
     pub id: Vec<u8>,
@@ -46,6 +50,7 @@ pub struct SelectionThread {
     pub active: bool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug)]
 pub struct SelectionRes {
     pub id: Vec<u8>,

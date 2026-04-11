@@ -1,5 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use eddist_core::domain::notice::Notice;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -34,15 +35,18 @@ pub trait NoticeRepository: Send + Sync {
     async fn delete_notice(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct NoticeRepositoryImpl(MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl NoticeRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl NoticeRepository for NoticeRepositoryImpl {
     async fn get_notices_paginated(&self, page: u32, limit: u32) -> anyhow::Result<Vec<Notice>> {

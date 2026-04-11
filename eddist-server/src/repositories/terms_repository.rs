@@ -1,4 +1,5 @@
 use eddist_core::domain::terms::Terms;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query_as};
 use uuid::Uuid;
 
@@ -7,17 +8,20 @@ pub trait TermsRepository: Send + Sync + 'static {
     async fn get_terms(&self) -> anyhow::Result<Option<Terms>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct TermsRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl TermsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         TermsRepositoryImpl { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl TermsRepository for TermsRepositoryImpl {
     async fn get_terms(&self) -> anyhow::Result<Option<Terms>> {

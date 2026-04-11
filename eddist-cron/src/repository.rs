@@ -26,6 +26,7 @@ impl Repository {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl Repository {
     pub async fn get_all_boards_info(&self) -> anyhow::Result<Vec<SelectionBoardInfo>> {
         let boards = sqlx::query_as!(
@@ -369,6 +370,7 @@ impl Repository {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 struct Res {
     author_name: String,
     mail: String,

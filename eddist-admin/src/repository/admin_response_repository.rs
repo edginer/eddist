@@ -1,10 +1,12 @@
 use chrono::{TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query_as, types::Json};
 use uuid::Uuid;
 
 use crate::models::Res;
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::admin_bbs_repository::SelectionRes;
 
 #[async_trait::async_trait]
@@ -33,15 +35,18 @@ pub trait AdminResponseRepository: Send + Sync {
     ) -> anyhow::Result<Res>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AdminResponseRepositoryImpl(pub(crate) MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AdminResponseRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 fn selection_res_to_res(res: SelectionRes) -> Res {
     Res {
         id: Uuid::from_slice(&res.id).unwrap(),
@@ -60,6 +65,7 @@ fn selection_res_to_res(res: SelectionRes) -> Res {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AdminResponseRepository for AdminResponseRepositoryImpl {
     async fn get_reses_by_thread_id(

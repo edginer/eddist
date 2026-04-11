@@ -3,7 +3,10 @@ use std::{
     time::Duration,
 };
 
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -57,6 +60,7 @@ pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfi
 }
 
 /// Refresh the cache with new configs from the database
+#[cfg(not(feature = "backend-postgres"))]
 pub async fn refresh_captcha_config_cache(pool: &MySqlPool) -> anyhow::Result<()> {
     let configs = get_active_captcha_configs(pool).await?;
     let global_cache = get_global_cache();
@@ -80,6 +84,7 @@ pub async fn refresh_captcha_config_cache(pool: &MySqlPool) -> anyhow::Result<()
 }
 
 /// Start a background task that periodically refreshes the captcha config cache
+#[cfg(not(feature = "backend-postgres"))]
 pub fn start_captcha_config_refresh_task(pool: MySqlPool, refresh_interval: Duration) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(refresh_interval);
@@ -93,4 +98,15 @@ pub fn start_captcha_config_refresh_task(pool: MySqlPool, refresh_interval: Dura
     });
 
     tracing::info!("Started captcha config cache refresh task with interval: {refresh_interval:?}",);
+}
+
+#[cfg(feature = "backend-postgres")]
+pub async fn refresh_captcha_config_cache(_pool: &PgPool) -> anyhow::Result<()> {
+    // TODO: Pass 2 — implement PG-specific query
+    Ok(())
+}
+
+#[cfg(feature = "backend-postgres")]
+pub fn start_captcha_config_refresh_task(_pool: PgPool, _refresh_interval: Duration) {
+    // TODO: Pass 2 — implement PG background refresh task
 }

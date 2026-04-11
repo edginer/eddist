@@ -48,6 +48,21 @@ async fn main() -> Result<()> {
     }
 }
 
+#[cfg(feature = "backend-postgres")]
+async fn backup() -> Result<()> {
+    anyhow::bail!("backup not yet implemented for PostgreSQL backend")
+}
+
+#[cfg(feature = "backend-postgres")]
+async fn validate() -> Result<()> {
+    anyhow::bail!("validate not yet implemented for PostgreSQL backend")
+}
+
+#[cfg(feature = "backend-postgres")]
+async fn recover() -> Result<()> {
+    anyhow::bail!("recover not yet implemented for PostgreSQL backend")
+}
+
 fn make_bucket() -> Result<Arc<s3::Bucket>> {
     Ok(Arc::from(s3::Bucket::new(
         env::var("S3_BUCKET_NAME")?.trim(),
@@ -64,6 +79,7 @@ fn make_bucket() -> Result<Arc<s3::Bucket>> {
     )?))
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn backup() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
     let bucket = make_bucket()?;
@@ -118,6 +134,7 @@ async fn backup() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn validate() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
     let bucket = make_bucket()?;
@@ -172,6 +189,7 @@ async fn validate() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn recover() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
     let bucket = make_bucket()?;

@@ -1,3 +1,4 @@
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
@@ -8,17 +9,20 @@ pub trait IdpRepository: Send + Sync + 'static {
     async fn get_idps(&self) -> anyhow::Result<Vec<Idp>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct IdpRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl IdpRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl IdpRepository for IdpRepositoryImpl {
     async fn get_idps(&self) -> anyhow::Result<Vec<Idp>> {

@@ -8,6 +8,7 @@ use eddist_core::domain::{
     res::ResView,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query, query_as, types::Json};
 use uuid::Uuid;
 
@@ -74,17 +75,20 @@ pub trait BbsRepository: Send + Sync + 'static {
     ) -> anyhow::Result<Option<Cap>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct BbsRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl BbsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> BbsRepositoryImpl {
         BbsRepositoryImpl { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl BbsRepository for BbsRepositoryImpl {
     async fn get_boards(&self) -> anyhow::Result<Vec<Board>> {
@@ -910,6 +914,7 @@ impl BbsRepository for BbsRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug)]
 struct SelectionThread {
     id: Vec<u8>,
@@ -927,6 +932,7 @@ struct SelectionThread {
     archive_converted: i8, // TINYINT
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug)]
 struct SelectionThreadWithMetadent {
     id: Uuid,
@@ -960,6 +966,7 @@ struct SelectionThreadWithMetadent {
     require_reauth: bool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug)]
 struct SelectionRes {
     author_name: String,
@@ -970,6 +977,7 @@ struct SelectionRes {
     is_abone: i8, // TINYINT
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug)]
 struct SelectionAuthedToken {
     id: Vec<u8>,

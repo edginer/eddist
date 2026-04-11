@@ -1,9 +1,12 @@
+#[cfg(not(feature = "backend-postgres"))]
 use chrono::NaiveDateTime;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{FromRow, MySql, QueryBuilder, Row, query, query_as};
 use uuid::Uuid;
 
 use crate::models::AuthedToken;
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, FromRow)]
 struct AuthedTokenRow {
     pub id: Vec<u8>,
@@ -21,6 +24,7 @@ struct AuthedTokenRow {
     pub require_reauth: bool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl From<AuthedTokenRow> for AuthedToken {
     fn from(row: AuthedTokenRow) -> Self {
         Self {
@@ -66,15 +70,18 @@ pub trait AuthedTokenRepository: Send + Sync {
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AuthedTokenRepositoryImpl(pub sqlx::MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AuthedTokenRepositoryImpl {
     pub fn new(pool: sqlx::MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken> {

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{Executor, MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -20,9 +21,11 @@ pub trait NgWordRepository: Send + Sync {
     async fn delete_ng_word(&self, ng_word_id: Uuid) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct NgWordRepositoryImpl(pub MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl NgWordRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
@@ -39,6 +42,7 @@ pub struct SelectionNgWord {
     pub board_id: Option<Uuid>,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl NgWordRepository for NgWordRepositoryImpl {
     async fn get_ng_words(&self) -> anyhow::Result<Vec<NgWord>> {
