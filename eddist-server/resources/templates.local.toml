@@ -32,3 +32,15 @@ path = "eddist-server/resources/templates/login-idp-selection.get.hbs"
 [[template.templates]]
 name = "error-page.get"
 path = "eddist-server/resources/templates/error-page.get.hbs"
+
+[[template.templates]]
+name = "re-auth.get"
+path = "eddist-server/resources/templates/re-auth.get.hbs"
+
+[[template.templates]]
+name = "re-auth.post.success"
+path = "eddist-server/resources/templates/re-auth.post.success.hbs"
+
+[[template.templates]]
+name = "re-auth.post.failed"
+path = "eddist-server/resources/templates/re-auth.post.failed.hbs"

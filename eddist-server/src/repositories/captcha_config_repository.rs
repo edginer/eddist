@@ -5,8 +5,8 @@ use sqlx::MySqlPool;
 use uuid::Uuid;
 
 use crate::domain::captcha_like::{
-    CaptchaProviderConfig, CaptchaVerificationConfig, CaptchaWidgetMetadata, HttpMethod,
-    RequestFormat,
+    CaptchaEndpointUsage, CaptchaProviderConfig, CaptchaVerificationConfig, CaptchaWidgetMetadata,
+    HttpMethod, RequestFormat,
 };
 
 #[derive(Debug, Clone)]
@@ -25,6 +25,7 @@ struct CaptchaConfigRow {
     verification: Option<serde_json::Value>,
     is_active: bool,
     display_order: i32,
+    endpoint_usage: String,
 }
 
 /// Get default widget config for first-class providers
@@ -214,6 +215,7 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
             secret: row.secret,
             base_url: row.base_url,
             widget,
+            endpoint_usage: CaptchaEndpointUsage::from_str(&row.endpoint_usage),
             capture_fields,
             verification,
         }
@@ -241,7 +243,8 @@ pub async fn get_active_captcha_configs(
             capture_fields AS "capture_fields: serde_json::Value",
             verification AS "verification: serde_json::Value",
             is_active AS "is_active: bool",
-            display_order
+            display_order,
+            endpoint_usage
         FROM captcha_configs
         WHERE is_active = 1
         ORDER BY display_order ASC, created_at ASC

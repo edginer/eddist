@@ -1,5 +1,7 @@
 use std::{env, sync::OnceLock};
 
+use rand::RngExt;
+
 use chrono::Utc;
 use eddist_core::simple_rate_limiter::RateLimiter;
 use metrics::counter;
@@ -18,7 +20,8 @@ use crate::{
     },
 };
 use eddist_core::{
-    domain::pubsub_repository::AuthTokenInitiated, redis_keys::authed_token_suspended_key,
+    domain::pubsub_repository::AuthTokenInitiated,
+    redis_keys::{authed_token_suspended_key, reauth_lock_key, reauth_temp_key},
     utils::is_auth_token_pub_enabled,
 };
 
@@ -149,6 +152,36 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             return Err(BbsCgiError::TemporarilySuspended);
         }
 
+        // Check require_reauth flag — generate a one-time temp key so the re-auth page
+        // can uniquely identify this token without relying on IP (which may change on mobile).
+        // A per-token lock key (reauth:lock:{id}) caps Redis entries at 2 per token regardless
+        // of how many post attempts are made; repeated attempts reuse the existing code.
+        if authed_token.require_reauth {
+            let token_id_str = authed_token.id.to_string();
+            let lock_key = reauth_lock_key(&token_id_str);
+            let existing_code: Option<String> = conn.get(&lock_key).await.unwrap_or(None);
+            let temp_key = match existing_code {
+                Some(code) => {
+                    // Refresh TTL on both keys so the window resets from the latest attempt
+                    let _ = conn.expire::<_, ()>(&lock_key, 60 * 5).await;
+                    let _ = conn.expire::<_, ()>(&reauth_temp_key(&code), 60 * 5).await;
+                    code
+                }
+                None => {
+                    let code = gen_reauth_temp_key();
+                    let _ = conn
+                        .set_ex::<_, _, ()>(&reauth_temp_key(&code), &token_id_str, 60 * 5)
+                        .await;
+                    let _ = conn.set_ex::<_, _, ()>(&lock_key, &code, 60 * 5).await;
+                    code
+                }
+            };
+            return Err(BbsCgiError::ReAuthRequired {
+                temp_key,
+                base_url: env::var("BASE_URL").unwrap(),
+            });
+        }
+
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
             let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
@@ -175,4 +208,14 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 
         Ok(authed_token)
     }
+}
+
+/// Generates an 8-character Crockford Base32 key (digits + uppercase letters, no I/L/O/U).
+/// 32^8 ≈ 1 trillion combinations — sufficient for a 5-minute TTL key.
+fn gen_reauth_temp_key() -> String {
+    const CHARS: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let mut rng = rand::rng();
+    (0..8)
+        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
+        .collect()
 }

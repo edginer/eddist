@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    t.id AS \"id: Uuid\",\n                    t.board_id AS \"board_id: Uuid\",\n                    t.thread_number AS thread_number,\n                    t.last_modified_at AS last_modified_at,\n                    t.sage_last_modified_at AS sage_last_modified_at,\n                    t.title AS title,\n                    t.authed_token_id AS \"authed_token_id: Uuid\",\n                    t.metadent AS metadent,\n                    t.response_count AS response_count,\n                    t.no_pool AS \"no_pool: bool\",\n                    t.active AS \"active: bool\",\n                    t.archived AS \"archived: bool\",\n                    t.archive_converted AS \"archive_converted: bool\",\n                    (\n                        SELECT r.client_info\n                        FROM responses r\n                        WHERE r.thread_id = t.id\n                        AND r.res_order = 1\n                    ) AS \"client_info! : Json<ClientInfo>\",\n                    at.token AS token,\n                    at.origin_ip AS origin_ip,\n                    at.reduced_origin_ip AS reduced_origin_ip,\n                    at.writing_ua AS writing_ua,\n                    at.authed_ua AS authed_ua,\n                    at.auth_code AS auth_code,\n                    at.created_at AS created_at,\n                    at.authed_at AS authed_at,\n                    at.validity AS \"validity: bool\",\n                    at.last_wrote_at AS last_wrote_at,\n                    at.author_id_seed AS author_id_seed,\n                    at.require_user_registration AS \"require_user_registration: bool\",\n                    at.registered_user_id AS \"registered_user_id?: Uuid\"\n                FROM\n                    threads AS t\n                INNER JOIN\n                    authed_tokens AS at ON t.authed_token_id = at.id\n                WHERE\n                    t.board_id = ?\n                    AND t.archived = 0\n                ORDER BY\n                    t.sage_last_modified_at DESC\n",
+  "query": "\n                SELECT\n                    t.id AS \"id: Uuid\",\n                    t.board_id AS \"board_id: Uuid\",\n                    t.thread_number AS thread_number,\n                    t.last_modified_at AS last_modified_at,\n                    t.sage_last_modified_at AS sage_last_modified_at,\n                    t.title AS title,\n                    t.authed_token_id AS \"authed_token_id: Uuid\",\n                    t.metadent AS metadent,\n                    t.response_count AS response_count,\n                    t.no_pool AS \"no_pool: bool\",\n                    t.active AS \"active: bool\",\n                    t.archived AS \"archived: bool\",\n                    t.archive_converted AS \"archive_converted: bool\",\n                    (\n                        SELECT r.client_info\n                        FROM responses r\n                        WHERE r.thread_id = t.id\n                        AND r.res_order = 1\n                    ) AS \"client_info! : Json<ClientInfo>\",\n                    at.token AS token,\n                    at.origin_ip AS origin_ip,\n                    at.reduced_origin_ip AS reduced_origin_ip,\n                    at.writing_ua AS writing_ua,\n                    at.authed_ua AS authed_ua,\n                    at.auth_code AS auth_code,\n                    at.created_at AS created_at,\n                    at.authed_at AS authed_at,\n                    at.validity AS \"validity: bool\",\n                    at.last_wrote_at AS last_wrote_at,\n                    at.author_id_seed AS author_id_seed,\n                    at.require_user_registration AS \"require_user_registration: bool\",\n                    at.registered_user_id AS \"registered_user_id?: Uuid\",\n                    at.require_reauth AS \"require_reauth: bool\"\n                FROM\n                    threads AS t\n                INNER JOIN\n                    authed_tokens AS at ON t.authed_token_id = at.id\n                WHERE\n                    t.board_id = ?\n                    AND t.archived = 0\n                ORDER BY\n                    t.sage_last_modified_at DESC\n",
   "describe": {
     "columns": [
       {
@@ -245,6 +245,15 @@
           "flags": "MULTIPLE_KEY | BINARY",
           "max_size": 16
         }
+      },
+      {
+        "ordinal": 27,
+        "name": "require_reauth: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
@@ -277,8 +286,9 @@
       true,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "31a90abded86599c72b5348bd5ded545e168c23410dacc2cedfa5aacfedef21f"
+  "hash": "bd2b97701cb032b92e3830b7eb74bd12b53949a8df5387f2ff8cd5046ccdd967"
 }

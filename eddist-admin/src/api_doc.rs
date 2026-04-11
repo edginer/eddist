@@ -47,6 +47,8 @@ use crate::{
         auth_tokens::list_authed_tokens,
         auth_tokens::get_authed_token,
         auth_tokens::delete_authed_token,
+        auth_tokens::require_reauth_token,
+        auth_tokens::clear_require_reauth_token,
 
         // Moderation routes
         moderation::get_ng_words,

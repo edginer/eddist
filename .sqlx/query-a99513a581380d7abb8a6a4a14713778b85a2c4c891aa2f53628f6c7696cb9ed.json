@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id\n            FROM authed_tokens WHERE auth_code = ? AND validity = false",
+  "query": "\n            SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                created_at,\n                authed_at,\n                validity AS \"validity!: bool\",\n                last_wrote_at,\n                additional_info AS \"additional_info: serde_json::Value\",\n                require_reauth AS \"require_reauth!: bool\"\n            FROM\n                authed_tokens\n            WHERE\n                id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -68,15 +68,6 @@
       },
       {
         "ordinal": 7,
-        "name": "auth_code",
-        "type_info": {
-          "type": "VarString",
-          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
-          "max_size": 48
-        }
-      },
-      {
-        "ordinal": 8,
         "name": "created_at",
         "type_info": {
           "type": "Datetime",
@@ -85,7 +76,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "authed_at",
         "type_info": {
           "type": "Datetime",
@@ -94,8 +85,8 @@
         }
       },
       {
-        "ordinal": 10,
-        "name": "validity",
+        "ordinal": 9,
+        "name": "validity!: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
@@ -103,7 +94,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "last_wrote_at",
         "type_info": {
           "type": "Datetime",
@@ -112,30 +103,21 @@
         }
       },
       {
-        "ordinal": 12,
-        "name": "author_id_seed",
+        "ordinal": 11,
+        "name": "additional_info: serde_json::Value",
         "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | BINARY",
-          "max_size": 64
+          "type": "Json",
+          "flags": "BLOB | BINARY",
+          "max_size": 4294967295
         }
       },
       {
-        "ordinal": 13,
-        "name": "require_user_registration",
+        "ordinal": 12,
+        "name": "require_reauth!: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
           "max_size": 1
-        }
-      },
-      {
-        "ordinal": 14,
-        "name": "registered_user_id",
-        "type_info": {
-          "type": "String",
-          "flags": "MULTIPLE_KEY | BINARY",
-          "max_size": 16
         }
       }
     ],
@@ -151,14 +133,12 @@
       false,
       true,
       false,
-      false,
       true,
       false,
       true,
-      false,
-      false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "c325756ecb80535c6237aa8e8e8e609265e8f5c9d41f7213e3b1ce9b9354b994"
+  "hash": "a99513a581380d7abb8a6a4a14713778b85a2c4c891aa2f53628f6c7696cb9ed"
 }

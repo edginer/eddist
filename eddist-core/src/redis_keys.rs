@@ -62,6 +62,14 @@ pub fn tripwire_uuid_seen_key(uuid: &str) -> String {
     format!("captcha:tripwire:uuid:{uuid}")
 }
 
+pub fn reauth_temp_key(temp_key: &str) -> String {
+    format!("reauth:temp:{temp_key}")
+}
+
+pub fn reauth_lock_key(token_id: &str) -> String {
+    format!("reauth:lock:{token_id}")
+}
+
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";

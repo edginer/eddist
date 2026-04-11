@@ -41,3 +41,37 @@ export const useDeleteAuthedToken = () => {
     onError: () => toast.error("Failed to delete authed token"),
   });
 };
+
+const REQUIRE_REAUTH = "/authed_tokens/{authed_token_id}/require-reauth";
+
+export const useRequireReAuth = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (authedTokenId: string) => {
+      await client.POST(REQUIRE_REAUTH, {
+        params: { path: { authed_token_id: authedTokenId } },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_AUTHED_TOKENS] });
+      toast.success("Re-auth required for token");
+    },
+    onError: () => toast.error("Failed to set re-auth requirement"),
+  });
+};
+
+export const useClearReAuth = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (authedTokenId: string) => {
+      await client.DELETE(REQUIRE_REAUTH, {
+        params: { path: { authed_token_id: authedTokenId } },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_AUTHED_TOKENS] });
+      toast.success("Re-auth requirement cleared");
+    },
+    onError: () => toast.error("Failed to clear re-auth requirement"),
+  });
+};

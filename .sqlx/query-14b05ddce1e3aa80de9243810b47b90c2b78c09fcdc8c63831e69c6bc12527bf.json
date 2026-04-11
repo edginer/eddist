@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE captcha_configs\n            SET name = ?, provider = ?, site_key = ?, secret = ?, base_url = ?,\n                widget_form_field_name = ?, widget_script_url = ?, widget_html = ?, widget_script_handler = ?,\n                capture_fields = ?, verification = ?,\n                is_active = ?, display_order = ?, endpoint_usage = ?, updated_at = ?, updated_by = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 17
+    },
+    "nullable": []
+  },
+  "hash": "14b05ddce1e3aa80de9243810b47b90c2b78c09fcdc8c63831e69c6bc12527bf"
+}

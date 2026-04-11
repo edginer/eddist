@@ -21,6 +21,7 @@ pub struct AuthedToken {
     pub author_id_seed: Vec<u8>,
     pub require_user_registration: bool,
     pub registered_user_id: Option<Uuid>,
+    pub require_reauth: bool,
 }
 
 impl AuthedToken {
@@ -53,6 +54,7 @@ impl AuthedToken {
             author_id_seed: sha2::Sha512::digest(reduced_ip.to_string().as_bytes()).to_vec(),
             require_user_registration: false,
             registered_user_id: None,
+            require_reauth: false,
         }
     }
 

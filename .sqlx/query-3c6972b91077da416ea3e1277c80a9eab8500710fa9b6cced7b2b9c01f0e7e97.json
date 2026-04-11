@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id\n            FROM authed_tokens WHERE id = ?",
+  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id,\n                require_reauth\n            FROM authed_tokens WHERE auth_code = ? AND validity = false",
   "describe": {
     "columns": [
       {
@@ -137,6 +137,15 @@
           "flags": "MULTIPLE_KEY | BINARY",
           "max_size": 16
         }
+      },
+      {
+        "ordinal": 15,
+        "name": "require_reauth",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
@@ -157,8 +166,9 @@
       true,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "47646f2cb3998ddc6cc5ff87d8c87a4a5dd77aa8451f4285b0e80d0331e7b517"
+  "hash": "3c6972b91077da416ea3e1277c80a9eab8500710fa9b6cced7b2b9c01f0e7e97"
 }
