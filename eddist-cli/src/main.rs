@@ -77,13 +77,29 @@ fn make_s3_client() -> Result<(Client, String)> {
         .build();
     Ok((Client::from_conf(config), bucket_name.trim().to_string()))
 }
+#[cfg(feature = "backend-postgres")]
+async fn backup() -> Result<()> {
+    anyhow::bail!("backup not yet implemented for PostgreSQL backend")
+}
 
+#[cfg(feature = "backend-postgres")]
+async fn validate() -> Result<()> {
+    anyhow::bail!("validate not yet implemented for PostgreSQL backend")
+}
+
+#[cfg(feature = "backend-postgres")]
+async fn recover() -> Result<()> {
+    anyhow::bail!("recover not yet implemented for PostgreSQL backend")
+}
+
+#[cfg(not(feature = "backend-postgres"))]
 async fn connect_database() -> Result<DatabaseConnection> {
     let mut options = ConnectOptions::new(env::var("DATABASE_URL")?);
     options.sqlx_logging(false);
     Ok(Database::connect(options).await?)
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 fn into_backup(token: authed_token::Model) -> AuthedTokenBackup {
     AuthedTokenBackup {
         id: token.id,
@@ -102,6 +118,7 @@ fn into_backup(token: authed_token::Model) -> AuthedTokenBackup {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn backup() -> Result<()> {
     let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
@@ -143,6 +160,7 @@ async fn backup() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn validate() -> Result<()> {
     let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
@@ -209,6 +227,7 @@ async fn validate() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn recover() -> Result<()> {
     let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
