@@ -209,14 +209,16 @@ async fn recover() -> Result<()> {
                 let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
 
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
-                let created_at =
-                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(token.created_at, chrono::Utc);
-                let authed_at = token
-                    .authed_at
-                    .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc));
-                let last_wrote_at = token
-                    .last_wrote_at
-                    .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc));
+                let created_at = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                    token.created_at,
+                    chrono::Utc,
+                );
+                let authed_at = token.authed_at.map(|dt| {
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc)
+                });
+                let last_wrote_at = token.last_wrote_at.map(|dt| {
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc)
+                });
 
                 let result = sqlx::query(
                     r#"INSERT INTO authed_tokens

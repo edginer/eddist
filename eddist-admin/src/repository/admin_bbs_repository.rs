@@ -1,14 +1,14 @@
 use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
+#[cfg(feature = "backend-postgres")]
+use sqlx::types::Json;
 #[cfg(not(feature = "backend-postgres"))]
 use sqlx::{FromRow, types::Json};
 #[cfg(feature = "backend-postgres")]
-use sqlx::types::Json;
-#[cfg(feature = "backend-postgres")]
 use uuid::Uuid;
 
-/// Shared selection types used by admin_board_repository, admin_thread_repository,
-/// and admin_response_repository.
+// Shared selection types used by admin_board_repository, admin_thread_repository,
+// and admin_response_repository.
 
 #[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, FromRow)]

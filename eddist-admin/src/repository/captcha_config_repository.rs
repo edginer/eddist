@@ -38,7 +38,11 @@ impl From<CaptchaConfigRowPg> for CaptchaConfig {
             .verification
             .and_then(|v| serde_json::from_value(v).ok());
 
-        let widget = match (row.widget_form_field_name, row.widget_script_url, row.widget_html) {
+        let widget = match (
+            row.widget_form_field_name,
+            row.widget_script_url,
+            row.widget_html,
+        ) {
             (Some(form_field_name), Some(script_url), Some(widget_html)) => {
                 Some(CaptchaWidgetConfig {
                     form_field_name,

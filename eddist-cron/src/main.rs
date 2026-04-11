@@ -512,10 +512,9 @@ async fn retry(
                             thread_number
                         ))
                         .await
+                    && code != 404
                 {
-                    if code != 404 {
-                        is_err = false;
-                    }
+                    is_err = false;
                 }
             }
             err => log::error!(

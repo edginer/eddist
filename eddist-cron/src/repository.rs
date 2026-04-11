@@ -490,7 +490,10 @@ impl Repository {
         .fetch_all(&self.0)
         .await?;
 
-        Ok(rows.into_iter().map(|t| (t.title, t.thread_number as u64, t.id)).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|t| (t.title, t.thread_number as u64, t.id))
+            .collect::<Vec<_>>())
     }
 
     pub async fn get_archived_threads(
@@ -513,16 +516,17 @@ impl Repository {
         .fetch_all(&self.0)
         .await?;
 
-        Ok(rows.into_iter().map(|t| (t.title, t.thread_number as u64, t.id)).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|t| (t.title, t.thread_number as u64, t.id))
+            .collect::<Vec<_>>())
     }
 
     pub async fn update_archive_converted(&self, thread_id: Uuid) -> anyhow::Result<()> {
-        sqlx::query(
-            r#"UPDATE threads SET archive_converted = TRUE WHERE id = $1"#,
-        )
-        .bind(thread_id)
-        .execute(&self.0)
-        .await?;
+        sqlx::query(r#"UPDATE threads SET archive_converted = TRUE WHERE id = $1"#)
+            .bind(thread_id)
+            .execute(&self.0)
+            .await?;
         Ok(())
     }
 

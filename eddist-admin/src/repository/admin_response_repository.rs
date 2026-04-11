@@ -1,9 +1,9 @@
 use chrono::{TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
-#[cfg(not(feature = "backend-postgres"))]
-use sqlx::{MySqlPool, query_as, types::Json};
 #[cfg(feature = "backend-postgres")]
 use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{MySqlPool, query_as, types::Json};
 use uuid::Uuid;
 
 use crate::models::Res;
@@ -523,10 +523,18 @@ impl AdminResponseRepository for AdminResponseRepositoryPgImpl {
         );
 
         let mut q = sqlx::query(&sql);
-        if let Some(ref v) = author_name { q = q.bind(v); }
-        if let Some(ref v) = mail { q = q.bind(v); }
-        if let Some(ref v) = body { q = q.bind(v); }
-        if let Some(v) = is_abone { q = q.bind(v); }
+        if let Some(ref v) = author_name {
+            q = q.bind(v);
+        }
+        if let Some(ref v) = mail {
+            q = q.bind(v);
+        }
+        if let Some(ref v) = body {
+            q = q.bind(v);
+        }
+        if let Some(v) = is_abone {
+            q = q.bind(v);
+        }
         q = q.bind(id);
         q.execute(pool).await?;
 

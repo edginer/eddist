@@ -362,9 +362,15 @@ impl CapRepository for CapRepositoryPgImpl {
 
         let sql = format!("UPDATE caps SET {} WHERE id = ${idx}", sets.join(", "));
         let mut q = sqlx::query(&sql);
-        if let Some(v) = name { q = q.bind(v); }
-        if let Some(v) = description { q = q.bind(v); }
-        if let Some(v) = password_hash { q = q.bind(v); }
+        if let Some(v) = name {
+            q = q.bind(v);
+        }
+        if let Some(v) = description {
+            q = q.bind(v);
+        }
+        if let Some(v) = password_hash {
+            q = q.bind(v);
+        }
         q = q.bind(now).bind(id);
         q.execute(&self.0).await?;
 
@@ -378,14 +384,12 @@ impl CapRepository for CapRepositoryPgImpl {
 
             for board_id in bids {
                 let bc_id = Uuid::now_v7();
-                sqlx::query(
-                    "INSERT INTO boards_caps (id, board_id, cap_id) VALUES ($1, $2, $3)",
-                )
-                .bind(bc_id)
-                .bind(board_id)
-                .bind(id)
-                .execute(&mut *tx)
-                .await?;
+                sqlx::query("INSERT INTO boards_caps (id, board_id, cap_id) VALUES ($1, $2, $3)")
+                    .bind(bc_id)
+                    .bind(board_id)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
             }
 
             tx.commit().await?;

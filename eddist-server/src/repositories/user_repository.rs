@@ -1,7 +1,7 @@
-#[cfg(feature = "backend-postgres")]
-use sqlx::PgPool;
 #[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
 use sqlx::Transaction;
 
 use super::Db;
@@ -431,35 +431,36 @@ struct UserIdpSelectionPg {
 
 #[cfg(feature = "backend-postgres")]
 fn fold_user_idp_rows(rows: Vec<UserIdpSelectionPg>) -> Option<crate::domain::user::User> {
-    rows.into_iter().fold(None, |mut acc: Option<crate::domain::user::User>, row| {
-        if let Some(user) = acc.as_mut() {
-            user.idps.push(crate::domain::user::UserIdp {
-                idp_id: row.idp_id,
-                idp_name: row.idp_name,
-                idp_display_name: row.idp_display_name,
-                idp_sub: row.idp_sub,
-                created_at: row.idp_bind_created_at.naive_utc(),
-                updated_at: row.idp_bind_updated_at.naive_utc(),
-            });
-        } else {
-            acc = Some(crate::domain::user::User {
-                id: row.user_id,
-                user_name: row.user_name,
-                enabled: row.user_enabled,
-                idps: vec![crate::domain::user::UserIdp {
+    rows.into_iter()
+        .fold(None, |mut acc: Option<crate::domain::user::User>, row| {
+            if let Some(user) = acc.as_mut() {
+                user.idps.push(crate::domain::user::UserIdp {
                     idp_id: row.idp_id,
                     idp_name: row.idp_name,
                     idp_display_name: row.idp_display_name,
                     idp_sub: row.idp_sub,
                     created_at: row.idp_bind_created_at.naive_utc(),
                     updated_at: row.idp_bind_updated_at.naive_utc(),
-                }],
-                created_at: row.user_created_at.naive_utc(),
-                updated_at: row.user_updated_at.naive_utc(),
-            });
-        }
-        acc
-    })
+                });
+            } else {
+                acc = Some(crate::domain::user::User {
+                    id: row.user_id,
+                    user_name: row.user_name,
+                    enabled: row.user_enabled,
+                    idps: vec![crate::domain::user::UserIdp {
+                        idp_id: row.idp_id,
+                        idp_name: row.idp_name,
+                        idp_display_name: row.idp_display_name,
+                        idp_sub: row.idp_sub,
+                        created_at: row.idp_bind_created_at.naive_utc(),
+                        updated_at: row.idp_bind_updated_at.naive_utc(),
+                    }],
+                    created_at: row.user_created_at.naive_utc(),
+                    updated_at: row.user_updated_at.naive_utc(),
+                });
+            }
+            acc
+        })
 }
 
 #[cfg(feature = "backend-postgres")]
@@ -623,12 +624,11 @@ impl UserRepository for UserRepositoryImpl {
         );
 
         // Serialize concurrent bindings — PG uses SELECT ... FOR UPDATE
-        let user_exists: Option<(Uuid,)> = sqlx::query_as(
-            r#"SELECT id FROM users WHERE id = $1 FOR UPDATE"#,
-        )
-        .bind(user_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let user_exists: Option<(Uuid,)> =
+            sqlx::query_as(r#"SELECT id FROM users WHERE id = $1 FOR UPDATE"#)
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?;
 
         if user_exists.is_none() {
             anyhow::bail!("user {user_id} not found");

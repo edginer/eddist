@@ -13,8 +13,7 @@ use metrics::describe_counter;
 use repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository};
 #[cfg(not(feature = "backend-postgres"))]
 use repositories::{
-    bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl,
+    bbs_repository::BbsRepositoryImpl, idp_repository::IdpRepositoryImpl,
     user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
@@ -36,19 +35,18 @@ use tokio::net::TcpListener;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
 
-use crate::{
-    app::{AppState, create_app},
-    services::PubSubRepos,
-};
 #[cfg(not(feature = "backend-postgres"))]
 use crate::repositories::{
-    notice_repository::NoticeRepositoryImpl,
-    terms_repository::TermsRepositoryImpl,
+    notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
 };
 #[cfg(feature = "backend-postgres")]
 use crate::repositories::{
     notice_repository::NoticeRepositoryPgImpl as NoticeRepositoryImpl,
     terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
+};
+use crate::{
+    app::{AppState, create_app},
+    services::PubSubRepos,
 };
 
 pub mod app;

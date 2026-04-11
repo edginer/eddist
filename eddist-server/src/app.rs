@@ -17,16 +17,10 @@ use tower_http::{
 };
 use tracing::{Span, info_span};
 
-use crate::{
-    middleware::user_restriction::user_restriction_middleware,
-    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-};
 #[cfg(not(feature = "backend-postgres"))]
 use crate::repositories::{
-    bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl,
-    notice_repository::NoticeRepositoryImpl,
-    terms_repository::TermsRepositoryImpl,
+    bbs_repository::BbsRepositoryImpl, idp_repository::IdpRepositoryImpl,
+    notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
     user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
@@ -38,6 +32,10 @@ use crate::repositories::{
     terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
     user_repository::UserRepositoryPgImpl as UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
+};
+use crate::{
+    middleware::user_restriction::user_restriction_middleware,
+    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
 };
 use crate::{
     routes::{

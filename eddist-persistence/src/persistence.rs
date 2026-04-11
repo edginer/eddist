@@ -2,7 +2,7 @@ use std::env;
 
 use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_CACHE_RES_KEY};
 use redis::AsyncCommands;
-use sqlx::{Connection, Executor, QueryBuilder, query};
+use sqlx::{Connection, QueryBuilder, query};
 use tokio::{select, time::sleep};
 use tracing::{error_span, info_span};
 
@@ -115,9 +115,7 @@ pub async fn run_persistence_loop(
         {
             use sqlx::Executor;
             db_conn
-                .execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
+                .execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')")
                 .await
                 .unwrap();
         }

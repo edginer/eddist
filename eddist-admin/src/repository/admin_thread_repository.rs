@@ -325,7 +325,10 @@ impl AdminThreadRepository for AdminThreadRepositoryPgImpl {
             .await?
         };
 
-        Ok(threads.into_iter().map(selection_thread_pg_to_thread).collect())
+        Ok(threads
+            .into_iter()
+            .map(selection_thread_pg_to_thread)
+            .collect())
     }
 
     async fn get_archived_threads_by_thread_id(
@@ -360,7 +363,10 @@ impl AdminThreadRepository for AdminThreadRepositoryPgImpl {
             .await?
         };
 
-        Ok(threads.into_iter().map(selection_thread_pg_to_thread).collect())
+        Ok(threads
+            .into_iter()
+            .map(selection_thread_pg_to_thread)
+            .collect())
     }
 
     async fn get_archived_threads_by_filter(
@@ -410,7 +416,10 @@ impl AdminThreadRepository for AdminThreadRepositoryPgImpl {
         q = q.bind(limit as i64).bind((page * limit) as i64);
 
         let threads = q.fetch_all(pool).await?;
-        Ok(threads.into_iter().map(selection_thread_pg_to_thread).collect())
+        Ok(threads
+            .into_iter()
+            .map(selection_thread_pg_to_thread)
+            .collect())
     }
 
     async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()> {

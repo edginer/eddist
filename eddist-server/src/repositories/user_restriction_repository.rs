@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use eddist_core::domain::user_restriction::{RestrictionRuleType, UserRestrictionRule};
-#[cfg(not(feature = "backend-postgres"))]
-use sqlx::{MySql, Pool};
 #[cfg(feature = "backend-postgres")]
 use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{MySql, Pool};
 use uuid::Uuid;
 
 #[async_trait]

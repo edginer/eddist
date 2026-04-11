@@ -423,7 +423,10 @@ impl NoticeRepository for NoticeRepositoryPgImpl {
         .bind(&new_slug)
         .bind(&title)
         .bind(&content)
-        .bind(chrono::DateTime::<Utc>::from_naive_utc_and_offset(published_at, Utc))
+        .bind(chrono::DateTime::<Utc>::from_naive_utc_and_offset(
+            published_at,
+            Utc,
+        ))
         .bind(now)
         .bind(id)
         .execute(&self.0)

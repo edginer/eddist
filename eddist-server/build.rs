@@ -8,9 +8,6 @@ fn main() {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let workspace_root = std::path::Path::new(&manifest_dir).parent().unwrap();
         let sqlx_pg_dir = workspace_root.join(".sqlx-pg");
-        println!(
-            "cargo:rustc-env=SQLX_OFFLINE_DIR={}",
-            sqlx_pg_dir.display()
-        );
+        println!("cargo:rustc-env=SQLX_OFFLINE_DIR={}", sqlx_pg_dir.display());
     }
 }

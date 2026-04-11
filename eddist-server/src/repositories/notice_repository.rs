@@ -1,8 +1,8 @@
 use eddist_core::domain::notice::{Notice, NoticeListItem};
-#[cfg(not(feature = "backend-postgres"))]
-use sqlx::{MySqlPool, query_as};
 #[cfg(feature = "backend-postgres")]
 use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{MySqlPool, query_as};
 use uuid::Uuid;
 
 #[async_trait::async_trait]
@@ -186,7 +186,10 @@ impl NoticeRepository for NoticeRepositoryPgImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(NoticeListItem::from).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(NoticeListItem::from)
+            .collect::<Vec<_>>())
     }
 
     async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>> {

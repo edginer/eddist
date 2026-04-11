@@ -1217,18 +1217,20 @@ impl BbsRepositoryPgImpl {
 #[async_trait::async_trait]
 impl BbsRepository for BbsRepositoryPgImpl {
     async fn get_boards(&self) -> anyhow::Result<Vec<Board>> {
-        let rows = sqlx::query_as::<_, BoardPg>(
-            "SELECT id, name, board_key, default_name FROM boards",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query_as::<_, BoardPg>("SELECT id, name, board_key, default_name FROM boards")
+                .fetch_all(&self.pool)
+                .await?;
 
-        Ok(rows.into_iter().map(|r| Board {
-            id: r.id,
-            name: r.name,
-            board_key: r.board_key,
-            default_name: r.default_name,
-        }).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|r| Board {
+                id: r.id,
+                name: r.name,
+                board_key: r.board_key,
+                default_name: r.default_name,
+            })
+            .collect::<Vec<_>>())
     }
 
     async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
@@ -1306,20 +1308,23 @@ impl BbsRepository for BbsRepositoryPgImpl {
             .fetch_all(&self.pool)
             .await?;
 
-        Ok(rows.into_iter().map(|r| crate::domain::thread::Thread {
-            id: r.id,
-            board_id: r.board_id,
-            thread_number: r.thread_number,
-            last_modified_at: r.last_modified_at,
-            sage_last_modified_at: r.sage_last_modified_at,
-            title: r.title,
-            authed_token_id: r.authed_token_id,
-            metadent: r.metadent,
-            response_count: r.response_count as u32,
-            no_pool: r.no_pool,
-            active: r.active,
-            archived: r.archived,
-        }).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|r| crate::domain::thread::Thread {
+                id: r.id,
+                board_id: r.board_id,
+                thread_number: r.thread_number,
+                last_modified_at: r.last_modified_at,
+                sage_last_modified_at: r.sage_last_modified_at,
+                title: r.title,
+                authed_token_id: r.authed_token_id,
+                metadent: r.metadent,
+                response_count: r.response_count as u32,
+                no_pool: r.no_pool,
+                active: r.active,
+                archived: r.archived,
+            })
+            .collect::<Vec<_>>())
     }
 
     async fn get_threads_with_metadent(
@@ -1349,43 +1354,46 @@ impl BbsRepository for BbsRepositoryPgImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|x| {
-            (
-                crate::domain::thread::Thread {
-                    id: x.id,
-                    board_id: x.board_id,
-                    thread_number: x.thread_number,
-                    last_modified_at: x.last_modified_at,
-                    sage_last_modified_at: x.sage_last_modified_at,
-                    title: x.title,
-                    authed_token_id: x.authed_token_id,
-                    metadent: x.metadent,
-                    response_count: x.response_count as u32,
-                    no_pool: x.no_pool,
-                    active: x.active,
-                    archived: x.archived,
-                },
-                x.client_info.0,
-                AuthedToken {
-                    id: x.authed_token_id,
-                    token: x.token,
-                    origin_ip: IpAddr::new(x.origin_ip.clone()),
-                    reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
-                    asn_num: 0,
-                    writing_ua: x.writing_ua,
-                    authed_ua: x.authed_ua,
-                    auth_code: x.auth_code,
-                    created_at: x.at_created_at,
-                    authed_at: x.authed_at,
-                    validity: x.validity,
-                    last_wrote_at: x.last_wrote_at,
-                    author_id_seed: x.author_id_seed,
-                    require_user_registration: x.require_user_registration,
-                    registered_user_id: x.registered_user_id,
-                    require_reauth: x.require_reauth,
-                },
-            )
-        }).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|x| {
+                (
+                    crate::domain::thread::Thread {
+                        id: x.id,
+                        board_id: x.board_id,
+                        thread_number: x.thread_number,
+                        last_modified_at: x.last_modified_at,
+                        sage_last_modified_at: x.sage_last_modified_at,
+                        title: x.title,
+                        authed_token_id: x.authed_token_id,
+                        metadent: x.metadent,
+                        response_count: x.response_count as u32,
+                        no_pool: x.no_pool,
+                        active: x.active,
+                        archived: x.archived,
+                    },
+                    x.client_info.0,
+                    AuthedToken {
+                        id: x.authed_token_id,
+                        token: x.token,
+                        origin_ip: IpAddr::new(x.origin_ip.clone()),
+                        reduced_ip: ReducedIpAddr::from(x.reduced_origin_ip),
+                        asn_num: 0,
+                        writing_ua: x.writing_ua,
+                        authed_ua: x.authed_ua,
+                        auth_code: x.auth_code,
+                        created_at: x.at_created_at,
+                        authed_at: x.authed_at,
+                        validity: x.validity,
+                        last_wrote_at: x.last_wrote_at,
+                        author_id_seed: x.author_id_seed,
+                        require_user_registration: x.require_user_registration,
+                        registered_user_id: x.registered_user_id,
+                        require_reauth: x.require_reauth,
+                    },
+                )
+            })
+            .collect::<Vec<_>>())
     }
 
     async fn get_thread_by_board_key_and_thread_number(
@@ -1436,14 +1444,17 @@ impl BbsRepository for BbsRepositoryPgImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| ResView {
-            author_name: r.author_name,
-            mail: r.mail,
-            body: r.body,
-            created_at: r.created_at,
-            author_id: r.author_id,
-            is_abone: r.is_abone,
-        }).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|r| ResView {
+                author_name: r.author_name,
+                mail: r.mail,
+                body: r.body,
+                created_at: r.created_at,
+                author_id: r.author_id,
+                is_abone: r.is_abone,
+            })
+            .collect::<Vec<_>>())
     }
 
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
@@ -1738,7 +1749,10 @@ impl BbsRepository for BbsRepositoryPgImpl {
         Ok(())
     }
 
-    async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<crate::domain::ng_word::NgWord>> {
+    async fn get_ng_words_by_board_key(
+        &self,
+        board_key: &str,
+    ) -> anyhow::Result<Vec<crate::domain::ng_word::NgWord>> {
         let rows = sqlx::query_as::<_, NgWordPg>(
             r#"
             SELECT nw.id, nw.name, nw.word, nw.created_at, nw.updated_at
@@ -1752,13 +1766,16 @@ impl BbsRepository for BbsRepositoryPgImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| crate::domain::ng_word::NgWord {
-            id: r.id,
-            name: r.name,
-            word: r.word,
-            created_at: r.created_at.naive_utc(),
-            updated_at: r.updated_at.naive_utc(),
-        }).collect::<Vec<_>>())
+        Ok(rows
+            .into_iter()
+            .map(|r| crate::domain::ng_word::NgWord {
+                id: r.id,
+                name: r.name,
+                word: r.word,
+                created_at: r.created_at.naive_utc(),
+                updated_at: r.updated_at.naive_utc(),
+            })
+            .collect::<Vec<_>>())
     }
 
     async fn get_cap_by_board_key(

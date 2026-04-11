@@ -1,7 +1,7 @@
-#[cfg(not(feature = "backend-postgres"))]
-use sqlx::{MySqlPool, query, query_as};
 #[cfg(feature = "backend-postgres")]
 use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
@@ -544,14 +544,30 @@ impl AdminBoardRepository for AdminBoardRepositoryPgImpl {
         }
 
         // Collect int values after we know which columns are present
-        if let Some(v) = board.base_thread_creation_span_sec { int_vals.push(v as i32); }
-        if let Some(v) = board.base_response_creation_span_sec { int_vals.push(v as i32); }
-        if let Some(v) = board.max_thread_name_byte_length { int_vals.push(v as i32); }
-        if let Some(v) = board.max_author_name_byte_length { int_vals.push(v as i32); }
-        if let Some(v) = board.max_email_byte_length { int_vals.push(v as i32); }
-        if let Some(v) = board.max_response_body_byte_length { int_vals.push(v as i32); }
-        if let Some(v) = board.max_response_body_lines { int_vals.push(v as i32); }
-        if let Some(v) = board.threads_archive_trigger_thread_count { int_vals.push(v as i32); }
+        if let Some(v) = board.base_thread_creation_span_sec {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.base_response_creation_span_sec {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.max_thread_name_byte_length {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.max_author_name_byte_length {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.max_email_byte_length {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.max_response_body_byte_length {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.max_response_body_lines {
+            int_vals.push(v as i32);
+        }
+        if let Some(v) = board.threads_archive_trigger_thread_count {
+            int_vals.push(v as i32);
+        }
 
         columns.extend(int_cols.iter());
         columns.extend(str_cols.iter());

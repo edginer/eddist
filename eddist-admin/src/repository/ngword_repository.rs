@@ -398,8 +398,12 @@ impl NgWordRepository for NgWordRepositoryPgImpl {
         if !sets.is_empty() {
             let sql = format!("UPDATE ng_words SET {} WHERE id = ${idx}", sets.join(", "));
             let mut q = sqlx::query(&sql);
-            if let Some(v) = name { q = q.bind(v); }
-            if let Some(v) = word { q = q.bind(v); }
+            if let Some(v) = name {
+                q = q.bind(v);
+            }
+            if let Some(v) = word {
+                q = q.bind(v);
+            }
             q = q.bind(id);
             q.execute(&self.0).await?;
         }

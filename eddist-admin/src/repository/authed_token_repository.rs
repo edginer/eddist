@@ -460,7 +460,10 @@ impl AuthedTokenRepository for AuthedTokenRepositoryPgImpl {
             .fetch_all(&self.0)
             .await?;
 
-        let tokens = rows.into_iter().map(crate::models::AuthedToken::from).collect();
+        let tokens = rows
+            .into_iter()
+            .map(crate::models::AuthedToken::from)
+            .collect();
 
         Ok((tokens, total as u64))
     }
