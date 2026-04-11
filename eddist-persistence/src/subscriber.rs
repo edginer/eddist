@@ -19,7 +19,10 @@ pub struct RedisSubRepository {
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
     s3_bucket: Option<(aws_sdk_s3::Client, String)>,
+    #[cfg(not(feature = "backend-postgres"))]
     db_pool: Option<sqlx::MySqlPool>,
+    #[cfg(feature = "backend-postgres")]
+    db_pool: Option<sqlx::PgPool>,
 }
 
 impl RedisSubRepository {
@@ -29,7 +32,10 @@ impl RedisSubRepository {
         cancel: tokio::sync::broadcast::Receiver<()>,
         s3_client: Option<aws_sdk_s3::Client>,
         s3_bucket_name: Option<String>,
+        #[cfg(not(feature = "backend-postgres"))]
         db_pool: Option<sqlx::MySqlPool>,
+        #[cfg(feature = "backend-postgres")]
+        db_pool: Option<sqlx::PgPool>,
     ) -> Self {
         Self {
             pubsub_conn,
