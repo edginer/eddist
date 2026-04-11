@@ -162,7 +162,10 @@ async fn main() -> anyhow::Result<()> {
     start_cache_refresh_task(user_restriction_repo, Duration::from_secs(300));
 
     // Start background task for captcha config cache refresh (every 5 minutes)
-    start_captcha_config_refresh_task(pool.clone(), Duration::from_secs(300));
+    start_captcha_config_refresh_task(
+        CaptchaConfigRepositoryImpl::new(pool.clone()),
+        Duration::from_secs(300),
+    );
 
     // Start background task for server settings cache refresh (every 5 minutes)
     start_server_settings_refresh_task(pool.clone(), Duration::from_secs(300));

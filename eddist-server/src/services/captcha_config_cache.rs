@@ -7,9 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
-    repositories::captcha_config_repository::{
-        CaptchaConfigRepository, CaptchaConfigRepositoryImpl,
-    },
+    repositories::captcha_config_repository::CaptchaConfigRepository,
 };
 
 static GLOBAL_CAPTCHA_CONFIG_CACHE: OnceLock<Arc<RwLock<CaptchaConfigCache>>> = OnceLock::new();
@@ -83,8 +81,10 @@ pub async fn refresh_captcha_config_cache(
 }
 
 /// Start a background task that periodically refreshes the captcha config cache
-pub fn start_captcha_config_refresh_task(pool: sqlx::MySqlPool, refresh_interval: Duration) {
-    let repo = CaptchaConfigRepositoryImpl::new(pool);
+pub fn start_captcha_config_refresh_task<R>(repo: R, refresh_interval: Duration)
+where
+    R: CaptchaConfigRepository + Clone,
+{
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(refresh_interval);
 
