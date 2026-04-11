@@ -3,7 +3,6 @@ use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
 use rand::{RngExt, distr::Alphanumeric};
 use redis::{AsyncCommands, aio::ConnectionManager};
-use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
@@ -16,7 +15,7 @@ use crate::{
         },
     },
     repositories::{
-        bbs_repository::{BbsRepository, CreatingAuthedToken},
+        Db, bbs_repository::{BbsRepository, CreatingAuthedToken},
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
@@ -52,7 +51,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
 #[async_trait::async_trait]
 impl<
     I: IdpRepository + Clone,
-    U: UserRepository + TransactionRepository<MySql> + Clone,
+    U: UserRepository + TransactionRepository<Db> + Clone,
     B: BbsRepository + Clone,
 > AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
     for UserAuthzIdpCallbackService<I, U, B>
@@ -105,7 +104,7 @@ impl<
 
 impl<
     I: IdpRepository + Clone,
-    U: UserRepository + TransactionRepository<MySql> + Clone,
+    U: UserRepository + TransactionRepository<Db> + Clone,
     B: BbsRepository + Clone,
 > UserAuthzIdpCallbackService<I, U, B>
 {

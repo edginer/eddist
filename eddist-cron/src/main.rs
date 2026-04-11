@@ -4,7 +4,10 @@ use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use s3::{Bucket, creds::Credentials};
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::mysql::MySqlPoolOptions;
+#[cfg(feature = "backend-postgres")]
+use sqlx::postgres::PgPoolOptions;
 use tokio::time::sleep;
 
 mod repository;
@@ -29,25 +32,23 @@ async fn main() {
     }
 
     let executed_time = Utc::now();
+    #[cfg(not(feature = "backend-postgres"))]
     let pool = MySqlPoolOptions::new()
-        .after_connect(|conn, _| {
-            use sqlx::Executor;
-
-            Box::pin(async move {
-                conn.execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
-                .await
-                .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                Ok(())
-            })
-        })
         .max_connections(4)
         .acquire_timeout(Duration::from_secs(25))
         .connect(&env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();
+
+    // PostgreSQL: no session mode setup needed.
+    #[cfg(feature = "backend-postgres")]
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .acquire_timeout(Duration::from_secs(25))
+        .connect(&env::var("DATABASE_URL").unwrap())
+        .await
+        .unwrap();
+
     let repo = repository::Repository::new(pool);
 
     log::info!("Application started with args: {args:?}");

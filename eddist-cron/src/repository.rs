@@ -1,14 +1,27 @@
 use chrono::{TimeZone, Utc};
-use sqlx::{MySqlPool, types::Json};
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
+use sqlx::types::Json;
 use uuid::Uuid;
 
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
 
 #[derive(Clone)]
+#[cfg(not(feature = "backend-postgres"))]
 pub(crate) struct Repository(MySqlPool);
+#[derive(Clone)]
+#[cfg(feature = "backend-postgres")]
+pub(crate) struct Repository(PgPool);
 
 impl Repository {
+    #[cfg(not(feature = "backend-postgres"))]
     pub fn new(pool: MySqlPool) -> Self {
+        Self(pool)
+    }
+    #[cfg(feature = "backend-postgres")]
+    pub fn new(pool: PgPool) -> Self {
         Self(pool)
     }
 }

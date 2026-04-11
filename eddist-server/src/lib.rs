@@ -7,6 +7,14 @@ pub use uuid;
 
 mod shiftjis;
 mod repositories {
+    /// Database backend type alias. Controlled by the `backend-postgres` feature flag.
+    /// All repository traits and service bounds use this alias so that swapping
+    /// backends requires no changes beyond enabling the feature and providing PG impls.
+    #[cfg(feature = "backend-postgres")]
+    pub(crate) type Db = sqlx::Postgres;
+    #[cfg(not(feature = "backend-postgres"))]
+    pub(crate) type Db = sqlx::MySql;
+
     pub(crate) mod bbs_pubsub_repository;
     pub(crate) mod bbs_repository;
     pub(crate) mod captcha_config_repository;

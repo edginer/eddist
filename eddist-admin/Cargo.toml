@@ -3,6 +3,10 @@ name = "eddist-admin"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+backend-postgres = []
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true

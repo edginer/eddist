@@ -1,4 +1,10 @@
-use sqlx::{MySql, MySqlPool, Transaction};
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::MySqlPool;
+use sqlx::Transaction;
+
+use super::Db;
 use uuid::Uuid;
 
 use crate::{
@@ -23,28 +29,36 @@ pub trait UserRepository: Send + Sync + 'static {
     async fn create_user_with_idp<'a>(
         &'a self,
         user: CreatingUser,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
+        tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>>;
     async fn bind_user_authed_token<'a>(
         &'a self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
+        tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>>;
 }
 
 #[derive(Debug, Clone)]
 pub struct UserRepositoryImpl {
+    #[cfg(not(feature = "backend-postgres"))]
     pool: MySqlPool,
+    #[cfg(feature = "backend-postgres")]
+    pool: PgPool,
 }
 
 impl UserRepositoryImpl {
+    #[cfg(not(feature = "backend-postgres"))]
     pub fn new(pool: MySqlPool) -> Self {
+        Self { pool }
+    }
+    #[cfg(feature = "backend-postgres")]
+    pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
-transaction_repository!(UserRepositoryImpl, pool, MySql);
+transaction_repository!(UserRepositoryImpl, pool, Db);
 
 #[async_trait::async_trait]
 impl UserRepository for UserRepositoryImpl {
@@ -223,8 +237,8 @@ impl UserRepository for UserRepositoryImpl {
     async fn create_user_with_idp<'a>(
         &'a self,
         user: CreatingUser,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
         sqlx::query!(
             r#"
             INSERT INTO users (id, user_name, created_at, updated_at)
@@ -273,8 +287,8 @@ impl UserRepository for UserRepositoryImpl {
         &'a self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
         log::info!(
             "insert: bind_user_authed_token: user_id: {}, authed_token_id: {}",
             user_id,

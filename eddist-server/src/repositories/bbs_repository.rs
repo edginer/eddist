@@ -64,13 +64,6 @@ pub trait BbsRepository: Send + Sync + 'static {
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()>;
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
-
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 
     async fn get_ng_words_by_board_key(&self, board_key: &str) -> anyhow::Result<Vec<NgWord>>;
@@ -850,23 +843,6 @@ impl BbsRepository for BbsRepositoryImpl {
         query.execute(&self.pool).await?;
 
         Ok(())
-    }
-
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        mut tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>> {
-        let query = query!(
-            "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
-            author_id_seed,
-            token_id.as_bytes().to_vec(),
-        );
-
-        query.execute(&mut *tx).await?;
-
-        Ok(tx)
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
