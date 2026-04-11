@@ -38,10 +38,17 @@ use tower_http::normalize_path::NormalizePathLayer;
 
 use crate::{
     app::{AppState, create_app},
-    repositories::{
-        notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
-    },
     services::PubSubRepos,
+};
+#[cfg(not(feature = "backend-postgres"))]
+use crate::repositories::{
+    notice_repository::NoticeRepositoryImpl,
+    terms_repository::TermsRepositoryImpl,
+};
+#[cfg(feature = "backend-postgres")]
+use crate::repositories::{
+    notice_repository::NoticeRepositoryPgImpl as NoticeRepositoryImpl,
+    terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
 };
 
 pub mod app;

@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use eddist_core::domain::user_restriction::{RestrictionRuleType, UserRestrictionRule};
 #[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySql, Pool};
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
 use uuid::Uuid;
 
 #[async_trait]
@@ -67,5 +69,73 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         }
 
         Ok(rules)
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+struct UserRestrictionRulePg {
+    pub id: Uuid,
+    pub name: String,
+    pub rule_type: String,
+    pub rule_value: String,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_by_email: String,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl TryFrom<UserRestrictionRulePg> for UserRestrictionRule {
+    type Error = anyhow::Error;
+    fn try_from(r: UserRestrictionRulePg) -> Result<Self, Self::Error> {
+        let rule_type = r
+            .rule_type
+            .parse::<RestrictionRuleType>()
+            .map_err(|e| anyhow::anyhow!("Invalid rule type '{}': {}", r.rule_type, e))?;
+        Ok(UserRestrictionRule {
+            id: r.id,
+            name: r.name,
+            rule_type,
+            rule_value: r.rule_value,
+            expires_at: r.expires_at,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            created_by_email: r.created_by_email,
+        })
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Clone)]
+pub struct UserRestrictionRepositoryPgImpl {
+    pool: PgPool,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl UserRestrictionRepositoryPgImpl {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait]
+impl UserRestrictionRepository for UserRestrictionRepositoryPgImpl {
+    async fn get_all_active_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {
+        let rows = sqlx::query_as::<_, UserRestrictionRulePg>(
+            r#"
+            SELECT id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email
+            FROM user_restriction_rules
+            WHERE expires_at IS NULL OR expires_at > NOW()
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(UserRestrictionRule::try_from)
+            .collect::<Result<Vec<_>, _>>()
     }
 }

@@ -2,6 +2,10 @@ use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
 #[cfg(not(feature = "backend-postgres"))]
 use sqlx::{FromRow, types::Json};
+#[cfg(feature = "backend-postgres")]
+use sqlx::types::Json;
+#[cfg(feature = "backend-postgres")]
+use uuid::Uuid;
 
 /// Shared selection types used by admin_board_repository, admin_thread_repository,
 /// and admin_response_repository.
@@ -16,8 +20,7 @@ pub struct SelectionBoardWithThreadCount {
     pub thread_count: i64,
 }
 
-#[cfg_attr(not(feature = "backend-postgres"), derive(FromRow))]
-#[derive(Debug)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct SelectionBoardInfo {
     pub local_rules: String,
     pub base_thread_creation_span_sec: i32,
@@ -64,6 +67,52 @@ pub struct SelectionRes {
     pub board_id: Vec<u8>,
     pub thread_id: Vec<u8>,
     pub is_abone: i8,
+    pub res_order: i32,
+    pub client_info: Json<ClientInfo>,
+}
+
+// PostgreSQL-specific selection structs (native UUID, TIMESTAMPTZ → DateTime<Utc>, bool)
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+pub struct SelectionBoardWithThreadCountPg {
+    pub id: Uuid,
+    pub name: String,
+    pub board_key: String,
+    pub default_name: String,
+    pub thread_count: i64,
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+pub struct SelectionThreadPg {
+    pub id: Uuid,
+    pub board_id: Uuid,
+    pub thread_number: i64,
+    pub last_modified_at: chrono::DateTime<Utc>,
+    pub sage_last_modified_at: chrono::DateTime<Utc>,
+    pub title: String,
+    pub authed_token_id: Uuid,
+    pub metadent: String,
+    pub response_count: i32,
+    pub no_pool: bool,
+    pub archived: bool,
+    pub active: bool,
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+pub struct SelectionResPg {
+    pub id: Uuid,
+    pub author_name: String,
+    pub mail: String,
+    pub body: String,
+    pub created_at: chrono::DateTime<Utc>,
+    pub author_id: String,
+    pub ip_addr: String,
+    pub authed_token_id: Uuid,
+    pub board_id: Uuid,
+    pub thread_id: Uuid,
+    pub is_abone: bool,
     pub res_order: i32,
     pub client_info: Json<ClientInfo>,
 }

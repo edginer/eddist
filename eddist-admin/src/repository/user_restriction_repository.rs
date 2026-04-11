@@ -195,3 +195,157 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         Ok(None)
     }
 }
+
+// PG row — TIMESTAMPTZ columns as DateTime<Utc>
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+struct UserRestrictionRulePg {
+    pub id: Uuid,
+    pub name: String,
+    pub rule_type: String,
+    pub rule_value: String,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_by_email: String,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl TryFrom<UserRestrictionRulePg> for UserRestrictionRule {
+    type Error = anyhow::Error;
+    fn try_from(r: UserRestrictionRulePg) -> Result<Self, Self::Error> {
+        let rule_type = r
+            .rule_type
+            .parse::<RestrictionRuleType>()
+            .map_err(|e| anyhow::anyhow!("Invalid rule type '{}': {}", r.rule_type, e))?;
+        Ok(UserRestrictionRule {
+            id: r.id,
+            name: r.name,
+            rule_type,
+            rule_value: r.rule_value,
+            expires_at: r.expires_at,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            created_by_email: r.created_by_email,
+        })
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Clone)]
+pub struct UserRestrictionRepositoryPgImpl {
+    pool: sqlx::PgPool,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl UserRestrictionRepositoryPgImpl {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait]
+impl UserRestrictionRepository for UserRestrictionRepositoryPgImpl {
+    async fn get_all_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {
+        let rows = sqlx::query_as::<_, UserRestrictionRulePg>(
+            r#"
+            SELECT id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email
+            FROM user_restriction_rules
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(UserRestrictionRule::try_from)
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    async fn create_rule(
+        &self,
+        input: CreateUserRestrictionRuleInput,
+    ) -> anyhow::Result<UserRestrictionRule> {
+        let id = Uuid::now_v7();
+        let now = chrono::Utc::now();
+
+        sqlx::query(
+            r#"
+            INSERT INTO user_restriction_rules
+            (id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(id)
+        .bind(&input.name)
+        .bind(input.rule_type.as_str())
+        .bind(&input.rule_value)
+        .bind(input.expires_at)
+        .bind(now)
+        .bind(now)
+        .bind(&input.created_by_email)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(UserRestrictionRule {
+            id,
+            name: input.name,
+            rule_type: input.rule_type,
+            rule_value: input.rule_value,
+            expires_at: input.expires_at,
+            created_at: now,
+            updated_at: now,
+            created_by_email: input.created_by_email,
+        })
+    }
+
+    async fn update_rule(&self, input: UpdateUserRestrictionRuleInput) -> anyhow::Result<()> {
+        let now = chrono::Utc::now();
+
+        if let (Some(name), Some(rule_type), Some(rule_value)) =
+            (&input.name, &input.rule_type, &input.rule_value)
+        {
+            sqlx::query(
+                r#"
+                UPDATE user_restriction_rules
+                SET name = $1, rule_type = $2, rule_value = $3, expires_at = $4, updated_at = $5
+                WHERE id = $6
+                "#,
+            )
+            .bind(name)
+            .bind(rule_type.as_str())
+            .bind(rule_value)
+            .bind(input.expires_at.flatten())
+            .bind(now)
+            .bind(input.id)
+            .execute(&self.pool)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn delete_rule(&self, id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("DELETE FROM user_restriction_rules WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn get_rule_by_id(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>> {
+        let row = sqlx::query_as::<_, UserRestrictionRulePg>(
+            r#"
+            SELECT id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email
+            FROM user_restriction_rules
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(UserRestrictionRule::try_from).transpose()
+    }
+}

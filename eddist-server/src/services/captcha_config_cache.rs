@@ -101,12 +101,39 @@ pub fn start_captcha_config_refresh_task(pool: MySqlPool, refresh_interval: Dura
 }
 
 #[cfg(feature = "backend-postgres")]
-pub async fn refresh_captcha_config_cache(_pool: &PgPool) -> anyhow::Result<()> {
-    // TODO: Pass 2 — implement PG-specific query
+pub async fn refresh_captcha_config_cache(pool: &PgPool) -> anyhow::Result<()> {
+    let configs = get_active_captcha_configs(pool).await?;
+    let global_cache = get_global_cache();
+    let mut cache = global_cache.write().await;
+
+    for config in &configs {
+        tracing::debug!(
+            "Loaded captcha config: provider={}, capture_fields={:?}",
+            config.provider,
+            config.capture_fields
+        );
+    }
+
+    cache.update_configs(configs);
+    tracing::info!(
+        "Captcha config cache refreshed with {} configs",
+        cache.configs.len()
+    );
     Ok(())
 }
 
 #[cfg(feature = "backend-postgres")]
-pub fn start_captcha_config_refresh_task(_pool: PgPool, _refresh_interval: Duration) {
-    // TODO: Pass 2 — implement PG background refresh task
+pub fn start_captcha_config_refresh_task(pool: PgPool, refresh_interval: Duration) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(refresh_interval);
+
+        loop {
+            interval.tick().await;
+            if let Err(e) = refresh_captcha_config_cache(&pool).await {
+                tracing::error!("Failed to refresh captcha config cache: {e}");
+            }
+        }
+    });
+
+    tracing::info!("Started captcha config cache refresh task with interval: {refresh_interval:?}",);
 }

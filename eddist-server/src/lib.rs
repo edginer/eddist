@@ -72,7 +72,6 @@ pub mod app;
 pub use app::AppState;
 use uuid::Uuid;
 
-use crate::repositories::notice_repository::NoticeRepositoryImpl;
 use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
 use crate::services::server_settings_cache::{
     refresh_server_settings_cache, start_server_settings_refresh_task,
@@ -80,7 +79,8 @@ use crate::services::server_settings_cache::{
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
-// Test app factory for integration tests
+// Test app factory for integration tests (MySQL only)
+#[cfg(not(feature = "backend-postgres"))]
 pub fn create_test_app(
     pool: sqlx::MySqlPool,
     redis_conn: redis::aio::ConnectionManager,
@@ -89,6 +89,7 @@ pub fn create_test_app(
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
@@ -139,7 +140,8 @@ pub fn create_test_app(
     app::create_app(app_state, redis_conn)
 }
 
-// Simple test helper that doesn't require exposing private types
+// Simple test helper that doesn't require exposing private types (MySQL only)
+#[cfg(not(feature = "backend-postgres"))]
 pub mod test_helpers {
     use chrono::Utc;
     use sqlx::{MySqlPool, Row};

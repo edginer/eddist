@@ -2,6 +2,8 @@
 use chrono::NaiveDateTime;
 #[cfg(not(feature = "backend-postgres"))]
 use sqlx::{FromRow, MySql, QueryBuilder, Row, query, query_as};
+#[cfg(feature = "backend-postgres")]
+use sqlx::{Postgres, QueryBuilder, Row};
 use uuid::Uuid;
 
 use crate::models::AuthedToken;
@@ -271,6 +273,211 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         )
         .execute(&self.0)
         .await?;
+        Ok(())
+    }
+}
+
+// PG implementation — TIMESTAMPTZ columns decoded as DateTime<Utc>, converted to NaiveDateTime
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+struct AuthedTokenRowPg {
+    pub id: Uuid,
+    pub token: String,
+    pub origin_ip: String,
+    pub reduced_origin_ip: String,
+    pub asn_num: i32,
+    pub writing_ua: String,
+    pub authed_ua: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub authed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub validity: bool,
+    pub last_wrote_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub additional_info: Option<serde_json::Value>,
+    pub require_reauth: bool,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl From<AuthedTokenRowPg> for crate::models::AuthedToken {
+    fn from(row: AuthedTokenRowPg) -> Self {
+        Self {
+            id: row.id,
+            token: row.token,
+            origin_ip: row.origin_ip,
+            reduced_origin_ip: row.reduced_origin_ip,
+            asn_num: row.asn_num,
+            writing_ua: row.writing_ua,
+            authed_ua: row.authed_ua,
+            created_at: row.created_at.naive_utc(),
+            authed_at: row.authed_at.map(|dt| dt.naive_utc()),
+            validity: row.validity,
+            last_wrote_at: row.last_wrote_at.map(|dt| dt.naive_utc()),
+            additional_info: row.additional_info,
+            require_reauth: row.require_reauth,
+        }
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Clone)]
+pub struct AuthedTokenRepositoryPgImpl(pub sqlx::PgPool);
+
+#[cfg(feature = "backend-postgres")]
+impl AuthedTokenRepositoryPgImpl {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self(pool)
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait::async_trait]
+impl AuthedTokenRepository for AuthedTokenRepositoryPgImpl {
+    async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<crate::models::AuthedToken> {
+        let row = sqlx::query_as::<_, AuthedTokenRowPg>(
+            r#"
+            SELECT
+                id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+                created_at, authed_at, validity, last_wrote_at, additional_info, require_reauth
+            FROM authed_tokens
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_one(&self.0)
+        .await?;
+
+        Ok(crate::models::AuthedToken::from(row))
+    }
+
+    async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("UPDATE authed_tokens SET validity = FALSE WHERE id = $1")
+            .bind(id)
+            .execute(&self.0)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+        let affected_ids = sqlx::query_as::<_, (Uuid,)>(
+            r#"
+            SELECT id FROM authed_tokens
+            WHERE validity = TRUE
+              AND origin_ip IN (
+                SELECT origin_ip FROM authed_tokens WHERE id = $1
+              )
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.0)
+        .await?
+        .into_iter()
+        .map(|(id,)| id)
+        .collect::<Vec<_>>();
+
+        sqlx::query(
+            r#"
+            UPDATE authed_tokens SET validity = FALSE
+            WHERE origin_ip IN (
+                SELECT origin_ip FROM authed_tokens WHERE id = $1
+            )
+            "#,
+        )
+        .bind(id)
+        .execute(&self.0)
+        .await?;
+
+        Ok(affected_ids)
+    }
+
+    async fn list_authed_tokens(
+        &self,
+        params: ListAuthedTokensParams<'_>,
+    ) -> anyhow::Result<(Vec<crate::models::AuthedToken>, u64)> {
+        let ListAuthedTokensParams {
+            offset,
+            limit,
+            origin_ip,
+            writing_ua,
+            authed_ua,
+            asn_num,
+            validity,
+            sort_column,
+            sort_asc,
+        } = params;
+
+        let mut count_builder: QueryBuilder<Postgres> =
+            QueryBuilder::new("SELECT COUNT(*) as cnt FROM authed_tokens WHERE 1=1");
+        let mut data_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+            "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, created_at, authed_at, validity, last_wrote_at, additional_info, require_reauth FROM authed_tokens WHERE 1=1",
+        );
+
+        if let Some(ip) = origin_ip {
+            count_builder.push(" AND origin_ip = ");
+            count_builder.push_bind(ip.to_string());
+            data_builder.push(" AND origin_ip = ");
+            data_builder.push_bind(ip.to_string());
+        }
+        if let Some(ua) = writing_ua {
+            count_builder.push(" AND writing_ua LIKE ");
+            count_builder.push_bind(format!("%{ua}%"));
+            data_builder.push(" AND writing_ua LIKE ");
+            data_builder.push_bind(format!("%{ua}%"));
+        }
+        if let Some(ua) = authed_ua {
+            count_builder.push(" AND authed_ua LIKE ");
+            count_builder.push_bind(format!("%{ua}%"));
+            data_builder.push(" AND authed_ua LIKE ");
+            data_builder.push_bind(format!("%{ua}%"));
+        }
+        if let Some(asn) = asn_num {
+            count_builder.push(" AND asn_num = ");
+            count_builder.push_bind(asn);
+            data_builder.push(" AND asn_num = ");
+            data_builder.push_bind(asn);
+        }
+        if let Some(v) = validity {
+            count_builder.push(" AND validity = ");
+            count_builder.push_bind(v);
+            data_builder.push(" AND validity = ");
+            data_builder.push_bind(v);
+        }
+
+        let direction = if sort_asc { " ASC" } else { " DESC" };
+        let safe_column = match sort_column {
+            "created_at" | "authed_at" | "last_wrote_at" => sort_column,
+            _ => anyhow::bail!("invalid sort column: {sort_column}"),
+        };
+        data_builder.push(format!(" ORDER BY {safe_column}{direction}"));
+        data_builder.push(" LIMIT ");
+        data_builder.push_bind(limit as i64);
+        data_builder.push(" OFFSET ");
+        data_builder.push_bind(offset as i64);
+
+        let count_row = count_builder.build().fetch_one(&self.0).await?;
+        let total: i64 = count_row.try_get("cnt")?;
+
+        let rows = data_builder
+            .build_query_as::<AuthedTokenRowPg>()
+            .fetch_all(&self.0)
+            .await?;
+
+        let tokens = rows.into_iter().map(crate::models::AuthedToken::from).collect();
+
+        Ok((tokens, total as u64))
+    }
+
+    async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("UPDATE authed_tokens SET require_reauth = TRUE WHERE id = $1")
+            .bind(id)
+            .execute(&self.0)
+            .await?;
+        Ok(())
+    }
+
+    async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("UPDATE authed_tokens SET require_reauth = FALSE WHERE id = $1")
+            .bind(id)
+            .execute(&self.0)
+            .await?;
         Ok(())
     }
 }
