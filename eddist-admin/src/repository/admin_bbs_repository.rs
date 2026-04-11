@@ -16,8 +16,8 @@ pub struct SelectionBoardWithThreadCount {
     pub thread_count: i64,
 }
 
-#[cfg(not(feature = "backend-postgres"))]
-#[derive(Debug, FromRow)]
+#[cfg_attr(not(feature = "backend-postgres"), derive(FromRow))]
+#[derive(Debug)]
 pub struct SelectionBoardInfo {
     pub local_rules: String,
     pub base_thread_creation_span_sec: i32,
