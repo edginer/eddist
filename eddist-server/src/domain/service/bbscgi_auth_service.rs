@@ -21,7 +21,7 @@ use crate::{
 };
 use eddist_core::{
     domain::pubsub_repository::AuthTokenInitiated,
-    redis_keys::{authed_token_suspended_key, reauth_temp_key},
+    redis_keys::{authed_token_suspended_key, reauth_lock_key, reauth_temp_key},
     utils::is_auth_token_pub_enabled,
 };
 
@@ -154,12 +154,28 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 
         // Check require_reauth flag — generate a one-time temp key so the re-auth page
         // can uniquely identify this token without relying on IP (which may change on mobile).
+        // A per-token lock key (reauth:lock:{id}) caps Redis entries at 2 per token regardless
+        // of how many post attempts are made; repeated attempts reuse the existing code.
         if authed_token.require_reauth {
-            let temp_key = gen_reauth_temp_key();
-            let redis_key = reauth_temp_key(&temp_key);
-            conn.set_ex::<_, _, ()>(&redis_key, authed_token.id.to_string(), 60 * 5)
-                .await
-                .unwrap_or(());
+            let token_id_str = authed_token.id.to_string();
+            let lock_key = reauth_lock_key(&token_id_str);
+            let existing_code: Option<String> = conn.get(&lock_key).await.unwrap_or(None);
+            let temp_key = match existing_code {
+                Some(code) => {
+                    // Refresh TTL on both keys so the window resets from the latest attempt
+                    let _ = conn.expire::<_, ()>(&lock_key, 60 * 5).await;
+                    let _ = conn.expire::<_, ()>(&reauth_temp_key(&code), 60 * 5).await;
+                    code
+                }
+                None => {
+                    let code = gen_reauth_temp_key();
+                    let _ = conn
+                        .set_ex::<_, _, ()>(&reauth_temp_key(&code), &token_id_str, 60 * 5)
+                        .await;
+                    let _ = conn.set_ex::<_, _, ()>(&lock_key, &code, 60 * 5).await;
+                    code
+                }
+            };
             return Err(BbsCgiError::ReAuthRequired {
                 temp_key,
                 base_url: env::var("BASE_URL").unwrap(),

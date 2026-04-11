@@ -13,7 +13,7 @@ use crate::{
     },
     repositories::bbs_repository::BbsRepository,
 };
-use eddist_core::redis_keys::reauth_temp_key;
+use eddist_core::redis_keys::{reauth_lock_key, reauth_temp_key};
 
 use super::AppService;
 
@@ -34,12 +34,8 @@ impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
     async fn execute(&self, input: ReAuthServiceInput) -> anyhow::Result<()> {
         let redis_key = reauth_temp_key(&input.temp_key);
         // Atomically read and delete the temp key — one-time use, closes replay window
-        let token_id_str: Option<String> = self
-            .redis_conn
-            .clone()
-            .get_del(&redis_key)
-            .await
-            .unwrap_or(None);
+        let mut conn = self.redis_conn.clone();
+        let token_id_str: Option<String> = conn.get_del(&redis_key).await.unwrap_or(None);
         let token_id_str = token_id_str.ok_or_else(|| {
             counter!("reauth_failure", "reason" => "invalid_temp_key").increment(1);
             BbsPostAuthWithCodeError::FailedToFindAuthedToken
@@ -48,6 +44,8 @@ impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
             counter!("reauth_failure", "reason" => "invalid_temp_key").increment(1);
             BbsPostAuthWithCodeError::FailedToFindAuthedToken
         })?;
+        // Delete the lock key so new codes can be issued after successful re-auth
+        let _ = conn.del::<_, ()>(&reauth_lock_key(&token_id_str)).await;
 
         let token = self
             .repo
