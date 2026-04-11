@@ -23,16 +23,29 @@ use crate::{
         not_found_rate_limit::{NotFoundPenaltyCache, not_found_rate_limit_middleware},
         user_restriction::user_restriction_middleware,
     },
-    repositories::{
-        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-        bbs_repository::BbsRepositoryImpl,
-        idp_repository::IdpRepositoryImpl,
-        notice_repository::NoticeRepositoryImpl,
-        stats_repository::StatsRepositoryImpl,
-        terms_repository::TermsRepositoryImpl,
-        user_repository::UserRepositoryImpl,
-        user_restriction_repository::UserRestrictionRepositoryImpl,
-    },
+    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+};
+#[cfg(not(feature = "backend-postgres"))]
+use crate::repositories::{
+    bbs_repository::BbsRepositoryImpl,
+    idp_repository::IdpRepositoryImpl,
+    notice_repository::NoticeRepositoryImpl,
+    stats_repository::StatsRepositoryImpl,
+    terms_repository::TermsRepositoryImpl,
+    user_repository::UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryImpl,
+};
+#[cfg(feature = "backend-postgres")]
+use crate::repositories::{
+    bbs_repository::BbsRepositoryPgImpl as BbsRepositoryImpl,
+    idp_repository::IdpRepositoryPgImpl as IdpRepositoryImpl,
+    notice_repository::NoticeRepositoryPgImpl as NoticeRepositoryImpl,
+    stats_repository::StatsRepositoryPgImpl as StatsRepositoryImpl,
+    terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
+    user_repository::UserRepositoryPgImpl as UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
+};
+use crate::{
     routes::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,

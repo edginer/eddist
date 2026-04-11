@@ -35,12 +35,6 @@ pub trait AuthedTokenRepository: Send + Sync + 'static {
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()>;
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
 }
 
@@ -268,23 +262,6 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
             .await?;
 
         Ok(())
-    }
-
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        mut tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>> {
-        query!(
-            "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
-            author_id_seed,
-            token_id,
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        Ok(tx)
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {

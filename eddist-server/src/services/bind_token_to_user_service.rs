@@ -1,8 +1,10 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
-use sqlx::MySql;
 use uuid::Uuid;
 
-use crate::{repositories::user_repository::UserRepository, utils::TransactionRepository};
+use crate::{
+    repositories::{Db, user_repository::UserRepository},
+    utils::TransactionRepository,
+};
 use eddist_core::redis_keys::user_session_key;
 
 use super::AppService;
@@ -23,7 +25,7 @@ impl<U: UserRepository + Clone> BindTokenToUserService<U> {
 }
 
 #[async_trait::async_trait]
-impl<U: UserRepository + TransactionRepository<MySql> + Clone>
+impl<U: UserRepository + TransactionRepository<Db> + Clone>
     AppService<BindTokenToUserServiceInput, ()> for BindTokenToUserService<U>
 {
     async fn execute(&self, input: BindTokenToUserServiceInput) -> anyhow::Result<()> {
