@@ -157,7 +157,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         if authed_token.require_reauth {
             let temp_key = gen_reauth_temp_key();
             let redis_key = reauth_temp_key(&temp_key);
-            conn.set_ex::<_, _, ()>(&redis_key, authed_token.id.to_string(), 3600)
+            conn.set_ex::<_, _, ()>(&redis_key, authed_token.id.to_string(), 60 * 5)
                 .await
                 .unwrap_or(());
             return Err(BbsCgiError::ReAuthRequired {
@@ -195,7 +195,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 }
 
 /// Generates an 8-character Crockford Base32 key (digits + uppercase letters, no I/L/O/U).
-/// 32^8 ≈ 1 trillion combinations — sufficient for a 1-hour TTL key.
+/// 32^8 ≈ 1 trillion combinations — sufficient for a 5-minute TTL key.
 fn gen_reauth_temp_key() -> String {
     const CHARS: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     let mut rng = rand::rng();
