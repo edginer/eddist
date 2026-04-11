@@ -209,6 +209,18 @@ async fn main() {
 
     #[cfg(not(feature = "backend-postgres"))]
     let pool = sqlx::mysql::MySqlPoolOptions::new()
+        .after_connect(|conn, _| {
+            use sqlx::Executor;
+            Box::pin(async move {
+                conn.execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
+                Ok(())
+            })
+        })
         .connect(&std::env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();

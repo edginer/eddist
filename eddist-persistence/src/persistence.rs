@@ -92,7 +92,6 @@ pub async fn run_persistence_loop(
         let db_conn = sqlx::PgConnection::connect(&database_url).await;
 
         let db_conn = match db_conn {
-            // PostgreSQL: TIMESTAMPTZ has native fractional precision; no session mode needed.
             Ok(db_conn) => Some(db_conn),
             Err(sqlx::Error::Io(e)) => {
                 error_span!("failed to connect to db", error = e.to_string().as_str());
@@ -109,6 +108,19 @@ pub async fn run_persistence_loop(
             Some(db_conn) => db_conn,
             None => continue,
         };
+
+        // MySQL: enable fractional-second truncation so DATETIME(3) stores cleanly.
+        // PostgreSQL: TIMESTAMPTZ has native precision; no session mode needed.
+        #[cfg(not(feature = "backend-postgres"))]
+        {
+            use sqlx::Executor;
+            db_conn
+                .execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+        }
 
         let res_list = res_list
             .iter()

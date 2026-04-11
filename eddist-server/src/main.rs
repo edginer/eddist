@@ -138,6 +138,12 @@ async fn main() -> anyhow::Result<()> {
                     .await
                     .unwrap();
                 log::info!("Set transaction isolation level to `READ-COMMITTED`");
+                conn.execute(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                )
+                .await
+                .unwrap();
+                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
                 Ok(())
             })
         })
