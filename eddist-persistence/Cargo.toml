@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = []
-backend-postgres = []
+backend-postgres = ["sea-orm/sqlx-postgres"]
 
 [dependencies]
 anyhow.workspace = true
