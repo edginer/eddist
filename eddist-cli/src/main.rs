@@ -49,18 +49,220 @@ async fn main() -> Result<()> {
 }
 
 #[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+struct AuthedTokenBackupPg {
+    pub id: Uuid,
+    pub token: String,
+    pub origin_ip: String,
+    pub reduced_origin_ip: String,
+    pub asn_num: i32,
+    pub writing_ua: String,
+    pub authed_ua: Option<String>,
+    pub auth_code: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub authed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_wrote_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub additional_info: Option<serde_json::Value>,
+    pub author_id_seed: Vec<u8>,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl From<AuthedTokenBackupPg> for AuthedTokenBackup {
+    fn from(r: AuthedTokenBackupPg) -> Self {
+        Self {
+            id: r.id,
+            token: r.token,
+            origin_ip: r.origin_ip,
+            reduced_origin_ip: r.reduced_origin_ip,
+            asn_num: r.asn_num,
+            writing_ua: r.writing_ua,
+            authed_ua: r.authed_ua,
+            auth_code: r.auth_code,
+            created_at: r.created_at.naive_utc(),
+            authed_at: r.authed_at.map(|dt| dt.naive_utc()),
+            last_wrote_at: r.last_wrote_at.map(|dt| dt.naive_utc()),
+            additional_info: r.additional_info,
+            author_id_seed: r.author_id_seed,
+        }
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
 async fn backup() -> Result<()> {
-    anyhow::bail!("backup not yet implemented for PostgreSQL backend")
+    let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
+    let bucket = make_bucket()?;
+
+    let rows = sqlx::query_as::<_, AuthedTokenBackupPg>(
+        r#"SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+                  auth_code, created_at, authed_at, last_wrote_at, additional_info, author_id_seed
+           FROM authed_tokens WHERE validity = TRUE"#,
+    )
+    .fetch_all(&pool)
+    .await?;
+
+    let total = rows.len();
+    println!("Backing up {total} valid tokens...");
+
+    let results = futures::stream::iter(rows)
+        .map(|row| {
+            let bucket = bucket.clone();
+            let token = AuthedTokenBackup::from(row);
+            async move {
+                let bytes = serde_json::to_vec(&token)?;
+                bucket
+                    .put_object(
+                        format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id),
+                        &bytes,
+                    )
+                    .await?;
+                anyhow::Ok(())
+            }
+        })
+        .buffer_unordered(CONCURRENCY)
+        .collect::<Vec<_>>()
+        .await;
+
+    let errors = results.iter().filter(|r| r.is_err()).count();
+    if errors > 0 {
+        eprintln!("{errors} tokens failed to backup");
+    }
+    println!("Done. Backed up {}/{total} tokens.", total - errors);
+    Ok(())
 }
 
 #[cfg(feature = "backend-postgres")]
 async fn validate() -> Result<()> {
-    anyhow::bail!("validate not yet implemented for PostgreSQL backend")
+    let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
+    let bucket = make_bucket()?;
+
+    let db_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM authed_tokens WHERE validity = TRUE")
+            .fetch_all(&pool)
+            .await?;
+    let db_ids = db_ids.into_iter().collect::<HashSet<_>>();
+
+    let prefix = format!("{AUTHED_TOKENS_S3_PREFIX}/");
+    let s3_ids = bucket
+        .list(prefix.clone(), None)
+        .await?
+        .into_iter()
+        .flat_map(|page| page.contents)
+        .filter_map(|obj| {
+            let name = obj.key.strip_prefix(&prefix)?.strip_suffix(".json")?;
+            Uuid::parse_str(name).ok()
+        })
+        .collect::<HashSet<_>>();
+
+    println!("DB valid tokens: {}", db_ids.len());
+    println!("S3 objects:      {}", s3_ids.len());
+
+    let mut missing_from_s3 = db_ids.difference(&s3_ids).collect::<Vec<_>>();
+    let mut orphaned_in_s3 = s3_ids.difference(&db_ids).collect::<Vec<_>>();
+    missing_from_s3.sort();
+    orphaned_in_s3.sort();
+
+    if missing_from_s3.is_empty() && orphaned_in_s3.is_empty() {
+        println!("No differences found.");
+    } else {
+        if !missing_from_s3.is_empty() {
+            println!("\nMissing from S3 ({}):", missing_from_s3.len());
+            for id in &missing_from_s3 {
+                println!("  {id}");
+            }
+        }
+        if !orphaned_in_s3.is_empty() {
+            println!(
+                "\nIn S3 but not in DB or invalidated ({}):",
+                orphaned_in_s3.len()
+            );
+            for id in &orphaned_in_s3 {
+                println!("  {id}");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(feature = "backend-postgres")]
 async fn recover() -> Result<()> {
-    anyhow::bail!("recover not yet implemented for PostgreSQL backend")
+    let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
+    let bucket = make_bucket()?;
+
+    let keys = bucket
+        .list(format!("{AUTHED_TOKENS_S3_PREFIX}/"), None)
+        .await?
+        .into_iter()
+        .flat_map(|page| page.contents)
+        .map(|obj| obj.key)
+        .collect::<Vec<_>>();
+
+    let total = keys.len();
+    println!("Recovering {total} tokens from S3...");
+
+    let results = futures::stream::iter(keys)
+        .map(|key| {
+            let bucket = bucket.clone();
+            let pool = pool.clone();
+            async move {
+                let data = bucket.get_object(&key).await?;
+                let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
+
+                let auth_code = token.auth_code.as_deref().unwrap_or("000000");
+                let created_at =
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(token.created_at, chrono::Utc);
+                let authed_at = token
+                    .authed_at
+                    .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc));
+                let last_wrote_at = token
+                    .last_wrote_at
+                    .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc));
+
+                let result = sqlx::query(
+                    r#"INSERT INTO authed_tokens
+                       (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+                        auth_code, created_at, authed_at, validity, last_wrote_at,
+                        author_id_seed, additional_info)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12, $13)
+                       ON CONFLICT DO NOTHING"#,
+                )
+                .bind(token.id)
+                .bind(&token.token)
+                .bind(&token.origin_ip)
+                .bind(&token.reduced_origin_ip)
+                .bind(token.asn_num)
+                .bind(&token.writing_ua)
+                .bind(&token.authed_ua)
+                .bind(auth_code)
+                .bind(created_at)
+                .bind(authed_at)
+                .bind(last_wrote_at)
+                .bind(&token.author_id_seed)
+                .bind(&token.additional_info)
+                .execute(&pool)
+                .await?;
+
+                anyhow::Ok(result.rows_affected() > 0)
+            }
+        })
+        .buffer_unordered(CONCURRENCY)
+        .collect::<Vec<_>>()
+        .await;
+
+    let inserted = results
+        .iter()
+        .filter(|r| r.as_ref().is_ok_and(|b| *b))
+        .count();
+    let skipped = results
+        .iter()
+        .filter(|r| r.as_ref().is_ok_and(|b| !*b))
+        .count();
+    let errors = results.iter().filter(|r| r.is_err()).count();
+    if errors > 0 {
+        eprintln!("{errors} tokens failed to recover");
+    }
+    println!("Done. Inserted {inserted}, skipped {skipped} already-existing tokens.");
+    Ok(())
 }
 
 fn make_bucket() -> Result<Arc<s3::Bucket>> {

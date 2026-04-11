@@ -233,7 +233,70 @@ async fn insert_multiple_res(
     conn: &mut sqlx::PgConnection,
     res_list: &[CreatingRes],
 ) -> Result<(), sqlx::Error> {
-    // TODO: Pass 2 — implement PG-specific bulk insert
-    let _ = (conn, res_list);
+    let mut tx = conn.begin().await?;
+
+    for chunk in res_list.chunks(1000) {
+        let mut thread_id_to_created_at = std::collections::HashMap::new();
+        for res in chunk {
+            let created_at = thread_id_to_created_at
+                .entry(res.thread_id)
+                .or_insert(res.created_at);
+            if res.created_at > *created_at {
+                *created_at = res.created_at;
+            }
+        }
+
+        let mut builder = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+            "INSERT INTO responses (
+                id, author_name, mail, author_id, body,
+                thread_id, board_id, ip_addr, authed_token_id,
+                created_at, client_info, res_order
+            )",
+        );
+
+        builder.push_values(chunk, |mut b, res| {
+            let client_info = serde_json::to_string(&res.client_info).unwrap();
+            b.push_bind(res.id)
+                .push_bind(&res.name)
+                .push_bind(&res.mail)
+                .push_bind(&res.author_ch5id)
+                .push_bind(&res.body)
+                .push_bind(res.thread_id)
+                .push_bind(res.board_id)
+                .push_bind(&res.ip_addr)
+                .push_bind(res.authed_token_id)
+                .push_bind(res.created_at)
+                .push_bind(client_info)
+                .push_bind(res.res_order);
+        });
+
+        builder.push(" ON CONFLICT DO NOTHING");
+
+        builder.build().execute(&mut *tx).await?;
+
+        for (thread_id, created_at) in thread_id_to_created_at.iter() {
+            let _ = sqlx::query(
+                r#"
+                WITH response_count AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM responses
+                    WHERE thread_id = $1
+                )
+                UPDATE threads
+                SET response_count = (SELECT cnt FROM response_count),
+                    last_modified_at = $2,
+                    active = (SELECT cnt FROM response_count) <= 1000
+                WHERE id = $3
+                "#,
+            )
+            .bind(thread_id)
+            .bind(created_at)
+            .bind(thread_id)
+            .execute(&mut *tx)
+            .await;
+        }
+    }
+
+    tx.commit().await?;
     Ok(())
 }
