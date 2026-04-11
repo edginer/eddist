@@ -83,8 +83,13 @@ pub async fn run_persistence_loop(
             continue;
         }
 
+        #[cfg(not(feature = "backend-postgres"))]
         let db_conn = sqlx::MySqlConnection::connect(&database_url).await;
+        #[cfg(feature = "backend-postgres")]
+        let db_conn = sqlx::PgConnection::connect(&database_url).await;
+
         let db_conn = match db_conn {
+            #[cfg(not(feature = "backend-postgres"))]
             Ok(mut db_conn) => {
                 // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior
                 if let Err(e) = db_conn
@@ -100,6 +105,9 @@ pub async fn run_persistence_loop(
                 }
                 Some(db_conn)
             }
+            #[cfg(feature = "backend-postgres")]
+            // PostgreSQL: TIMESTAMPTZ has native fractional precision; no session mode needed.
+            Ok(db_conn) => Some(db_conn),
             Err(sqlx::Error::Io(e)) => {
                 error!(error = e.to_string().as_str(), "failed to connect to db");
                 None
