@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use eddist_core::utils::slugify;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
 use uuid::Uuid;
 
@@ -229,17 +230,20 @@ pub trait CaptchaConfigRepository: Send + Sync + 'static {
     async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct CaptchaConfigRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl CaptchaConfigRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>> {

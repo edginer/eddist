@@ -1,4 +1,5 @@
 use eddist_core::domain::notice::{Notice, NoticeListItem};
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::{MySqlPool, query_as};
 use uuid::Uuid;
 
@@ -13,17 +14,20 @@ pub trait NoticeRepository: Send + Sync + 'static {
     async fn count_notices(&self) -> anyhow::Result<i64>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct NoticeRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl NoticeRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         NoticeRepositoryImpl { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl NoticeRepository for NoticeRepositoryImpl {
     async fn get_notices_paginated(

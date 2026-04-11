@@ -159,6 +159,7 @@ pub async fn run_persistence_loop(
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn insert_multiple_res(
     conn: &mut sqlx::MySqlConnection,
     res_list: &[CreatingRes],
@@ -274,6 +275,7 @@ async fn insert_multiple_res(
     Ok(())
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn insert_single_res(
     tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
     res: &CreatingRes,
@@ -313,5 +315,15 @@ async fn insert_single_res(
     .execute(&mut **tx)
     .await?;
 
+    Ok(())
+}
+
+#[cfg(feature = "backend-postgres")]
+async fn insert_multiple_res(
+    conn: &mut sqlx::PgConnection,
+    res_list: &[CreatingRes],
+) -> Result<(), sqlx::Error> {
+    // TODO: Pass 2 — implement PG-specific bulk insert
+    let _ = (conn, res_list);
     Ok(())
 }
