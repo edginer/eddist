@@ -18,6 +18,14 @@ use crate::{
     shiftjis::{SJisResponseBuilder, SjisContentType},
 };
 
+/// Extracts the byte-size suffix from a dat ETag of the form `W/"board-thread-SIZE"`.
+/// Board keys are `[a-z0-9]+` and thread numbers are digits, so the last `-`-delimited
+/// segment is always the size.
+fn parse_etag_byte_size(inm: &str) -> Option<usize> {
+    let inner = inm.trim().trim_start_matches("W/\"").trim_end_matches('"');
+    inner.rsplit('-').next()?.parse().ok()
+}
+
 pub async fn get_dat_txt(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -36,11 +44,25 @@ pub async fn get_dat_txt(
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
 
+    // Parse the expected byte size from If-None-Match before the service call so
+    // the service can skip flatten+collect when the cache size hasn't changed.
+    // Range requests don't use ETags for conditional checks, so skip them.
+    let range = headers.get("Range");
+    let if_none_match_hdr = headers.get("If-None-Match");
+    let expected_byte_size = if range.is_none() {
+        if_none_match_hdr
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_etag_byte_size)
+    } else {
+        None
+    };
+
     let svc = state.get_container().thread_retrival();
     let result = match svc
         .execute(ThreadRetrievalServiceInput {
             board_key: board_key.clone(),
             thread_number: thread_number_num as u64,
+            expected_byte_size,
         })
         .await
     {
@@ -79,7 +101,16 @@ pub async fn get_dat_txt(
         }
     };
 
-    let range = headers.get("Range");
+    let Some(result) = result.raw() else {
+        let etag_val = if_none_match_hdr.unwrap();
+        return Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .header("ETag", etag_val)
+            .header("Cache-Control", "max-age=5,s-maxage=1")
+            .body(Body::empty())
+            .unwrap();
+    };
+
     let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
 
     let (result, is_partial) = match (range, ua) {
@@ -90,19 +121,16 @@ pub async fn get_dat_txt(
                 let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok()) else {
                     return Response::builder().status(400).body(Body::empty()).unwrap();
                 };
-
-                let raw = result.raw().into_iter().skip(start).collect::<Vec<_>>();
-                (raw, true)
+                (result.get(start..).unwrap_or_default().to_vec(), true)
             } else {
-                (result.raw(), false)
+                (result, false)
             }
         }
-        _ => (result.raw(), false),
+        _ => (result, false),
     };
 
     let (if_none_match, etag) = if !is_partial {
-        let inm = headers
-            .get("If-None-Match")
+        let inm = if_none_match_hdr
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
         let etag = Some(format!(
