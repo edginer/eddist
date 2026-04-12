@@ -102,6 +102,15 @@ jobs:
           tags: |
             ghcr.io/edginer/eddist-persistence:${{ github.sha }}
             ghcr.io/edginer/eddist-persistence:latest
+      - name: Build and push Docker image (eddist-cli)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-cli/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-cli:${{ github.sha }}
+            ghcr.io/edginer/eddist-cli:latest
       - name: notify deploy server
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:

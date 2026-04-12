@@ -1,0 +1,110 @@
+name: Build eddist-all (postgres)
+
+on:
+  push:
+    branches:
+      - feat/postgres-migration
+
+jobs:
+  build-eddist-pg:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+      - name: Load cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-pg-${{ hashFiles('**/Cargo.lock') }}
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+          version: "latest"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            eddist-server/client-v2/pnpm-lock.yaml
+            eddist-admin/client/pnpm-lock.yaml
+      - name: Install pnpm dependencies
+        run: pnpm install
+      - name: Build eddist-client-v2
+        run: pnpm -F eddist-client-v2 build
+      - name: Build eddist-admin-client
+        run: pnpm -F eddist-admin-client build
+      - name: Build (postgres backend)
+        run: |
+          cargo build --release \
+            -p eddist \
+            -p eddist-admin \
+            -p eddist-cron \
+            -p eddist-persistence \
+            -p eddist-cli \
+            --features eddist/backend-postgres,eddist-admin/backend-postgres,eddist-cron/backend-postgres,eddist-persistence/backend-postgres,eddist-cli/backend-postgres
+      - name: rm .dockerignore
+        run: rm .dockerignore
+      - name: Login to Docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (eddist)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist:${{ github.sha }}-pg
+            ghcr.io/edginer/eddist:latest-pg
+      - name: Build and push Docker image (eddist-admin)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-admin/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-admin:${{ github.sha }}-pg
+            ghcr.io/edginer/eddist-admin:latest-pg
+      - name: Build and push Docker image (eddist-cron)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-cron/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-cron:${{ github.sha }}-pg
+            ghcr.io/edginer/eddist-cron:latest-pg
+      - name: Build and push Docker image (eddist-persistence)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-persistence/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-persistence:${{ github.sha }}-pg
+            ghcr.io/edginer/eddist-persistence:latest-pg
+      - name: Build and push Docker image (eddist-cli)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-prod/eddist-cli/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/edginer/eddist-cli:${{ github.sha }}-pg
+            ghcr.io/edginer/eddist-cli:latest-pg
