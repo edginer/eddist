@@ -36,9 +36,15 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
         {
             Ok(chunks) if !chunks.is_empty() => {
                 counter!("dat_retrieval", "source" => "cache").increment(1);
-                Ok(ThreadResListRaw {
-                    raw: chunks.into_iter().flatten().collect(),
-                })
+                let total_len: usize = chunks.iter().map(|c| c.len()).sum();
+                if input.expected_byte_size == Some(total_len) {
+                    return Ok(ThreadResListRaw { raw: None });
+                }
+                let mut raw = Vec::with_capacity(total_len);
+                for chunk in chunks {
+                    raw.extend_from_slice(&chunk);
+                }
+                Ok(ThreadResListRaw { raw: Some(raw) })
             }
             _ => {
                 counter!("dat_retrieval", "source" => "db").increment(1);
@@ -64,7 +70,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
                 };
 
                 Ok(ThreadResListRaw {
-                    raw: th_res_list.get_sjis_thread_res_list(&board.default_name),
+                    raw: Some(th_res_list.get_sjis_thread_res_list(&board.default_name)),
                 })
             }
         }
@@ -74,15 +80,19 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
 pub struct ThreadRetrievalServiceInput {
     pub board_key: String,
     pub thread_number: u64,
+    /// Byte size extracted from the client's If-None-Match ETag. When the
+    /// cache total matches this value the service returns `ThreadResListRaw { raw: None }`
+    /// (not-modified signal) without allocating the response body.
+    pub expected_byte_size: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ThreadResListRaw {
-    raw: Vec<u8>,
+    raw: Option<Vec<u8>>,
 }
 
 impl ThreadResListRaw {
-    pub fn raw(self) -> Vec<u8> {
+    pub fn raw(self) -> Option<Vec<u8>> {
         self.raw
     }
 }
