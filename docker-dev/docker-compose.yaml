@@ -63,11 +63,10 @@ services:
       - client-v2
     extra_hosts:
       - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
-  # PostgreSQL — used during the co-existence phase for MySQL→PG migration.
-  # pgloader continuously syncs data from MySQL into this instance.
+  # PostgreSQL — used for PG backend development.
   # To activate: docker compose --profile migrate up
   postgres:
-    image: postgres:16
+    image: postgres:18
     container_name: postgres_container
     profiles:
       - migrate
@@ -78,26 +77,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
-  # pgloader — continuously replicates MySQL → PostgreSQL (binlog-based).
-  # Requires MySQL binlog to be enabled (binlog_format=ROW).
-  # Run schema migration on postgres first:
-  #   DATABASE_URL=postgres://postgres:pgpassword@localhost:5432/eddist \
-  #     sqlx migrate run --source migrations/pg
-  # Then start pgloader:
-  #   docker compose --profile migrate up pgloader
-  pgloader:
-    image: ghcr.io/dimitri/pgloader:latest
-    container_name: pgloader_container
-    profiles:
-      - migrate
-    volumes:
-      - ./pgloader.load:/etc/pgloader/eddist.load
-    command: pgloader /etc/pgloader/eddist.load
-    depends_on:
-      - mysql
-      - postgres
 
 volumes:
   mysql_data:

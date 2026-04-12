@@ -6,6 +6,8 @@ use s3::creds::Credentials;
 use std::{collections::HashSet, env, sync::Arc};
 use uuid::Uuid;
 
+mod migrate;
+
 const CONCURRENCY: usize = 16;
 
 #[derive(Parser)]
@@ -21,6 +23,15 @@ enum Commands {
     AuthedTokens {
         #[command(subcommand)]
         command: AuthedTokensCommand,
+    },
+    /// Migrate data from MySQL to PostgreSQL (excludes archived_responses and archived_threads)
+    Migrate {
+        /// MySQL connection URL (defaults to DATABASE_URL env var)
+        #[arg(long)]
+        mysql_url: Option<String>,
+        /// PostgreSQL connection URL (defaults to PG_DATABASE_URL env var)
+        #[arg(long)]
+        pg_url: Option<String>,
     },
 }
 
@@ -45,6 +56,15 @@ async fn main() -> Result<()> {
             AuthedTokensCommand::Recover => recover().await,
             AuthedTokensCommand::Validate => validate().await,
         },
+        Commands::Migrate { mysql_url, pg_url } => {
+            let mysql_url = mysql_url
+                .or_else(|| env::var("DATABASE_URL").ok())
+                .expect("provide --mysql-url or set DATABASE_URL / MYSQL_URL");
+            let pg_url = pg_url
+                .or_else(|| env::var("PG_DATABASE_URL").ok())
+                .expect("provide --pg-url or set PG_DATABASE_URL");
+            migrate::run(&mysql_url, &pg_url).await
+        }
     }
 }
 
