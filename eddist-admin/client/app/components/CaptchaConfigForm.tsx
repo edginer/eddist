@@ -131,6 +131,18 @@ const CaptchaConfigForm = (props: Props) => {
           </div>
         </div>
 
+        <div>
+          <Label>Endpoint Usage</Label>
+          <Select
+            {...register("endpoint_usage")}
+            defaultValue={defaults?.endpoint_usage ?? "auth_code"}
+          >
+            <option value="auth_code">auth_code (posting new threads/replies)</option>
+            <option value="re_auth">re_auth (re-authentication)</option>
+            <option value="all">all (both endpoints)</option>
+          </Select>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>Site Key</Label>
