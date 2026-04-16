@@ -71,6 +71,7 @@ const CaptchaConfigs = () => {
             <TableHeadCell>Name</TableHeadCell>
             <TableHeadCell>Provider</TableHeadCell>
             <TableHeadCell>Site Key</TableHeadCell>
+            <TableHeadCell>Endpoint</TableHeadCell>
             <TableHeadCell>Status</TableHeadCell>
             <TableHeadCell>Order</TableHeadCell>
             <TableHeadCell>Actions</TableHeadCell>
@@ -86,6 +87,19 @@ const CaptchaConfigs = () => {
                   <code className="text-sm text-gray-600 max-w-xs truncate block">
                     {config.site_key}
                   </code>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    color={
+                      config.endpoint_usage === "re_auth"
+                        ? "indigo"
+                        : config.endpoint_usage === "all"
+                          ? "purple"
+                          : "blue"
+                    }
+                  >
+                    {config.endpoint_usage}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge color={config.is_active ? "success" : "gray"}>
