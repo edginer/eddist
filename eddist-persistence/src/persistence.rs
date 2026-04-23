@@ -2,7 +2,7 @@ use std::env;
 
 use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_CACHE_RES_KEY};
 use redis::AsyncCommands;
-use sqlx::{Connection, Executor, QueryBuilder, query};
+use sqlx::{Connection, QueryBuilder, query};
 use tokio::{select, time::sleep};
 use tracing::{error_span, info_span};
 
@@ -86,23 +86,13 @@ pub async fn run_persistence_loop(
             continue;
         }
 
+        #[cfg(not(feature = "backend-postgres"))]
         let db_conn = sqlx::MySqlConnection::connect(&database_url).await;
+        #[cfg(feature = "backend-postgres")]
+        let db_conn = sqlx::PgConnection::connect(&database_url).await;
+
         let db_conn = match db_conn {
-            Ok(mut db_conn) => {
-                // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior
-                if let Err(e) = db_conn
-                    .execute(
-                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                    )
-                    .await
-                {
-                    error_span!(
-                        "failed to set TIME_TRUNCATE_FRACTIONAL mode",
-                        error = e.to_string().as_str()
-                    );
-                }
-                Some(db_conn)
-            }
+            Ok(db_conn) => Some(db_conn),
             Err(sqlx::Error::Io(e)) => {
                 error_span!("failed to connect to db", error = e.to_string().as_str());
                 None
@@ -118,6 +108,17 @@ pub async fn run_persistence_loop(
             Some(db_conn) => db_conn,
             None => continue,
         };
+
+        // MySQL: enable fractional-second truncation so DATETIME(3) stores cleanly.
+        // PostgreSQL: TIMESTAMPTZ has native precision; no session mode needed.
+        #[cfg(not(feature = "backend-postgres"))]
+        {
+            use sqlx::Executor;
+            db_conn
+                .execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')")
+                .await
+                .unwrap();
+        }
 
         let res_list = res_list
             .iter()
@@ -143,6 +144,7 @@ pub async fn run_persistence_loop(
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 async fn insert_multiple_res(
     conn: &mut sqlx::MySqlConnection,
     res_list: &[CreatingRes],
@@ -229,6 +231,79 @@ async fn insert_multiple_res(
                 thread_id
             );
             let _ = query.execute(&mut *tx).await;
+        }
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
+#[cfg(feature = "backend-postgres")]
+async fn insert_multiple_res(
+    conn: &mut sqlx::PgConnection,
+    res_list: &[CreatingRes],
+) -> Result<(), sqlx::Error> {
+    let mut tx = conn.begin().await?;
+
+    for chunk in res_list.chunks(1000) {
+        let mut thread_id_to_created_at = std::collections::HashMap::new();
+        for res in chunk {
+            let created_at = thread_id_to_created_at
+                .entry(res.thread_id)
+                .or_insert(res.created_at);
+            if res.created_at > *created_at {
+                *created_at = res.created_at;
+            }
+        }
+
+        let mut builder = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+            "INSERT INTO responses (
+                id, author_name, mail, author_id, body,
+                thread_id, board_id, ip_addr, authed_token_id,
+                created_at, client_info, res_order
+            )",
+        );
+
+        builder.push_values(chunk, |mut b, res| {
+            let client_info = serde_json::to_string(&res.client_info).unwrap();
+            b.push_bind(res.id)
+                .push_bind(&res.name)
+                .push_bind(&res.mail)
+                .push_bind(&res.author_ch5id)
+                .push_bind(&res.body)
+                .push_bind(res.thread_id)
+                .push_bind(res.board_id)
+                .push_bind(&res.ip_addr)
+                .push_bind(res.authed_token_id)
+                .push_bind(res.created_at)
+                .push_bind(client_info)
+                .push_bind(res.res_order);
+        });
+
+        builder.push(" ON CONFLICT DO NOTHING");
+
+        builder.build().execute(&mut *tx).await?;
+
+        for (thread_id, created_at) in thread_id_to_created_at.iter() {
+            let _ = sqlx::query(
+                r#"
+                WITH response_count AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM responses
+                    WHERE thread_id = $1
+                )
+                UPDATE threads
+                SET response_count = (SELECT cnt FROM response_count),
+                    last_modified_at = $2,
+                    active = (SELECT cnt FROM response_count) <= 1000
+                WHERE id = $3
+                "#,
+            )
+            .bind(thread_id)
+            .bind(created_at)
+            .bind(thread_id)
+            .execute(&mut *tx)
+            .await;
         }
     }
 

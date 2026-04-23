@@ -25,15 +25,18 @@ pub trait CapRepository: Send + Sync {
     ) -> anyhow::Result<Cap>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct CapRepositoryImpl(pub sqlx::MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl CapRepositoryImpl {
     pub fn new(pool: sqlx::MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg_attr(feature = "backend-postgres", derive(sqlx::FromRow))]
 #[derive(Debug)]
 pub struct SelectionCap {
     pub id: Uuid,
@@ -44,6 +47,7 @@ pub struct SelectionCap {
     pub board_id: Option<Uuid>,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl CapRepository for CapRepositoryImpl {
     async fn get_caps(&self) -> anyhow::Result<Vec<Cap>> {
@@ -222,6 +226,181 @@ impl CapRepository for CapRepositoryImpl {
             description: description.map_or_else(|| "".to_string(), |x| x.to_string()),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            board_ids: board_ids.unwrap_or_default(),
+        })
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Clone)]
+pub struct CapRepositoryPgImpl(pub sqlx::PgPool);
+
+#[cfg(feature = "backend-postgres")]
+impl CapRepositoryPgImpl {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self(pool)
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait::async_trait]
+impl CapRepository for CapRepositoryPgImpl {
+    async fn get_caps(&self) -> anyhow::Result<Vec<Cap>> {
+        let selections = sqlx::query_as::<_, SelectionCap>(
+            r#"
+            SELECT
+                cap.id,
+                name,
+                description,
+                created_at,
+                updated_at,
+                board_id
+            FROM caps AS cap
+            LEFT OUTER JOIN boards_caps AS bcap ON cap.id = bcap.cap_id
+            "#,
+        )
+        .fetch_all(&self.0)
+        .await?;
+
+        let mut caps_map = std::collections::HashMap::<_, Cap>::new();
+        for selection in selections {
+            caps_map
+                .entry(selection.id)
+                .and_modify(|x| {
+                    if let Some(board_id) = selection.board_id {
+                        x.board_ids.push(board_id);
+                    }
+                })
+                .or_insert(Cap {
+                    id: selection.id,
+                    name: selection.name,
+                    description: selection.description,
+                    created_at: selection.created_at,
+                    updated_at: selection.updated_at,
+                    board_ids: if let Some(board_id) = selection.board_id {
+                        vec![board_id]
+                    } else {
+                        Vec::new()
+                    },
+                });
+        }
+
+        Ok(caps_map.into_values().collect())
+    }
+
+    async fn create_cap(
+        &self,
+        name: &str,
+        description: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<Cap> {
+        let id = Uuid::now_v7();
+        let now = Utc::now();
+
+        sqlx::query(
+            "INSERT INTO caps (id, name, description, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(id)
+        .bind(name)
+        .bind(description)
+        .bind(password_hash)
+        .bind(now)
+        .bind(now)
+        .execute(&self.0)
+        .await?;
+
+        Ok(Cap {
+            id,
+            name: name.to_string(),
+            description: description.to_string(),
+            created_at: now,
+            updated_at: now,
+            board_ids: Vec::new(),
+        })
+    }
+
+    async fn delete_cap(&self, cap_id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("DELETE FROM boards_caps WHERE cap_id = $1")
+            .bind(cap_id)
+            .execute(&self.0)
+            .await?;
+
+        sqlx::query("DELETE FROM caps WHERE id = $1")
+            .bind(cap_id)
+            .execute(&self.0)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn update_cap(
+        &self,
+        id: Uuid,
+        name: Option<&str>,
+        description: Option<&str>,
+        password_hash: Option<&str>,
+        board_ids: Option<Vec<Uuid>>,
+    ) -> anyhow::Result<Cap> {
+        let now = Utc::now();
+        let mut sets: Vec<String> = Vec::new();
+        let mut idx = 1usize;
+
+        if name.is_some() {
+            sets.push(format!("name = ${idx}"));
+            idx += 1;
+        }
+        if description.is_some() {
+            sets.push(format!("description = ${idx}"));
+            idx += 1;
+        }
+        if password_hash.is_some() {
+            sets.push(format!("password_hash = ${idx}"));
+            idx += 1;
+        }
+        sets.push(format!("updated_at = ${idx}"));
+        idx += 1;
+
+        let sql = format!("UPDATE caps SET {} WHERE id = ${idx}", sets.join(", "));
+        let mut q = sqlx::query(&sql);
+        if let Some(v) = name {
+            q = q.bind(v);
+        }
+        if let Some(v) = description {
+            q = q.bind(v);
+        }
+        if let Some(v) = password_hash {
+            q = q.bind(v);
+        }
+        q = q.bind(now).bind(id);
+        q.execute(&self.0).await?;
+
+        if let Some(ref bids) = board_ids {
+            let mut tx = self.0.begin().await?;
+
+            sqlx::query("DELETE FROM boards_caps WHERE cap_id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+
+            for board_id in bids {
+                let bc_id = Uuid::now_v7();
+                sqlx::query("INSERT INTO boards_caps (id, board_id, cap_id) VALUES ($1, $2, $3)")
+                    .bind(bc_id)
+                    .bind(board_id)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+
+            tx.commit().await?;
+        }
+
+        Ok(Cap {
+            id,
+            name: name.map_or_else(|| "".to_string(), |x| x.to_string()),
+            description: description.map_or_else(|| "".to_string(), |x| x.to_string()),
+            created_at: now,
+            updated_at: now,
             board_ids: board_ids.unwrap_or_default(),
         })
     }

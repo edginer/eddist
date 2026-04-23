@@ -3,6 +3,10 @@ name = "eddist-cron"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+backend-postgres = []
+
 [dependencies]
 tokio.workspace = true
 sqlx.workspace = true

@@ -1,4 +1,10 @@
-use sqlx::{MySql, MySqlPool, Transaction};
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
+use sqlx::Transaction;
+
+use super::Db;
 use uuid::Uuid;
 
 use crate::{
@@ -23,29 +29,46 @@ pub trait UserRepository: Send + Sync + 'static {
     async fn create_user_with_idp<'a>(
         &'a self,
         user: CreatingUser,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
+        tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>>;
     async fn bind_user_authed_token<'a>(
         &'a self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
+        tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>>;
 }
 
 #[derive(Debug, Clone)]
 pub struct UserRepositoryImpl {
+    #[cfg(not(feature = "backend-postgres"))]
     pool: MySqlPool,
+    #[cfg(feature = "backend-postgres")]
+    pool: PgPool,
 }
 
 impl UserRepositoryImpl {
+    #[cfg(not(feature = "backend-postgres"))]
     pub fn new(pool: MySqlPool) -> Self {
+        Self { pool }
+    }
+    #[cfg(feature = "backend-postgres")]
+    pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
-transaction_repository!(UserRepositoryImpl, pool, MySql);
+#[cfg(not(feature = "backend-postgres"))]
+transaction_repository!(UserRepositoryImpl, pool, Db);
 
+#[cfg(feature = "backend-postgres")]
+transaction_repository!(UserRepositoryImpl, pool, Db);
+
+/// Type alias so main.rs can import `UserRepositoryPgImpl` regardless of which Db is active.
+#[cfg(feature = "backend-postgres")]
+pub type UserRepositoryPgImpl = UserRepositoryImpl;
+
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>> {
@@ -223,8 +246,8 @@ impl UserRepository for UserRepositoryImpl {
     async fn create_user_with_idp<'a>(
         &'a self,
         user: CreatingUser,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
         sqlx::query!(
             r#"
             INSERT INTO users (id, user_name, created_at, updated_at)
@@ -273,8 +296,8 @@ impl UserRepository for UserRepositoryImpl {
         &'a self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
         log::info!(
             "insert: bind_user_authed_token: user_id: {}, authed_token_id: {}",
             user_id,
@@ -367,6 +390,7 @@ impl UserRepository for UserRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 struct UserIdpSelection {
     pub user_id: Uuid,
     pub user_name: String,
@@ -387,4 +411,288 @@ pub struct CreatingUser {
     pub user_name: String,
     pub idp_id: Uuid,
     pub idp_sub: String,
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, sqlx::FromRow)]
+struct UserIdpSelectionPg {
+    pub user_id: Uuid,
+    pub user_name: String,
+    pub user_enabled: bool,
+    pub user_created_at: chrono::DateTime<chrono::Utc>,
+    pub user_updated_at: chrono::DateTime<chrono::Utc>,
+    pub idp_id: Uuid,
+    pub idp_name: String,
+    pub idp_display_name: String,
+    pub idp_sub: String,
+    pub idp_bind_created_at: chrono::DateTime<chrono::Utc>,
+    pub idp_bind_updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[cfg(feature = "backend-postgres")]
+fn fold_user_idp_rows(rows: Vec<UserIdpSelectionPg>) -> Option<crate::domain::user::User> {
+    rows.into_iter()
+        .fold(None, |mut acc: Option<crate::domain::user::User>, row| {
+            if let Some(user) = acc.as_mut() {
+                user.idps.push(crate::domain::user::UserIdp {
+                    idp_id: row.idp_id,
+                    idp_name: row.idp_name,
+                    idp_display_name: row.idp_display_name,
+                    idp_sub: row.idp_sub,
+                    created_at: row.idp_bind_created_at.naive_utc(),
+                    updated_at: row.idp_bind_updated_at.naive_utc(),
+                });
+            } else {
+                acc = Some(crate::domain::user::User {
+                    id: row.user_id,
+                    user_name: row.user_name,
+                    enabled: row.user_enabled,
+                    idps: vec![crate::domain::user::UserIdp {
+                        idp_id: row.idp_id,
+                        idp_name: row.idp_name,
+                        idp_display_name: row.idp_display_name,
+                        idp_sub: row.idp_sub,
+                        created_at: row.idp_bind_created_at.naive_utc(),
+                        updated_at: row.idp_bind_updated_at.naive_utc(),
+                    }],
+                    created_at: row.user_created_at.naive_utc(),
+                    updated_at: row.user_updated_at.naive_utc(),
+                });
+            }
+            acc
+        })
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait::async_trait]
+impl UserRepository for UserRepositoryImpl {
+    async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<crate::domain::user::User>> {
+        let rows = sqlx::query_as::<_, UserIdpSelectionPg>(
+            r#"
+            SELECT
+                us.id AS user_id,
+                us.user_name,
+                us.enabled AS user_enabled,
+                us.created_at AS user_created_at,
+                us.updated_at AS user_updated_at,
+                idps.id AS idp_id,
+                idps.idp_name,
+                idps.idp_display_name,
+                uib.idp_sub,
+                uib.created_at AS idp_bind_created_at,
+                uib.updated_at AS idp_bind_updated_at
+            FROM users AS us
+            JOIN user_idp_bindings AS uib ON us.id = uib.user_id
+            JOIN idps AS idps ON uib.idp_id = idps.id
+            WHERE us.id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(fold_user_idp_rows(rows))
+    }
+
+    async fn get_user_by_idp_sub(
+        &self,
+        idp_name: &str,
+        idp_sub: &str,
+    ) -> anyhow::Result<Option<crate::domain::user::User>> {
+        let rows = sqlx::query_as::<_, UserIdpSelectionPg>(
+            r#"
+            SELECT
+                us.id AS user_id,
+                us.user_name,
+                us.enabled AS user_enabled,
+                us.created_at AS user_created_at,
+                us.updated_at AS user_updated_at,
+                idps.id AS idp_id,
+                idps.idp_name,
+                idps.idp_display_name,
+                uib.idp_sub,
+                uib.created_at AS idp_bind_created_at,
+                uib.updated_at AS idp_bind_updated_at
+            FROM users AS us
+            JOIN user_idp_bindings AS uib ON us.id = uib.user_id
+            JOIN idps AS idps ON uib.idp_id = idps.id
+            WHERE idps.idp_name = $1 AND uib.idp_sub = $2
+            "#,
+        )
+        .bind(idp_name)
+        .bind(idp_sub)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(fold_user_idp_rows(rows))
+    }
+
+    async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            SELECT authed_token_id
+            FROM user_authed_tokens
+            WHERE user_id = $1
+            ORDER BY created_at
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|(id,)| id).collect::<Vec<_>>())
+    }
+
+    async fn get_valid_authed_token_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<String>> {
+        let row: Option<(String,)> = sqlx::query_as(
+            r#"
+            SELECT at.token
+            FROM authed_tokens at
+            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
+            WHERE uat.user_id = $1 AND at.validity = TRUE
+            ORDER BY at.authed_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|(token,)| token))
+    }
+
+    async fn create_user_with_idp<'a>(
+        &'a self,
+        user: CreatingUser,
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
+        sqlx::query(
+            r#"
+            INSERT INTO users (id, user_name, created_at, updated_at)
+            VALUES ($1, $2, NOW(), NOW())
+            "#,
+        )
+        .bind(user.user_id)
+        .bind(&user.user_name)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO user_idp_bindings (id, user_id, idp_id, idp_sub, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            "#,
+        )
+        .bind(Uuid::now_v7())
+        .bind(user.user_id)
+        .bind(user.idp_id)
+        .bind(&user.idp_sub)
+        .execute(&mut *tx)
+        .await?;
+
+        Ok(tx)
+    }
+
+    async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool> {
+        let row: (bool,) = sqlx::query_as(
+            r#"
+            SELECT (registered_user_id IS NOT NULL)
+            FROM authed_tokens
+            WHERE id = $1
+            "#,
+        )
+        .bind(authed_token_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(row.0)
+    }
+
+    async fn bind_user_authed_token<'a>(
+        &'a self,
+        user_id: Uuid,
+        authed_token_id: Uuid,
+        mut tx: Transaction<'a, Db>,
+    ) -> anyhow::Result<Transaction<'a, Db>> {
+        log::info!(
+            "insert: bind_user_authed_token: user_id: {}, authed_token_id: {}",
+            user_id,
+            authed_token_id
+        );
+
+        // Serialize concurrent bindings — PG uses SELECT ... FOR UPDATE
+        let user_exists: Option<(Uuid,)> =
+            sqlx::query_as(r#"SELECT id FROM users WHERE id = $1 FOR UPDATE"#)
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+
+        if user_exists.is_none() {
+            anyhow::bail!("user {user_id} not found");
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO user_authed_tokens (id, user_id, authed_token_id, created_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            "#,
+        )
+        .bind(Uuid::now_v7())
+        .bind(user_id)
+        .bind(authed_token_id)
+        .execute(&mut *tx)
+        .await?;
+
+        log::info!(
+            "update: bind_user_authed_token: user_id: {}, authed_token_id: {}",
+            user_id,
+            authed_token_id
+        );
+
+        let canonical_seed: Option<(Vec<u8>,)> = sqlx::query_as(
+            r#"
+            SELECT at.author_id_seed
+            FROM authed_tokens at
+            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
+            WHERE uat.user_id = $1
+            ORDER BY uat.created_at ASC
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some((seed,)) = canonical_seed {
+            sqlx::query(
+                r#"
+                UPDATE authed_tokens
+                SET registered_user_id = $1, author_id_seed = $2
+                WHERE id = $3
+                "#,
+            )
+            .bind(user_id)
+            .bind(&seed)
+            .bind(authed_token_id)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE authed_tokens
+                SET registered_user_id = $1
+                WHERE id = $2
+                "#,
+            )
+            .bind(user_id)
+            .bind(authed_token_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        Ok(tx)
+    }
 }
