@@ -1,4 +1,7 @@
+use base64::Engine;
+use chacha20poly1305::{KeyInit, aead::Aead};
 use chrono::Utc;
+use eddist_core::server_settings::KEY_AI_OPENAI_API_KEY;
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -17,6 +20,25 @@ impl ServerSettingsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self(pool)
     }
+}
+
+fn encrypt_value(plain: &str) -> String {
+    let key = std::env::var("TINKER_SECRET").unwrap();
+    let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
+
+    let encrypted = chacha20poly1305::ChaCha20Poly1305::new(
+        md5::digest::generic_array::GenericArray::from_slice(&key),
+    )
+    .encrypt(
+        chacha20poly1305::Nonce::from_slice(&[0; 12]),
+        chacha20poly1305::aead::Payload {
+            msg: plain.as_bytes(),
+            aad: b"",
+        },
+    )
+    .unwrap();
+
+    base64::engine::general_purpose::STANDARD.encode(&encrypted)
 }
 
 #[async_trait::async_trait]
@@ -39,12 +61,29 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         .fetch_all(&self.0)
         .await?;
 
+        let settings = settings
+            .into_iter()
+            .map(|mut s| {
+                if s.setting_key == KEY_AI_OPENAI_API_KEY && !s.value.is_empty() {
+                    s.value = "***".to_string();
+                }
+                s
+            })
+            .collect();
+
         Ok(settings)
     }
 
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting> {
         let id = Uuid::now_v7();
         let now = Utc::now().naive_utc();
+
+        let should_encrypt = input.setting_key == KEY_AI_OPENAI_API_KEY;
+        let value = if should_encrypt {
+            encrypt_value(&input.value)
+        } else {
+            input.value.clone()
+        };
 
         query!(
             r#"
@@ -57,7 +96,7 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
             "#,
             id,
             input.setting_key,
-            input.value,
+            value,
             input.description,
             now,
             now
@@ -82,6 +121,13 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         )
         .fetch_one(&self.0)
         .await?;
+
+        if setting.setting_key == KEY_AI_OPENAI_API_KEY && !setting.value.is_empty() {
+            return Ok(ServerSetting {
+                value: "***".to_string(),
+                ..setting
+            });
+        }
 
         Ok(setting)
     }
