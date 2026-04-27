@@ -4,6 +4,7 @@ pub mod domain {
     pub mod cap;
     pub mod client_info;
     pub mod ip_addr;
+    pub mod metadent;
     pub mod notice;
     pub mod pubsub_repository;
     pub mod res;

@@ -4,12 +4,20 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use super::client_info::ClientInfo;
+use super::metadent::MetadentType;
 
 pub const CHANNEL_PUBSUB_ITEM: &str = "bbs:pubsubitem";
 pub const CHANNEL_AUTH_TOKEN_INITIATED: &str = "bbs:event:auth_token_initiated";
 pub const CHANNEL_AUTH_TOKEN_REQUESTED: &str = "bbs:event:auth_token_requested";
 pub const CHANNEL_AUTH_TOKEN_SUCCEEDED: &str = "bbs:event:auth_token_succeeded";
 pub const CHANNEL_AUTH_TOKEN_REVOKED: &str = "bbs:event:auth_token_revoked";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModerationResult {
+    pub flagged: bool,
+    pub categories: Value,
+    pub category_scores: Value,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreatingRes {
@@ -26,6 +34,7 @@ pub struct CreatingRes {
     pub client_info: ClientInfo,
     pub res_order: i32,
     pub is_sage: bool,
+    pub moderation_result: Option<ModerationResult>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,4 +73,23 @@ pub struct AuthTokenRevoked {
 pub enum PubSubItem {
     CreatingRes(Box<CreatingRes>),
     Shutdown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatingThread {
+    pub thread_id: Uuid,
+    pub response_id: Uuid,
+    pub title: String,
+    pub unix_time: u64,
+    pub body: String,
+    pub name: String,
+    pub mail: String,
+    pub created_at: DateTime<Utc>,
+    pub author_ch5id: String,
+    pub authed_token_id: Uuid,
+    pub ip_addr: String,
+    pub board_id: Uuid,
+    pub metadent: MetadentType,
+    pub client_info: ClientInfo,
+    pub moderation_result: Option<ModerationResult>,
 }
