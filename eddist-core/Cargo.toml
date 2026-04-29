@@ -17,3 +17,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 metrics.workspace = true
 ipnet.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+protox.workspace = true

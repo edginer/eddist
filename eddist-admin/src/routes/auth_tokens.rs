@@ -6,10 +6,10 @@ use axum::{
 };
 use eddist_core::{
     domain::pubsub_repository::{AuthTokenRevoked, CHANNEL_AUTH_TOKEN_REVOKED},
+    proto::encode_auth_token_revoked,
     utils::is_authed_token_backup_enabled,
 };
 use redis::AsyncCommands;
-use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -194,12 +194,6 @@ pub(crate) async fn publish_token_revoked(
     conn: &mut redis::aio::ConnectionManager,
     authed_token_id: Uuid,
 ) {
-    match serde_json::to_string(&AuthTokenRevoked { authed_token_id }) {
-        Ok(payload) => {
-            let _: Result<(), _> = conn.publish(CHANNEL_AUTH_TOKEN_REVOKED, payload).await;
-        }
-        Err(e) => {
-            warn!("Failed to serialize AuthTokenRevoked for {authed_token_id}: {e}");
-        }
-    }
+    let payload = encode_auth_token_revoked(&AuthTokenRevoked { authed_token_id });
+    let _: Result<(), _> = conn.publish(CHANNEL_AUTH_TOKEN_REVOKED, payload).await;
 }

@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package eddist.events;
+
+import "google/protobuf/timestamp.proto";
+
+// Tinker tracks user engagement state across sessions.
+message Tinker {
+  string authed_token = 1;
+  uint32 wrote_count = 2;
+  uint32 created_thread_count = 3;
+  uint32 level = 4;
+  uint64 last_level_up_at = 5;
+  uint64 last_wrote_at = 6;
+  optional uint64 last_created_thread_at = 7;
+}
+
+// ClientInfo carries request metadata attached to each post event.
+message ClientInfo {
+  string user_agent = 1;
+  uint32 asn_num = 2;
+  string ip_addr = 3;
+  optional Tinker tinker = 4;
+}
+
+// ModerationResult holds the outcome of an OpenAI content-moderation check.
+// categories and category_scores are JSON-encoded objects as returned by the API.
+message ModerationResult {
+  bool flagged = 1;
+  string categories = 2;
+  string category_scores = 3;
+}
+
+// MetadentType controls how detailed the metadata dent in a response is.
+enum MetadentType {
+  METADENT_TYPE_NONE = 0;
+  METADENT_TYPE_VERBOSE = 1;
+  METADENT_TYPE_VVERBOSE = 2;
+  METADENT_TYPE_VVVERBOSE = 3;
+}
+
+// CreatingThread is published on bbs:event:thread_created when a new thread is opened.
+// thread_id, response_id, authed_token_id, board_id are 16-byte UUID values (RFC 4122).
+message CreatingThread {
+  bytes thread_id = 1;
+  bytes response_id = 2;
+  string title = 3;
+  uint64 unix_time = 4;
+  string body = 5;
+  string name = 6;
+  string mail = 7;
+  google.protobuf.Timestamp created_at = 8;
+  string author_ch5id = 9;
+  bytes authed_token_id = 10;
+  string ip_addr = 11;
+  bytes board_id = 12;
+  MetadentType metadent = 13;
+  ClientInfo client_info = 14;
+  optional ModerationResult moderation_result = 15;
+}
+
+// CreatingRes is published on bbs:event:res_created when a reply is posted.
+// id, authed_token_id, thread_id, board_id are 16-byte UUID values (RFC 4122).
+message CreatingRes {
+  bytes id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string body = 3;
+  string name = 4;
+  string mail = 5;
+  string author_ch5id = 6;
+  bytes authed_token_id = 7;
+  string ip_addr = 8;
+  bytes thread_id = 9;
+  bytes board_id = 10;
+  ClientInfo client_info = 11;
+  int32 res_order = 12;
+  bool is_sage = 13;
+  optional ModerationResult moderation_result = 14;
+}
+
+// AuthTokenInitiated is published on bbs:event:auth_token_initiated
+// when a client begins the authentication flow.
+message AuthTokenInitiated {
+  bytes authed_token_id = 1;
+  string origin_ip = 2;
+  string user_agent = 3;
+  uint32 asn_num = 4;
+}
+
+// AuthTokenRequested is published on bbs:event:auth_token_requested
+// when the user submits the auth code.
+message AuthTokenRequested {
+  optional bytes authed_token_id = 1;
+  string origin_ip = 2;
+  string user_agent = 3;
+  uint32 asn_num = 4;
+  string auth_code = 5;
+}
+
+// AuthTokenSucceeded is published on bbs:event:auth_token_succeeded
+// when authentication completes.
+// additional_info is an optional JSON object with provider-specific data.
+message AuthTokenSucceeded {
+  bytes authed_token_id = 1;
+  string origin_ip = 2;
+  string user_agent = 3;
+  uint32 asn_num = 4;
+  google.protobuf.Timestamp authed_at = 5;
+  optional string additional_info = 6;
+}
+
+// AuthTokenRevoked is published on bbs:event:auth_token_revoked
+// when a token is suspended by an admin.
+message AuthTokenRevoked {
+  bytes authed_token_id = 1;
+}

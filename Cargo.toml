@@ -102,6 +102,12 @@ axum-prometheus = "0.10.0"
 # CLI
 clap = { version = "4", features = ["derive"] }
 
+# Protobuf
+prost = "0.14"
+prost-types = "0.14"
+prost-build = "0.14"
+protox = "0.9"
+
 # Misc
 jsonpath-rust = "1.0.4"
 regex = "1.12.3"

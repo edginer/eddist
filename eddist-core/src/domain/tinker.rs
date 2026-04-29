@@ -13,6 +13,26 @@ pub struct Tinker {
 }
 
 impl Tinker {
+    pub fn from_parts(
+        authed_token: String,
+        wrote_count: u32,
+        created_thread_count: u32,
+        level: u32,
+        last_level_up_at: u64,
+        last_wrote_at: u64,
+        last_created_thread_at: Option<u64>,
+    ) -> Self {
+        Self {
+            authed_token,
+            wrote_count,
+            created_thread_count,
+            level,
+            last_level_up_at,
+            last_wrote_at,
+            last_created_thread_at,
+        }
+    }
+
     pub fn new(authed_token: String, datetime: DateTime<Utc>) -> Self {
         Self {
             authed_token,
