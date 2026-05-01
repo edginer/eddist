@@ -190,9 +190,12 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
     }
 
     async fn delete_thread(&self, board_key: &str, thread_number: u64) -> anyhow::Result<()> {
-        self.0
-            .delete_object(format!("{board_key}/dat/{thread_number}.dat"))
-            .await?;
+        let src = format!("{board_key}/dat/{thread_number}.dat");
+        let dst = format!("{src}.deleted");
+        if let Ok(data) = self.0.get_object(&src).await {
+            self.0.put_object(&dst, &data.to_vec()).await?;
+            self.0.delete_object(&src).await?;
+        }
 
         Ok(())
     }

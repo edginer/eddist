@@ -1,6 +1,6 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import Breadcrumb from "~/components/Breadcrumb";
 import DatArchiveResponseList from "~/components/DatArchiveResponseList";
 import {
@@ -8,6 +8,7 @@ import {
   getDatArcvhiedThread,
   useDeleteAuthedToken,
   useDeleteDatArchivedResponse,
+  useDeleteDatArchivedThread,
   useUpdateDatArchivedResponse,
 } from "~/hooks/queries";
 
@@ -49,12 +50,50 @@ const Page = () => {
     | undefined
   >();
 
+  const navigate = useNavigate();
   const deleteAuthedTokenMutation = useDeleteAuthedToken();
   const updateDatResponseMutation = useUpdateDatArchivedResponse();
   const deleteDatResponseMutation = useDeleteDatArchivedResponse();
+  const deleteThreadMutation = useDeleteDatArchivedThread();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <>
+      <Modal show={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} dismissible>
+        <ModalHeader>Delete Thread</ModalHeader>
+        <ModalBody>
+          Are you sure you want to delete this thread? The dat file will be renamed and hidden.
+        </ModalBody>
+        <ModalFooter>
+          <Button color="gray" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            disabled={deleteThreadMutation.isPending}
+            onClick={() => {
+              deleteThreadMutation.mutate(
+                {
+                  params: {
+                    path: {
+                      board_key: params.boardKey ?? "",
+                      thread_number: Number(params.threadId),
+                    },
+                  },
+                },
+                {
+                  onSuccess: () => {
+                    setShowDeleteConfirm(false);
+                    navigate(`/dashboard/boards/${params.boardKey}`);
+                  },
+                },
+              );
+            }}
+          >
+            Delete
+          </Button>
+        </ModalFooter>
+      </Modal>
       <Modal
         show={onEditResponseOrder != null}
         onClose={() => setOnEditResponseOrder(undefined)}
@@ -161,9 +200,14 @@ const Page = () => {
       </Modal>
 
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          Thread: {thread?.title} ({params.threadId})
-        </h1>
+        <div className="flex items-center gap-4 mb-2">
+          <h1 className="text-3xl font-bold">
+            Thread: {thread?.title} ({params.threadId})
+          </h1>
+          <Button color="red" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+            Delete Thread
+          </Button>
+        </div>
         <Breadcrumb>
           <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
             Boards
