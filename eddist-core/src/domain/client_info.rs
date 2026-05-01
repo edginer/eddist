@@ -10,6 +10,17 @@ pub struct ClientInfo {
     pub tinker: Option<Box<Tinker>>,
 }
 
+impl Default for ClientInfo {
+    fn default() -> Self {
+        Self {
+            user_agent: String::new(),
+            asn_num: 0,
+            ip_addr: String::new(),
+            tinker: None,
+        }
+    }
+}
+
 impl ClientInfo {
     pub fn ip_addr(&self) -> IpAddr {
         IpAddr::new(self.ip_addr.clone())

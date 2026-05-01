@@ -28,17 +28,16 @@ fn bytes_to_uuid(bytes: &[u8]) -> Uuid {
     Uuid::from_slice(bytes).expect("invalid UUID bytes in protobuf message")
 }
 
-fn dt_to_ts(dt: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
-    Some(Timestamp {
+fn dt_to_ts(dt: chrono::DateTime<chrono::Utc>) -> Timestamp {
+    Timestamp {
         seconds: dt.timestamp(),
         nanos: dt.timestamp_subsec_nanos() as i32,
-    })
+    }
 }
 
 fn ts_to_dt(ts: Option<Timestamp>) -> chrono::DateTime<chrono::Utc> {
     ts.and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))
         .unwrap_or_default()
-        .with_timezone(&chrono::Utc)
 }
 
 fn metadent_to_i32(m: MetadentType) -> i32 {
@@ -148,7 +147,7 @@ impl From<&CreatingThread> for events::CreatingThread {
             body: e.body.clone(),
             name: e.name.clone(),
             mail: e.mail.clone(),
-            created_at: dt_to_ts(e.created_at),
+            created_at: Some(dt_to_ts(e.created_at)),
             author_ch5id: e.author_ch5id.clone(),
             authed_token_id: uuid_to_bytes(e.authed_token_id),
             ip_addr: e.ip_addr.clone(),
@@ -184,12 +183,7 @@ impl TryFrom<events::CreatingThread> for CreatingThread {
             client_info: p
                 .client_info
                 .map(ClientInfo::from)
-                .unwrap_or_else(|| ClientInfo {
-                    user_agent: String::new(),
-                    asn_num: 0,
-                    ip_addr: String::new(),
-                    tinker: None,
-                }),
+                .unwrap_or_default(),
             moderation_result: p.moderation_result.map(ModerationResult::from),
         })
     }
@@ -201,7 +195,7 @@ impl From<&CreatingRes> for events::CreatingRes {
     fn from(e: &CreatingRes) -> Self {
         Self {
             id: uuid_to_bytes(e.id),
-            created_at: dt_to_ts(e.created_at),
+            created_at: Some(dt_to_ts(e.created_at)),
             body: e.body.clone(),
             name: e.name.clone(),
             mail: e.mail.clone(),
@@ -239,12 +233,7 @@ impl TryFrom<events::CreatingRes> for CreatingRes {
             client_info: p
                 .client_info
                 .map(ClientInfo::from)
-                .unwrap_or_else(|| ClientInfo {
-                    user_agent: String::new(),
-                    asn_num: 0,
-                    ip_addr: String::new(),
-                    tinker: None,
-                }),
+                .unwrap_or_default(),
             res_order: p.res_order,
             is_sage: p.is_sage,
             moderation_result: p.moderation_result.map(ModerationResult::from),
@@ -307,7 +296,7 @@ impl From<&AuthTokenSucceeded> for events::AuthTokenSucceeded {
             origin_ip: e.origin_ip.clone(),
             user_agent: e.user_agent.clone(),
             asn_num: e.asn_num,
-            authed_at: dt_to_ts(e.authed_at),
+            authed_at: Some(dt_to_ts(e.authed_at)),
             additional_info: e.additional_info.as_ref().map(|v| v.to_string()),
         }
     }
