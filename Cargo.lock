@@ -1375,6 +1375,7 @@ dependencies = [
  "log",
  "md-5 0.10.6",
  "oauth2",
+ "rand 0.10.0",
  "redis",
  "reqwest",
  "rust-s3",

@@ -27,11 +27,13 @@ fn encrypt_client_secret(plain_secret: &str) -> String {
     let key = std::env::var("TINKER_SECRET").unwrap();
     let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
 
+    let nonce_bytes: [u8; 12] = rand::random();
+    let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
     let encrypted = chacha20poly1305::ChaCha20Poly1305::new(
         md5::digest::generic_array::GenericArray::from_slice(&key),
     )
     .encrypt(
-        chacha20poly1305::Nonce::from_slice(&[0; 12]),
+        nonce,
         chacha20poly1305::aead::Payload {
             msg: plain_secret.as_bytes(),
             aad: b"",
@@ -39,7 +41,12 @@ fn encrypt_client_secret(plain_secret: &str) -> String {
     )
     .unwrap();
 
-    base64::engine::general_purpose::STANDARD.encode(&encrypted)
+    let mut payload = nonce_bytes.to_vec();
+    payload.extend_from_slice(&encrypted);
+    format!(
+        "v1:{}",
+        base64::engine::general_purpose::STANDARD.encode(&payload)
+    )
 }
 
 #[async_trait::async_trait]

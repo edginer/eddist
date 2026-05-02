@@ -8,7 +8,7 @@ use super::server_settings_cache::{ServerSettingKey, get_server_setting};
 
 pub async fn moderate(text: &str) -> Option<ModerationResult> {
     let encrypted_key = get_server_setting(ServerSettingKey::AiOpenAiApiKey).await?;
-    let api_key = decrypt_api_key(&encrypted_key);
+    let api_key = decrypt_api_key(&encrypted_key)?;
     match call_api_with_retry(&api_key, text).await {
         Ok(result) => Some(result),
         Err(e) => {
@@ -35,27 +35,30 @@ async fn call_api_with_retry(api_key: &str, input: &str) -> anyhow::Result<Moder
     Err(last_err)
 }
 
-fn decrypt_api_key(b64: &str) -> String {
-    let key = std::env::var("TINKER_SECRET").unwrap();
+fn decrypt_api_key(b64: &str) -> Option<String> {
+    let b64 = b64.strip_prefix("v1:")?;
+    let key = std::env::var("TINKER_SECRET").ok()?;
     let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
 
-    let ciphertext = base64::engine::general_purpose::STANDARD
-        .decode(b64)
-        .unwrap();
+    let data = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+    if data.len() < 12 {
+        return None;
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(12);
 
     let plaintext = chacha20poly1305::ChaCha20Poly1305::new(
         md5::digest::generic_array::GenericArray::from_slice(&key),
     )
     .decrypt(
-        chacha20poly1305::Nonce::from_slice(&[0; 12]),
+        chacha20poly1305::Nonce::from_slice(nonce_bytes),
         chacha20poly1305::aead::Payload {
-            msg: &ciphertext,
+            msg: ciphertext,
             aad: b"",
         },
     )
-    .unwrap();
+    .ok()?;
 
-    std::str::from_utf8(&plaintext).unwrap().to_string()
+    std::str::from_utf8(&plaintext).ok().map(str::to_string)
 }
 
 async fn call_api(api_key: &str, input: &str) -> anyhow::Result<ModerationResult> {

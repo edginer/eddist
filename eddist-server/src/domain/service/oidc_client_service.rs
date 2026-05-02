@@ -64,42 +64,89 @@ impl<T: IdpRepository + Clone> OidcClientService<T> {
 fn decrypt_client_secret(b64_secret: &str) -> String {
     let key = std::env::var("TINKER_SECRET").unwrap();
     let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
-
-    let secret = base64::engine::general_purpose::STANDARD
-        .decode(b64_secret)
-        .unwrap();
-
-    let secret = chacha20poly1305::ChaCha20Poly1305::new(
+    let cipher = chacha20poly1305::ChaCha20Poly1305::new(
         md5::digest::generic_array::GenericArray::from_slice(&key),
-    )
-    .decrypt(
-        chacha20poly1305::Nonce::from_slice(&[0; 12]),
-        chacha20poly1305::aead::Payload {
-            msg: &secret,
-            aad: b"",
-        },
-    )
-    .unwrap();
+    );
 
-    std::str::from_utf8(&secret).unwrap().to_string()
+    let plaintext = if let Some(b64) = b64_secret.strip_prefix("v1:") {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
+        let (nonce_bytes, ciphertext) = data.split_at(12);
+        cipher
+            .decrypt(
+                chacha20poly1305::Nonce::from_slice(nonce_bytes),
+                chacha20poly1305::aead::Payload {
+                    msg: ciphertext,
+                    aad: b"",
+                },
+            )
+            .unwrap()
+    } else {
+        // Legacy: zero nonce, ciphertext only
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(b64_secret)
+            .unwrap();
+        cipher
+            .decrypt(
+                chacha20poly1305::Nonce::from_slice(&[0; 12]),
+                chacha20poly1305::aead::Payload {
+                    msg: &data,
+                    aad: b"",
+                },
+            )
+            .unwrap()
+    };
+
+    std::str::from_utf8(&plaintext).unwrap().to_string()
 }
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::*;
 
-    #[test]
-    fn test_decrypt_client_secret() {
-        // Set up the environment variable for the key
-        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
+    const TEST_KEY: &str = "a_very_secret_key_that_is_not_32_bytes!";
 
-        // Encrypt a sample secret
-        let key = std::env::var("TINKER_SECRET").unwrap();
-        let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
+    #[test]
+    fn test_decrypt_client_secret_v1() {
+        unsafe { std::env::set_var("TINKER_SECRET", TEST_KEY) };
+
+        let key = TEST_KEY.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
+        let secret = "my_secret_client_secret";
+        let nonce_bytes: [u8; 12] = rand::random();
+        let cipher = chacha20poly1305::ChaCha20Poly1305::new(
+            md5::digest::generic_array::GenericArray::from_slice(&key),
+        );
+        let ciphertext = cipher
+            .encrypt(
+                chacha20poly1305::Nonce::from_slice(&nonce_bytes),
+                chacha20poly1305::aead::Payload {
+                    msg: secret.as_bytes(),
+                    aad: b"",
+                },
+            )
+            .unwrap();
+        let mut payload = nonce_bytes.to_vec();
+        payload.extend_from_slice(&ciphertext);
+        let b64 = format!(
+            "v1:{}",
+            base64::engine::general_purpose::STANDARD.encode(&payload)
+        );
+
+        assert_eq!(decrypt_client_secret(&b64), secret);
+    }
+
+    #[test]
+    fn test_decrypt_client_secret_legacy() {
+        unsafe { std::env::set_var("TINKER_SECRET", TEST_KEY) };
+
+        let key = TEST_KEY.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
         let secret = "my_secret_client_secret";
         let cipher = chacha20poly1305::ChaCha20Poly1305::new(
             md5::digest::generic_array::GenericArray::from_slice(&key),
         );
-        let encrypted_secret = cipher
+        let ciphertext = cipher
             .encrypt(
                 chacha20poly1305::Nonce::from_slice(&[0; 12]),
                 chacha20poly1305::aead::Payload {
@@ -108,11 +155,8 @@ mod tests {
                 },
             )
             .unwrap();
-        let b64_encrypted_secret =
-            base64::engine::general_purpose::STANDARD.encode(&encrypted_secret);
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&ciphertext);
 
-        // Decrypt the secret and verify it matches the original
-        let decrypted_secret = decrypt_client_secret(&b64_encrypted_secret);
-        assert_eq!(decrypted_secret, secret);
+        assert_eq!(decrypt_client_secret(&b64), secret);
     }
 }
