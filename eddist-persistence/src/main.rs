@@ -50,9 +50,35 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    #[cfg(not(feature = "backend-postgres"))]
     let db_pool = if is_authed_token_backup_enabled() {
         let database_url = env::var("DATABASE_URL")?;
-        Some(sqlx::MySqlPool::connect(&database_url).await?)
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .after_connect(|conn, _| {
+                use sqlx::Executor;
+                Box::pin(async move {
+                    conn.execute(
+                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                    )
+                    .await
+                    .unwrap();
+                    log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
+                    Ok(())
+                })
+            })
+            .connect(&database_url)
+            .await?;
+        Some(pool)
+    } else {
+        None
+    };
+    #[cfg(feature = "backend-postgres")]
+    let db_pool = if is_authed_token_backup_enabled() {
+        let database_url = env::var("DATABASE_URL")?;
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect(&database_url)
+            .await?;
+        Some(pool)
     } else {
         None
     };

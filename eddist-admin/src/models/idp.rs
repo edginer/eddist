@@ -3,6 +3,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// IdP model for API responses (client_secret is never exposed)
+#[cfg_attr(feature = "backend-postgres", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
 pub struct Idp {
     pub id: Uuid,

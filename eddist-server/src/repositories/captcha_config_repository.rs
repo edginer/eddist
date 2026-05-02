@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use eddist_core::utils::slugify;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::captcha_like::{
@@ -9,6 +12,7 @@ use crate::domain::captcha_like::{
     HttpMethod, RequestFormat,
 };
 
+#[cfg_attr(feature = "backend-postgres", derive(sqlx::FromRow))]
 #[derive(Debug, Clone)]
 struct CaptchaConfigRow {
     id: Uuid,
@@ -223,6 +227,7 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
 }
 
 /// Load all active captcha configs from the database
+#[cfg(not(feature = "backend-postgres"))]
 pub async fn get_active_captcha_configs(
     pool: &MySqlPool,
 ) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
@@ -249,6 +254,28 @@ pub async fn get_active_captcha_configs(
         WHERE is_active = 1
         ORDER BY display_order ASC, created_at ASC
         "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(CaptchaProviderConfig::from).collect())
+}
+
+/// Load all active captcha configs from the database (PostgreSQL)
+#[cfg(feature = "backend-postgres")]
+pub async fn get_active_captcha_configs(
+    pool: &PgPool,
+) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
+    let rows = sqlx::query_as::<_, CaptchaConfigRow>(
+        r#"
+        SELECT
+            id, name, provider, site_key, secret,
+            base_url, widget_form_field_name, widget_script_url, widget_html, widget_script_handler,
+            capture_fields, verification, is_active, display_order, endpoint_usage
+        FROM captcha_configs
+        WHERE is_active = TRUE
+        ORDER BY display_order ASC, created_at ASC
+        "#,
     )
     .fetch_all(pool)
     .await?;

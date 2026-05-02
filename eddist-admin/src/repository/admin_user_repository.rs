@@ -15,15 +15,18 @@ pub trait AdminUserRepository: Send + Sync {
     async fn update_user_status(&self, user_id: Uuid, enabled: bool) -> anyhow::Result<()>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Clone)]
 pub struct AdminUserRepositoryImpl(pub sqlx::MySqlPool);
 
+#[cfg(not(feature = "backend-postgres"))]
 impl AdminUserRepositoryImpl {
     pub fn new(pool: sqlx::MySqlPool) -> Self {
         Self(pool)
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl AdminUserRepository for AdminUserRepositoryImpl {
     async fn search_users(
@@ -212,6 +215,7 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct UserIdpsSelection {
     pub user_id: Uuid,
@@ -220,4 +224,197 @@ pub struct UserIdpsSelection {
     pub idp_name: Option<String>,
     pub idp_sub: Option<String>,
     pub idp_binding_id: Option<Uuid>,
+}
+
+// PG version — same fields, native UUID
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct UserIdpsSelectionPg {
+    pub user_id: Uuid,
+    pub user_name: String,
+    pub enabled: bool,
+    pub idp_name: Option<String>,
+    pub idp_sub: Option<String>,
+    pub idp_binding_id: Option<Uuid>,
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Clone)]
+pub struct AdminUserRepositoryPgImpl(pub sqlx::PgPool);
+
+#[cfg(feature = "backend-postgres")]
+impl AdminUserRepositoryPgImpl {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self(pool)
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait::async_trait]
+impl AdminUserRepository for AdminUserRepositoryPgImpl {
+    async fn search_users(
+        &self,
+        user_id: Option<Uuid>,
+        user_name: Option<String>,
+        authed_token_id: Option<Uuid>,
+    ) -> anyhow::Result<Vec<User>> {
+        if user_id.is_none() && user_name.is_none() && authed_token_id.is_none() {
+            return Ok(vec![]);
+        }
+
+        let mut sets: Vec<String> = Vec::new();
+        let mut param_idx = 1usize;
+
+        if user_id.is_some() {
+            sets.push(format!("u.id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if user_name.is_some() {
+            sets.push(format!("u.user_name = ${param_idx}"));
+            param_idx += 1;
+        }
+        if authed_token_id.is_some() {
+            sets.push(format!(
+                "u.id IN (SELECT user_id FROM user_authed_tokens WHERE authed_token_id = ${param_idx})"
+            ));
+            param_idx += 1;
+        }
+        let _ = param_idx;
+
+        let sql = format!(
+            r#"
+            SELECT
+                u.id AS user_id,
+                u.user_name AS user_name,
+                u.enabled AS enabled,
+                ub.id AS idp_binding_id,
+                ub.idp_sub AS idp_sub,
+                i.idp_name AS idp_name
+            FROM users AS u
+            LEFT JOIN user_idp_bindings AS ub ON u.id = ub.user_id
+            LEFT JOIN idps AS i ON ub.idp_id = i.id
+            WHERE {}
+            "#,
+            sets.join(" OR ")
+        );
+
+        let mut q = sqlx::query_as::<_, UserIdpsSelectionPg>(&sql);
+        if let Some(uid) = user_id {
+            q = q.bind(uid);
+        }
+        if let Some(ref uname) = user_name {
+            q = q.bind(uname);
+        }
+        if let Some(tid) = authed_token_id {
+            q = q.bind(tid);
+        }
+        let users = q.fetch_all(&self.0).await?;
+
+        if users.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let unique_user_ids = users
+            .iter()
+            .map(|x| x.user_id)
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let mut authed_token_map: std::collections::HashMap<Uuid, Vec<Uuid>> =
+            std::collections::HashMap::new();
+        for uid in &unique_user_ids {
+            let tokens = sqlx::query_as::<_, (Uuid,)>(
+                r#"
+                SELECT authed_token_id
+                FROM user_authed_tokens
+                WHERE user_id = $1
+                "#,
+            )
+            .bind(uid)
+            .fetch_all(&self.0)
+            .await?
+            .into_iter()
+            .map(|(id,)| id)
+            .collect::<Vec<_>>();
+            authed_token_map.insert(*uid, tokens);
+        }
+
+        Ok(users
+            .into_iter()
+            .fold(
+                std::collections::HashMap::new(),
+                |mut acc: std::collections::HashMap<Uuid, User>, user| {
+                    let uid = user.user_id;
+                    if let Some(existing) = acc.get_mut(&uid) {
+                        if let (Some(idp_binding_id), Some(idp_sub), Some(idp_name)) =
+                            (user.idp_binding_id, user.idp_sub, user.idp_name)
+                        {
+                            existing.idp_bindings.push(UserIdpBinding {
+                                id: idp_binding_id,
+                                user_id: uid,
+                                idp_name,
+                                idp_sub,
+                            });
+                        }
+                    } else {
+                        let idp_bindings =
+                            if let (Some(idp_binding_id), Some(idp_sub), Some(idp_name)) =
+                                (user.idp_binding_id, user.idp_sub, user.idp_name)
+                            {
+                                vec![UserIdpBinding {
+                                    id: idp_binding_id,
+                                    user_id: uid,
+                                    idp_name,
+                                    idp_sub,
+                                }]
+                            } else {
+                                vec![]
+                            };
+                        acc.insert(
+                            uid,
+                            User {
+                                id: uid,
+                                user_name: user.user_name,
+                                enabled: user.enabled,
+                                idp_bindings,
+                                authed_token_ids: authed_token_map
+                                    .get(&uid)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            },
+                        );
+                    }
+                    acc
+                },
+            )
+            .into_values()
+            .collect())
+    }
+
+    async fn update_user_status(&self, user_id: Uuid, enabled: bool) -> anyhow::Result<()> {
+        let mut tx = self.0.begin().await?;
+
+        sqlx::query("UPDATE users SET enabled = $1 WHERE id = $2")
+            .bind(enabled)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query(
+            r#"
+            UPDATE authed_tokens SET validity = $1
+            WHERE id IN (
+                SELECT authed_token_id FROM user_authed_tokens WHERE user_id = $2
+            )
+            "#,
+        )
+        .bind(enabled)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
 }

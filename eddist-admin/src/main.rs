@@ -15,6 +15,7 @@ use axum::{
 };
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use oauth2::{AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl, TokenUrl};
+#[cfg(not(feature = "backend-postgres"))]
 use repository::{
     admin_archive_repository::AdminArchiveRepositoryImpl,
     admin_board_repository::AdminBoardRepositoryImpl,
@@ -27,6 +28,23 @@ use repository::{
     server_settings_repository::ServerSettingsRepositoryImpl,
     terms_repository::TermsRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
+};
+#[cfg(feature = "backend-postgres")]
+use repository::{
+    admin_archive_repository::AdminArchiveRepositoryImpl,
+    admin_board_repository::AdminBoardRepositoryPgImpl as AdminBoardRepositoryImpl,
+    admin_response_repository::AdminResponseRepositoryPgImpl as AdminResponseRepositoryImpl,
+    admin_thread_repository::AdminThreadRepositoryPgImpl as AdminThreadRepositoryImpl,
+    admin_user_repository::AdminUserRepositoryPgImpl as AdminUserRepositoryImpl,
+    authed_token_repository::AuthedTokenRepositoryPgImpl as AuthedTokenRepositoryImpl,
+    cap_repository::CapRepositoryPgImpl as CapRepositoryImpl,
+    captcha_config_repository::CaptchaConfigRepositoryPgImpl as CaptchaConfigRepositoryImpl,
+    idp_repository::IdpAdminRepositoryPgImpl as IdpAdminRepositoryImpl,
+    ngword_repository::NgWordRepositoryPgImpl as NgWordRepositoryImpl,
+    notice_repository::NoticeRepositoryPgImpl as NoticeRepositoryImpl,
+    server_settings_repository::ServerSettingsRepositoryPgImpl as ServerSettingsRepositoryImpl,
+    terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
 };
 use s3::creds::Credentials;
 use time::Duration;
@@ -189,10 +207,10 @@ async fn main() {
     let serve_dir = ServeDir::new(serve_dir)
         .not_found_service(ServeFile::new(format!("{serve_dir}/index.html")));
 
+    #[cfg(not(feature = "backend-postgres"))]
     let pool = sqlx::mysql::MySqlPoolOptions::new()
         .after_connect(|conn, _| {
             use sqlx::Executor;
-
             Box::pin(async move {
                 conn.execute(
                     "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
@@ -203,6 +221,13 @@ async fn main() {
                 Ok(())
             })
         })
+        .connect(&std::env::var("DATABASE_URL").unwrap())
+        .await
+        .unwrap();
+
+    // PostgreSQL: no session mode setup needed.
+    #[cfg(feature = "backend-postgres")]
+    let pool = sqlx::postgres::PgPoolOptions::new()
         .connect(&std::env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();

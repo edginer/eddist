@@ -63,6 +63,24 @@ services:
       - client-v2
     extra_hosts:
       - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
+  # PostgreSQL — used for PG backend development.
+  # To activate: docker compose --profile migrate up
+  postgres:
+    image: postgres:18
+    container_name: postgres_container
+    profiles:
+      - migrate
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pgpassword
+      POSTGRES_DB: eddist
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+
 volumes:
   mysql_data:
+  postgres_data:
   pnpm_store:
