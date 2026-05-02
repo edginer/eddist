@@ -36,7 +36,8 @@ pub fn sanitize_base(input: &str, is_body: bool) -> String {
 
 pub fn sanitize_num_refs(input: &str) -> String {
     // Delete all of semicolon closing \n character references
-    let re = SANITIZE_NUM_REFS_REGEX.get_or_init(|| Regex::new(r"&#([Xx]0*[aA]|0*10);").unwrap());
+    let re = SANITIZE_NUM_REFS_REGEX
+        .get_or_init(|| Regex::new(r"&#([Xx]0*[aA]|0*10|0*8203|[Xx]0*200[bB]);").unwrap());
     let rn_sanitized = re.replace_all(input, "");
 
     sanitize_ascii_numeric_character_reference(&sanitize_non_semi_closing_num_char_refs(
@@ -294,6 +295,12 @@ mod tests {
         assert_eq!(sanitize_num_refs("test&#X0A;end"), "testend");
         assert_eq!(sanitize_num_refs("keep&#41;this"), "keep)this"); // &#41; is ASCII ')'
         assert_eq!(sanitize_num_refs("keep&#12354;this"), "keep&#12354;this"); // &#12354; is non-ASCII
+
+        // Zero-width space numeric references
+        assert_eq!(sanitize_num_refs("test&#8203;end"), "testend");
+        assert_eq!(sanitize_num_refs("test&#x200B;end"), "testend");
+        assert_eq!(sanitize_num_refs("test&#X200B;end"), "testend");
+        assert_eq!(sanitize_num_refs("test&#x200b;end"), "testend");
 
         // Edge cases: standalone # should not cause panic
         assert_eq!(sanitize_num_refs("#"), "#");
