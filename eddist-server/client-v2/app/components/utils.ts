@@ -184,7 +184,13 @@ const afterPost = async (res: Response): Promise<PostResponseResult> => {
         },
       };
     }
-    throw new Error(`Failed to post a response: ${res.statusText}`);
+    return {
+      success: false,
+      error: {
+        kind: "unknown",
+        errorHtml: text || `${res.status} ${res.statusText}`,
+      },
+    };
   }
 
   if (text.includes("error_code")) {
