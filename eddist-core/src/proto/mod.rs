@@ -180,10 +180,7 @@ impl TryFrom<events::CreatingThread> for CreatingThread {
             ip_addr: p.ip_addr,
             board_id: bytes_to_uuid(&p.board_id),
             metadent: i32_to_metadent(p.metadent),
-            client_info: p
-                .client_info
-                .map(ClientInfo::from)
-                .unwrap_or_default(),
+            client_info: p.client_info.map(ClientInfo::from).unwrap_or_default(),
             moderation_result: p.moderation_result.map(ModerationResult::from),
         })
     }
@@ -230,10 +227,7 @@ impl TryFrom<events::CreatingRes> for CreatingRes {
             ip_addr: p.ip_addr,
             thread_id: bytes_to_uuid(&p.thread_id),
             board_id: bytes_to_uuid(&p.board_id),
-            client_info: p
-                .client_info
-                .map(ClientInfo::from)
-                .unwrap_or_default(),
+            client_info: p.client_info.map(ClientInfo::from).unwrap_or_default(),
             res_order: p.res_order,
             is_sage: p.is_sage,
             moderation_result: p.moderation_result.map(ModerationResult::from),

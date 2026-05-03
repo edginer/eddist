@@ -1,6 +1,7 @@
 use base64::Engine;
 use chacha20poly1305::{KeyInit, aead::Aead};
 use eddist_core::domain::pubsub_repository::ModerationResult;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -10,9 +11,13 @@ pub async fn moderate(text: &str) -> Option<ModerationResult> {
     let encrypted_key = get_server_setting(ServerSettingKey::AiOpenAiApiKey).await?;
     let api_key = decrypt_api_key(&encrypted_key)?;
     match call_api_with_retry(&api_key, text).await {
-        Ok(result) => Some(result),
+        Ok(result) => {
+            counter!("openai_moderation_requests", "result" => "success").increment(1);
+            Some(result)
+        }
         Err(e) => {
             warn!(error = %e, "OpenAI moderation API call failed after retries");
+            counter!("openai_moderation_requests", "result" => "error").increment(1);
             None
         }
     }
@@ -23,6 +28,7 @@ async fn call_api_with_retry(api_key: &str, input: &str) -> anyhow::Result<Moder
     for attempt in 0u32..3 {
         if attempt > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(500 * (1u64 << attempt))).await;
+            counter!("openai_moderation_retries").increment(1);
         }
         match call_api(api_key, input).await {
             Ok(r) => return Ok(r),
@@ -78,6 +84,8 @@ async fn call_api(api_key: &str, input: &str) -> anyhow::Result<ModerationResult
         categories: serde_json::Value,
         category_scores: serde_json::Value,
     }
+
+    counter!("openai_moderation_api_calls").increment(1);
 
     let client = reqwest::Client::new();
     let resp = client
