@@ -20,10 +20,6 @@ impl ServerSettingsRepositoryImpl {
     }
 }
 
-fn encrypt_value(plain: &str) -> String {
-    symmetric::encrypt(plain)
-}
-
 #[async_trait::async_trait]
 impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<ServerSetting>> {
@@ -63,7 +59,7 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
 
         let should_encrypt = input.setting_key == KEY_AI_OPENAI_API_KEY;
         let value = if should_encrypt {
-            encrypt_value(&input.value)
+            symmetric::encrypt(&input.value)
         } else {
             input.value.clone()
         };

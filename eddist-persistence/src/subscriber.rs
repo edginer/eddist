@@ -44,6 +44,11 @@ pub trait SubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error>;
 }
 
+async fn reconnect_pubsub(redis_url: &str) -> anyhow::Result<redis::aio::PubSub> {
+    let client = redis::Client::open(redis_url)?;
+    Ok(client.get_async_pubsub().await?)
+}
+
 impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         let mut error_count = 0u32;
@@ -69,29 +74,16 @@ impl SubRepository for RedisSubRepository {
                 sleep(std::time::Duration::from_secs(backoff_secs)).await;
                 error_count = error_count.saturating_add(1);
 
-                match redis::Client::open(redis_url.clone()) {
-                    Ok(client) => match client.get_async_pubsub().await {
-                        Ok(new_pubsub) => {
-                            self.pubsub_conn = new_pubsub;
-                            info!("Successfully reconnected to Redis pubsub");
-                            continue;
-                        }
-                        Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                "Failed to get pubsub connection"
-                            );
-                            continue;
-                        }
-                    },
+                match reconnect_pubsub(&redis_url).await {
+                    Ok(new_pubsub) => {
+                        self.pubsub_conn = new_pubsub;
+                        info!("Successfully reconnected to Redis pubsub");
+                    }
                     Err(e) => {
-                        error!(
-                            error = e.to_string().as_str(),
-                            "Failed to create Redis client"
-                        );
-                        continue;
+                        error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
                     }
                 }
+                continue;
             }
 
             info!("Application starts subscribing to pubsub channel");
@@ -110,24 +102,13 @@ impl SubRepository for RedisSubRepository {
                     let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
                     sleep(std::time::Duration::from_secs(backoff_secs)).await;
 
-                    match redis::Client::open(redis_url.clone()) {
-                        Ok(client) => match client.get_async_pubsub().await {
-                            Ok(new_pubsub) => {
-                                self.pubsub_conn = new_pubsub;
-                                info!("Successfully reconnected to Redis pubsub");
-                            }
-                            Err(e) => {
-                                error!(
-                                    error = e.to_string().as_str(),
-                                    "Failed to get pubsub connection"
-                                );
-                            }
-                        },
+                    match reconnect_pubsub(&redis_url).await {
+                        Ok(new_pubsub) => {
+                            self.pubsub_conn = new_pubsub;
+                            info!("Successfully reconnected to Redis pubsub");
+                        }
                         Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                "Failed to create Redis client"
-                            );
+                            error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
                         }
                     }
                 }

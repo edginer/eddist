@@ -1,5 +1,5 @@
 import { Button, Checkbox, HelperText, Label, TextInput } from "flowbite-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getServerSettings, useUpsertServerSetting } from "~/hooks/queries";
 
 type SettingDefinition =
@@ -63,25 +63,27 @@ const ServerSettings = () => {
   const { data: settings } = getServerSettings();
   const upsertMutation = useUpsertServerSetting();
 
+  const settingMap = useMemo(
+    () => new Map(settings?.map((s) => [s.setting_key, s]) ?? []),
+    [settings],
+  );
+
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (settings) {
-      const initial: Record<string, string> = {};
-      for (const def of KNOWN_SETTINGS) {
-        const existing = settings.find((s) => s.setting_key === def.key);
-        if (def.type === "boolean") {
-          initial[def.key] = existing?.value ?? "false";
-        } else {
-          // For text fields show empty string so the user types a new value;
-          // the server returns "***" for sensitive fields that are already set.
-          initial[def.key] = "";
-        }
+    const initial: Record<string, string> = {};
+    for (const def of KNOWN_SETTINGS) {
+      const existing = settingMap.get(def.key);
+      if (def.type === "boolean") {
+        initial[def.key] = existing?.value ?? "false";
+      } else {
+        // Server returns "***" for sensitive fields already set; start empty so the user types a new value.
+        initial[def.key] = "";
       }
-      setValues(initial);
     }
-  }, [settings]);
+    setValues(initial);
+  }, [settingMap]);
 
   const handleToggle = (key: string, checked: boolean) => {
     setValues((prev) => ({ ...prev, [key]: checked ? "true" : "false" }));
@@ -95,7 +97,7 @@ const ServerSettings = () => {
     setSaving(true);
     try {
       for (const def of KNOWN_SETTINGS) {
-        const existing = settings?.find((s) => s.setting_key === def.key);
+        const existing = settingMap.get(def.key);
         const newValue = values[def.key] ?? "";
 
         if (def.type === "boolean") {
@@ -110,8 +112,7 @@ const ServerSettings = () => {
             });
           }
         } else {
-          // Only submit text fields if the user actually typed something
-          // (empty = no change; "***" guard avoids re-submitting masked values)
+          // Empty = no change; skip "***" to avoid re-submitting the masked sentinel.
           if (newValue.length > 0 && newValue !== MASKED_VALUE) {
             await upsertMutation.mutateAsync({
               body: {
@@ -129,13 +130,11 @@ const ServerSettings = () => {
   };
 
   const hasChanges = KNOWN_SETTINGS.some((def) => {
-    const existing = settings?.find((s) => s.setting_key === def.key);
     const currentValue = values[def.key] ?? "";
     if (def.type === "boolean") {
-      const savedValue = existing?.value ?? "false";
+      const savedValue = settingMap.get(def.key)?.value ?? "false";
       return currentValue !== savedValue;
     }
-    // Text field changed if the user typed something non-empty and not masked
     return currentValue.length > 0 && currentValue !== MASKED_VALUE;
   });
 
@@ -164,7 +163,7 @@ const ServerSettings = () => {
               <>
                 <Label htmlFor={def.key} className="text-base">
                   {def.label}
-                  {settings?.find((s) => s.setting_key === def.key)?.value === MASKED_VALUE && (
+                  {settingMap.get(def.key)?.value === MASKED_VALUE && (
                     <span className="ml-2 text-xs text-gray-500 font-normal">(already set)</span>
                   )}
                 </Label>

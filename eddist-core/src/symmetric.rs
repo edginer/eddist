@@ -1,23 +1,29 @@
+use std::sync::OnceLock;
+
 use base64::Engine;
 use chacha20poly1305::{KeyInit, aead::Aead};
 
-fn derive_key() -> Vec<u8> {
-    std::env::var("TINKER_SECRET")
-        .expect("TINKER_SECRET must be set")
-        .as_bytes()
-        .iter()
-        .take(32)
-        .copied()
-        .collect()
+static KEY: OnceLock<Vec<u8>> = OnceLock::new();
+
+fn derived_key() -> &'static [u8] {
+    KEY.get_or_init(|| {
+        std::env::var("TINKER_SECRET")
+            .expect("TINKER_SECRET must be set")
+            .as_bytes()
+            .iter()
+            .take(32)
+            .copied()
+            .collect()
+    })
 }
 
 /// Encrypts `plain` with ChaCha20-Poly1305 using a random nonce derived from TINKER_SECRET.
 /// Returns a `v1:<base64(nonce || ciphertext)>` string.
 pub fn encrypt(plain: &str) -> String {
-    let key = derive_key();
+    let key = derived_key();
     let nonce_bytes: [u8; 12] = rand::random();
     let ciphertext = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(&key),
+        md5::digest::generic_array::GenericArray::from_slice(key),
     )
     .encrypt(
         chacha20poly1305::Nonce::from_slice(&nonce_bytes),
@@ -42,13 +48,13 @@ pub fn decrypt(b64: &str) -> anyhow::Result<String> {
         .strip_prefix("v1:")
         .ok_or_else(|| anyhow::anyhow!("unknown encryption format (missing v1: prefix)"))?;
 
-    let key = derive_key();
+    let key = derived_key();
     let data = base64::engine::general_purpose::STANDARD.decode(b64)?;
     anyhow::ensure!(data.len() >= 12, "ciphertext too short");
 
     let (nonce_bytes, ciphertext) = data.split_at(12);
     let plaintext = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(&key),
+        md5::digest::generic_array::GenericArray::from_slice(key),
     )
     .decrypt(
         chacha20poly1305::Nonce::from_slice(nonce_bytes),
