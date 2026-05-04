@@ -1,5 +1,4 @@
-use base64::Engine;
-use chacha20poly1305::{KeyInit, aead::Aead};
+use eddist_core::symmetric;
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -24,29 +23,7 @@ impl IdpAdminRepositoryImpl {
 }
 
 fn encrypt_client_secret(plain_secret: &str) -> String {
-    let key = std::env::var("TINKER_SECRET").unwrap();
-    let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
-
-    let nonce_bytes: [u8; 12] = rand::random();
-    let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
-    let encrypted = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(&key),
-    )
-    .encrypt(
-        nonce,
-        chacha20poly1305::aead::Payload {
-            msg: plain_secret.as_bytes(),
-            aad: b"",
-        },
-    )
-    .unwrap();
-
-    let mut payload = nonce_bytes.to_vec();
-    payload.extend_from_slice(&encrypted);
-    format!(
-        "v1:{}",
-        base64::engine::general_purpose::STANDARD.encode(&payload)
-    )
+    symmetric::encrypt(plain_secret)
 }
 
 #[async_trait::async_trait]

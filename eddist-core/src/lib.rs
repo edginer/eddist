@@ -15,6 +15,7 @@ pub mod domain {
 }
 
 pub mod cache_aside;
+pub mod symmetric;
 pub mod proto;
 pub mod redis_keys;
 pub mod server_settings;
