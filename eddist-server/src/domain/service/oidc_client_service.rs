@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use base64::Engine;
-use chacha20poly1305::{KeyInit, aead::Aead};
+use eddist_core::symmetric;
 use openidconnect::{ClientId, ClientSecret, IssuerUrl, core::CoreProviderMetadata};
 
 use crate::{
@@ -62,57 +61,19 @@ impl<T: IdpRepository + Clone> OidcClientService<T> {
 }
 
 fn decrypt_client_secret(b64_secret: &str) -> String {
-    let key = std::env::var("TINKER_SECRET").unwrap();
-    let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
-
-    let secret = base64::engine::general_purpose::STANDARD
-        .decode(b64_secret)
-        .unwrap();
-
-    let secret = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(&key),
-    )
-    .decrypt(
-        chacha20poly1305::Nonce::from_slice(&[0; 12]),
-        chacha20poly1305::aead::Payload {
-            msg: &secret,
-            aad: b"",
-        },
-    )
-    .unwrap();
-
-    std::str::from_utf8(&secret).unwrap().to_string()
+    symmetric::decrypt(b64_secret).expect("failed to decrypt client_secret")
 }
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_decrypt_client_secret() {
-        // Set up the environment variable for the key
-        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
-
-        // Encrypt a sample secret
-        let key = std::env::var("TINKER_SECRET").unwrap();
-        let key = key.as_bytes().iter().take(32).copied().collect::<Vec<u8>>();
+    fn test_decrypt_client_secret_round_trip() {
+        unsafe {
+            std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")
+        };
         let secret = "my_secret_client_secret";
-        let cipher = chacha20poly1305::ChaCha20Poly1305::new(
-            md5::digest::generic_array::GenericArray::from_slice(&key),
-        );
-        let encrypted_secret = cipher
-            .encrypt(
-                chacha20poly1305::Nonce::from_slice(&[0; 12]),
-                chacha20poly1305::aead::Payload {
-                    msg: secret.as_bytes(),
-                    aad: b"",
-                },
-            )
-            .unwrap();
-        let b64_encrypted_secret =
-            base64::engine::general_purpose::STANDARD.encode(&encrypted_secret);
-
-        // Decrypt the secret and verify it matches the original
-        let decrypted_secret = decrypt_client_secret(&b64_encrypted_secret);
-        assert_eq!(decrypted_secret, secret);
+        let encrypted = symmetric::encrypt(secret);
+        assert_eq!(decrypt_client_secret(&encrypted), secret);
     }
 }

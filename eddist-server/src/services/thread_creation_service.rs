@@ -38,7 +38,7 @@ use crate::{
 use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
-    BbsCgiService,
+    BbsCgiService, openai_moderation_service,
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
@@ -201,6 +201,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             board_id: board.id,
             metadent: res.metadent_type(),
             client_info,
+            moderation_result: None,
         };
 
         let res_span_svc = ResCreationSpanManagementService::new(
@@ -229,7 +230,19 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
 
         let db_result = bbs_repo.create_thread(creating_th).await;
         if db_result.is_ok() && is_thread_pub_enabled() {
-            let _ = event_repo.publish_thread_created(creating_th_clone).await;
+            tokio::spawn(async move {
+                let moderation_result =
+                    if get_server_setting_bool(ServerSettingKey::AiModerationOnThread).await {
+                        let text =
+                            format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
+                        openai_moderation_service::moderate(&text).await
+                    } else {
+                        None
+                    };
+                let mut creating_th_clone = creating_th_clone;
+                creating_th_clone.moderation_result = moderation_result;
+                let _ = event_repo.publish_thread_created(creating_th_clone).await;
+            });
         }
         db_result.map_err(|e| {
             if e.to_string() == "Given thread number is already exists" {

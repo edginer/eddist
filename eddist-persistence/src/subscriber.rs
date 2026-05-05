@@ -1,10 +1,10 @@
-use std::env;
+use std::{env, sync::Arc};
 
 use eddist_core::{
     domain::pubsub_repository::{
-        AuthTokenRevoked, AuthTokenSucceeded, CHANNEL_AUTH_TOKEN_REVOKED,
-        CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, PubSubItem,
+        CHANNEL_AUTH_TOKEN_REVOKED, CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, PubSubItem,
     },
+    proto::{decode_auth_token_revoked, decode_auth_token_succeeded},
     redis_keys::DB_FAILED_CACHE_RES_KEY,
 };
 use futures::StreamExt;
@@ -18,7 +18,7 @@ pub struct RedisSubRepository {
     pubsub_conn: redis::aio::PubSub,
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
-    s3_bucket: Option<std::sync::Arc<s3::Bucket>>,
+    s3_bucket: Option<Arc<s3::Bucket>>,
     db_pool: Option<sqlx::MySqlPool>,
 }
 
@@ -27,7 +27,7 @@ impl RedisSubRepository {
         pubsub_conn: redis::aio::PubSub,
         conn: redis::aio::ConnectionManager,
         cancel: tokio::sync::broadcast::Receiver<()>,
-        s3_bucket: Option<std::sync::Arc<s3::Bucket>>,
+        s3_bucket: Option<Arc<s3::Bucket>>,
         db_pool: Option<sqlx::MySqlPool>,
     ) -> Self {
         Self {
@@ -44,20 +44,21 @@ pub trait SubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error>;
 }
 
+async fn reconnect_pubsub(redis_url: &str) -> anyhow::Result<redis::aio::PubSub> {
+    let client = redis::Client::open(redis_url)?;
+    Ok(client.get_async_pubsub().await?)
+}
+
 impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         let mut error_count = 0u32;
         let redis_url = env::var("REDIS_URL").unwrap();
         let backup_enabled = self.s3_bucket.is_some();
-        let channels: Vec<&str> = if backup_enabled {
-            vec![
-                CHANNEL_PUBSUB_ITEM,
-                CHANNEL_AUTH_TOKEN_SUCCEEDED,
-                CHANNEL_AUTH_TOKEN_REVOKED,
-            ]
-        } else {
-            vec![CHANNEL_PUBSUB_ITEM]
-        };
+        let mut channels: Vec<&str> = vec![CHANNEL_PUBSUB_ITEM];
+        if backup_enabled {
+            channels.push(CHANNEL_AUTH_TOKEN_SUCCEEDED);
+            channels.push(CHANNEL_AUTH_TOKEN_REVOKED);
+        }
 
         loop {
             let subscribe_result = self.pubsub_conn.subscribe(channels.as_slice()).await;
@@ -68,76 +69,46 @@ impl SubRepository for RedisSubRepository {
                     "Failed to subscribe to Redis pubsub"
                 );
 
-                // Apply exponential backoff
                 let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
                 error!(seconds = backoff_secs, "Backing off before retry");
                 sleep(std::time::Duration::from_secs(backoff_secs)).await;
                 error_count = error_count.saturating_add(1);
 
-                // Attempt to reconnect
-                match redis::Client::open(redis_url.clone()) {
-                    Ok(client) => match client.get_async_pubsub().await {
-                        Ok(new_pubsub) => {
-                            self.pubsub_conn = new_pubsub;
-                            info!("Successfully reconnected to Redis pubsub");
-                            continue;
-                        }
-                        Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                "Failed to get pubsub connection"
-                            );
-                            continue;
-                        }
-                    },
+                match reconnect_pubsub(&redis_url).await {
+                    Ok(new_pubsub) => {
+                        self.pubsub_conn = new_pubsub;
+                        info!("Successfully reconnected to Redis pubsub");
+                    }
                     Err(e) => {
-                        error!(
-                            error = e.to_string().as_str(),
-                            "Failed to create Redis client"
-                        );
-                        continue;
+                        error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
                     }
                 }
+                continue;
             }
 
             info!("Application starts subscribing to pubsub channel");
-            error_count = 0; // Reset error count on successful subscription
+            error_count = 0;
 
             let subscribe_result = self.handle_messages().await;
 
             match subscribe_result {
                 Ok(true) => {
-                    // Normal shutdown requested
                     break;
                 }
                 Ok(false) => {
-                    // Connection lost, will retry
                     error!("Redis pubsub connection lost, attempting to reconnect");
                     error_count = error_count.saturating_add(1);
 
-                    // Apply exponential backoff before reconnecting
                     let backoff_secs = std::cmp::min(2u64.pow(error_count), 60);
                     sleep(std::time::Duration::from_secs(backoff_secs)).await;
 
-                    // Recreate pubsub connection
-                    match redis::Client::open(redis_url.clone()) {
-                        Ok(client) => match client.get_async_pubsub().await {
-                            Ok(new_pubsub) => {
-                                self.pubsub_conn = new_pubsub;
-                                info!("Successfully reconnected to Redis pubsub");
-                            }
-                            Err(e) => {
-                                error!(
-                                    error = e.to_string().as_str(),
-                                    "Failed to get pubsub connection"
-                                );
-                            }
-                        },
+                    match reconnect_pubsub(&redis_url).await {
+                        Ok(new_pubsub) => {
+                            self.pubsub_conn = new_pubsub;
+                            info!("Successfully reconnected to Redis pubsub");
+                        }
                         Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                "Failed to create Redis client"
-                            );
+                            error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
                         }
                     }
                 }
@@ -158,43 +129,39 @@ impl SubRepository for RedisSubRepository {
 }
 
 impl RedisSubRepository {
-    /// Handle incoming messages. Returns Ok(true) for shutdown, Ok(false) for connection lost.
+    /// Returns Ok(true) for shutdown, Ok(false) for connection lost.
     async fn handle_messages(&mut self) -> Result<bool, anyhow::Error> {
         loop {
             let mut on_message = self.pubsub_conn.on_message();
             let msg = select! {
                 _ = self.cancel.recv() => {
-                    return Ok(true); // Shutdown requested
+                    return Ok(true);
                 }
                 msg = on_message.next() => msg,
             };
 
             let Some(msg) = msg else {
-                // Stream ended, connection likely lost
                 error!("Pubsub message stream ended");
                 return Ok(false);
             };
 
             let channel = msg.get_channel::<String>().unwrap_or_default();
 
-            info!(
-                payload = msg.get_payload::<String>().unwrap_or_default().as_str(),
-                "received pubsub message"
-            );
-
-            let payload = match msg.get_payload::<String>() {
-                Ok(p) => p,
-                Err(e) => {
-                    error!(
-                        error = e.to_string().as_str(),
-                        "Failed to get message payload"
-                    );
-                    continue;
-                }
-            };
-
             match channel.as_str() {
                 ch if ch == CHANNEL_PUBSUB_ITEM => {
+                    let payload = match msg.get_payload::<String>() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to get message payload"
+                            );
+                            continue;
+                        }
+                    };
+
+                    info!(payload = payload.as_str(), "received pubsub message");
+
                     let item = match serde_json::from_str::<PubSubItem>(&payload) {
                         Ok(i) => i,
                         Err(e) => {
@@ -219,21 +186,32 @@ impl RedisSubRepository {
                                     error = e.to_string().as_str(),
                                     "Failed to push to Redis cache"
                                 );
-                                return Ok(false); // Connection likely lost
+                                return Ok(false);
                             }
                         }
                         PubSubItem::Shutdown => {
-                            return Ok(true); // Shutdown requested
+                            return Ok(true);
                         }
                     }
                 }
                 ch if ch == CHANNEL_AUTH_TOKEN_SUCCEEDED => {
-                    let event = match serde_json::from_str::<AuthTokenSucceeded>(&payload) {
+                    let payload = match msg.get_payload::<Vec<u8>>() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to get message payload"
+                            );
+                            continue;
+                        }
+                    };
+
+                    let event = match decode_auth_token_succeeded(&payload) {
                         Ok(e) => e,
                         Err(e) => {
                             error!(
                                 error = e.to_string().as_str(),
-                                "Failed to parse AuthTokenSucceeded"
+                                "Failed to decode AuthTokenSucceeded"
                             );
                             continue;
                         }
@@ -252,12 +230,23 @@ impl RedisSubRepository {
                     }
                 }
                 ch if ch == CHANNEL_AUTH_TOKEN_REVOKED => {
-                    let event = match serde_json::from_str::<AuthTokenRevoked>(&payload) {
+                    let payload = match msg.get_payload::<Vec<u8>>() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to get message payload"
+                            );
+                            continue;
+                        }
+                    };
+
+                    let event = match decode_auth_token_revoked(&payload) {
                         Ok(e) => e,
                         Err(e) => {
                             error!(
                                 error = e.to_string().as_str(),
-                                "Failed to parse AuthTokenRevoked"
+                                "Failed to decode AuthTokenRevoked"
                             );
                             continue;
                         }

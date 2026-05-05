@@ -1,4 +1,5 @@
 use chrono::Utc;
+use eddist_core::{server_settings::KEY_AI_OPENAI_API_KEY, symmetric};
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -39,12 +40,29 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         .fetch_all(&self.0)
         .await?;
 
+        let settings = settings
+            .into_iter()
+            .map(|mut s| {
+                if s.setting_key == KEY_AI_OPENAI_API_KEY && !s.value.is_empty() {
+                    s.value = "***".to_string();
+                }
+                s
+            })
+            .collect();
+
         Ok(settings)
     }
 
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting> {
         let id = Uuid::now_v7();
         let now = Utc::now().naive_utc();
+
+        let should_encrypt = input.setting_key == KEY_AI_OPENAI_API_KEY;
+        let value = if should_encrypt {
+            symmetric::encrypt(&input.value)
+        } else {
+            input.value.clone()
+        };
 
         query!(
             r#"
@@ -57,7 +75,7 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
             "#,
             id,
             input.setting_key,
-            input.value,
+            value,
             input.description,
             now,
             now
@@ -82,6 +100,13 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         )
         .fetch_one(&self.0)
         .await?;
+
+        if setting.setting_key == KEY_AI_OPENAI_API_KEY && !setting.value.is_empty() {
+            return Ok(ServerSetting {
+                value: "***".to_string(),
+                ..setting
+            });
+        }
 
         Ok(setting)
     }

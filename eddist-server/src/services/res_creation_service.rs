@@ -46,7 +46,7 @@ use crate::{
 use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
-    BbsCgiService,
+    BbsCgiService, openai_moderation_service,
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 
@@ -321,6 +321,7 @@ impl<
             client_info,
             res_order: order as i32,
             is_sage: res.is_sage(),
+            moderation_result: None,
         };
 
         let event_repo = self.4.clone();
@@ -337,6 +338,14 @@ impl<
             }
 
             if is_res_pub_enabled() {
+                let moderation_result =
+                    if get_server_setting_bool(ServerSettingKey::AiModerationOnRes).await {
+                        openai_moderation_service::moderate(&cres.body).await
+                    } else {
+                        None
+                    };
+                let mut cres = cres;
+                cres.moderation_result = moderation_result;
                 let _ = event_repo.publish_res_created(cres).await;
             }
 

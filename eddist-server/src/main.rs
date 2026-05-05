@@ -208,6 +208,18 @@ async fn main() -> anyhow::Result<()> {
         "dat_retrieval",
         "dat file retrieval count by source (cache or db)"
     );
+    describe_counter!(
+        "openai_moderation_requests",
+        "OpenAI moderation request count by result (success/error)"
+    );
+    describe_counter!(
+        "openai_moderation_api_calls",
+        "individual HTTP calls to OpenAI moderation API including retries"
+    );
+    describe_counter!(
+        "openai_moderation_retries",
+        "OpenAI moderation retry count (excludes first attempt)"
+    );
 
     let app = create_app(app_state, conn_mgr);
 
