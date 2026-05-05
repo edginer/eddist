@@ -1,8 +1,8 @@
 use std::{env, str::FromStr, time::Duration};
 
-use chrono::{TimeDelta, Timelike, Utc};
+use chrono::{TimeDelta, TimeZone, Timelike, Utc};
 use cron::Schedule;
-use eddist_core::{tracing::init_tracing, utils::is_prod};
+use eddist_core::{domain::res::get_1001_sjis_bytes, tracing::init_tracing, utils::is_prod};
 use s3::{Bucket, creds::Credentials};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::time::sleep;
@@ -157,7 +157,7 @@ async fn main() {
                     .get_threads_with_archive_converted(&board.board_key, true)
                     .await
                     .unwrap();
-                for (_, _, id) in threads {
+                for (_, _, id, _) in threads {
                     repo.archive_thread_and_responses(id).await.unwrap();
                 }
             }
@@ -188,7 +188,7 @@ async fn main() {
                     .await
                     .unwrap();
 
-                for (title, thread_number, id) in threads {
+                for (title, thread_number, id, last_modified_at) in threads {
                     let mut admin_dat = Vec::new();
                     let mut dat = Vec::new();
 
@@ -217,6 +217,18 @@ async fn main() {
 
                         dat.append(&mut res.get_inner());
                         admin_dat.append(&mut admin_res.get_inner());
+                    }
+
+                    if board.enable_1001_message {
+                        let last_modified_utc = Utc.from_utc_datetime(&last_modified_at);
+                        let bytes_1001 = get_1001_sjis_bytes(
+                            thread_number as i64,
+                            last_modified_utc,
+                            board.custom_1001_message.as_deref(),
+                        )
+                        .get_inner();
+                        dat.extend_from_slice(&bytes_1001);
+                        admin_dat.extend_from_slice(&bytes_1001);
                     }
 
                     // TODO: sjis to utf-8 workarounds for now

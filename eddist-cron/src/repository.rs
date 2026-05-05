@@ -22,7 +22,9 @@ impl Repository {
                 b.board_key AS board_key,
                 b.default_name AS default_name,
                 bi.threads_archive_cron AS threads_archive_cron,
-                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count
+                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,
+                bi.enable_1001_message AS "enable_1001_message: bool",
+                bi.custom_1001_message AS custom_1001_message
             FROM
                 boards AS b
             JOIN
@@ -75,11 +77,12 @@ impl Repository {
         &self,
         board_key: &str,
         is_archive_converted: bool,
-    ) -> anyhow::Result<Vec<(String, u64, Uuid)>> {
+    ) -> anyhow::Result<Vec<(String, u64, Uuid, chrono::NaiveDateTime)>> {
         struct Thread {
             title: String,
             thread_number: i64,
             id: Uuid,
+            last_modified_at: chrono::NaiveDateTime,
         }
 
         let threads = sqlx::query_as!(
@@ -88,7 +91,8 @@ impl Repository {
             SELECT
                 title,
                 thread_number,
-                id AS "id: Uuid"
+                id AS "id: Uuid",
+                last_modified_at
             FROM
                 threads
             WHERE
@@ -107,7 +111,7 @@ impl Repository {
         .await?;
         Ok(threads
             .into_iter()
-            .map(|t| (t.title, t.thread_number as u64, t.id))
+            .map(|t| (t.title, t.thread_number as u64, t.id, t.last_modified_at))
             .collect())
     }
 
@@ -373,4 +377,6 @@ pub struct SelectionBoardInfo {
     pub default_name: String,
     pub threads_archive_cron: Option<String>,
     pub threads_archive_trigger_thread_count: Option<i32>,
+    pub enable_1001_message: bool,
+    pub custom_1001_message: Option<String>,
 }

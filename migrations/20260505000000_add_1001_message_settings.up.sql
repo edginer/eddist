@@ -1,0 +1,3 @@
+ALTER TABLE boards_info
+    ADD COLUMN enable_1001_message BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN custom_1001_message TEXT DEFAULT NULL;

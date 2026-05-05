@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            local_rules,\n            base_thread_creation_span_sec,\n            base_response_creation_span_sec,\n            max_thread_name_byte_length,\n            max_author_name_byte_length,\n            max_email_byte_length,\n            max_response_body_byte_length,\n            max_response_body_lines,\n            threads_archive_cron,\n            threads_archive_trigger_thread_count,\n            created_at,\n            updated_at,\n            read_only AS \"read_only: bool\",\n            force_metadent_type\n        FROM boards_info\n        WHERE id = ?\n        ",
+  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            local_rules,\n            base_thread_creation_span_sec,\n            base_response_creation_span_sec,\n            max_thread_name_byte_length,\n            max_author_name_byte_length,\n            max_email_byte_length,\n            max_response_body_byte_length,\n            max_response_body_lines,\n            threads_archive_cron,\n            threads_archive_trigger_thread_count,\n            created_at,\n            updated_at,\n            read_only AS \"read_only: bool\",\n            force_metadent_type,\n            enable_1001_message AS \"enable_1001_message: bool\",\n            custom_1001_message\n        FROM boards_info\n        WHERE id = ?\n        ",
   "describe": {
     "columns": [
       {
@@ -137,6 +137,24 @@
           "flags": "",
           "max_size": 40
         }
+      },
+      {
+        "ordinal": 15,
+        "name": "enable_1001_message: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "custom_1001_message",
+        "type_info": {
+          "type": "Blob",
+          "flags": "BLOB",
+          "max_size": 262140
+        }
       }
     ],
     "parameters": {
@@ -157,8 +175,10 @@
       false,
       false,
       false,
+      true,
+      false,
       true
     ]
   },
-  "hash": "f1e188a32ee1ad0059fa92603e89361e3b77e7e5f7004fe0d501faf573f93429"
+  "hash": "f87c10e6cfc04e92e368886e42f1a70e76a3025c8b297774a34e4a909bed4f8d"
 }

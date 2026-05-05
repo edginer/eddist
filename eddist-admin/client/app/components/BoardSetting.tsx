@@ -48,6 +48,11 @@ const boardThreadsArchiveSettingSchema = z.object({
     .optional(),
 });
 
+const boardThreadStopperSettingSchema = z.object({
+  enable_1001_message: z.boolean(),
+  custom_1001_message: z.string().optional().nullable(),
+});
+
 const SettingField: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <div className="flex flex-col mb-2">{children}</div>;
 };
@@ -332,6 +337,63 @@ const ThreadsArchiveSetting: React.FC<{
   );
 };
 
+const ThreadStopperSetting: React.FC<{
+  board: Board;
+  boardInfo: BoardInfo;
+  refetch: () => Promise<void>;
+}> = ({ board, boardInfo, refetch }) => {
+  const { register, handleSubmit, watch } = useForm<
+    z.infer<typeof boardThreadStopperSettingSchema>
+  >({
+    resolver: zodResolver(boardThreadStopperSettingSchema),
+    defaultValues: {
+      enable_1001_message: boardInfo.enable_1001_message,
+      custom_1001_message: boardInfo.custom_1001_message ?? "",
+    },
+  });
+
+  const updateBoardMutation = useUpdateBoard();
+  const enableChecked = watch("enable_1001_message");
+
+  return (
+    <form
+      onSubmit={handleSubmit((data) => {
+        updateBoardMutation.mutate(
+          {
+            params: { path: { board_key: board.board_key } },
+            body: {
+              enable_1001_message: data.enable_1001_message,
+              custom_1001_message: data.custom_1001_message || "",
+            },
+          },
+          { onSuccess: () => refetch() },
+        );
+      })}
+    >
+      <h2 className="text-2xl font-semibold text-gray-700 mb-4">Thread Stopper Setting</h2>
+      <SettingField>
+        <Label>Enable 1001 Message</Label>
+        <Checkbox className="mt-1" {...register("enable_1001_message")} />
+        <HelperText>Show the 1001 stopper message at the bottom of full threads</HelperText>
+      </SettingField>
+      <SettingField>
+        <Label>Custom Message Body</Label>
+        <Textarea
+          {...register("custom_1001_message")}
+          disabled={!enableChecked}
+          className="mt-1"
+          rows={4}
+          placeholder="Leave empty to use the default Japanese message with life time"
+        />
+        <HelperText>
+          Replaces the default body text. Leave blank for the default message.
+        </HelperText>
+      </SettingField>
+      <Button type="submit">Update</Button>
+    </form>
+  );
+};
+
 const BoardSetting = ({
   board,
   refetchBoard,
@@ -361,6 +423,8 @@ const BoardSetting = ({
       <PostRestrictionSetting board={board} boardInfo={boardInfo} refetch={refetch} />
       <hr className="bg-gray-500 border-0 h-px my-4" />
       <ThreadsArchiveSetting board={board} boardInfo={boardInfo} refetch={refetch} />
+      <hr className="bg-gray-500 border-0 h-px my-4" />
+      <ThreadStopperSetting board={board} boardInfo={boardInfo} refetch={refetch} />
     </div>
   );
 };

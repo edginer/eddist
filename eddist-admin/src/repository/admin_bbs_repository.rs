@@ -28,6 +28,8 @@ pub struct SelectionBoardInfo {
     pub threads_archive_cron: Option<String>,
     pub read_only: bool,
     pub force_metadent_type: Option<String>,
+    pub enable_1001_message: bool,
+    pub custom_1001_message: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
