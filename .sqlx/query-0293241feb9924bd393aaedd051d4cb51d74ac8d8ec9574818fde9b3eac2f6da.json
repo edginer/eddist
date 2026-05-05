@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                title,\n                thread_number,\n                id AS \"id: Uuid\"\n            FROM\n                threads\n            WHERE\n                board_id = (SELECT id FROM boards WHERE board_key = ?)\n            AND\n                active = 0\n            AND\n                archived = 1\n            AND\n                archive_converted = ?\n            ",
+  "query": "\n            SELECT\n                title,\n                thread_number,\n                id AS \"id: Uuid\",\n                last_modified_at\n            FROM\n                threads\n            WHERE\n                board_id = (SELECT id FROM boards WHERE board_key = ?)\n            AND\n                active = 0\n            AND\n                archived = 1\n            AND\n                archive_converted = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -29,6 +29,15 @@
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
           "max_size": 16
         }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_modified_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
       }
     ],
     "parameters": {
@@ -37,8 +46,9 @@
     "nullable": [
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "bf451f5cb4d22df8445a9943c49cc9bf7096fc695d20505f7a89d58eebee2105"
+  "hash": "0293241feb9924bd393aaedd051d4cb51d74ac8d8ec9574818fde9b3eac2f6da"
 }
