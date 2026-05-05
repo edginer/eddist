@@ -635,6 +635,8 @@ export interface components {
         BoardInfo: {
             base_response_creation_span_sec: number;
             base_thread_creation_span_sec: number;
+            custom_1001_message?: string | null;
+            enable_1001_message: boolean;
             force_metadent_type?: string | null;
             local_rules: string;
             max_author_name_byte_length: number;
@@ -778,7 +780,9 @@ export interface components {
         EditBoardInput: {
             base_response_creation_span_sec?: number | null;
             base_thread_creation_span_sec?: number | null;
+            custom_1001_message?: string | null;
             default_name?: string | null;
+            enable_1001_message?: boolean | null;
             force_metadent_type?: string | null;
             local_rule?: string | null;
             max_author_name_byte_length?: number | null;

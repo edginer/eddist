@@ -25,6 +25,8 @@ pub struct BoardInfo {
     pub threads_archive_trigger_thread_count: Option<usize>,
     pub read_only: bool,
     pub force_metadent_type: Option<String>,
+    pub enable_1001_message: bool,
+    pub custom_1001_message: Option<String>,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
@@ -61,4 +63,6 @@ pub struct EditBoardInput {
     pub threads_archive_trigger_thread_count: Option<usize>,
     pub read_only: Option<bool>,
     pub force_metadent_type: Option<String>,
+    pub enable_1001_message: Option<bool>,
+    pub custom_1001_message: Option<String>,
 }

@@ -2408,7 +2408,8 @@
           "max_email_byte_length",
           "max_response_body_byte_length",
           "max_response_body_lines",
-          "read_only"
+          "read_only",
+          "enable_1001_message"
         ],
         "properties": {
           "base_response_creation_span_sec": {
@@ -2418,6 +2419,15 @@
           "base_thread_creation_span_sec": {
             "type": "integer",
             "minimum": 0
+          },
+          "custom_1001_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enable_1001_message": {
+            "type": "boolean"
           },
           "force_metadent_type": {
             "type": [
@@ -3012,9 +3022,21 @@
             ],
             "minimum": 0
           },
+          "custom_1001_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "default_name": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "enable_1001_message": {
+            "type": [
+              "boolean",
               "null"
             ]
           },

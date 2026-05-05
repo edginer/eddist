@@ -155,7 +155,9 @@ impl BbsRepository for BbsRepositoryImpl {
             created_at,
             updated_at,
             read_only AS "read_only: bool",
-            force_metadent_type
+            force_metadent_type,
+            enable_1001_message AS "enable_1001_message: bool",
+            custom_1001_message
         FROM boards_info
         WHERE id = ?
         "#,

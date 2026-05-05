@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 use crate::utils::to_ja_datetime;
@@ -57,6 +57,35 @@ pub fn get_sjis_bytes(
             .as_str(),
         )
     }
+}
+
+pub fn get_1001_sjis_bytes(
+    thread_number: i64,
+    last_modified_at: DateTime<Utc>,
+    custom_message: Option<&str>,
+) -> SJisStr {
+    let body = match custom_message {
+        Some(msg) => msg.to_string(),
+        None => {
+            let created_at = Utc
+                .timestamp_opt(thread_number, 0)
+                .single()
+                .unwrap_or(last_modified_at);
+            let total_secs = last_modified_at
+                .signed_duration_since(created_at)
+                .num_seconds()
+                .max(0);
+            let days = total_secs / 86400;
+            let hours = (total_secs % 86400) / 3600;
+            let minutes = (total_secs % 3600) / 60;
+            let seconds = total_secs % 60;
+            format!(
+                "このスレッドは1000を超えました。<br>新しいスレッドを立ててください。<br><br>life time: {}日{}時間{}分{}秒",
+                days, hours, minutes, seconds
+            )
+        }
+    };
+    SJisStr::from(format!("1001<><>Over 1000 Thread<>{}<>\n", body).as_str())
 }
 
 impl ResView {
