@@ -1,7 +1,7 @@
 use core::str;
 
+use aws_sdk_s3::{Client, primitives::ByteStream};
 use eddist_core::domain::sjis_str::SJisStr;
-use s3::Bucket;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -41,11 +41,14 @@ pub struct ArchivedResUpdate {
 }
 
 #[derive(Debug, Clone)]
-pub struct AdminArchiveRepositoryImpl(Bucket);
+pub struct AdminArchiveRepositoryImpl {
+    client: Client,
+    bucket: String,
+}
 
 impl AdminArchiveRepositoryImpl {
-    pub fn new(bucket: Bucket) -> Self {
-        Self(bucket)
+    pub fn new(client: Client, bucket: String) -> Self {
+        Self { client, bucket }
     }
 }
 
@@ -90,12 +93,15 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<ArchivedThread> {
-        let dat_file = self
-            .0
-            .get_object(format!("{board_key}/dat/{thread_number}.dat"))
+        let output = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(format!("{board_key}/dat/{thread_number}.dat"))
+            .send()
             .await?;
 
-        let dat_bytes = dat_file.to_vec();
+        let dat_bytes = output.body.collect().await?.into_bytes().to_vec();
 
         let utf8_str = if let Ok(dat_bytes) = str::from_utf8(&dat_bytes) {
             dat_bytes.to_string()
@@ -113,12 +119,15 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<ArchivedAdminThread> {
-        let dat_file = self
-            .0
-            .get_object(format!("{board_key}/admin/{thread_number}.dat"))
+        let output = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(format!("{board_key}/admin/{thread_number}.dat"))
+            .send()
             .await?;
 
-        let dat_bytes = dat_file.to_vec();
+        let dat_bytes = output.body.collect().await?.into_bytes().to_vec();
 
         let utf8_str = if let Ok(dat_bytes) = str::from_utf8(&dat_bytes) {
             dat_bytes.to_string()
@@ -156,8 +165,12 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
 
         let dat = convert_reses_to_dat_file(a_thread.responses, &a_thread.title);
 
-        self.0
-            .put_object(format!("{board_key}/dat/{thread_number}.dat"), &dat)
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(format!("{board_key}/dat/{thread_number}.dat"))
+            .body(ByteStream::from(dat))
+            .send()
             .await?;
 
         Ok(())
@@ -182,8 +195,12 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
 
         let dat = convert_reses_to_dat_file(a_thread.responses, &a_thread.title);
 
-        self.0
-            .put_object(format!("{board_key}/dat/{thread_number}.dat"), &dat)
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(format!("{board_key}/dat/{thread_number}.dat"))
+            .body(ByteStream::from(dat))
+            .send()
             .await?;
 
         Ok(())
@@ -192,9 +209,28 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
     async fn delete_thread(&self, board_key: &str, thread_number: u64) -> anyhow::Result<()> {
         let src = format!("{board_key}/dat/{thread_number}.dat");
         let dst = format!("{src}.deleted");
-        if let Ok(data) = self.0.get_object(&src).await {
-            self.0.put_object(&dst, &data.to_vec()).await?;
-            self.0.delete_object(&src).await?;
+        let get_result = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(&src)
+            .send()
+            .await;
+        if let Ok(output) = get_result {
+            let data = output.body.collect().await?.into_bytes();
+            self.client
+                .put_object()
+                .bucket(&self.bucket)
+                .key(&dst)
+                .body(ByteStream::from(data))
+                .send()
+                .await?;
+            self.client
+                .delete_object()
+                .bucket(&self.bucket)
+                .key(&src)
+                .send()
+                .await?;
         }
 
         Ok(())

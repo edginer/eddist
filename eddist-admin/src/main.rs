@@ -4,6 +4,10 @@ use auth::{
     auth_simple_header, get_check_auth, get_login, get_login_callback, get_logout,
     post_native_session,
 };
+use aws_sdk_s3::{
+    Client as S3Client, Config as S3Config,
+    config::{Credentials, Region},
+};
 use axum::{
     Router, ServiceExt,
     body::Body,
@@ -28,7 +32,6 @@ use repository::{
     terms_repository::TermsRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
-use s3::creds::Credentials;
 use time::Duration;
 use tokio::net::TcpListener;
 use tower_layer::Layer;
@@ -207,21 +210,22 @@ async fn main() {
         .await
         .unwrap();
 
-    let s3_client = s3::bucket::Bucket::new(
-        env::var("S3_BUCKET_NAME").unwrap().trim(),
-        s3::Region::R2 {
-            account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
-        },
-        Credentials::new(
-            Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
-            Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
-            None,
-            None,
-            None,
-        )
-        .unwrap(),
-    )
-    .unwrap();
+    let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
+    let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
+    let s3_endpoint = format!("https://{}.r2.cloudflarestorage.com", r2_account_id.trim());
+    let s3_creds = Credentials::new(
+        env::var("S3_ACCESS_KEY").unwrap().trim(),
+        env::var("S3_ACCESS_SECRET_KEY").unwrap().trim(),
+        None,
+        None,
+        "custom",
+    );
+    let s3_config = S3Config::builder()
+        .credentials_provider(s3_creds)
+        .region(Region::new("auto"))
+        .endpoint_url(s3_endpoint)
+        .build();
+    let s3_client = S3Client::from_conf(s3_config);
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
@@ -243,7 +247,7 @@ async fn main() {
             .get_connection_manager()
             .await
             .unwrap(),
-        admin_archive_repo: Arc::new(AdminArchiveRepositoryImpl::new(*s3_client)),
+        admin_archive_repo: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
         authed_token_repo: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
         cap_repo: Arc::new(CapRepositoryImpl::new(pool.clone())),
         user_repo: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
