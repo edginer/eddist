@@ -91,6 +91,10 @@ rust-s3 = { version = "0.37.1", default-features = false, features = [
     "tags",
     "fail-on-err",
 ] }
+aws-sdk-s3 = { version = "1", default-features = false, features = [
+    "rt-tokio",
+    "rustls",
+] }
 
 # Observability
 tracing = "0.1.44"

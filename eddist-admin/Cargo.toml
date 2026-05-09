@@ -29,6 +29,6 @@ redis = { workspace = true, features = ["connection-manager"] }
 eddist-core.workspace = true
 utoipa.workspace = true
 tower-layer.workspace = true
-rust-s3.workspace = true
+aws-sdk-s3.workspace = true
 encoding_rs.workspace = true
 thiserror.workspace = true
