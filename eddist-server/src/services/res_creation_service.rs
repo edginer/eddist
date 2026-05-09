@@ -264,7 +264,7 @@ impl<
         {
             // Get the actual wait time considering all restrictions (1-hour restriction, penalties, etc.)
             let wait_time = res_span_svc
-                .get_actual_wait_time_for_authed_token(&authed_token.reduced_ip.to_string())
+                .get_actual_wait_time_for_auth_ip(&authed_token.reduced_ip.to_string())
                 .await;
 
             return Err(BbsCgiError::ResCreationSpanRestriction {
