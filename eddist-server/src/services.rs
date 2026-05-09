@@ -1,4 +1,5 @@
 use auth_with_code_service::AuthWithCodeService;
+use aws_sdk_s3::Client;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
@@ -7,7 +8,6 @@ use metadent_thread_list_service::MetadentThreadListService;
 use reauth_service::ReAuthService;
 use redis::aio::ConnectionManager;
 use res_creation_service::ResCreationService;
-use s3::Bucket;
 use thread_creation_service::TheradCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
@@ -119,7 +119,8 @@ impl<
         user_restriction_repo: R,
         redis_conn: ConnectionManager,
         pubsub: PubSubRepos<P, E>,
-        bucket: Bucket,
+        client: Client,
+        bucket_name: String,
     ) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
@@ -146,7 +147,7 @@ impl<
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
             thread_retrival: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
-            kako_thread_retrieval: KakoThreadRetrievalService::new(bucket),
+            kako_thread_retrieval: KakoThreadRetrievalService::new(client, bucket_name),
 
             user_reg_temp_url: UserRegTempUrlService::new(
                 idp_repo.clone(),

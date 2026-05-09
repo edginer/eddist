@@ -141,22 +141,22 @@ async fn main() -> anyhow::Result<()> {
 
     let template_engine = load_template_engine();
 
-    let s3_client = s3::bucket::Bucket::new(
-        env::var("S3_BUCKET_NAME").unwrap().trim(),
-        s3::Region::R2 {
-            account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
-        },
-        s3::creds::Credentials::new(
-            Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
-            Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
-            None,
-            None,
-            None,
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    s3::set_retries(0);
+    let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
+    let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
+    let s3_endpoint = format!("https://{}.r2.cloudflarestorage.com", r2_account_id.trim());
+    let s3_creds = aws_sdk_s3::config::Credentials::new(
+        env::var("S3_ACCESS_KEY").unwrap().trim(),
+        env::var("S3_ACCESS_SECRET_KEY").unwrap().trim(),
+        None,
+        None,
+        "custom",
+    );
+    let s3_config = aws_sdk_s3::Config::builder()
+        .credentials_provider(s3_creds)
+        .region(aws_sdk_s3::config::Region::new("auto"))
+        .endpoint_url(s3_endpoint)
+        .build();
+    let s3_client = aws_sdk_s3::Client::from_conf(s3_config);
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
@@ -176,7 +176,8 @@ async fn main() -> anyhow::Result<()> {
                 pub_repo,
                 event_repo,
             },
-            *s3_client,
+            s3_client,
+            s3_bucket_name,
         ),
         notice_repo,
         terms_repo,
