@@ -21,6 +21,7 @@ allowed-tools:
   - Bash(pnpm -F eddist-client-v2 check)
   - Bash(pnpm -F eddist-admin-client typecheck)
   - Bash(pnpm -F eddist-client-v2 typecheck)
+model: Haiku
 ---
 
 # Commit and Push Skill
@@ -50,7 +51,7 @@ cargo fmt
 
 This formats all Rust code in the workspace. Must succeed before continuing.
 
-## Step 3: Run SQLx prepare
+## Step 3: Run SQLx prepare (if there are any suspections of SQL query/schema changes)
 
 ```
 cargo sqlx prepare --workspace
@@ -59,7 +60,7 @@ cargo sqlx prepare --workspace
 This regenerates the `.sqlx/` offline query cache. Must succeed before continuing.
 If it fails due to no DATABASE_URL, note that to the user and skip this step.
 
-## Step 4: Run frontend format & lint (Biome)
+## Step 4: Run frontend format & lint using Biome (if any changes were made to frontend code)
 
 Run biome check with auto-fix for both frontend packages:
 
@@ -71,7 +72,7 @@ pnpm -F eddist-client-v2 check
 These run `biome check --write ./app` which formats and lints in one pass.
 Run both; if either has lint errors that cannot be auto-fixed, report them to the user and stop.
 
-## Step 4b: Run frontend TypeScript typechecks
+## Step 4b: Run frontend TypeScript typechecks (if any changes were made to frontend code)
 
 Run TypeScript typechecks for both frontend packages:
 
