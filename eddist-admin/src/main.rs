@@ -6,7 +6,7 @@ use auth::{
 };
 use aws_sdk_s3::{
     Client as S3Client, Config as S3Config,
-    config::{Credentials, Region},
+    config::{BehaviorVersion, Credentials, Region},
 };
 use axum::{
     Router, ServiceExt,
@@ -221,6 +221,7 @@ async fn main() {
         "custom",
     );
     let s3_config = S3Config::builder()
+        .behavior_version(BehaviorVersion::latest())
         .credentials_provider(s3_creds)
         .region(Region::new("auto"))
         .endpoint_url(s3_endpoint)

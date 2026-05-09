@@ -69,9 +69,7 @@ mod tests {
 
     #[test]
     fn test_decrypt_client_secret_round_trip() {
-        unsafe {
-            std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")
-        };
+        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
         let secret = "my_secret_client_secret";
         let encrypted = symmetric::encrypt(secret);
         assert_eq!(decrypt_client_secret(&encrypted), secret);

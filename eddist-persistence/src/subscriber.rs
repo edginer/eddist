@@ -80,7 +80,10 @@ impl SubRepository for RedisSubRepository {
                         info!("Successfully reconnected to Redis pubsub");
                     }
                     Err(e) => {
-                        error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
+                        error!(
+                            error = e.to_string().as_str(),
+                            "Failed to reconnect to Redis pubsub"
+                        );
                     }
                 }
                 continue;
@@ -108,7 +111,10 @@ impl SubRepository for RedisSubRepository {
                             info!("Successfully reconnected to Redis pubsub");
                         }
                         Err(e) => {
-                            error!(error = e.to_string().as_str(), "Failed to reconnect to Redis pubsub");
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to reconnect to Redis pubsub"
+                            );
                         }
                     }
                 }
