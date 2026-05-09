@@ -18,8 +18,7 @@ pub struct RedisSubRepository {
     pubsub_conn: redis::aio::PubSub,
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
-    s3_client: Option<aws_sdk_s3::Client>,
-    s3_bucket_name: Option<String>,
+    s3_bucket: Option<(aws_sdk_s3::Client, String)>,
     db_pool: Option<sqlx::MySqlPool>,
 }
 
@@ -36,8 +35,7 @@ impl RedisSubRepository {
             pubsub_conn,
             conn,
             cancel,
-            s3_client,
-            s3_bucket_name,
+            s3_bucket: s3_client.zip(s3_bucket_name),
             db_pool,
         }
     }
@@ -56,7 +54,7 @@ impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         let mut error_count = 0u32;
         let redis_url = env::var("REDIS_URL").unwrap();
-        let backup_enabled = self.s3_client.is_some();
+        let backup_enabled = self.s3_bucket.is_some();
         let mut channels: Vec<&str> = vec![CHANNEL_PUBSUB_ITEM];
         if backup_enabled {
             channels.push(CHANNEL_AUTH_TOKEN_SUCCEEDED);
@@ -226,11 +224,9 @@ impl RedisSubRepository {
                         }
                     };
                     let token_id = event.authed_token_id;
-                    if let (Some(pool), Some(client), Some(bucket_name)) = (
-                        self.db_pool.as_ref(),
-                        self.s3_client.as_ref(),
-                        self.s3_bucket_name.as_ref(),
-                    ) {
+                    if let (Some(pool), Some((client, bucket_name))) =
+                        (self.db_pool.as_ref(), self.s3_bucket.as_ref())
+                    {
                         let pool = pool.clone();
                         let client = client.clone();
                         let bucket_name = bucket_name.clone();
@@ -266,9 +262,7 @@ impl RedisSubRepository {
                         }
                     };
                     let token_id = event.authed_token_id;
-                    if let (Some(client), Some(bucket_name)) =
-                        (self.s3_client.as_ref(), self.s3_bucket_name.as_ref())
-                    {
+                    if let Some((client, bucket_name)) = self.s3_bucket.as_ref() {
                         let client = client.clone();
                         let bucket_name = bucket_name.clone();
                         tokio::spawn(async move {

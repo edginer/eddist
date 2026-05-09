@@ -495,16 +495,7 @@ async fn retry(
         retry_delay *= 2;
         match result {
             Ok(_) => {
-                if s3_client
-                    .head_object()
-                    .bucket(bucket_name)
-                    .key(&key)
-                    .send()
-                    .await
-                    .is_ok()
-                {
-                    is_err = false;
-                }
+                is_err = false;
             }
             Err(err) => log::error!(
                 "Failed to upload {}/{}.dat: {err:?}, retry count: {}",
