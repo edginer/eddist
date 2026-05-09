@@ -39,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
         let endpoint = format!("https://{}.r2.cloudflarestorage.com", account_id.trim());
         let creds = Credentials::new(access_key.trim(), secret_key.trim(), None, None, "custom");
         let config = aws_sdk_s3::Config::builder()
+            .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
             .credentials_provider(creds)
             .region(Region::new("auto"))
             .endpoint_url(endpoint)

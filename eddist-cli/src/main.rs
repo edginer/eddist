@@ -64,6 +64,7 @@ fn make_s3_client() -> Result<(Client, String)> {
         "custom",
     );
     let config = aws_sdk_s3::Config::builder()
+        .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
         .credentials_provider(creds)
         .region(Region::new("auto"))
         .endpoint_url(endpoint)

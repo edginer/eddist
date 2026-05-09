@@ -152,6 +152,7 @@ async fn main() -> anyhow::Result<()> {
         "custom",
     );
     let s3_config = aws_sdk_s3::Config::builder()
+        .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
         .credentials_provider(s3_creds)
         .region(aws_sdk_s3::config::Region::new("auto"))
         .endpoint_url(s3_endpoint)
