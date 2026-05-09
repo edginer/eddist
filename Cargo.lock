@@ -1787,7 +1787,6 @@ dependencies = [
  "oauth2",
  "redis",
  "reqwest",
- "rust-s3",
  "serde",
  "serde_json",
  "sqlx",
