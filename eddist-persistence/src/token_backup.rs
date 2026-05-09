@@ -1,9 +1,11 @@
+use aws_sdk_s3::{Client, primitives::ByteStream};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use uuid::Uuid;
 
 pub async fn backup_token(
     pool: &sqlx::MySqlPool,
-    bucket: &s3::Bucket,
+    client: &Client,
+    bucket_name: &str,
     token_id: Uuid,
 ) -> anyhow::Result<()> {
     let backup = sqlx::query_as!(
@@ -29,16 +31,27 @@ pub async fn backup_token(
     .await?;
 
     let bytes = serde_json::to_vec(&backup)?;
-    bucket
-        .put_object(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"), &bytes)
+    client
+        .put_object()
+        .bucket(bucket_name)
+        .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"))
+        .body(ByteStream::from(bytes))
+        .send()
         .await?;
 
     Ok(())
 }
 
-pub async fn remove_token_backup(bucket: &s3::Bucket, token_id: Uuid) -> anyhow::Result<()> {
-    bucket
-        .delete_object(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"))
+pub async fn remove_token_backup(
+    client: &Client,
+    bucket_name: &str,
+    token_id: Uuid,
+) -> anyhow::Result<()> {
+    client
+        .delete_object()
+        .bucket(bucket_name)
+        .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"))
+        .send()
         .await?;
     Ok(())
 }

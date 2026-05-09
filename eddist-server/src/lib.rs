@@ -86,15 +86,14 @@ pub fn create_test_app(
     };
     use crate::services::{AppServiceContainer, PubSubRepos};
 
-    // Create test S3 bucket (stub for testing)
-    let bucket = s3::Bucket::new(
-        "test-bucket",
-        s3::Region::R2 {
-            account_id: "test".to_string(),
-        },
-        s3::creds::Credentials::new(Some("test"), Some("test"), None, None, None).unwrap(),
-    )
-    .unwrap();
+    let s3_creds = aws_sdk_s3::config::Credentials::new("test", "test", None, None, "custom");
+    let s3_config = aws_sdk_s3::Config::builder()
+        .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
+        .credentials_provider(s3_creds)
+        .region(aws_sdk_s3::config::Region::new("auto"))
+        .endpoint_url("https://test.r2.cloudflarestorage.com")
+        .build();
+    let s3_client = aws_sdk_s3::Client::from_conf(s3_config);
 
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let pub_repo = RedisPubRepository::new(redis_conn.clone());
@@ -117,7 +116,8 @@ pub fn create_test_app(
                 pub_repo,
                 event_repo,
             },
-            *bucket,
+            s3_client,
+            "test-bucket".to_string(),
         ),
         notice_repo,
         terms_repo,

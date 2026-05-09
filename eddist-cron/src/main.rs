@@ -1,9 +1,15 @@
 use std::{env, str::FromStr, time::Duration};
 
+use aws_sdk_s3::{
+    Client,
+    config::{Credentials, Region},
+    error::SdkError,
+    operation::head_object::HeadObjectError,
+    primitives::ByteStream,
+};
 use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{tracing::init_tracing, utils::is_prod};
-use s3::{Bucket, creds::Credentials};
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::time::sleep;
 
@@ -166,21 +172,7 @@ async fn main() {
             // convert
             // - convert (to dat text file compressed by gzip and delete responses, and publish to S3 compatible storage)
             let boards = repo.get_all_boards_info().await.unwrap();
-            let s3_client = s3::bucket::Bucket::new(
-                env::var("S3_BUCKET_NAME").unwrap().trim(),
-                s3::Region::R2 {
-                    account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
-                },
-                Credentials::new(
-                    Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
-                    Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
-                    None,
-                    None,
-                    None,
-                )
-                .unwrap(),
-            )
-            .unwrap();
+            let (s3_client, s3_bucket_name) = make_s3_client();
 
             for board in boards {
                 let threads = repo
@@ -225,6 +217,7 @@ async fn main() {
 
                     if retry(
                         &s3_client,
+                        &s3_bucket_name,
                         &board.board_key,
                         thread_number,
                         admin_dat.as_bytes(),
@@ -243,6 +236,7 @@ async fn main() {
 
                     if retry(
                         &s3_client,
+                        &s3_bucket_name,
                         &board.board_key,
                         thread_number,
                         dat.as_bytes(),
@@ -283,21 +277,7 @@ async fn main() {
             // - convert (to dat text file compressed by gzip and delete responses, and publish to S3 compatible storage)
             //   with only threads that are not converted yet because of the previous error
             let boards = repo.get_all_boards_info().await.unwrap();
-            let s3_client = s3::bucket::Bucket::new(
-                env::var("S3_BUCKET_NAME").unwrap().trim(),
-                s3::Region::R2 {
-                    account_id: env::var("R2_ACCOUNT_ID").unwrap().trim().to_string(),
-                },
-                Credentials::new(
-                    Some(env::var("S3_ACCESS_KEY").unwrap().trim()),
-                    Some(env::var("S3_ACCESS_SECRET_KEY").unwrap().trim()),
-                    None,
-                    None,
-                    None,
-                )
-                .unwrap(),
-            )
-            .unwrap();
+            let (s3_client, s3_bucket_name) = make_s3_client();
 
             for board in boards {
                 let threads = repo
@@ -347,16 +327,17 @@ async fn main() {
                     let admin_dat = encoding_rs::SHIFT_JIS.decode(&admin_dat).0.into_owned();
                     let dat = encoding_rs::SHIFT_JIS.decode(&dat).0.into_owned();
 
-                    let admin_needs = if let Ok((_, code)) = s3_client
-                        .head_object(format!(
+                    let admin_needs = match s3_client
+                        .head_object()
+                        .bucket(&s3_bucket_name)
+                        .key(format!(
                             "{}/{}/{}.dat",
                             board.board_key, "admin", thread_number
                         ))
+                        .send()
                         .await
                     {
-                        if code == 404 {
-                            true
-                        } else {
+                        Ok(_) => {
                             log::info!(
                                 "admin.dat already exists: {}/{}",
                                 board.board_key,
@@ -364,8 +345,19 @@ async fn main() {
                             );
                             false
                         }
-                    } else {
-                        true
+                        Err(SdkError::ServiceError(e))
+                            if matches!(e.err(), HeadObjectError::NotFound(_)) =>
+                        {
+                            true
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to check admin.dat existence: {}/{}, assuming upload needed: {err:?}",
+                                board.board_key,
+                                thread_number
+                            );
+                            true
+                        }
                     };
 
                     if admin_needs {
@@ -378,6 +370,7 @@ async fn main() {
 
                         if retry(
                             &s3_client,
+                            &s3_bucket_name,
                             &board.board_key,
                             thread_number,
                             admin_dat.as_bytes(),
@@ -395,16 +388,17 @@ async fn main() {
                         }
                     }
 
-                    let dat_needs = if let Ok((_, code)) = s3_client
-                        .head_object(format!(
+                    let dat_needs = match s3_client
+                        .head_object()
+                        .bucket(&s3_bucket_name)
+                        .key(format!(
                             "{}/{}/{}.dat",
                             board.board_key, "dat", thread_number
                         ))
+                        .send()
                         .await
                     {
-                        if code == 404 {
-                            true
-                        } else {
+                        Ok(_) => {
                             log::info!(
                                 "normal.dat already exists: {}/{}",
                                 board.board_key,
@@ -412,8 +406,19 @@ async fn main() {
                             );
                             false
                         }
-                    } else {
-                        true
+                        Err(SdkError::ServiceError(e))
+                            if matches!(e.err(), HeadObjectError::NotFound(_)) =>
+                        {
+                            true
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to check normal.dat existence: {}/{}, assuming upload needed: {err:?}",
+                                board.board_key,
+                                thread_number
+                            );
+                            true
+                        }
                     };
 
                     if dat_needs {
@@ -426,6 +431,7 @@ async fn main() {
 
                         if retry(
                             &s3_client,
+                            &s3_bucket_name,
                             &board.board_key,
                             thread_number,
                             dat.as_bytes(),
@@ -460,8 +466,32 @@ async fn main() {
     }
 }
 
+fn make_s3_client() -> (Client, String) {
+    let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
+    let bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
+    let endpoint = format!("https://{}.r2.cloudflarestorage.com", r2_account_id.trim());
+
+    let creds = Credentials::new(
+        env::var("S3_ACCESS_KEY").unwrap().trim(),
+        env::var("S3_ACCESS_SECRET_KEY").unwrap().trim(),
+        None,
+        None,
+        "custom",
+    );
+
+    let config = aws_sdk_s3::Config::builder()
+        .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
+        .credentials_provider(creds)
+        .region(Region::new("auto"))
+        .endpoint_url(endpoint)
+        .build();
+
+    (Client::from_conf(config), bucket_name)
+}
+
 async fn retry(
-    s3_client: &Bucket,
+    s3_client: &Client,
+    bucket_name: &str,
     board_key: &str,
     thread_number: u64,
     content: &[u8],
@@ -475,37 +505,26 @@ async fn retry(
         if retry_count >= 0 {
             tokio::time::sleep(Duration::from_secs(retry_delay)).await;
         }
+        let key = format!(
+            "{}/{}/{}.dat",
+            board_key,
+            if is_admin { "admin" } else { "dat" },
+            thread_number
+        );
         let result = s3_client
-            .put_object(
-                format!(
-                    "{}/{}/{}.dat",
-                    board_key,
-                    if is_admin { "admin" } else { "dat" },
-                    thread_number
-                ),
-                content,
-            )
+            .put_object()
+            .bucket(bucket_name)
+            .key(&key)
+            .body(ByteStream::from(content.to_vec()))
+            .send()
             .await;
         retry_count += 1;
         retry_delay *= 2;
         match result {
-            Ok(result) => {
-                if result.status_code() == 200
-                    && let Ok((_, code)) = s3_client
-                        .head_object(format!(
-                            "{}/{}/{}.dat",
-                            board_key,
-                            if is_admin { "admin" } else { "dat" },
-                            thread_number
-                        ))
-                        .await
-                {
-                    if code != 404 {
-                        is_err = false;
-                    }
-                }
+            Ok(_) => {
+                is_err = false;
             }
-            err => log::error!(
+            Err(err) => log::error!(
                 "Failed to upload {}/{}.dat: {err:?}, retry count: {}",
                 if is_admin { "admin" } else { "normal" },
                 thread_number,

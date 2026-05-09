@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::env;
 
 use eddist_core::{
     domain::pubsub_repository::{
@@ -18,7 +18,7 @@ pub struct RedisSubRepository {
     pubsub_conn: redis::aio::PubSub,
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
-    s3_bucket: Option<Arc<s3::Bucket>>,
+    s3_bucket: Option<(aws_sdk_s3::Client, String)>,
     db_pool: Option<sqlx::MySqlPool>,
 }
 
@@ -27,14 +27,15 @@ impl RedisSubRepository {
         pubsub_conn: redis::aio::PubSub,
         conn: redis::aio::ConnectionManager,
         cancel: tokio::sync::broadcast::Receiver<()>,
-        s3_bucket: Option<Arc<s3::Bucket>>,
+        s3_client: Option<aws_sdk_s3::Client>,
+        s3_bucket_name: Option<String>,
         db_pool: Option<sqlx::MySqlPool>,
     ) -> Self {
         Self {
             pubsub_conn,
             conn,
             cancel,
-            s3_bucket,
+            s3_bucket: s3_client.zip(s3_bucket_name),
             db_pool,
         }
     }
@@ -223,13 +224,16 @@ impl RedisSubRepository {
                         }
                     };
                     let token_id = event.authed_token_id;
-                    if let (Some(pool), Some(bucket)) =
+                    if let (Some(pool), Some((client, bucket_name))) =
                         (self.db_pool.as_ref(), self.s3_bucket.as_ref())
                     {
                         let pool = pool.clone();
-                        let bucket = bucket.clone();
+                        let client = client.clone();
+                        let bucket_name = bucket_name.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = backup_token(&pool, &bucket, token_id).await {
+                            if let Err(e) =
+                                backup_token(&pool, &client, &bucket_name, token_id).await
+                            {
                                 warn!("Failed to backup token {token_id}: {e}");
                             }
                         });
@@ -258,10 +262,13 @@ impl RedisSubRepository {
                         }
                     };
                     let token_id = event.authed_token_id;
-                    if let Some(bucket) = self.s3_bucket.as_ref() {
-                        let bucket = bucket.clone();
+                    if let Some((client, bucket_name)) = self.s3_bucket.as_ref() {
+                        let client = client.clone();
+                        let bucket_name = bucket_name.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = remove_token_backup(&bucket, token_id).await {
+                            if let Err(e) =
+                                remove_token_backup(&client, &bucket_name, token_id).await
+                            {
                                 warn!("Failed to remove token backup {token_id}: {e}");
                             }
                         });

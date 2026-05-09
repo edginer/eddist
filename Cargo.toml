@@ -86,11 +86,6 @@ aes-gcm = "0.10"
 pwhash = "1.0.0"
 
 # Cloud storage
-rust-s3 = { version = "0.37.1", default-features = false, features = [
-    "tokio-rustls-tls",
-    "tags",
-    "fail-on-err",
-] }
 aws-sdk-s3 = { version = "1", default-features = false, features = [
     "rt-tokio",
     "rustls",

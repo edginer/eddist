@@ -1,41 +1,36 @@
-use s3::Bucket;
+use aws_sdk_s3::{Client, error::SdkError, operation::get_object::GetObjectError};
 
 use super::AppService;
 
 #[derive(Debug, Clone)]
-pub struct KakoThreadRetrievalService(Bucket);
+pub struct KakoThreadRetrievalService(Client, String);
 
 impl KakoThreadRetrievalService {
-    pub fn new(bucket: Bucket) -> Self {
-        Self(bucket)
+    pub fn new(client: Client, bucket_name: String) -> Self {
+        Self(client, bucket_name)
     }
 }
 
 #[async_trait::async_trait]
 impl AppService<KakoThreadRetrievalServiceInput, Vec<u8>> for KakoThreadRetrievalService {
     async fn execute(&self, input: KakoThreadRetrievalServiceInput) -> anyhow::Result<Vec<u8>> {
-        match self
-            .0
-            .get_object(format!(
-                "{}/dat/{}.dat",
-                input.board_key, input.thread_number
-            ))
-            .await
-        {
-            Ok(obj) => Ok(obj.bytes().to_vec()),
-            Err(err) => match err {
-                s3::error::S3Error::HttpFailWithBody(404, _) => {
-                    Err(anyhow::anyhow!("Thread not found"))
-                }
-                _ => {
-                    log::error!(
-                        "Error retrieving kako thread: {err:?}, path: {}/dat/{}.dat",
-                        input.board_key,
-                        input.thread_number
-                    );
-                    Err(anyhow::anyhow!("Error retrieving thread: {err:?}"))
-                }
-            },
+        let key = format!("{}/dat/{}.dat", input.board_key, input.thread_number);
+        match self.0.get_object().bucket(&self.1).key(&key).send().await {
+            Ok(output) => {
+                let bytes = output.body.collect().await?.into_bytes().to_vec();
+                Ok(bytes)
+            }
+            Err(SdkError::ServiceError(e)) if matches!(e.err(), GetObjectError::NoSuchKey(_)) => {
+                Err(anyhow::anyhow!("Thread not found"))
+            }
+            Err(err) => {
+                log::error!(
+                    "Error retrieving kako thread: {err:?}, path: {}/dat/{}.dat",
+                    input.board_key,
+                    input.thread_number
+                );
+                Err(anyhow::anyhow!("Error retrieving thread: {err:?}"))
+            }
         }
     }
 }

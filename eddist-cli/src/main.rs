@@ -1,9 +1,13 @@
 use anyhow::Result;
+use aws_sdk_s3::{
+    Client,
+    config::{Credentials, Region},
+    primitives::ByteStream,
+};
 use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
-use s3::creds::Credentials;
-use std::{collections::HashSet, env, sync::Arc};
+use std::{collections::HashSet, env};
 use uuid::Uuid;
 
 const CONCURRENCY: usize = 16;
@@ -48,25 +52,29 @@ async fn main() -> Result<()> {
     }
 }
 
-fn make_bucket() -> Result<Arc<s3::Bucket>> {
-    Ok(Arc::from(s3::Bucket::new(
-        env::var("S3_BUCKET_NAME")?.trim(),
-        s3::Region::R2 {
-            account_id: env::var("R2_ACCOUNT_ID")?.trim().to_string(),
-        },
-        Credentials::new(
-            Some(env::var("S3_ACCESS_KEY")?.trim()),
-            Some(env::var("S3_ACCESS_SECRET_KEY")?.trim()),
-            None,
-            None,
-            None,
-        )?,
-    )?))
+fn make_s3_client() -> Result<(Client, String)> {
+    let account_id = env::var("R2_ACCOUNT_ID")?;
+    let bucket_name = env::var("S3_BUCKET_NAME")?;
+    let endpoint = format!("https://{}.r2.cloudflarestorage.com", account_id.trim());
+    let creds = Credentials::new(
+        env::var("S3_ACCESS_KEY")?.trim(),
+        env::var("S3_ACCESS_SECRET_KEY")?.trim(),
+        None,
+        None,
+        "custom",
+    );
+    let config = aws_sdk_s3::Config::builder()
+        .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
+        .credentials_provider(creds)
+        .region(Region::new("auto"))
+        .endpoint_url(endpoint)
+        .build();
+    Ok((Client::from_conf(config), bucket_name.trim().to_string()))
 }
 
 async fn backup() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
     let rows = sqlx::query_as!(
         AuthedTokenBackup,
@@ -94,14 +102,16 @@ async fn backup() -> Result<()> {
 
     let results = futures::stream::iter(rows)
         .map(|token| {
-            let bucket = bucket.clone();
+            let client = client.clone();
+            let bucket_name = bucket_name.clone();
             async move {
                 let bytes = serde_json::to_vec(&token)?;
-                bucket
-                    .put_object(
-                        format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id),
-                        &bytes,
-                    )
+                client
+                    .put_object()
+                    .bucket(&bucket_name)
+                    .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id))
+                    .body(ByteStream::from(bytes))
+                    .send()
                     .await?;
                 anyhow::Ok(())
             }
@@ -120,7 +130,7 @@ async fn backup() -> Result<()> {
 
 async fn validate() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
     let db_ids =
         sqlx::query_scalar!(r#"SELECT id AS "id!: Uuid" FROM authed_tokens WHERE validity = 1"#)
@@ -130,16 +140,25 @@ async fn validate() -> Result<()> {
             .collect::<HashSet<_>>();
 
     let prefix = format!("{AUTHED_TOKENS_S3_PREFIX}/");
-    let s3_ids = bucket
-        .list(prefix.clone(), None)
-        .await?
-        .into_iter()
-        .flat_map(|page| page.contents)
-        .filter_map(|obj| {
-            let name = obj.key.strip_prefix(&prefix)?.strip_suffix(".json")?;
-            Uuid::parse_str(name).ok()
-        })
-        .collect::<HashSet<_>>();
+    let mut pages = client
+        .list_objects_v2()
+        .bucket(&bucket_name)
+        .prefix(&prefix)
+        .into_paginator()
+        .send();
+    let mut s3_ids = HashSet::new();
+    while let Some(page) = pages.next().await {
+        for obj in page?.contents.unwrap_or_default() {
+            if let Some(key) = obj.key
+                && let Some(name) = key
+                    .strip_prefix(&prefix)
+                    .and_then(|n| n.strip_suffix(".json"))
+                && let Ok(id) = Uuid::parse_str(name)
+            {
+                s3_ids.insert(id);
+            }
+        }
+    }
 
     println!("DB valid tokens: {}", db_ids.len());
     println!("S3 objects:      {}", s3_ids.len());
@@ -174,26 +193,40 @@ async fn validate() -> Result<()> {
 
 async fn recover() -> Result<()> {
     let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
-    let keys = bucket
-        .list(format!("{AUTHED_TOKENS_S3_PREFIX}/"), None)
-        .await?
-        .into_iter()
-        .flat_map(|page| page.contents)
-        .map(|obj| obj.key)
-        .collect::<Vec<_>>();
+    let mut pages = client
+        .list_objects_v2()
+        .bucket(&bucket_name)
+        .prefix(format!("{AUTHED_TOKENS_S3_PREFIX}/"))
+        .into_paginator()
+        .send();
+    let mut keys = Vec::new();
+    while let Some(page) = pages.next().await {
+        for obj in page?.contents.unwrap_or_default() {
+            if let Some(key) = obj.key {
+                keys.push(key);
+            }
+        }
+    }
 
     let total = keys.len();
     println!("Recovering {total} tokens from S3...");
 
     let results = futures::stream::iter(keys)
         .map(|key| {
-            let bucket = bucket.clone();
+            let client = client.clone();
+            let bucket_name = bucket_name.clone();
             let pool = pool.clone();
             async move {
-                let data = bucket.get_object(&key).await?;
-                let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
+                let output = client
+                    .get_object()
+                    .bucket(&bucket_name)
+                    .key(&key)
+                    .send()
+                    .await?;
+                let data = output.body.collect().await?.into_bytes();
+                let token: AuthedTokenBackup = serde_json::from_slice(&data)?;
 
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
 

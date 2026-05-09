@@ -5,11 +5,14 @@ mod token_backup;
 
 use std::env;
 
+use aws_sdk_s3::{
+    Client,
+    config::{Credentials, Region},
+};
 use eddist_core::{
     tracing::init_tracing,
     utils::{is_authed_token_backup_enabled, is_prod},
 };
-use s3::creds::Credentials;
 use tokio::join;
 
 use subscriber::SubRepository;
@@ -28,26 +31,25 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(shutdown::run_shutdown_server(ctrl_c_tx));
 
-    let s3_bucket = if is_authed_token_backup_enabled() {
+    let (s3_client, s3_bucket_name) = if is_authed_token_backup_enabled() {
         let bucket_name = env::var("S3_BUCKET_NAME")?;
         let account_id = env::var("R2_ACCOUNT_ID")?;
         let access_key = env::var("S3_ACCESS_KEY")?;
         let secret_key = env::var("S3_ACCESS_SECRET_KEY")?;
-        Some(std::sync::Arc::from(s3::bucket::Bucket::new(
-            bucket_name.trim(),
-            s3::Region::R2 {
-                account_id: account_id.trim().to_string(),
-            },
-            Credentials::new(
-                Some(access_key.trim()),
-                Some(secret_key.trim()),
-                None,
-                None,
-                None,
-            )?,
-        )?))
+        let endpoint = format!("https://{}.r2.cloudflarestorage.com", account_id.trim());
+        let creds = Credentials::new(access_key.trim(), secret_key.trim(), None, None, "custom");
+        let config = aws_sdk_s3::Config::builder()
+            .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
+            .credentials_provider(creds)
+            .region(Region::new("auto"))
+            .endpoint_url(endpoint)
+            .build();
+        (
+            Some(Client::from_conf(config)),
+            Some(bucket_name.trim().to_string()),
+        )
     } else {
-        None
+        (None, None)
     };
 
     let db_pool = if is_authed_token_backup_enabled() {
@@ -65,7 +67,8 @@ async fn main() -> anyhow::Result<()> {
         pubsub_conn,
         conn.clone(),
         ctrl_c_sub_sub,
-        s3_bucket,
+        s3_client,
+        s3_bucket_name,
         db_pool,
     );
 
