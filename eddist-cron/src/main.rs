@@ -3,6 +3,8 @@ use std::{env, str::FromStr, time::Duration};
 use aws_sdk_s3::{
     Client,
     config::{Credentials, Region},
+    error::SdkError,
+    operation::head_object::HeadObjectError,
     primitives::ByteStream,
 };
 use chrono::{TimeDelta, Timelike, Utc};
@@ -343,7 +345,19 @@ async fn main() {
                             );
                             false
                         }
-                        Err(_) => true,
+                        Err(SdkError::ServiceError(e))
+                            if matches!(e.err(), HeadObjectError::NotFound(_)) =>
+                        {
+                            true
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to check admin.dat existence: {}/{}, assuming upload needed: {err:?}",
+                                board.board_key,
+                                thread_number
+                            );
+                            true
+                        }
                     };
 
                     if admin_needs {
@@ -392,7 +406,19 @@ async fn main() {
                             );
                             false
                         }
-                        Err(_) => true,
+                        Err(SdkError::ServiceError(e))
+                            if matches!(e.err(), HeadObjectError::NotFound(_)) =>
+                        {
+                            true
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to check normal.dat existence: {}/{}, assuming upload needed: {err:?}",
+                                board.board_key,
+                                thread_number
+                            );
+                            true
+                        }
                     };
 
                     if dat_needs {

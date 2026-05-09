@@ -1,4 +1,4 @@
-use aws_sdk_s3::{Client, error::SdkError};
+use aws_sdk_s3::{Client, error::SdkError, operation::get_object::GetObjectError};
 
 use super::AppService;
 
@@ -20,7 +20,7 @@ impl AppService<KakoThreadRetrievalServiceInput, Vec<u8>> for KakoThreadRetrieva
                 let bytes = output.body.collect().await?.into_bytes().to_vec();
                 Ok(bytes)
             }
-            Err(SdkError::ServiceError(e)) if e.raw().status().as_u16() == 404 => {
+            Err(SdkError::ServiceError(e)) if matches!(e.err(), GetObjectError::NoSuchKey(_)) => {
                 Err(anyhow::anyhow!("Thread not found"))
             }
             Err(err) => {
