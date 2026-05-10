@@ -211,7 +211,7 @@ async fn main() {
                         admin_dat.append(&mut admin_res.get_inner());
                     }
 
-                    if board.enable_1001_message {
+                    if board.enable_1001_message && responses.len() >= 1000 {
                         let last_modified_utc = Utc.from_utc_datetime(&last_modified_at);
                         let bytes_1001 = get_1001_sjis_bytes(
                             thread_number as i64,

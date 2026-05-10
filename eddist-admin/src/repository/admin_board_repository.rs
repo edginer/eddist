@@ -282,10 +282,6 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             }
             None => {}
         }
-        if board.enable_1001_message.is_some() {
-            sets.push("enable_1001_message = ?");
-        }
-
         if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
             sets.push("base_thread_creation_span_sec = ?");
             values.push(base_thread_creation_span_sec);
@@ -322,6 +318,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         }
         if board.read_only.is_some() {
             sets.push("read_only = ?");
+        }
+        if board.enable_1001_message.is_some() {
+            sets.push("enable_1001_message = ?");
         }
 
         let mut tx = pool.begin().await?;
