@@ -210,8 +210,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             board_info.base_thread_creation_span_sec as u64,
         );
 
+        let authed_token_reduced_ip = authed_token.reduced_ip.to_string();
         if res_span_svc
-            .is_thread_within_creation_span(&authed_token.token, &input.ip_addr, unix_time as u64)
+            .is_thread_within_creation_span(
+                &authed_token_reduced_ip,
+                &input.ip_addr,
+                unix_time as u64,
+            )
             .await
         {
             return Err(BbsCgiError::TooManyCreatingThreadWithoutTinker);
@@ -224,7 +229,6 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             return Err(BbsCgiError::NgWordDetected);
         }
 
-        let authed_token_clone = authed_token.token.clone();
         let event_repo = self.3.clone();
         let creating_th_clone = creating_th.clone();
 
@@ -261,14 +265,14 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 .await?;
             res_span_svc
                 .update_last_res_creation_time(
-                    &authed_token_clone,
+                    &authed_token_reduced_ip,
                     &input.ip_addr,
                     unix_time as u64,
                 )
                 .await;
             res_span_svc
                 .update_last_thread_creation_time(
-                    &authed_token_clone,
+                    &authed_token_reduced_ip,
                     &input.ip_addr,
                     unix_time as u64,
                 )
