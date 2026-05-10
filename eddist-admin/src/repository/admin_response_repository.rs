@@ -107,7 +107,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                         thread_number = ?
                 )
             ORDER BY
-                res_order ASC
+                res_order ASC, id ASC
             "#,
             board_key,
             thread_number
@@ -165,7 +165,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                         thread_number = ?
                 )
             ORDER BY
-                res_order ASC
+                res_order ASC, id ASC
             "#,
             board_key,
             thread_number
