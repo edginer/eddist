@@ -42,6 +42,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             __html: `(function(){var t=localStorage.getItem('eddist:theme');var d=window.matchMedia('(prefers-color-scheme:dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}})()`,
           }}
         />
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: bootstraps existing users who don't yet have the safe_mode cookie before the server default is set
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(!document.cookie.includes('safe_mode=')){document.cookie='safe_mode=off; path=/; max-age=31536000; SameSite=Lax'}})()`,
+          }}
+        />
       </head>
       <body className="dark:bg-gray-900">
         {children}
