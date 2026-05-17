@@ -93,7 +93,21 @@ const convertThreadTextToResponseList = (text: string) => {
       const aboneRegex = /^(.*)<>(.*)<><> あぼーん<>(.*)$/;
       const aboneMatch = line.match(aboneRegex);
       if (aboneMatch == null) {
-        throw new Error(`Invalid response line: ${line}`);
+        // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
+        const stopperRegex = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
+        const stopperMatch = line.match(stopperRegex);
+        if (stopperMatch == null) {
+          throw new Error(`Invalid response line: ${line}`);
+        }
+        return {
+          name: stopperMatch[1],
+          mail: "",
+          date: "Over 1000 Thread",
+          authorId: "",
+          bodyParts: [{ text: stopperMatch[3], isMatch: false }],
+          id: idx + 1,
+          authorIdAppearBeforeCount: 0,
+        };
       }
 
       if (idx === 0) {
