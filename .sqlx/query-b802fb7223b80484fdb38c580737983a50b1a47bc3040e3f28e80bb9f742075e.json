@@ -1,10 +1,19 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                b.board_key AS board_key,\n                b.default_name AS default_name,\n                bi.threads_archive_cron AS threads_archive_cron,\n                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,\n                bi.enable_1001_message AS \"enable_1001_message: bool\",\n                bi.custom_1001_message AS custom_1001_message\n            FROM\n                boards AS b\n            JOIN\n                boards_info AS bi\n            ON\n                b.id = bi.id\n            ",
+  "query": "\n            SELECT\n                BIN_TO_UUID(b.id) AS \"board_id!: Uuid\",\n                b.board_key AS board_key,\n                b.default_name AS default_name,\n                bi.threads_archive_cron AS threads_archive_cron,\n                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,\n                bi.enable_1001_message AS \"enable_1001_message: bool\",\n                bi.custom_1001_message AS custom_1001_message\n            FROM\n                boards AS b\n            JOIN\n                boards_info AS bi\n            ON\n                b.id = bi.id\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "board_id!: Uuid",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 144
+        }
+      },
+      {
+        "ordinal": 1,
         "name": "board_key",
         "type_info": {
           "type": "VarString",
@@ -13,7 +22,7 @@
         }
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "default_name",
         "type_info": {
           "type": "Blob",
@@ -22,7 +31,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "threads_archive_cron",
         "type_info": {
           "type": "VarString",
@@ -31,7 +40,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "threads_archive_trigger_thread_count",
         "type_info": {
           "type": "Long",
@@ -40,7 +49,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "enable_1001_message: bool",
         "type_info": {
           "type": "Tiny",
@@ -49,7 +58,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "custom_1001_message",
         "type_info": {
           "type": "Blob",
@@ -62,6 +71,7 @@
       "Right": 0
     },
     "nullable": [
+      true,
       false,
       false,
       true,
@@ -70,5 +80,5 @@
       true
     ]
   },
-  "hash": "3bb95a502a62f14f869b3fd3c0a1d154499919e1e62ae5c8b0d2c9307f82e401"
+  "hash": "b802fb7223b80484fdb38c580737983a50b1a47bc3040e3f28e80bb9f742075e"
 }

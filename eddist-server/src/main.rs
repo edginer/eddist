@@ -132,6 +132,7 @@ async fn main() -> anyhow::Result<()> {
         stats_repo,
         template_engine: Arc::new(template_engine),
         tinker_secret,
+        redis_conn: conn_mgr.clone(),
     };
 
     // Start background task for user restriction cache refresh
