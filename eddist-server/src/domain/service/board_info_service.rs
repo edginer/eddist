@@ -189,11 +189,11 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
         is_thread: bool,
     ) -> Result<(), BbsCgiError> {
         if let Some(tinker) = &self.tinker {
-            // Response creation span multiplier based on tinker level
-            let span_multiplier = match tinker.level() {
+            // Response creation span multiplier based on tinker internal_level
+            let span_multiplier = match tinker.internal_level() {
                 0 | 1 => 3,
                 2 => 2,
-                _ => 1, // level >= 3
+                _ => 1, // internal_level >= 3
             };
             let res_span_sec =
                 (board_info.base_response_creation_span_sec * span_multiplier) as u64;
@@ -201,28 +201,28 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
             let elapsed = chrono::Utc::now().timestamp() as u64 - tinker.last_wrote_at();
             if elapsed < res_span_sec {
                 return Err(BbsCgiError::TooManyCreatingRes {
-                    tinker_level: tinker.level(),
+                    tinker_level: tinker.internal_level(),
                     span_sec: res_span_sec as i32,
                 });
             }
 
             if is_thread && let Some(last_created_thread_at) = tinker.last_created_thread_at() {
                 let elapsed = chrono::Utc::now().timestamp() as u64 - last_created_thread_at;
-                // Thread creation span limit (in seconds) based on tinker level
+                // Thread creation span limit (in seconds) based on tinker internal_level
                 // Base values are doubled for the final limit
-                let base_span = match tinker.level() {
+                let base_span = match tinker.internal_level() {
                     0 => 60 * 60, // 1 hour
                     1 => 60 * 30, // 30 min
                     2 => 60 * 15, // 15 min
                     3 => 60 * 8,  // 8 min
                     4 => 60 * 4,  // 4 min
-                    _ => 60 * 2,  // 2 min (level >= 5)
+                    _ => 60 * 2,  // 2 min (internal_level >= 5)
                 };
                 let span_limit = base_span * 2;
 
                 if elapsed < span_limit {
                     return Err(BbsCgiError::TooManyCreatingThread {
-                        tinker_level: tinker.level(),
+                        tinker_level: tinker.internal_level(),
                         span_sec: span_limit as i32,
                     });
                 }

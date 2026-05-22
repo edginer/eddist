@@ -13,6 +13,7 @@ message Tinker {
   uint64 last_level_up_at = 5;
   uint64 last_wrote_at = 6;
   optional uint64 last_created_thread_at = 7;
+  uint32 internal_level = 8;
 }
 
 // ClientInfo carries request metadata attached to each post event.

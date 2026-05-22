@@ -205,9 +205,9 @@ impl<
         };
         let mut res = res.set_author_id(&authed_token, cap_name);
 
-        // Restrict the image posting below level 2
+        // Restrict the image posting below internal_level 2
         if let Some(tinker) = &input.tinker {
-            if tinker.level() < 2 && !res.get_all_images().is_empty() {
+            if tinker.internal_level() < 2 && !res.get_all_images().is_empty() {
                 return Err(BbsCgiError::ImageUrlBelowLv2);
             }
         } else if !res.get_all_images().is_empty() {
@@ -215,10 +215,10 @@ impl<
             return Err(BbsCgiError::ImageUrlBelowLv2);
         }
 
-        // Restrict the anchor count below level 2
+        // Restrict the anchor count below internal_level 2
         const MAX_ANCHORS_BELOW_LV2: usize = 3;
         let needs_anchor_check = if let Some(tinker) = &input.tinker {
-            tinker.level() < 2
+            tinker.internal_level() < 2
         } else {
             true
         };
