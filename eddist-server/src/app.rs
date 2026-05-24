@@ -24,6 +24,7 @@ use crate::{
         bbs_repository::BbsRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
         notice_repository::NoticeRepositoryImpl,
+        stats_repository::StatsRepository,
         terms_repository::TermsRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
@@ -34,6 +35,7 @@ use crate::{
         dat_routing::{get_dat_txt, get_kako_dat_txt},
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         re_auth::{get_re_auth, post_re_auth},
+        stats::get_stats,
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         terms::get_terms,
         user::user_routes,
@@ -59,6 +61,7 @@ pub struct AppState {
     >,
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
+    pub stats_repo: StatsRepository,
     pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
 }
@@ -251,6 +254,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route("/api/notices", get(get_notices_paginated))
         .route("/api/notices/{slug}", get(get_notice_by_slug))
         .route("/api/client-config", get(get_api_client_config))
+        .route("/api/stats", get(get_stats))
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",

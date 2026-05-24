@@ -12,6 +12,7 @@ mod repositories {
     pub(crate) mod captcha_config_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod notice_repository;
+    pub(crate) mod stats_repository;
     pub(crate) mod terms_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
@@ -54,6 +55,7 @@ mod routes {
     pub mod notice;
     pub mod re_auth;
     pub mod statics;
+    pub mod stats;
     pub mod subject_list;
     pub mod terms;
     pub mod user;
@@ -69,6 +71,7 @@ use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
 use crate::services::server_settings_cache::{
     refresh_server_settings_cache, start_server_settings_refresh_task,
 };
+use crate::services::stats_counter::start_stats_flush_task;
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
@@ -100,10 +103,12 @@ pub fn create_test_app(
     let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
+    let stats_repo = crate::repositories::stats_repository::StatsRepository::new(pool.clone());
 
     drop(refresh_server_settings_cache(&pool));
     start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
     start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
+    start_stats_flush_task(pool.clone(), std::time::Duration::from_secs(30));
 
     let app_state = AppState {
         services: AppServiceContainer::new(
@@ -121,6 +126,7 @@ pub fn create_test_app(
         ),
         notice_repo,
         terms_repo,
+        stats_repo,
         template_engine: std::sync::Arc::new(load_template_engine()),
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::now_v7().as_bytes())

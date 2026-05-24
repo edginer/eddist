@@ -48,6 +48,7 @@ pub(crate) mod openai_moderation_service;
 pub(crate) mod reauth_service;
 pub(crate) mod res_creation_service;
 pub(crate) mod server_settings_cache;
+pub(crate) mod stats_counter;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;

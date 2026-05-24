@@ -1,0 +1,44 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT\n                date AS \"date: NaiveDate\",\n                total_responses,\n                new_threads\n            FROM daily_stats\n            WHERE date < CURDATE()\n            ORDER BY date DESC\n            LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date: NaiveDate",
+        "type_info": {
+          "type": "Date",
+          "flags": "NOT_NULL | UNIQUE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "total_responses",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL",
+          "max_size": 20
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "new_threads",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL",
+          "max_size": 20
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2e1b4895cfb02da3d4679cf80382c42edf87c9f34814c05e7c461b0ae8af8f49"
+}

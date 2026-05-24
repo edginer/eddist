@@ -16,6 +16,7 @@ use crate::{
         bind_token_to_user_service::BindTokenToUserServiceInput,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+        stats_counter::{increment_response_delta, increment_thread_delta},
         thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
@@ -126,7 +127,10 @@ pub async fn post_bbs_cgi(
                 tinker,
                 authed_token_id,
                 is_authed_token_bound,
-            }) => (tinker, authed_token_id, is_authed_token_bound),
+            }) => {
+                increment_thread_delta();
+                (tinker, authed_token_id, is_authed_token_bound)
+            }
             Err(e) => {
                 return on_error(e, true);
             }
@@ -162,7 +166,10 @@ pub async fn post_bbs_cgi(
                 res_order,
                 authed_token_id,
                 is_authed_token_bound,
-            }) => (tinker, res_order, authed_token_id, is_authed_token_bound),
+            }) => {
+                increment_response_delta();
+                (tinker, res_order, authed_token_id, is_authed_token_bound)
+            }
             Err(e) => {
                 return on_error(e, false);
             }
