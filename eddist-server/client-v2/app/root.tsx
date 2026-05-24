@@ -60,7 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-const FULL_WIDTH_ROUTES = ["/terms"];
+const FULL_WIDTH_ROUTES = ["/terms", "/"];
 
 export default function App() {
   const location = useLocation();
