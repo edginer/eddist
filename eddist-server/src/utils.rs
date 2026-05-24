@@ -61,7 +61,7 @@ pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
     .claims;
 
     // Legacy cookies pre-date the internal_level field; promote to level so restrictions are unchanged.
-    let tinker = if tinker.internal_level() == 0 {
+    let tinker = if !tinker.has_explicit_internal_level() {
         let level = tinker.level();
         tinker.patch_internal_level(level)
     } else {

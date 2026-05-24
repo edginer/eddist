@@ -175,6 +175,7 @@ const ResponseList = ({
                     Created Thread Count: {response.client_info.tinker.created_thread_count}
                   </p>
                   <p className="ml-2">Level: {response.client_info.tinker.level}</p>
+                  <p className="ml-2">Internal Level: {response.client_info.tinker.internal_level}</p>
                   <p className="ml-2">
                     Last Level Up:{" "}
                     {new Date(response.client_info.tinker.last_level_up_at * 1000).toLocaleString()}

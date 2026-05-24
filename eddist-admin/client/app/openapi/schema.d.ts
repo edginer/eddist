@@ -942,6 +942,8 @@ export interface components {
             authed_token: string;
             /** Format: int32 */
             created_thread_count: number;
+            /** Format: int32 */
+            internal_level: number;
             /** Format: int64 */
             last_created_thread_at?: number | null;
             /** Format: int64 */

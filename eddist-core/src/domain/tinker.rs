@@ -8,7 +8,7 @@ pub struct Tinker {
     created_thread_count: u32,
     level: u32,
     #[serde(rename = "ilvl", default)]
-    internal_level: u32,
+    internal_level: Option<u32>,
     last_level_up_at: u64,
     last_wrote_at: u64,
     last_created_thread_at: Option<u64>,
@@ -30,7 +30,7 @@ impl Tinker {
             wrote_count,
             created_thread_count,
             level,
-            internal_level,
+            internal_level: Some(internal_level),
             last_level_up_at,
             last_wrote_at,
             last_created_thread_at,
@@ -43,7 +43,7 @@ impl Tinker {
             wrote_count: 0,
             created_thread_count: 0,
             level: 1,
-            internal_level: 1,
+            internal_level: Some(1),
             last_level_up_at: datetime.timestamp() as u64,
             last_wrote_at: 0,
             last_created_thread_at: None,
@@ -55,22 +55,16 @@ impl Tinker {
         let timestamp = datetime.timestamp() as u64;
         let level_up = self.last_level_up_at + 23 * 60 * 60 < timestamp;
         let level = if level_up { self.level + 1 } else { self.level };
-        let internal_level = if level_up {
-            self.internal_level + 1
-        } else {
-            self.internal_level
-        };
+        let internal_level = self
+            .internal_level
+            .map(|ilvl| (if level_up { ilvl + 1 } else { ilvl }).min(20));
 
         Self {
             authed_token: self.authed_token,
             wrote_count,
             created_thread_count: self.created_thread_count,
             level: if level > 20 { 20 } else { level },
-            internal_level: if internal_level > 20 {
-                20
-            } else {
-                internal_level
-            },
+            internal_level,
             last_level_up_at: if level_up {
                 timestamp
             } else {
@@ -87,22 +81,16 @@ impl Tinker {
         let timestamp = datetime.timestamp() as u64;
         let level_up = self.last_level_up_at + 23 * 60 * 60 < timestamp;
         let level = if level_up { self.level + 1 } else { self.level };
-        let internal_level = if level_up {
-            self.internal_level + 1
-        } else {
-            self.internal_level
-        };
+        let internal_level = self
+            .internal_level
+            .map(|ilvl| (if level_up { ilvl + 1 } else { ilvl }).min(20));
 
         Self {
             authed_token: self.authed_token,
             wrote_count,
             created_thread_count,
             level: if level > 20 { 20 } else { level },
-            internal_level: if internal_level > 20 {
-                20
-            } else {
-                internal_level
-            },
+            internal_level,
             last_level_up_at: if level_up {
                 timestamp
             } else {
@@ -118,12 +106,16 @@ impl Tinker {
     }
 
     pub fn internal_level(&self) -> u32 {
-        self.internal_level
+        self.internal_level.unwrap_or(0)
+    }
+
+    pub fn has_explicit_internal_level(&self) -> bool {
+        self.internal_level.is_some()
     }
 
     pub fn patch_internal_level(self, v: u32) -> Self {
         Self {
-            internal_level: v,
+            internal_level: Some(v),
             ..self
         }
     }
