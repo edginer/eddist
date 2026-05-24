@@ -40,7 +40,10 @@ pub async fn get_stats(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     let today = TodayStatsResponse {
-        total_responses: today_stat.as_ref().map(|s| s.total_responses).unwrap_or(0),
+        total_responses: today_stat
+            .as_ref()
+            .map(|s| s.total_responses + s.new_threads)
+            .unwrap_or(0),
         new_threads: today_stat.as_ref().map(|s| s.new_threads).unwrap_or(0),
     };
 
@@ -48,7 +51,7 @@ pub async fn get_stats(State(state): State<AppState>) -> impl IntoResponse {
         .into_iter()
         .map(|s| DailyStatResponse {
             date: s.date.to_string(),
-            total_responses: s.total_responses,
+            total_responses: s.total_responses + s.new_threads,
             new_threads: s.new_threads,
         })
         .collect::<Vec<_>>();
