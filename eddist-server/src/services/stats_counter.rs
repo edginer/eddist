@@ -36,10 +36,10 @@ pub fn increment_thread_delta() {
         .fetch_add(1, Ordering::Relaxed);
 }
 
-async fn flush_stats(pool: &MySqlPool) -> anyhow::Result<()> {
+pub async fn flush_stats_now(pool: &MySqlPool) -> anyhow::Result<()> {
     let counter = get_global_counter();
-    let delta_r = counter.response_delta.swap(0, Ordering::Relaxed);
-    let delta_t = counter.thread_delta.swap(0, Ordering::Relaxed);
+    let delta_r = counter.response_delta.load(Ordering::Relaxed);
+    let delta_t = counter.thread_delta.load(Ordering::Relaxed);
 
     if delta_r == 0 && delta_t == 0 {
         return Ok(());
@@ -57,19 +57,19 @@ async fn flush_stats(pool: &MySqlPool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
 
+    counter.response_delta.fetch_sub(delta_r, Ordering::Relaxed);
+    counter.thread_delta.fetch_sub(delta_t, Ordering::Relaxed);
+
     Ok(())
 }
 
 pub fn start_stats_flush_task(pool: MySqlPool, interval: Duration) {
     tokio::spawn(async move {
+        tracing::info!("Started stats flush task with interval: {interval:?}");
         let mut ticker = tokio::time::interval(interval);
         loop {
             ticker.tick().await;
-            if let Err(e) = flush_stats(&pool).await {
-                tracing::error!("Failed to flush stats to DB: {e}");
-            }
+            let _ = flush_stats_now(&pool).await;
         }
     });
-
-    tracing::info!("Started stats flush task with interval: {interval:?}");
 }

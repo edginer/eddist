@@ -1,4 +1,9 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    extract::State,
+    http::{HeaderValue, StatusCode},
+    response::IntoResponse,
+};
 use serde::Serialize;
 
 use crate::app::AppState;
@@ -50,6 +55,6 @@ pub async fn get_stats(State(state): State<AppState>) -> impl IntoResponse {
 
     let mut resp = Json(StatsResponse { today, history }).into_response();
     resp.headers_mut()
-        .insert("Cache-Control", "s-maxage=30".parse().unwrap());
+        .insert("Cache-Control", HeaderValue::from_static("s-maxage=30"));
     resp
 }

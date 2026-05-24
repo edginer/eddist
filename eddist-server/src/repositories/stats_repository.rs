@@ -9,11 +9,11 @@ pub struct DailyStat {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsRepository {
+pub struct StatsRepositoryImpl {
     pool: MySqlPool,
 }
 
-impl StatsRepository {
+impl StatsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }

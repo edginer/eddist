@@ -24,7 +24,7 @@ use crate::{
         bbs_repository::BbsRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
         notice_repository::NoticeRepositoryImpl,
-        stats_repository::StatsRepository,
+        stats_repository::StatsRepositoryImpl,
         terms_repository::TermsRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
@@ -61,7 +61,7 @@ pub struct AppState {
     >,
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
-    pub stats_repo: StatsRepository,
+    pub stats_repo: StatsRepositoryImpl,
     pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
 }
