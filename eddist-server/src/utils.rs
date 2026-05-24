@@ -57,9 +57,12 @@ pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
         ),
         &validation,
     )
-    .unwrap();
+    .unwrap()
+    .claims;
 
-    Some(tinker.claims)
+    // Legacy cookies pre-date the internal_level field; promote to level so restrictions are unchanged.
+    let level = tinker.level();
+    Some(tinker.patch_internal_level_if_missing(level))
 }
 
 #[async_trait::async_trait]

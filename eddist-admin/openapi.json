@@ -3577,6 +3577,7 @@
           "wrote_count",
           "created_thread_count",
           "level",
+          "internal_level",
           "last_level_up_at",
           "last_wrote_at"
         ],
@@ -3585,6 +3586,11 @@
             "type": "string"
           },
           "created_thread_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "internal_level": {
             "type": "integer",
             "format": "int32",
             "minimum": 0

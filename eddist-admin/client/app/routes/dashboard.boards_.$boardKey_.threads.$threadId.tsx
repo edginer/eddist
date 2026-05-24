@@ -32,6 +32,7 @@ export interface Tinker {
   wrote_count: number;
   created_thread_count: number;
   level: number;
+  internal_level: number;
   last_level_up_at: number;
   last_wrote_at: number;
   last_created_thread_at?: number | null;
