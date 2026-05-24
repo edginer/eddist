@@ -1,8 +1,11 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader, Tooltip } from "flowbite-react";
+import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
+import { useThreadHistory } from "~/contexts/ThreadHistoryContext";
+import { useUISettings } from "~/contexts/UISettingsContext";
 import { NGRuleSection } from "./NGRuleSection";
 import { Tabs } from "./Tabs";
 
@@ -11,8 +14,42 @@ interface NGWordsSettingsModalProps {
   setOpen: (open: boolean) => void;
 }
 
+type ConfirmTarget = "history" | "favorites" | "post_history";
+
+const CONFIRM_TEXT: Record<ConfirmTarget, { title: string; body: string }> = {
+  history: {
+    title: "閲覧履歴の削除",
+    body: "閲覧履歴をすべて削除して機能を無効にします。この操作は取り消せません。",
+  },
+  favorites: {
+    title: "お気に入りの削除",
+    body: "お気に入りをすべて削除して機能を無効にします。この操作は取り消せません。",
+  },
+  post_history: {
+    title: "投稿履歴の削除",
+    body: "投稿履歴をすべて削除して機能を無効にします。この操作は取り消せません。",
+  },
+};
+
 const ThemeTab = () => {
   const { theme, setTheme } = useTheme();
+  const { settings, setSetting } = useUISettings();
+  const { clearHistory, favorites, removeFavorite, clearPostHistory } = useThreadHistory();
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+
+  const handleConfirm = () => {
+    if (confirmTarget === "history") {
+      clearHistory();
+      setSetting("enableReadHistory", false);
+    } else if (confirmTarget === "favorites") {
+      for (const fav of favorites) removeFavorite(fav.key);
+      setSetting("enableFavorites", false);
+    } else if (confirmTarget === "post_history") {
+      clearPostHistory();
+      setSetting("enablePostHistory", false);
+    }
+    setConfirmTarget(null);
+  };
 
   const options = [
     { value: "system", label: "システムデフォルト", icon: FaDesktop },
@@ -21,25 +58,100 @@ const ThemeTab = () => {
   ] as const;
 
   return (
-    <div className="py-2 dark:text-gray-100">
-      <h3 className="text-lg font-semibold mb-4">テーマ</h3>
-      <div className="flex flex-col gap-3">
-        {options.map(({ value, label, icon: Icon }) => (
-          <label key={value} className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="theme"
-              value={value}
-              checked={theme === value}
-              onChange={() => setTheme(value)}
-              className="cursor-pointer"
-            />
-            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            <span>{label}</span>
-          </label>
-        ))}
+    <>
+      {confirmTarget && (
+        <Modal show size="sm" onClose={() => setConfirmTarget(null)} dismissible>
+          <ModalHeader>{CONFIRM_TEXT[confirmTarget].title}</ModalHeader>
+          <ModalBody>
+            <p className="text-gray-700 dark:text-gray-300">{CONFIRM_TEXT[confirmTarget].body}</p>
+          </ModalBody>
+          <ModalFooter className="flex justify-end gap-2">
+            <Button color="gray" onClick={() => setConfirmTarget(null)}>
+              キャンセル
+            </Button>
+            <Button color="red" onClick={handleConfirm}>
+              削除して無効にする
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
+      <div className="py-2 dark:text-gray-100 flex flex-col gap-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-4">テーマ</h3>
+          <div className="flex flex-col gap-3">
+            {options.map(({ value, label, icon: Icon }) => (
+              <label key={value} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="theme"
+                  value={value}
+                  checked={theme === value}
+                  onChange={() => setTheme(value)}
+                  className="cursor-pointer"
+                />
+                <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-4">表示</h3>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.showHistoryButtons}
+                onChange={(e) => setSetting("showHistoryButtons", e.target.checked)}
+                className="cursor-pointer"
+              />
+              <span>ヘッダーに履歴・お気に入りボタンを表示する</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-4">履歴・お気に入り</h3>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.enableReadHistory}
+                onChange={(e) => {
+                  if (!e.target.checked) setConfirmTarget("history");
+                  else setSetting("enableReadHistory", true);
+                }}
+                className="cursor-pointer"
+              />
+              <span>閲覧履歴を記録する</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.enableFavorites}
+                onChange={(e) => {
+                  if (!e.target.checked) setConfirmTarget("favorites");
+                  else setSetting("enableFavorites", true);
+                }}
+                className="cursor-pointer"
+              />
+              <span>お気に入り機能を有効にする</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.enablePostHistory}
+                onChange={(e) => {
+                  if (!e.target.checked) setConfirmTarget("post_history");
+                  else setSetting("enablePostHistory", true);
+                }}
+                className="cursor-pointer"
+              />
+              <span>投稿履歴を記録する</span>
+            </label>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -122,7 +234,7 @@ export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProp
             },
             {
               id: "theme",
-              title: "テーマ",
+              title: "テーマ・表示",
               content: <ThemeTab />,
             },
           ]}

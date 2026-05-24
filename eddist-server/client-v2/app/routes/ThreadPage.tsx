@@ -1,6 +1,6 @@
 import { Button } from "flowbite-react";
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
+import { FaArrowLeft, FaBookmark, FaCog, FaHistory, FaPen, FaSync } from "react-icons/fa";
 import { data, Link, useParams } from "react-router";
 import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
@@ -8,6 +8,8 @@ import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { type BodyAnchorPart, fetchThread, type Response } from "~/api-client/thread";
 import { useNGWords } from "~/contexts/NGWordsContext";
+import { useThreadHistory } from "~/contexts/ThreadHistoryContext";
+import { useUISettings } from "~/contexts/UISettingsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { FloatingNGButton } from "../components/FloatingNGButton";
@@ -19,6 +21,9 @@ const LazyNGWordsSettingsModal = lazy(() =>
   import("../components/NGWordsSettingsModal").then((m) => ({
     default: m.NGWordsSettingsModal,
   })),
+);
+const LazyHistoryModal = lazy(() =>
+  import("../components/HistoryModal").then((m) => ({ default: m.HistoryModal })),
 );
 
 export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
@@ -184,10 +189,14 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
   const [creatingResponse, setCreatingResponse] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const hasEverOpenedHistory = useRef(false);
   const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { shouldFilterResponse } = useNGWords();
+  const { recordVisit, toggleFavorite, isFavorite } = useThreadHistory();
+  const { settings: uiSettings } = useUISettings();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuResponse, setContextMenuResponse] = useState<Response | null>(null);
   const [contextMenuType, setContextMenuType] = useState<"authorId" | "name" | null>(null);
@@ -227,6 +236,19 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
     setIsHydrated(true);
     mutate();
   }, [mutate]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-record when response count changes
+  useEffect(() => {
+    if (
+      uiSettings.enableReadHistory &&
+      params.boardKey &&
+      params.threadKey &&
+      posts?.threadName &&
+      posts.responses.length > 0
+    ) {
+      recordVisit(params.boardKey, params.threadKey, posts.threadName, posts.responses.length);
+    }
+  }, [posts?.responses.length, uiSettings.enableReadHistory]);
 
   // Find current board
   const currentBoard = boards?.find(
@@ -337,6 +359,48 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
+        {uiSettings.showHistoryButtons && uiSettings.enableFavorites && (
+          <button
+            type="button"
+            onClick={() =>
+              toggleFavorite(
+                params.boardKey ?? "",
+                params.threadKey ?? "",
+                posts?.threadName ?? "",
+                posts?.responses.length ?? 0,
+              )
+            }
+            className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title={
+              isFavorite(params.boardKey ?? "", params.threadKey ?? "")
+                ? "お気に入り解除"
+                : "お気に入り登録"
+            }
+          >
+            <FaBookmark
+              className={twMerge(
+                "w-4 h-4",
+                isFavorite(params.boardKey ?? "", params.threadKey ?? "")
+                  ? "text-yellow-400"
+                  : "text-gray-400 dark:text-gray-500",
+              )}
+            />
+          </button>
+        )}
+        {uiSettings.showHistoryButtons &&
+          (uiSettings.enableFavorites || uiSettings.enableReadHistory) && (
+            <button
+              type="button"
+              onClick={() => {
+                hasEverOpenedHistory.current = true;
+                setShowHistory(true);
+              }}
+              className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="履歴・お気に入り"
+            >
+              <FaHistory className="w-4 h-4" />
+            </button>
+          )}
         <button
           type="button"
           onClick={() => {
@@ -344,7 +408,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             setShowNGSettings(true);
           }}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          title="NG設定"
+          title="設定"
         >
           <FaCog className="w-4 h-4" />
         </button>
@@ -367,6 +431,11 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
           </Suspense>
         )}
+        {hasEverOpenedHistory.current && (
+          <Suspense fallback={null}>
+            <LazyHistoryModal open={showHistory} setOpen={setShowHistory} />
+          </Suspense>
+        )}
       </header>
 
       {hasEverOpenedResponse.current && (
@@ -376,6 +445,7 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
             setOpen={setCreatingResponse}
             boardKey={params.boardKey ?? ""}
             threadKey={params.threadKey ?? ""}
+            threadTitle={posts?.threadName ?? ""}
             refetchThread={mutate}
           />
         </Suspense>
