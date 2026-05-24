@@ -96,7 +96,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
                 threads_archive_trigger_thread_count,
                 threads_archive_cron,
                 read_only AS "read_only!: bool",
-                force_metadent_type
+                force_metadent_type,
+                enable_1001_message AS "enable_1001_message!: bool",
+                custom_1001_message
             FROM
                 boards_info
             WHERE
@@ -122,6 +124,8 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             threads_archive_cron: board.threads_archive_cron,
             read_only: board.read_only,
             force_metadent_type: board.force_metadent_type,
+            enable_1001_message: board.enable_1001_message,
+            custom_1001_message: board.custom_1001_message,
         })
     }
 
@@ -268,7 +272,16 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             }
             None => {}
         }
-
+        match &board.custom_1001_message {
+            Some(v) if v.is_empty() => {
+                sets.push("custom_1001_message = NULL");
+            }
+            Some(v) => {
+                sets.push("custom_1001_message = ?");
+                values_str.push(v);
+            }
+            None => {}
+        }
         if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
             sets.push("base_thread_creation_span_sec = ?");
             values.push(base_thread_creation_span_sec);
@@ -306,6 +319,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         if board.read_only.is_some() {
             sets.push("read_only = ?");
         }
+        if board.enable_1001_message.is_some() {
+            sets.push("enable_1001_message = ?");
+        }
 
         let mut tx = pool.begin().await?;
 
@@ -338,6 +354,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             }
             if let Some(read_only) = board.read_only {
                 query = query.bind(read_only);
+            }
+            if let Some(enable_1001_message) = board.enable_1001_message {
+                query = query.bind(enable_1001_message);
             }
             let query = query.bind(board_key);
 

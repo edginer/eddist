@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                local_rules,\n                base_thread_creation_span_sec,\n                base_response_creation_span_sec,\n                max_thread_name_byte_length,\n                max_author_name_byte_length,\n                max_email_byte_length,\n                max_response_body_byte_length,\n                max_response_body_lines,\n                threads_archive_trigger_thread_count,\n                threads_archive_cron,\n                read_only AS \"read_only!: bool\",\n                force_metadent_type\n            FROM\n                boards_info\n            WHERE\n                id = ?\n            ",
+  "query": "\n            SELECT\n                local_rules,\n                base_thread_creation_span_sec,\n                base_response_creation_span_sec,\n                max_thread_name_byte_length,\n                max_author_name_byte_length,\n                max_email_byte_length,\n                max_response_body_byte_length,\n                max_response_body_lines,\n                threads_archive_trigger_thread_count,\n                threads_archive_cron,\n                read_only AS \"read_only!: bool\",\n                force_metadent_type,\n                enable_1001_message AS \"enable_1001_message!: bool\",\n                custom_1001_message\n            FROM\n                boards_info\n            WHERE\n                id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -110,6 +110,24 @@
           "flags": "",
           "max_size": 40
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "enable_1001_message!: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "custom_1001_message",
+        "type_info": {
+          "type": "Blob",
+          "flags": "BLOB",
+          "max_size": 262140
+        }
       }
     ],
     "parameters": {
@@ -127,8 +145,10 @@
       true,
       true,
       false,
+      true,
+      false,
       true
     ]
   },
-  "hash": "cc424c3a553099dab63a1fd0e3c57223fab728eda4f76515278136e89990c7e3"
+  "hash": "849d96bcf67fd921bba94536f4de169993a6c08fe6e8110106f6363f51836340"
 }
