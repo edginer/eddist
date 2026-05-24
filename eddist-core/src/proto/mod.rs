@@ -77,6 +77,9 @@ impl From<&Tinker> for events::Tinker {
 
 impl From<events::Tinker> for Tinker {
     fn from(p: events::Tinker) -> Self {
+        // proto3 defaults absent uint32 fields to 0, so pre-internal_level events
+        // will have internal_level = Some(0) here rather than None (as JWT deserialization does).
+        // This is intentional: event replay applies maximum restrictions, which is the safe default.
         Tinker::from_parts(
             p.authed_token,
             p.wrote_count,
