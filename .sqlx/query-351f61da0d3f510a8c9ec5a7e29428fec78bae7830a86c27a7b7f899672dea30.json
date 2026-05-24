@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                date AS \"date: NaiveDate\",\n                total_responses,\n                new_threads\n            FROM daily_stats\n            WHERE date < CURDATE()\n            ORDER BY date DESC\n            LIMIT ?",
+  "query": "SELECT\n                date AS \"date: NaiveDate\",\n                total_responses,\n                new_threads\n            FROM daily_stats\n            WHERE date < DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))\n            ORDER BY date DESC\n            LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -40,5 +40,5 @@
       false
     ]
   },
-  "hash": "2e1b4895cfb02da3d4679cf80382c42edf87c9f34814c05e7c461b0ae8af8f49"
+  "hash": "351f61da0d3f510a8c9ec5a7e29428fec78bae7830a86c27a7b7f899672dea30"
 }

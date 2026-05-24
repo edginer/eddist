@@ -46,7 +46,8 @@ async fn flush_stats(pool: &MySqlPool) -> anyhow::Result<()> {
     }
 
     sqlx::query!(
-        "INSERT INTO daily_stats (date, total_responses, new_threads) VALUES (CURDATE(), ?, ?) \
+        "INSERT INTO daily_stats (date, total_responses, new_threads) \
+         VALUES (DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')), ?, ?) \
          ON DUPLICATE KEY UPDATE \
          total_responses = total_responses + VALUES(total_responses), \
          new_threads = new_threads + VALUES(new_threads)",

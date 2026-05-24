@@ -26,7 +26,7 @@ impl StatsRepository {
                 total_responses,
                 new_threads
             FROM daily_stats
-            WHERE date = CURDATE()"#,
+            WHERE date = DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))"#,
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -42,7 +42,7 @@ impl StatsRepository {
                 total_responses,
                 new_threads
             FROM daily_stats
-            WHERE date < CURDATE()
+            WHERE date < DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))
             ORDER BY date DESC
             LIMIT ?"#,
             days,
