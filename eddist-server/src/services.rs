@@ -60,6 +60,7 @@ pub(crate) mod user_page_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
 pub mod user_restriction_service;
+pub(crate) mod validation;
 
 #[mockall::automock]
 #[async_trait::async_trait]

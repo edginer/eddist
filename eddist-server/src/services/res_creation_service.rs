@@ -1,21 +1,18 @@
-use std::{borrow::Cow, env};
+use std::borrow::Cow;
 
 use anyhow::anyhow;
 use chrono::Utc;
 use eddist_core::{
     domain::{
-        cap::calculate_cap_hash,
         client_info::ClientInfo,
         ip_addr::ReducedIpAddr,
         pubsub_repository::{CreatingRes, PubSubItem},
         tinker::Tinker,
     },
-    simple_rate_limiter::RateLimiter,
     utils::is_res_pub_enabled,
 };
 use metrics::counter;
 use redis::{Cmd, Value, aio::ConnectionManager};
-use tokio::sync::Mutex;
 use tracing::error_span;
 use uuid::Uuid;
 
@@ -25,8 +22,7 @@ use crate::{
         res::Res,
         res_core::ResCore,
         service::{
-            bbscgi_auth_service::{BbsCgiAuthService, USER_CREATION_RATE_LIMIT},
-            bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
+            bbscgi_auth_service::BbsCgiAuthService,
             board_info_service::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
@@ -48,6 +44,7 @@ use eddist_core::redis_keys::thread_cache_key;
 use super::{
     BbsCgiService, openai_moderation_service,
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    validation::{check_userreg, resolve_cap_name},
 };
 
 #[derive(Clone)]
@@ -169,40 +166,11 @@ impl<
             )
             .await?;
 
-        if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
-            && input.body.starts_with("!userreg")
-        {
-            let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
-                Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
-            });
-            {
-                let mut rate_limiter = rate_limiter.lock().await;
-                if !rate_limiter.check_and_add(&authed_token.token) {
-                    return Err(BbsCgiError::TooManyUserCreationAttempt);
-                }
-            }
-
-            let user_reg_url_svc = UserRegTempUrlService::new(redis_conn.clone());
-            return match user_reg_url_svc
-                .create_userreg_temp_url(&authed_token)
-                .await?
-            {
-                UserRegUrlKind::Registered => Err(BbsCgiError::UserAlreadyRegistered),
-                UserRegUrlKind::NotRegistered(user_reg_url) => {
-                    Err(BbsCgiError::UserRegTempUrl { url: user_reg_url })
-                }
-            };
+        if let Some(err) = check_userreg(&input.body, &authed_token, redis_conn.clone()).await? {
+            return Err(err);
         }
 
-        let cap_name = if let Some(cap) = res.cap() {
-            let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
-            self.0
-                .get_cap_by_board_key(&hash, &input.board_key)
-                .await?
-                .map(|x| x.name)
-        } else {
-            None
-        };
+        let cap_name = resolve_cap_name(&self.0, &res, &input.board_key).await?;
         let mut res = res.set_author_id(&authed_token, cap_name);
 
         // Restrict the image posting below internal_level 2
