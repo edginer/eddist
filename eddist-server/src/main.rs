@@ -21,6 +21,7 @@ use services::{
     AppServiceContainer,
     captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
     server_settings_cache::{refresh_server_settings_cache, start_server_settings_refresh_task},
+    stats_counter::{flush_stats_now, start_stats_flush_task},
     user_restriction_service::start_cache_refresh_task,
 };
 use sqlx::mysql::MySqlPoolOptions;
@@ -32,7 +33,8 @@ use tower_http::normalize_path::NormalizePathLayer;
 use crate::{
     app::{AppState, create_app},
     repositories::{
-        notice_repository::NoticeRepositoryImpl, terms_repository::TermsRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl, stats_repository::StatsRepositoryImpl,
+        terms_repository::TermsRepositoryImpl,
     },
     services::PubSubRepos,
 };
@@ -45,6 +47,7 @@ mod repositories {
     pub(crate) mod captcha_config_repository;
     pub(crate) mod idp_repository;
     pub(crate) mod notice_repository;
+    pub(crate) mod stats_repository;
     pub(crate) mod terms_repository;
     pub(crate) mod user_repository;
     pub(crate) mod user_restriction_repository;
@@ -90,7 +93,7 @@ mod routes {
     pub mod dat_routing;
     pub mod notice;
     pub mod re_auth;
-    pub mod statics;
+    pub mod stats;
     pub mod subject_list;
     pub mod terms;
     pub mod user;
@@ -162,6 +165,7 @@ async fn main() -> anyhow::Result<()> {
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = TermsRepositoryImpl::new(pool.clone());
+    let stats_repo = StatsRepositoryImpl::new(pool.clone());
 
     // Load initial server settings from database and initialize cache
     refresh_server_settings_cache(&pool).await?;
@@ -182,6 +186,7 @@ async fn main() -> anyhow::Result<()> {
         ),
         notice_repo,
         terms_repo,
+        stats_repo,
         template_engine: Arc::new(template_engine),
         tinker_secret,
     };
@@ -193,7 +198,10 @@ async fn main() -> anyhow::Result<()> {
     start_captcha_config_refresh_task(pool.clone(), Duration::from_secs(300));
 
     // Start background task for server settings cache refresh (every 5 minutes)
-    start_server_settings_refresh_task(pool, Duration::from_secs(300));
+    start_server_settings_refresh_task(pool.clone(), Duration::from_secs(300));
+
+    // Start background task for stats flush (every 30 seconds)
+    start_stats_flush_task(pool.clone(), Duration::from_secs(30));
 
     log::info!("Start application server with 0.0.0.0:8080");
 
@@ -242,6 +250,10 @@ async fn main() -> anyhow::Result<()> {
         .with_graceful_shutdown(graceful_shutdown_http())
         .await
         .unwrap();
+
+    if flush_stats_now(&pool).await.is_ok() {
+        tracing::info!("Flushed stats on shutdown.");
+    }
 
     tokio::time::sleep(Duration::from_millis(3000)).await;
 
