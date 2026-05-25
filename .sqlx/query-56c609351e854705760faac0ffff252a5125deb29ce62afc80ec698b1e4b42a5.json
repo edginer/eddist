@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT * FROM threads \n            WHERE thread_number = ? \n            AND board_id = (\n                SELECT id FROM boards WHERE board_key = ? LIMIT 1\n            )",
+  "query": "SELECT * FROM threads\n            WHERE thread_number = ?\n            AND board_id = (\n                SELECT id FROM boards WHERE board_key = ? LIMIT 1\n            )",
   "describe": {
     "columns": [
       {
@@ -140,5 +140,5 @@
       false
     ]
   },
-  "hash": "ba81b89cefcd1e90019d493ec7e52d34e69ef5103d7ff59a73cf20983d6e8ba4"
+  "hash": "56c609351e854705760faac0ffff252a5125deb29ce62afc80ec698b1e4b42a5"
 }

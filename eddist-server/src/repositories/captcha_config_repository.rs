@@ -222,36 +222,52 @@ impl From<CaptchaConfigRow> for CaptchaProviderConfig {
     }
 }
 
-/// Load all active captcha configs from the database
-pub async fn get_active_captcha_configs(
-    pool: &MySqlPool,
-) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
-    let rows = sqlx::query_as!(
-        CaptchaConfigRow,
-        r#"
-        SELECT
-            id AS "id: Uuid",
-            name,
-            provider,
-            site_key,
-            secret,
-            base_url,
-            widget_form_field_name,
-            widget_script_url,
-            widget_html,
-            widget_script_handler,
-            capture_fields AS "capture_fields: serde_json::Value",
-            verification AS "verification: serde_json::Value",
-            is_active AS "is_active: bool",
-            display_order,
-            endpoint_usage
-        FROM captcha_configs
-        WHERE is_active = 1
-        ORDER BY display_order ASC, created_at ASC
-        "#
-    )
-    .fetch_all(pool)
-    .await?;
+#[async_trait::async_trait]
+pub trait CaptchaConfigRepository: Send + Sync + 'static {
+    async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>>;
+}
 
-    Ok(rows.into_iter().map(CaptchaProviderConfig::from).collect())
+#[derive(Debug, Clone)]
+pub struct CaptchaConfigRepositoryImpl {
+    pool: MySqlPool,
+}
+
+impl CaptchaConfigRepositoryImpl {
+    pub fn new(pool: MySqlPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait::async_trait]
+impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
+    async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
+        let rows = sqlx::query_as!(
+            CaptchaConfigRow,
+            r#"
+            SELECT
+                id AS "id: Uuid",
+                name,
+                provider,
+                site_key,
+                secret,
+                base_url,
+                widget_form_field_name,
+                widget_script_url,
+                widget_html,
+                widget_script_handler,
+                capture_fields AS "capture_fields: serde_json::Value",
+                verification AS "verification: serde_json::Value",
+                is_active AS "is_active: bool",
+                display_order,
+                endpoint_usage
+            FROM captcha_configs
+            WHERE is_active = 1
+            ORDER BY display_order ASC, created_at ASC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(CaptchaProviderConfig::from).collect())
+    }
 }

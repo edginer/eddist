@@ -8,6 +8,12 @@ pub struct DailyStat {
     pub new_threads: i64,
 }
 
+#[async_trait::async_trait]
+pub trait StatsRepository: Send + Sync + 'static {
+    async fn get_today_stat(&self) -> anyhow::Result<Option<DailyStat>>;
+    async fn get_daily_stats(&self, days: u32) -> anyhow::Result<Vec<DailyStat>>;
+}
+
 #[derive(Debug, Clone)]
 pub struct StatsRepositoryImpl {
     pool: MySqlPool,
@@ -17,8 +23,11 @@ impl StatsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
+}
 
-    pub async fn get_today_stat(&self) -> anyhow::Result<Option<DailyStat>> {
+#[async_trait::async_trait]
+impl StatsRepository for StatsRepositoryImpl {
+    async fn get_today_stat(&self) -> anyhow::Result<Option<DailyStat>> {
         let row = sqlx::query_as!(
             DailyStat,
             r#"SELECT
@@ -34,7 +43,7 @@ impl StatsRepositoryImpl {
         Ok(row)
     }
 
-    pub async fn get_daily_stats(&self, days: u32) -> anyhow::Result<Vec<DailyStat>> {
+    async fn get_daily_stats(&self, days: u32) -> anyhow::Result<Vec<DailyStat>> {
         let rows = sqlx::query_as!(
             DailyStat,
             r#"SELECT

@@ -3,12 +3,13 @@ use std::{
     time::Duration,
 };
 
-use sqlx::MySqlPool;
 use tokio::sync::RwLock;
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
-    repositories::captcha_config_repository::get_active_captcha_configs,
+    repositories::captcha_config_repository::{
+        CaptchaConfigRepository, CaptchaConfigRepositoryImpl,
+    },
 };
 
 static GLOBAL_CAPTCHA_CONFIG_CACHE: OnceLock<Arc<RwLock<CaptchaConfigCache>>> = OnceLock::new();
@@ -57,8 +58,10 @@ pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfi
 }
 
 /// Refresh the cache with new configs from the database
-pub async fn refresh_captcha_config_cache(pool: &MySqlPool) -> anyhow::Result<()> {
-    let configs = get_active_captcha_configs(pool).await?;
+pub async fn refresh_captcha_config_cache(
+    repo: &dyn CaptchaConfigRepository,
+) -> anyhow::Result<()> {
+    let configs = repo.get_active_captcha_configs().await?;
     let global_cache = get_global_cache();
     let mut cache = global_cache.write().await;
 
@@ -80,13 +83,14 @@ pub async fn refresh_captcha_config_cache(pool: &MySqlPool) -> anyhow::Result<()
 }
 
 /// Start a background task that periodically refreshes the captcha config cache
-pub fn start_captcha_config_refresh_task(pool: MySqlPool, refresh_interval: Duration) {
+pub fn start_captcha_config_refresh_task(pool: sqlx::MySqlPool, refresh_interval: Duration) {
+    let repo = CaptchaConfigRepositoryImpl::new(pool);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(refresh_interval);
 
         loop {
             interval.tick().await;
-            if let Err(e) = refresh_captcha_config_cache(&pool).await {
+            if let Err(e) = refresh_captcha_config_cache(&repo).await {
                 tracing::error!("Failed to refresh captcha config cache: {e}");
             }
         }

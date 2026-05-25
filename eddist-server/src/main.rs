@@ -13,6 +13,7 @@ use eddist::{
     repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
+        captcha_config_repository::CaptchaConfigRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
         notice_repository::NoticeRepositoryImpl,
         stats_repository::StatsRepositoryImpl,
@@ -80,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     let tinker_secret = env::var("TINKER_SECRET").unwrap();
 
     // Load initial captcha configs from database and initialize cache
-    refresh_captcha_config_cache(&pool).await?;
+    refresh_captcha_config_cache(&CaptchaConfigRepositoryImpl::new(pool.clone())).await?;
 
     let template_engine = load_template_engine();
 

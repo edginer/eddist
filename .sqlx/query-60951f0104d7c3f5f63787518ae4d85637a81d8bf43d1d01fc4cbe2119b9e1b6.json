@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            name,\n            board_key,\n            default_name\n        FROM boards \n        WHERE board_key = ?",
+  "query": "\n        SELECT\n            id AS \"id: Uuid\",\n            name,\n            board_key,\n            default_name\n        FROM boards\n        WHERE board_key = ?",
   "describe": {
     "columns": [
       {
@@ -50,5 +50,5 @@
       false
     ]
   },
-  "hash": "9651b4c1fd82a12575b69401cf27adcbe46aa68c4cc17fdeb109eaf79a536d1d"
+  "hash": "60951f0104d7c3f5f63787518ae4d85637a81d8bf43d1d01fc4cbe2119b9e1b6"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone\n            FROM responses WHERE thread_id = ? \n            ORDER BY res_order, id",
+  "query": "SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone\n            FROM responses WHERE thread_id = ?\n            ORDER BY res_order, id",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "b0ec6bf58977a322bb8cccc577e1c7d589fbf281b1e54e8d79e6fec6297c9eac"
+  "hash": "a08e63a678ed8b5761854dd13efc9068bfbb2c9e9879d1220827694c792b9c38"
 }
