@@ -17,7 +17,7 @@ use crate::{
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
         stats_counter::{increment_response_delta, increment_thread_delta},
-        thread_creation_service::{TheradCreationServiceInput, ThreadCreationServiceOutput},
+        thread_creation_service::{ThreadCreationServiceInput, ThreadCreationServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
     utils::{get_asn_num, get_origin_ip, get_tinker, get_ua},
@@ -108,7 +108,7 @@ pub async fn post_bbs_cgi(
 
         let svc = state.services.thread_creation();
         let (tinker, authed_token_id, is_authed_token_bound) = match svc
-            .execute(TheradCreationServiceInput {
+            .execute(ThreadCreationServiceInput {
                 board_key,
                 title,
                 authed_token: edge_token,

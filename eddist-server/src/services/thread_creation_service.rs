@@ -43,7 +43,7 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
+pub struct ThreadCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
     T,
     U,
     ConnectionManager,
@@ -51,7 +51,7 @@ pub struct TheradCreationService<T: BbsRepository, U: UserRepository, E: Creatio
 );
 
 impl<T: BbsRepository, U: UserRepository, E: CreationEventRepository>
-    TheradCreationService<T, U, E>
+    ThreadCreationService<T, U, E>
 {
     pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, event_repo: E) -> Self {
         Self(repo, user_repo, redis_conn, event_repo)
@@ -60,12 +60,12 @@ impl<T: BbsRepository, U: UserRepository, E: CreationEventRepository>
 
 #[async_trait::async_trait]
 impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventRepository>
-    BbsCgiService<TheradCreationServiceInput, ThreadCreationServiceOutput>
-    for TheradCreationService<T, U, E>
+    BbsCgiService<ThreadCreationServiceInput, ThreadCreationServiceOutput>
+    for ThreadCreationService<T, U, E>
 {
     async fn execute(
         &self,
-        input: TheradCreationServiceInput,
+        input: ThreadCreationServiceInput,
     ) -> Result<ThreadCreationServiceOutput, BbsCgiError> {
         let mut redis_conn = self.2.clone();
         let bbs_repo = self.0.clone();
@@ -316,7 +316,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
     }
 }
 
-pub struct TheradCreationServiceInput {
+pub struct ThreadCreationServiceInput {
     pub board_key: String,
     pub title: String,
     pub authed_token: Option<String>,

@@ -6,16 +6,16 @@ pub use sqlx;
 pub use uuid;
 
 mod shiftjis;
-mod repositories {
-    pub(crate) mod bbs_pubsub_repository;
-    pub(crate) mod bbs_repository;
-    pub(crate) mod captcha_config_repository;
-    pub(crate) mod idp_repository;
-    pub(crate) mod notice_repository;
-    pub(crate) mod stats_repository;
-    pub(crate) mod terms_repository;
-    pub(crate) mod user_repository;
-    pub(crate) mod user_restriction_repository;
+pub mod repositories {
+    pub mod bbs_pubsub_repository;
+    pub mod bbs_repository;
+    pub mod captcha_config_repository;
+    pub mod idp_repository;
+    pub mod notice_repository;
+    pub mod stats_repository;
+    pub mod terms_repository;
+    pub mod user_repository;
+    pub mod user_restriction_repository;
 }
 mod domain {
     pub(crate) mod service {
@@ -41,7 +41,7 @@ mod domain {
 }
 mod error;
 mod middleware;
-mod services;
+pub mod services;
 mod template;
 pub(crate) mod external {
     pub mod captcha_like_client;
