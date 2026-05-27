@@ -1,64 +1,52 @@
 use std::{
-    sync::{
-        Arc, OnceLock,
-        atomic::{AtomicI64, Ordering},
-    },
+    collections::HashMap,
+    sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
 use sqlx::MySqlPool;
 
-pub struct StatsCounter {
-    pub response_delta: AtomicI64,
-    pub thread_delta: AtomicI64,
+static BOARD_STATS: OnceLock<Arc<Mutex<HashMap<String, (i64, i64)>>>> = OnceLock::new();
+
+fn get_board_stats() -> &'static Arc<Mutex<HashMap<String, (i64, i64)>>> {
+    BOARD_STATS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
 }
 
-static GLOBAL_STATS_COUNTER: OnceLock<Arc<StatsCounter>> = OnceLock::new();
-
-fn get_global_counter() -> &'static Arc<StatsCounter> {
-    GLOBAL_STATS_COUNTER.get_or_init(|| {
-        Arc::new(StatsCounter {
-            response_delta: AtomicI64::new(0),
-            thread_delta: AtomicI64::new(0),
-        })
-    })
+pub fn increment_board_response_delta(board_key: &str) {
+    let mut map = get_board_stats().lock().unwrap();
+    let entry = map.entry(board_key.to_string()).or_insert((0, 0));
+    entry.0 += 1;
 }
 
-pub fn increment_response_delta() {
-    get_global_counter()
-        .response_delta
-        .fetch_add(1, Ordering::Relaxed);
-}
-
-pub fn increment_thread_delta() {
-    get_global_counter()
-        .thread_delta
-        .fetch_add(1, Ordering::Relaxed);
+pub fn increment_board_thread_delta(board_key: &str) {
+    let mut map = get_board_stats().lock().unwrap();
+    let entry = map.entry(board_key.to_string()).or_insert((0, 0));
+    entry.1 += 1;
 }
 
 pub async fn flush_stats_now(pool: &MySqlPool) -> anyhow::Result<()> {
-    let counter = get_global_counter();
-    let delta_r = counter.response_delta.load(Ordering::Relaxed);
-    let delta_t = counter.thread_delta.load(Ordering::Relaxed);
+    let deltas: HashMap<String, (i64, i64)> = {
+        let mut map = get_board_stats().lock().unwrap();
+        std::mem::take(&mut *map)
+    };
 
-    if delta_r == 0 && delta_t == 0 {
-        return Ok(());
+    for (board_key, (response_delta, thread_delta)) in deltas {
+        if response_delta == 0 && thread_delta == 0 {
+            continue;
+        }
+        sqlx::query!(
+            "INSERT INTO daily_stats (date, board_key, total_responses, new_threads) \
+             VALUES (DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')), ?, ?, ?) \
+             ON DUPLICATE KEY UPDATE \
+             total_responses = total_responses + VALUES(total_responses), \
+             new_threads = new_threads + VALUES(new_threads)",
+            board_key,
+            response_delta,
+            thread_delta,
+        )
+        .execute(pool)
+        .await?;
     }
-
-    sqlx::query!(
-        "INSERT INTO daily_stats (date, total_responses, new_threads) \
-         VALUES (DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')), ?, ?) \
-         ON DUPLICATE KEY UPDATE \
-         total_responses = total_responses + VALUES(total_responses), \
-         new_threads = new_threads + VALUES(new_threads)",
-        delta_r,
-        delta_t,
-    )
-    .execute(pool)
-    .await?;
-
-    counter.response_delta.fetch_sub(delta_r, Ordering::Relaxed);
-    counter.thread_delta.fetch_sub(delta_t, Ordering::Relaxed);
 
     Ok(())
 }

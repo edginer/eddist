@@ -16,7 +16,7 @@ use crate::{
         bind_token_to_user_service::BindTokenToUserServiceInput,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
-        stats_counter::{increment_response_delta, increment_thread_delta},
+        stats_counter::{increment_board_response_delta, increment_board_thread_delta},
         thread_creation_service::{ThreadCreationServiceInput, ThreadCreationServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
@@ -109,7 +109,7 @@ pub async fn post_bbs_cgi(
         let svc = state.services.thread_creation();
         let (tinker, authed_token_id, is_authed_token_bound) = match svc
             .execute(ThreadCreationServiceInput {
-                board_key,
+                board_key: board_key.clone(),
                 title,
                 authed_token: edge_token,
                 name,
@@ -128,7 +128,7 @@ pub async fn post_bbs_cgi(
                 authed_token_id,
                 is_authed_token_bound,
             }) => {
-                increment_thread_delta();
+                increment_board_thread_delta(&board_key);
                 (tinker, authed_token_id, is_authed_token_bound)
             }
             Err(e) => {
@@ -147,7 +147,7 @@ pub async fn post_bbs_cgi(
         let svc = state.services.res_creation();
         match svc
             .execute(ResCreationServiceInput {
-                board_key,
+                board_key: board_key.clone(),
                 thread_number,
                 authed_token_cookie: edge_token,
                 name,
@@ -167,7 +167,7 @@ pub async fn post_bbs_cgi(
                 authed_token_id,
                 is_authed_token_bound,
             }) => {
-                increment_response_delta();
+                increment_board_response_delta(&board_key);
                 (tinker, res_order, authed_token_id, is_authed_token_bound)
             }
             Err(e) => {
