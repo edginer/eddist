@@ -6,98 +6,39 @@ use std::{convert::Infallible, env, sync::Arc, time::Duration};
 use axum::{
     ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
 };
+use eddist::{
+    AppState,
+    app::create_app,
+    load_template_engine,
+    repositories::{
+        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+        bbs_repository::BbsRepositoryImpl,
+        captcha_config_repository::CaptchaConfigRepositoryImpl,
+        idp_repository::IdpRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl,
+        stats_repository::StatsRepositoryImpl,
+        terms_repository::TermsRepositoryImpl,
+        user_repository::UserRepositoryImpl,
+        user_restriction_repository::UserRestrictionRepositoryImpl,
+    },
+    services::{
+        AppServiceContainer, PubSubRepos,
+        captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
+        server_settings_cache::{
+            refresh_server_settings_cache, start_server_settings_refresh_task,
+        },
+        stats_counter::{flush_stats_now, start_stats_flush_task},
+    },
+    start_cache_refresh_task,
+};
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
-use repositories::{
-    bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-    bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl,
-    user_repository::UserRepositoryImpl,
-    user_restriction_repository::UserRestrictionRepositoryImpl,
-};
-use services::{
-    AppServiceContainer,
-    captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
-    server_settings_cache::{refresh_server_settings_cache, start_server_settings_refresh_task},
-    stats_counter::{flush_stats_now, start_stats_flush_task},
-    user_restriction_service::start_cache_refresh_task,
-};
 use sqlx::mysql::MySqlPoolOptions;
-use template::load_template_engine;
 use tokio::net::TcpListener;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
-
-use crate::{
-    app::{AppState, create_app},
-    repositories::{
-        notice_repository::NoticeRepositoryImpl, stats_repository::StatsRepositoryImpl,
-        terms_repository::TermsRepositoryImpl,
-    },
-    services::PubSubRepos,
-};
-
-pub mod app;
-mod shiftjis;
-mod repositories {
-    pub(crate) mod bbs_pubsub_repository;
-    pub(crate) mod bbs_repository;
-    pub(crate) mod captcha_config_repository;
-    pub(crate) mod idp_repository;
-    pub(crate) mod notice_repository;
-    pub(crate) mod stats_repository;
-    pub(crate) mod terms_repository;
-    pub(crate) mod user_repository;
-    pub(crate) mod user_restriction_repository;
-}
-mod domain {
-    pub(crate) mod service {
-        pub mod bbscgi_auth_service;
-        pub mod bbscgi_user_reg_temp_url_service;
-        pub mod board_info_service;
-        pub mod email_auth_restriction_service;
-        pub mod ng_word_reading_service;
-        pub mod oidc_client_service;
-        pub mod res_creation_span_management_service;
-    }
-
-    pub(crate) mod user;
-
-    pub(crate) mod authed_token;
-    pub(crate) mod captcha_like;
-    pub(crate) mod metadent;
-    pub(crate) mod ng_word;
-    pub(crate) mod res;
-    pub(crate) mod res_core;
-    pub(crate) mod thread;
-    pub(crate) mod thread_list;
-    pub(crate) mod thread_res_list;
-
-    pub(crate) mod utils;
-}
-mod error;
-mod middleware;
-mod services;
-mod template;
-
-pub(crate) mod external {
-    pub mod captcha_like_client;
-    pub mod oidc_client;
-}
-pub(crate) mod utils;
-mod routes {
-    pub mod auth_code;
-    pub mod bbs_cgi;
-    pub mod dat_routing;
-    pub mod notice;
-    pub mod re_auth;
-    pub mod stats;
-    pub mod subject_list;
-    pub mod terms;
-    pub mod user;
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -140,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     let tinker_secret = env::var("TINKER_SECRET").unwrap();
 
     // Load initial captcha configs from database and initialize cache
-    refresh_captcha_config_cache(&pool).await?;
+    refresh_captcha_config_cache(&CaptchaConfigRepositoryImpl::new(pool.clone())).await?;
 
     let template_engine = load_template_engine();
 

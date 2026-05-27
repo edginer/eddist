@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::app::AppState;
+use crate::{app::AppState, repositories::stats_repository::StatsRepository};
 
 #[derive(Serialize)]
 pub struct TodayStatsResponse {

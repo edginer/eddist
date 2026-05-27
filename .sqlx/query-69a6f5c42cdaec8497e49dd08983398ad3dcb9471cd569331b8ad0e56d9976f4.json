@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                id,\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity,\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration,\n                registered_user_id,\n                require_reauth\n            FROM authed_tokens WHERE id = ?",
+  "query": "SELECT\n                id AS \"id: Uuid\",\n                token,\n                origin_ip,\n                reduced_origin_ip,\n                asn_num,\n                writing_ua,\n                authed_ua,\n                auth_code,\n                created_at,\n                authed_at,\n                validity AS \"validity: bool\",\n                last_wrote_at,\n                author_id_seed,\n                require_user_registration AS \"require_user_registration: bool\",\n                registered_user_id AS \"registered_user_id?: Uuid\",\n                require_reauth AS \"require_reauth: bool\"\n            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "id: Uuid",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
@@ -95,7 +95,7 @@
       },
       {
         "ordinal": 10,
-        "name": "validity",
+        "name": "validity: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
@@ -122,7 +122,7 @@
       },
       {
         "ordinal": 13,
-        "name": "require_user_registration",
+        "name": "require_user_registration: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -131,7 +131,7 @@
       },
       {
         "ordinal": 14,
-        "name": "registered_user_id",
+        "name": "registered_user_id?: Uuid",
         "type_info": {
           "type": "String",
           "flags": "MULTIPLE_KEY | BINARY",
@@ -140,7 +140,7 @@
       },
       {
         "ordinal": 15,
-        "name": "require_reauth",
+        "name": "require_reauth: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -149,7 +149,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -170,5 +170,5 @@
       false
     ]
   },
-  "hash": "0492738015ac02d8b6995d8e60fa9c186654d8a5679be67d3e61ecf602f44f86"
+  "hash": "69a6f5c42cdaec8497e49dd08983398ad3dcb9471cd569331b8ad0e56d9976f4"
 }

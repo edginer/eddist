@@ -57,7 +57,7 @@ pub async fn get_dat_txt(
         None
     };
 
-    let svc = state.get_container().thread_retrival();
+    let svc = state.get_container().thread_retrieval();
     let result = match svc
         .execute(ThreadRetrievalServiceInput {
             board_key: board_key.clone(),

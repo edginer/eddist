@@ -8,7 +8,7 @@ use metadent_thread_list_service::MetadentThreadListService;
 use reauth_service::ReAuthService;
 use redis::aio::ConnectionManager;
 use res_creation_service::ResCreationService;
-use thread_creation_service::TheradCreationService;
+use thread_creation_service::ThreadCreationService;
 use thread_list_service::ThreadListService;
 use thread_retrieval_service::ThreadRetrievalService;
 use user_authz_idp_callback_service::UserAuthzIdpCallbackService;
@@ -40,15 +40,15 @@ pub struct PubSubRepos<P: PubRepository, E: CreationEventRepository> {
 pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
-pub(crate) mod captcha_config_cache;
+pub mod captcha_config_cache;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod metadent_thread_list_service;
 pub(crate) mod openai_moderation_service;
 pub(crate) mod reauth_service;
 pub(crate) mod res_creation_service;
-pub(crate) mod server_settings_cache;
-pub(crate) mod stats_counter;
+pub mod server_settings_cache;
+pub mod stats_counter;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
 pub(crate) mod thread_retrieval_service;
@@ -59,7 +59,8 @@ pub(crate) mod user_logout_service;
 pub(crate) mod user_page_service;
 pub(crate) mod user_reg_idp_redirection_service;
 pub(crate) mod user_reg_temp_url_service;
-pub(crate) mod user_restriction_service;
+pub mod user_restriction_service;
+pub(crate) mod validation;
 
 #[mockall::automock]
 #[async_trait::async_trait]
@@ -87,10 +88,10 @@ pub struct AppServiceContainer<
     board_info: BoardInfoService<B>,
     list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B, U, P, E>,
-    thread_creation: TheradCreationService<B, U, E>,
+    thread_creation: ThreadCreationService<B, U, E>,
     thread_list: ThreadListService<B>,
     metadent_thread_list: MetadentThreadListService<B>,
-    thread_retrival: ThreadRetrievalService<B>,
+    thread_retrieval: ThreadRetrievalService<B>,
     kako_thread_retrieval: KakoThreadRetrievalService,
 
     user_reg_temp_url: UserRegTempUrlService<I, U, B>,
@@ -139,7 +140,7 @@ impl<
                 pubsub.pub_repo.clone(),
                 pubsub.event_repo.clone(),
             ),
-            thread_creation: TheradCreationService::new(
+            thread_creation: ThreadCreationService::new(
                 bbs_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
@@ -147,7 +148,7 @@ impl<
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
-            thread_retrival: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
+            thread_retrieval: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
             kako_thread_retrieval: KakoThreadRetrievalService::new(client, bucket_name),
 
             user_reg_temp_url: UserRegTempUrlService::new(
@@ -208,7 +209,7 @@ impl<
         &self.res_creation
     }
 
-    pub fn thread_creation(&self) -> &TheradCreationService<B, U, E> {
+    pub fn thread_creation(&self) -> &ThreadCreationService<B, U, E> {
         &self.thread_creation
     }
 
@@ -220,8 +221,8 @@ impl<
         &self.metadent_thread_list
     }
 
-    pub fn thread_retrival(&self) -> &ThreadRetrievalService<B> {
-        &self.thread_retrival
+    pub fn thread_retrieval(&self) -> &ThreadRetrievalService<B> {
+        &self.thread_retrieval
     }
 
     pub fn list_boards(&self) -> &ListBoardsService<B> {

@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                nw.id AS \"id: Uuid\",\n                nw.name AS name,\n                nw.word AS word,\n                nw.created_at AS created_at,\n                nw.updated_at AS updated_at\n            FROM ng_words AS nw\n            JOIN boards_ng_words AS bnw \n            ON nw.id = bnw.ng_word_id\n            JOIN boards AS b\n            ON bnw.board_id = b.id\n            WHERE b.board_key = ?\n        ",
+  "query": "SELECT\n                nw.id AS \"id: Uuid\",\n                nw.name AS name,\n                nw.word AS word,\n                nw.created_at AS created_at,\n                nw.updated_at AS updated_at\n            FROM ng_words AS nw\n            JOIN boards_ng_words AS bnw\n            ON nw.id = bnw.ng_word_id\n            JOIN boards AS b\n            ON bnw.board_id = b.id\n            WHERE b.board_key = ?\n        ",
   "describe": {
     "columns": [
       {
@@ -60,5 +60,5 @@
       false
     ]
   },
-  "hash": "2bcfaf143e5d8aa2030618f42db32096aa2af0165bffa067cba96050dbd33807"
+  "hash": "4116a38c6509572b44e300f4c3b1bc1e1b96863f01368348c0e0ef665ec28c5f"
 }

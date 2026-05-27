@@ -109,6 +109,16 @@ impl<
     B: BbsRepository + Clone,
 > UserAuthzIdpCallbackService<I, U, B>
 {
+    async fn bind_token(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
+        let tx = self.user_repo.begin().await?;
+        let tx = self
+            .user_repo
+            .bind_user_authed_token(user_id, token_id, tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn register_user_with_idp(
         &self,
         user_reg_state: UserRegState,
@@ -157,12 +167,7 @@ impl<
             .await?
         {
             // Already user is registered
-            let tx = self.user_repo.begin().await?;
-            let tx = self
-                .user_repo
-                .bind_user_authed_token(u.id, authed_token_uuid, tx)
-                .await?;
-            tx.commit().await?;
+            self.bind_token(u.id, authed_token_uuid).await?;
 
             if !u.enabled {
                 return Err(anyhow::anyhow!("user is disabled"));
@@ -202,12 +207,7 @@ impl<
             && token.validity
             && token.registered_user_id.is_none()
         {
-            let tx = self.user_repo.begin().await?;
-            let tx = self
-                .user_repo
-                .bind_user_authed_token(user_id, token.id, tx)
-                .await?;
-            tx.commit().await?;
+            self.bind_token(user_id, token.id).await?;
         }
 
         let mut hasher = sha3::Sha3_512::new();
@@ -282,12 +282,7 @@ impl<
                     && token.validity
                     && token.registered_user_id.is_none()
                 {
-                    let tx = self.user_repo.begin().await?;
-                    let tx = self
-                        .user_repo
-                        .bind_user_authed_token(user.id, token.id, tx)
-                        .await?;
-                    tx.commit().await?;
+                    self.bind_token(user.id, token.id).await?;
                     Some(browser_token)
                 } else {
                     // No valid unbound browser token — create and activate a new one.
@@ -311,12 +306,7 @@ impl<
                     self.bbs_repo
                         .activate_authed_status(&new_token.token, &user_agent, created_at, None)
                         .await?;
-                    let tx = self.user_repo.begin().await?;
-                    let tx = self
-                        .user_repo
-                        .bind_user_authed_token(user.id, new_token.id, tx)
-                        .await?;
-                    tx.commit().await?;
+                    self.bind_token(user.id, new_token.id).await?;
                     Some(new_token.token)
                 };
 

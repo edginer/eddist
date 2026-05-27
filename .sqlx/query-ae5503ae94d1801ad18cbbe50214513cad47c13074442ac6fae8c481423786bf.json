@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT * FROM threads WHERE board_id = ? AND active = 1",
+  "query": "SELECT\n                        id AS \"id: Uuid\",\n                        board_id AS \"board_id: Uuid\",\n                        thread_number,\n                        last_modified_at,\n                        sage_last_modified_at,\n                        title,\n                        authed_token_id AS \"authed_token_id: Uuid\",\n                        metadent,\n                        response_count,\n                        no_pool AS \"no_pool: bool\",\n                        active AS \"active: bool\",\n                        archived AS \"archived: bool\",\n                        archive_converted AS \"archive_converted: bool\"\n                    FROM threads WHERE board_id = ? AND active = 0 AND archived = 0",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "id: Uuid",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
@@ -14,7 +14,7 @@
       },
       {
         "ordinal": 1,
-        "name": "board_id",
+        "name": "board_id: Uuid",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
@@ -59,7 +59,7 @@
       },
       {
         "ordinal": 6,
-        "name": "authed_token_id",
+        "name": "authed_token_id: Uuid",
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
@@ -86,7 +86,7 @@
       },
       {
         "ordinal": 9,
-        "name": "no_pool",
+        "name": "no_pool: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -95,7 +95,7 @@
       },
       {
         "ordinal": 10,
-        "name": "active",
+        "name": "active: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -104,7 +104,7 @@
       },
       {
         "ordinal": 11,
-        "name": "archived",
+        "name": "archived: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -113,7 +113,7 @@
       },
       {
         "ordinal": 12,
-        "name": "archive_converted",
+        "name": "archive_converted: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -140,5 +140,5 @@
       false
     ]
   },
-  "hash": "6892971cfe2239567d98073abb8e7c967467661836a9fd07ee0973bdac944de9"
+  "hash": "ae5503ae94d1801ad18cbbe50214513cad47c13074442ac6fae8c481423786bf"
 }

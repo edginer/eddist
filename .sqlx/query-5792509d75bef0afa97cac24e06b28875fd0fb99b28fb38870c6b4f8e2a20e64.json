@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO responses\n                (\n                    id,\n                    author_name,\n                    mail,\n                    author_id,\n                    body,\n                    thread_id,\n                    board_id,\n                    ip_addr,\n                    authed_token_id,\n                    created_at,\n                    client_info,\n                    res_order\n                )\n                VALUES\n                (\n                    ?, ?, ?, ?, ?,\n                    ?, ?, ?, ?, ?,\n                    ?, ?\n                )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "5792509d75bef0afa97cac24e06b28875fd0fb99b28fb38870c6b4f8e2a20e64"
+}
