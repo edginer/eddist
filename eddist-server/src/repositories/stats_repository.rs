@@ -13,6 +13,7 @@ pub struct BoardDailyStat {
 pub trait StatsRepository: Send + Sync + 'static {
     async fn get_today_stats_per_board(&self) -> anyhow::Result<Vec<BoardDailyStat>>;
     async fn get_daily_stats_per_board(&self, days: u32) -> anyhow::Result<Vec<BoardDailyStat>>;
+    async fn flush_board_stats(&self, snapshot: &[(String, i64, i64)]) -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -63,5 +64,27 @@ impl StatsRepository for StatsRepositoryImpl {
         .await?;
 
         Ok(rows)
+    }
+
+    async fn flush_board_stats(&self, snapshot: &[(String, i64, i64)]) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin().await?;
+
+        for (board_key, response_delta, thread_delta) in snapshot {
+            sqlx::query!(
+                "INSERT INTO daily_stats (date, board_key, total_responses, new_threads) \
+                 VALUES (DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')), ?, ?, ?) \
+                 ON DUPLICATE KEY UPDATE \
+                 total_responses = total_responses + VALUES(total_responses), \
+                 new_threads = new_threads + VALUES(new_threads)",
+                board_key,
+                response_delta,
+                thread_delta,
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
     }
 }

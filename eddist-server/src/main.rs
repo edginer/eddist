@@ -107,6 +107,8 @@ async fn main() -> anyhow::Result<()> {
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = TermsRepositoryImpl::new(pool.clone());
     let stats_repo = StatsRepositoryImpl::new(pool.clone());
+    let stats_repo_for_flush = stats_repo.clone();
+    let stats_repo_for_shutdown = stats_repo.clone();
 
     // Load initial server settings from database and initialize cache
     refresh_server_settings_cache(&pool).await?;
@@ -142,7 +144,7 @@ async fn main() -> anyhow::Result<()> {
     start_server_settings_refresh_task(pool.clone(), Duration::from_secs(300));
 
     // Start background task for stats flush (every 30 seconds)
-    start_stats_flush_task(pool.clone(), Duration::from_secs(30));
+    start_stats_flush_task(stats_repo_for_flush, Duration::from_secs(30));
 
     log::info!("Start application server with 0.0.0.0:8080");
 
@@ -192,7 +194,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    if flush_stats_now(&pool).await.is_ok() {
+    if flush_stats_now(&stats_repo_for_shutdown).await.is_ok() {
         tracing::info!("Flushed stats on shutdown.");
     }
 
