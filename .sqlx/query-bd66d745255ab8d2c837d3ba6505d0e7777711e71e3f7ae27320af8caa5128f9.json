@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone\n            FROM responses WHERE thread_id = ?\n            ORDER BY res_order, id",
+  "query": "SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone AS \"is_abone: bool\"\n            FROM responses WHERE thread_id = ?\n            ORDER BY res_order, id",
   "describe": {
     "columns": [
       {
@@ -50,7 +50,7 @@
       },
       {
         "ordinal": 5,
-        "name": "is_abone",
+        "name": "is_abone: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "a08e63a678ed8b5761854dd13efc9068bfbb2c9e9879d1220827694c792b9c38"
+  "hash": "bd66d745255ab8d2c837d3ba6505d0e7777711e71e3f7ae27320af8caa5128f9"
 }

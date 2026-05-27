@@ -14,7 +14,7 @@ use super::{BbsRepositoryImpl, CreatingThread};
 pub enum ThreadStatus {
     // Show in the thread list
     Active,
-    // Not show in the thread list and can't be posted (will be archived via eddiner-archiver)
+    // Not show in the thread list and can't be posted (will be archived via eddist-cron)
     Archived,
     // Show in the thread list but can't be posted
     Inactive,
@@ -48,13 +48,25 @@ impl ThreadRepository for BbsRepositoryImpl {
         board_id: Uuid,
         status: ThreadStatus,
     ) -> anyhow::Result<Vec<Thread>> {
-        let board_id = Vec::<u8>::from(board_id);
-
         let threads = match status {
             ThreadStatus::Active => {
                 query_as!(
                     SelectionThread,
-                    r"SELECT * FROM threads WHERE board_id = ? AND active = 1",
+                    r#"SELECT
+                        id AS "id: Uuid",
+                        board_id AS "board_id: Uuid",
+                        thread_number,
+                        last_modified_at,
+                        sage_last_modified_at,
+                        title,
+                        authed_token_id AS "authed_token_id: Uuid",
+                        metadent,
+                        response_count,
+                        no_pool AS "no_pool: bool",
+                        active AS "active: bool",
+                        archived AS "archived: bool",
+                        archive_converted AS "archive_converted: bool"
+                    FROM threads WHERE board_id = ? AND active = 1"#,
                     board_id
                 )
                 .fetch_all(&self.pool)
@@ -63,7 +75,21 @@ impl ThreadRepository for BbsRepositoryImpl {
             ThreadStatus::Archived => {
                 query_as!(
                     SelectionThread,
-                    "SELECT * FROM threads WHERE board_id = ? AND archived = 1",
+                    r#"SELECT
+                        id AS "id: Uuid",
+                        board_id AS "board_id: Uuid",
+                        thread_number,
+                        last_modified_at,
+                        sage_last_modified_at,
+                        title,
+                        authed_token_id AS "authed_token_id: Uuid",
+                        metadent,
+                        response_count,
+                        no_pool AS "no_pool: bool",
+                        active AS "active: bool",
+                        archived AS "archived: bool",
+                        archive_converted AS "archive_converted: bool"
+                    FROM threads WHERE board_id = ? AND archived = 1"#,
                     board_id
                 )
                 .fetch_all(&self.pool)
@@ -72,7 +98,21 @@ impl ThreadRepository for BbsRepositoryImpl {
             ThreadStatus::Inactive => {
                 query_as!(
                     SelectionThread,
-                    "SELECT * FROM threads WHERE board_id = ? AND active = 0 AND archived = 0",
+                    r#"SELECT
+                        id AS "id: Uuid",
+                        board_id AS "board_id: Uuid",
+                        thread_number,
+                        last_modified_at,
+                        sage_last_modified_at,
+                        title,
+                        authed_token_id AS "authed_token_id: Uuid",
+                        metadent,
+                        response_count,
+                        no_pool AS "no_pool: bool",
+                        active AS "active: bool",
+                        archived AS "archived: bool",
+                        archive_converted AS "archive_converted: bool"
+                    FROM threads WHERE board_id = ? AND active = 0 AND archived = 0"#,
                     board_id
                 )
                 .fetch_all(&self.pool)
@@ -81,7 +121,21 @@ impl ThreadRepository for BbsRepositoryImpl {
             ThreadStatus::Unarchived => {
                 query_as!(
                     SelectionThread,
-                    "SELECT * FROM threads WHERE board_id = ? AND archived = 0 ORDER BY sage_last_modified_at DESC",
+                    r#"SELECT
+                        id AS "id: Uuid",
+                        board_id AS "board_id: Uuid",
+                        thread_number,
+                        last_modified_at,
+                        sage_last_modified_at,
+                        title,
+                        authed_token_id AS "authed_token_id: Uuid",
+                        metadent,
+                        response_count,
+                        no_pool AS "no_pool: bool",
+                        active AS "active: bool",
+                        archived AS "archived: bool",
+                        archive_converted AS "archive_converted: bool"
+                    FROM threads WHERE board_id = ? AND archived = 0 ORDER BY sage_last_modified_at DESC"#,
                     board_id
                 )
                 .fetch_all(&self.pool)
@@ -200,11 +254,25 @@ impl ThreadRepository for BbsRepositoryImpl {
     ) -> anyhow::Result<Option<Thread>> {
         let th = query_as!(
             SelectionThread,
-            "SELECT * FROM threads
+            r#"SELECT
+                id AS "id: Uuid",
+                board_id AS "board_id: Uuid",
+                thread_number,
+                last_modified_at,
+                sage_last_modified_at,
+                title,
+                authed_token_id AS "authed_token_id: Uuid",
+                metadent,
+                response_count,
+                no_pool AS "no_pool: bool",
+                active AS "active: bool",
+                archived AS "archived: bool",
+                archive_converted AS "archive_converted: bool"
+            FROM threads
             WHERE thread_number = ?
             AND board_id = (
                 SELECT id FROM boards WHERE board_key = ? LIMIT 1
-            )",
+            )"#,
             thread_number,
             board_key,
         )
@@ -215,14 +283,9 @@ impl ThreadRepository for BbsRepositoryImpl {
     }
 
     async fn create_thread(&self, thread: CreatingThread) -> anyhow::Result<()> {
-        let metadent = Option::<&str>::from(thread.metadent);
-        let metadent = metadent.unwrap_or("");
-
-        let (response_id, thread_id, board_id) = (
-            thread.response_id.as_bytes().to_vec(),
-            thread.thread_id.as_bytes().to_vec(),
-            thread.board_id.as_bytes().to_vec(),
-        );
+        let metadent = Option::<&str>::from(thread.metadent).unwrap_or("");
+        let (response_id, thread_id, board_id) =
+            (thread.response_id, thread.thread_id, thread.board_id);
         let client_info_json = serde_json::to_string(&thread.client_info)?;
 
         let th_query = query!(
@@ -245,7 +308,7 @@ impl ThreadRepository for BbsRepositoryImpl {
             thread.created_at,
             thread.created_at,
             thread.title,
-            thread.authed_token_id.as_bytes().to_vec(),
+            thread.authed_token_id,
             metadent
         );
 
@@ -280,7 +343,7 @@ impl ThreadRepository for BbsRepositoryImpl {
             thread_id,
             board_id,
             thread.ip_addr,
-            thread.authed_token_id.as_bytes().to_vec(),
+            thread.authed_token_id,
             thread.created_at,
             client_info_json,
         );
@@ -306,36 +369,36 @@ impl ThreadRepository for BbsRepositoryImpl {
 
 #[derive(Debug)]
 struct SelectionThread {
-    id: Vec<u8>,
-    board_id: Vec<u8>,
+    id: Uuid,
+    board_id: Uuid,
     thread_number: i64,
     last_modified_at: NaiveDateTime,
     sage_last_modified_at: NaiveDateTime,
     title: String,
-    authed_token_id: Vec<u8>,
+    authed_token_id: Uuid,
     metadent: String,
     response_count: i32,
-    no_pool: i8,           // TINYINT
-    active: i8,            // TINYINT
-    archived: i8,          // TINYINT
-    archive_converted: i8, // TINYINT
+    no_pool: bool,
+    active: bool,
+    archived: bool,
+    archive_converted: bool,
 }
 
 impl SelectionThread {
     fn into_thread(self) -> Thread {
         Thread {
-            id: self.id.try_into().unwrap(),
-            board_id: self.board_id.try_into().unwrap(),
+            id: self.id,
+            board_id: self.board_id,
             thread_number: self.thread_number,
             last_modified_at: Utc.from_utc_datetime(&self.last_modified_at),
             sage_last_modified_at: Utc.from_utc_datetime(&self.sage_last_modified_at),
             title: self.title,
-            authed_token_id: self.authed_token_id.try_into().unwrap(),
+            authed_token_id: self.authed_token_id,
             metadent: self.metadent,
             response_count: self.response_count as u32,
-            no_pool: self.no_pool != 0,
-            active: self.active != 0,
-            archived: self.archived != 0,
+            no_pool: self.no_pool,
+            active: self.active,
+            archived: self.archived,
         }
     }
 }
@@ -351,10 +414,10 @@ struct SelectionThreadWithMetadent {
     authed_token_id: Uuid,
     metadent: String,
     response_count: i32,
-    no_pool: bool,           // TINYINT
-    active: bool,            // TINYINT
-    archived: bool,          // TINYINT
-    archive_converted: bool, // TINYINT
+    no_pool: bool,
+    active: bool,
+    archived: bool,
+    archive_converted: bool,
     client_info: Json<ClientInfo>,
 
     token: String,

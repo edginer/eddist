@@ -50,7 +50,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         let row = sqlx::query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id,
+                id AS "id: Uuid",
                 token,
                 origin_ip,
                 reduced_origin_ip,
@@ -60,12 +60,12 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
                 auth_code,
                 created_at,
                 authed_at,
-                validity,
+                validity AS "validity: bool",
                 last_wrote_at,
                 author_id_seed,
-                require_user_registration,
-                registered_user_id,
-                require_reauth
+                require_user_registration AS "require_user_registration: bool",
+                registered_user_id AS "registered_user_id?: Uuid",
+                require_reauth AS "require_reauth: bool"
             FROM authed_tokens WHERE token = ?"#,
             token
         )
@@ -79,7 +79,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         let row = sqlx::query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id,
+                id AS "id: Uuid",
                 token,
                 origin_ip,
                 reduced_origin_ip,
@@ -89,14 +89,14 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
                 auth_code,
                 created_at,
                 authed_at,
-                validity,
+                validity AS "validity: bool",
                 last_wrote_at,
                 author_id_seed,
-                require_user_registration,
-                registered_user_id,
-                require_reauth
+                require_user_registration AS "require_user_registration: bool",
+                registered_user_id AS "registered_user_id?: Uuid",
+                require_reauth AS "require_reauth: bool"
             FROM authed_tokens WHERE id = ?"#,
-            id.as_bytes().to_vec()
+            id
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -112,7 +112,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         let row = sqlx::query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id,
+                id AS "id: Uuid",
                 token,
                 origin_ip,
                 reduced_origin_ip,
@@ -122,12 +122,12 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
                 auth_code,
                 created_at,
                 authed_at,
-                validity,
+                validity AS "validity: bool",
                 last_wrote_at,
                 author_id_seed,
-                require_user_registration,
-                registered_user_id,
-                require_reauth
+                require_user_registration AS "require_user_registration: bool",
+                registered_user_id AS "registered_user_id?: Uuid",
+                require_reauth AS "require_reauth: bool"
             FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
             reduced_ip,
             auth_code
@@ -145,7 +145,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         let rows = sqlx::query_as!(
             SelectionAuthedToken,
             r#"SELECT
-                id,
+                id AS "id: Uuid",
                 token,
                 origin_ip,
                 reduced_origin_ip,
@@ -155,12 +155,12 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
                 auth_code,
                 created_at,
                 authed_at,
-                validity,
+                validity AS "validity: bool",
                 last_wrote_at,
                 author_id_seed,
-                require_user_registration,
-                registered_user_id,
-                require_reauth
+                require_user_registration AS "require_user_registration: bool",
+                registered_user_id AS "registered_user_id?: Uuid",
+                require_reauth AS "require_reauth: bool"
             FROM authed_tokens WHERE auth_code = ? AND validity = false"#,
             auth_code
         )
@@ -193,7 +193,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
                     require_user_registration
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            authed_token.id.as_bytes().to_vec(),
+            authed_token.id,
             authed_token.token,
             ip_addr,
             reduced_ip,
@@ -242,7 +242,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         query!(
             "UPDATE authed_tokens SET last_wrote_at = ? WHERE id = ?",
             last_wrote,
-            token_id.as_bytes().to_vec(),
+            token_id,
         )
         .execute(&self.pool)
         .await?;
@@ -279,7 +279,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         query!(
             "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
             author_id_seed,
-            token_id.as_bytes().to_vec(),
+            token_id,
         )
         .execute(&mut *tx)
         .await?;
@@ -290,7 +290,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
         query!(
             "UPDATE authed_tokens SET require_reauth = 0 WHERE id = ?",
-            id.as_bytes().to_vec()
+            id
         )
         .execute(&self.pool)
         .await?;
@@ -314,7 +314,7 @@ pub struct CreatingAuthedToken {
 
 #[derive(Debug)]
 struct SelectionAuthedToken {
-    id: Vec<u8>,
+    id: Uuid,
     token: String,
     origin_ip: String,
     reduced_origin_ip: String,
@@ -324,18 +324,18 @@ struct SelectionAuthedToken {
     auth_code: String,
     created_at: NaiveDateTime,
     authed_at: Option<NaiveDateTime>,
-    validity: i8, // TINYINT
+    validity: bool,
     last_wrote_at: Option<NaiveDateTime>,
     author_id_seed: Vec<u8>,
-    require_user_registration: i8, // TINYINT
-    registered_user_id: Option<Vec<u8>>,
-    require_reauth: i8, // TINYINT
+    require_user_registration: bool,
+    registered_user_id: Option<Uuid>,
+    require_reauth: bool,
 }
 
 impl SelectionAuthedToken {
     fn into_authed_token(self) -> AuthedToken {
         AuthedToken {
-            id: self.id.try_into().unwrap(),
+            id: self.id,
             token: self.token,
             origin_ip: IpAddr::new(self.origin_ip),
             reduced_ip: ReducedIpAddr::from(self.reduced_origin_ip),
@@ -345,12 +345,12 @@ impl SelectionAuthedToken {
             auth_code: self.auth_code,
             created_at: self.created_at.and_utc(),
             authed_at: self.authed_at.map(|x| x.and_utc()),
-            validity: self.validity != 0,
+            validity: self.validity,
             last_wrote_at: self.last_wrote_at.map(|x| x.and_utc()),
             author_id_seed: self.author_id_seed,
-            require_user_registration: self.require_user_registration != 0,
-            registered_user_id: self.registered_user_id.map(|x| x.try_into().unwrap()),
-            require_reauth: self.require_reauth != 0,
+            require_user_registration: self.require_user_registration,
+            registered_user_id: self.registered_user_id,
+            require_reauth: self.require_reauth,
         }
     }
 }

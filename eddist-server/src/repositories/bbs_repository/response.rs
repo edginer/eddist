@@ -1,5 +1,6 @@
 use chrono::{NaiveDateTime, TimeZone, Utc};
-use eddist_core::domain::{pubsub_repository::CreatingRes, res::ResView};
+use eddist_core::domain::pubsub_repository::CreatingRes;
+use eddist_core::domain::res::ResView;
 use sqlx::query;
 use uuid::Uuid;
 
@@ -14,19 +15,17 @@ pub trait ResponseRepository: Send + Sync + 'static {
 #[async_trait::async_trait]
 impl ResponseRepository for BbsRepositoryImpl {
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>> {
-        let thread_id = Vec::<u8>::from(thread_id);
-
         let responses = sqlx::query_as!(
             SelectionRes,
-            "SELECT
+            r#"SELECT
                 author_name,
                 mail,
                 body,
                 created_at,
                 author_id,
-                is_abone
+                is_abone AS "is_abone: bool"
             FROM responses WHERE thread_id = ?
-            ORDER BY res_order, id",
+            ORDER BY res_order, id"#,
             thread_id
         )
         .fetch_all(&self.pool)
@@ -40,17 +39,13 @@ impl ResponseRepository for BbsRepositoryImpl {
                 body: x.body,
                 created_at: Utc.from_utc_datetime(&x.created_at),
                 author_id: x.author_id,
-                is_abone: x.is_abone != 0,
+                is_abone: x.is_abone,
             })
             .collect())
     }
 
     async fn create_response(&self, res: CreatingRes) -> anyhow::Result<()> {
-        let (res_id, th_id, board_id) = (
-            res.id.as_bytes().to_vec(),
-            res.thread_id.as_bytes().to_vec(),
-            res.board_id.as_bytes().to_vec(),
-        );
+        let (res_id, th_id, board_id) = (res.id, res.thread_id, res.board_id);
         let client_info_json = serde_json::to_string(&res.client_info)?;
 
         let th_query = query!(
@@ -108,8 +103,8 @@ impl ResponseRepository for BbsRepositoryImpl {
             th_id,
             board_id,
             res.ip_addr,
-            res.authed_token_id.as_bytes().to_vec(),
-            res.created_at.clone(),
+            res.authed_token_id,
+            res.created_at,
             client_info_json,
             res.res_order,
         );
@@ -130,5 +125,5 @@ struct SelectionRes {
     body: String,
     created_at: NaiveDateTime,
     author_id: String,
-    is_abone: i8, // TINYINT
+    is_abone: bool,
 }

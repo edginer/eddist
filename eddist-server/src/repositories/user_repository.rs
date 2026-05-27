@@ -74,7 +74,7 @@ impl UserRepository for UserRepositoryImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(assemble_user_from_rows(user_idps))
+        Ok(assemble_user_from_user_idp_rows(user_idps))
     }
 
     async fn get_user_by_idp_sub(
@@ -108,7 +108,7 @@ impl UserRepository for UserRepositoryImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(assemble_user_from_rows(user_idps))
+        Ok(assemble_user_from_user_idp_rows(user_idps))
     }
 
     async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
@@ -301,36 +301,38 @@ impl UserRepository for UserRepositoryImpl {
     }
 }
 
-fn assemble_user_from_rows(rows: Vec<UserIdpSelection>) -> Option<User> {
-    rows.into_iter().fold(None, |mut acc: Option<User>, row| {
-        if let Some(user) = acc.as_mut() {
-            user.idps.push(UserIdp {
-                idp_id: row.idp_id,
-                idp_name: row.idp_name,
-                idp_display_name: row.idp_display_name,
-                idp_sub: row.idp_sub,
-                created_at: row.idp_bind_created_at,
-                updated_at: row.idp_bind_updated_at,
-            });
-        } else {
-            acc = Some(User {
-                id: row.user_id,
-                user_name: row.user_name,
-                enabled: row.user_enabled,
-                idps: vec![UserIdp {
+fn assemble_user_from_user_idp_rows(user_idp_rows: Vec<UserIdpSelection>) -> Option<User> {
+    user_idp_rows
+        .into_iter()
+        .fold(None, |mut acc: Option<User>, row| {
+            if let Some(user) = acc.as_mut() {
+                user.idps.push(UserIdp {
                     idp_id: row.idp_id,
                     idp_name: row.idp_name,
                     idp_display_name: row.idp_display_name,
                     idp_sub: row.idp_sub,
                     created_at: row.idp_bind_created_at,
                     updated_at: row.idp_bind_updated_at,
-                }],
-                created_at: row.user_created_at,
-                updated_at: row.user_updated_at,
-            });
-        }
-        acc
-    })
+                });
+            } else {
+                acc = Some(User {
+                    id: row.user_id,
+                    user_name: row.user_name,
+                    enabled: row.user_enabled,
+                    idps: vec![UserIdp {
+                        idp_id: row.idp_id,
+                        idp_name: row.idp_name,
+                        idp_display_name: row.idp_display_name,
+                        idp_sub: row.idp_sub,
+                        created_at: row.idp_bind_created_at,
+                        updated_at: row.idp_bind_updated_at,
+                    }],
+                    created_at: row.user_created_at,
+                    updated_at: row.user_updated_at,
+                });
+            }
+            acc
+        })
 }
 
 struct UserIdpSelection {
