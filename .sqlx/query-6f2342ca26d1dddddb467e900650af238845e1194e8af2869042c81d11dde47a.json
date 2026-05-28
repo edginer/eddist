@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO daily_stats (date, board_key, total_responses, new_threads) VALUES (DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')), ?, ?, ?) ON DUPLICATE KEY UPDATE total_responses = total_responses + VALUES(total_responses), new_threads = new_threads + VALUES(new_threads)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "6f2342ca26d1dddddb467e900650af238845e1194e8af2869042c81d11dde47a"
+}

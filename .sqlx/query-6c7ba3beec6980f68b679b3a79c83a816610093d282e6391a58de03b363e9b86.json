@@ -1,10 +1,19 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT\n                date AS \"date: NaiveDate\",\n                total_responses,\n                new_threads\n            FROM daily_stats\n            WHERE date < DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))\n            ORDER BY date DESC\n            LIMIT ?",
+  "query": "SELECT\n                board_key,\n                date AS \"date: NaiveDate\",\n                total_responses,\n                new_threads\n            FROM daily_stats\n            WHERE date = DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "board_key",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | PRIMARY_KEY",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 1,
         "name": "date: NaiveDate",
         "type_info": {
           "type": "Date",
@@ -13,7 +22,7 @@
         }
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "total_responses",
         "type_info": {
           "type": "LongLong",
@@ -22,7 +31,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "new_threads",
         "type_info": {
           "type": "LongLong",
@@ -32,13 +41,14 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
+      false,
       false,
       false,
       false
     ]
   },
-  "hash": "351f61da0d3f510a8c9ec5a7e29428fec78bae7830a86c27a7b7f899672dea30"
+  "hash": "6c7ba3beec6980f68b679b3a79c83a816610093d282e6391a58de03b363e9b86"
 }
