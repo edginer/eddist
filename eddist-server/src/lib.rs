@@ -14,6 +14,7 @@ pub mod repositories {
     pub mod notice_repository;
     pub mod stats_repository;
     pub mod terms_repository;
+    pub mod trending_repository;
     pub mod user_repository;
     pub mod user_restriction_repository;
 }
@@ -58,6 +59,7 @@ mod routes {
     pub mod stats;
     pub mod subject_list;
     pub mod terms;
+    pub mod trending;
     pub mod user;
 }
 
@@ -103,6 +105,8 @@ pub fn create_test_app(
     let notice_repo = NoticeRepositoryImpl::new(pool.clone());
     let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
     let stats_repo = crate::repositories::stats_repository::StatsRepositoryImpl::new(pool.clone());
+    let trending_repo =
+        crate::repositories::trending_repository::TrendingRepositoryImpl::new(pool.clone());
 
     drop(refresh_server_settings_cache(&pool));
     start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
@@ -125,6 +129,7 @@ pub fn create_test_app(
         notice_repo,
         terms_repo,
         stats_repo,
+        trending_repo,
         template_engine: std::sync::Arc::new(load_template_engine()),
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::now_v7().as_bytes())
