@@ -1,14 +1,18 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader, Tooltip } from "flowbite-react";
+import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
+import { useRevalidator } from "react-router";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
+import { parseCookie } from "~/utils/cookie";
 import { NGRuleSection } from "./NGRuleSection";
 import { Tabs } from "./Tabs";
 
 interface NGWordsSettingsModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
+  enableSafeMode: boolean;
 }
 
 const ThemeTab = () => {
@@ -43,7 +47,55 @@ const ThemeTab = () => {
   );
 };
 
-export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProps) => {
+const SafeModeTab = () => {
+  const { revalidate } = useRevalidator();
+  const [safeMode, setSafeMode] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return parseCookie(document.cookie, "safe_mode") !== "off";
+  });
+
+  const handleToggle = () => {
+    const next = !safeMode;
+    if (next) {
+      document.cookie = "safe_mode=; path=/; max-age=0; SameSite=Lax";
+    } else {
+      document.cookie = "safe_mode=off; path=/; max-age=31536000; SameSite=Lax";
+    }
+    setSafeMode(next);
+    revalidate();
+  };
+
+  return (
+    <div className="py-2 dark:text-gray-100">
+      <h3 className="text-lg font-semibold mb-2">セーフモード</h3>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        ONのとき、不適切と判定されたスレッドをスレッド一覧から非表示にします。スレッドURLへの直接アクセスは引き続き可能です。
+      </p>
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <div className="relative">
+          <input type="checkbox" className="sr-only" checked={safeMode} onChange={handleToggle} />
+          <div
+            className={`w-11 h-6 rounded-full transition-colors ${
+              safeMode ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+            }`}
+          />
+          <div
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              safeMode ? "translate-x-5" : ""
+            }`}
+          />
+        </div>
+        <span className="font-medium">セーフモード: {safeMode ? "ON" : "OFF"}</span>
+      </label>
+    </div>
+  );
+};
+
+export const NGWordsSettingsModal = ({
+  open,
+  setOpen,
+  enableSafeMode,
+}: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
   return (
@@ -125,6 +177,9 @@ export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProp
               title: "テーマ",
               content: <ThemeTab />,
             },
+            ...(enableSafeMode
+              ? [{ id: "safe-mode", title: "セーフモード", content: <SafeModeTab /> }]
+              : []),
           ]}
         />
       </ModalBody>

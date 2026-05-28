@@ -53,6 +53,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
+      enable_safe_mode: false,
     })),
   ]);
 
@@ -60,6 +61,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     {
       thread,
       boards,
+      enableSafeMode: clientConfig.enable_safe_mode ?? false,
       eddistData: {
         bbsName: context.BBS_NAME ?? "エッヂ掲示板",
         availableUserRegistration: clientConfig.enable_user_registration,
@@ -67,6 +69,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     } satisfies {
       thread: { threadName: string; responses: Response[] };
       boards: Board[];
+      enableSafeMode: boolean;
       eddistData: {
         bbsName: string;
         availableUserRegistration: boolean;
@@ -116,7 +119,9 @@ const Meta = ({ bbsName, threadName }: { bbsName: string; threadName: string }) 
   </>
 );
 
-const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.ComponentProps) => {
+const ThreadPage = ({
+  loaderData: { boards, thread, enableSafeMode, eddistData },
+}: Route.ComponentProps) => {
   const params = useParams();
 
   const [popups, setPopups] = useState<Popup[]>([]);
@@ -364,7 +369,11 @@ const ThreadPage = ({ loaderData: { boards, thread, eddistData } }: Route.Compon
 
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+              enableSafeMode={enableSafeMode}
+            />
           </Suspense>
         )}
       </header>

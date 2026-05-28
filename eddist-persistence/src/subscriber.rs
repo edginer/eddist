@@ -4,8 +4,8 @@ use eddist_core::{
     domain::pubsub_repository::{
         CHANNEL_AUTH_TOKEN_REVOKED, CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM, PubSubItem,
     },
-    proto::{decode_auth_token_revoked, decode_auth_token_succeeded},
-    redis_keys::DB_FAILED_CACHE_RES_KEY,
+    proto::{decode_auth_token_revoked, decode_auth_token_succeeded, decode_creating_thread},
+    redis_keys::{CHANNEL_THREAD_CREATED, DB_FAILED_CACHE_RES_KEY, unsafe_threads_key},
 };
 use futures::StreamExt;
 use redis::AsyncCommands;
@@ -55,7 +55,7 @@ impl SubRepository for RedisSubRepository {
         let mut error_count = 0u32;
         let redis_url = env::var("REDIS_URL").unwrap();
         let backup_enabled = self.s3_bucket.is_some();
-        let mut channels: Vec<&str> = vec![CHANNEL_PUBSUB_ITEM];
+        let mut channels = vec![CHANNEL_PUBSUB_ITEM, CHANNEL_THREAD_CREATED];
         if backup_enabled {
             channels.push(CHANNEL_AUTH_TOKEN_SUCCEEDED);
             channels.push(CHANNEL_AUTH_TOKEN_REVOKED);
@@ -237,6 +237,46 @@ impl RedisSubRepository {
                                 warn!("Failed to backup token {token_id}: {e}");
                             }
                         });
+                    }
+                }
+                ch if ch == CHANNEL_THREAD_CREATED => {
+                    let payload = match msg.get_payload::<Vec<u8>>() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to get thread_created payload"
+                            );
+                            continue;
+                        }
+                    };
+
+                    let event = match decode_creating_thread(&payload) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to decode CreatingThread"
+                            );
+                            continue;
+                        }
+                    };
+
+                    if event.moderation_result.map(|m| m.flagged).unwrap_or(false) {
+                        let key = unsafe_threads_key(event.board_id);
+                        let mut conn = self.conn.clone();
+                        if let Err(e) = conn.sadd::<_, _, ()>(&key, event.unix_time).await {
+                            error!(
+                                error = e.to_string().as_str(),
+                                "Failed to add unsafe thread to Redis set"
+                            );
+                        } else {
+                            info!(
+                                board_id = event.board_id.to_string().as_str(),
+                                unix_time = event.unix_time,
+                                "Flagged thread stored in safe mode set"
+                            );
+                        }
                     }
                 }
                 ch if ch == CHANNEL_AUTH_TOKEN_REVOKED => {

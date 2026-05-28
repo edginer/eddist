@@ -35,6 +35,7 @@ use crate::{
         dat_routing::{get_dat_txt, get_kako_dat_txt},
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         re_auth::{get_re_auth, post_re_auth},
+        safe_mode::get_unsafe_thread_ids,
         stats::get_stats,
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         terms::get_terms,
@@ -64,6 +65,7 @@ pub struct AppState {
     pub stats_repo: StatsRepositoryImpl,
     pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
+    pub redis_conn: redis::aio::ConnectionManager,
 }
 
 impl AppState {
@@ -110,6 +112,7 @@ async fn get_setting_txt(
                 max_response_body_lines,
                 ..
             },
+        ..
     }) = state
         .services
         .board_info()
@@ -186,9 +189,11 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
 async fn get_api_client_config() -> impl IntoResponse {
     let enable_user_registration =
         get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await;
+    let enable_safe_mode = get_server_setting_bool(ServerSettingKey::EnableSafeMode).await;
 
     let mut resp = Json(serde_json::json!({
         "enable_user_registration": enable_user_registration,
+        "enable_safe_mode": enable_safe_mode,
     }))
     .into_response();
     resp.headers_mut()
@@ -255,6 +260,10 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route("/api/notices/{slug}", get(get_notice_by_slug))
         .route("/api/client-config", get(get_api_client_config))
         .route("/api/stats", get(get_stats))
+        .route(
+            "/api/{boardKey}/unsafe-thread-ids",
+            get(get_unsafe_thread_ids),
+        )
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",

@@ -9,7 +9,11 @@ use aws_sdk_s3::{
 };
 use chrono::{TimeDelta, TimeZone, Timelike, Utc};
 use cron::Schedule;
-use eddist_core::{domain::res::get_1001_sjis_bytes, tracing::init_tracing, utils::is_prod};
+use eddist_core::{
+    domain::res::get_1001_sjis_bytes, redis_keys::unsafe_threads_key, tracing::init_tracing,
+    utils::is_prod,
+};
+use redis::AsyncCommands;
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::time::sleep;
 
@@ -64,6 +68,12 @@ async fn main() {
             // inactivate and archive
             // - inactivate (set active to false, archived to true)
 
+            let redis_conn = redis::Client::open(env::var("REDIS_URL").unwrap())
+                .unwrap()
+                .get_connection_manager()
+                .await
+                .unwrap();
+
             let boards = repo.get_all_boards_info().await.unwrap();
             let mut tasks = Vec::new();
 
@@ -102,30 +112,49 @@ async fn main() {
 
                     // Create parallel task for each board
                     let repo_clone = repo.clone();
+                    let mut redis_conn = redis_conn.clone();
                     let board_key = b.board_key.clone();
+                    let board_id = b.board_id;
 
                     let task = tokio::spawn(async move {
                         // Randomize thread archive timing (0-59 seconds)
                         let random_delay = rand::random::<u64>() % 60;
                         sleep(Duration::from_secs(random_delay)).await;
 
-                        match repo_clone
+                        if let Err(e) = repo_clone
                             .update_threads_to_inactive(&board_key, trigger as u32)
                             .await
                         {
-                            Ok(_) => {
-                                log::info!(
-                                    "`inactivate` Cronjob for board: {board_key} is executed"
-                                );
-                                Ok(())
+                            log::error!("`inactivate` Cronjob for board: {board_key} failed: {e}");
+                            return Err(e);
+                        }
+
+                        log::info!("`inactivate` Cronjob for board: {board_key} is executed");
+
+                        // Purge newly inactive threads from the safe-mode unsafe set
+                        match repo_clone
+                            .get_inactive_thread_numbers_for_board(&board_key)
+                            .await
+                        {
+                            Ok(thread_numbers) if !thread_numbers.is_empty() => {
+                                let key = unsafe_threads_key(board_id);
+                                if let Err(e) =
+                                    redis_conn.srem::<_, _, ()>(&key, thread_numbers).await
+                                {
+                                    log::error!(
+                                        "Failed to purge unsafe threads for board {board_key}: {e}"
+                                    );
+                                }
                             }
+                            Ok(_) => {}
                             Err(e) => {
                                 log::error!(
-                                    "`inactivate` Cronjob for board: {board_key} failed: {e}"
+                                    "Failed to get inactive thread numbers for board {board_key}: {e}"
                                 );
-                                Err(e)
                             }
                         }
+
+                        Ok(())
                     });
 
                     tasks.push(task);

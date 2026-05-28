@@ -54,6 +54,7 @@ mod routes {
     pub mod dat_routing;
     pub mod notice;
     pub mod re_auth;
+    pub mod safe_mode;
     pub mod stats;
     pub mod subject_list;
     pub mod terms;
@@ -128,6 +129,7 @@ pub fn create_test_app(
         tinker_secret: base64::engine::general_purpose::STANDARD
             .encode(Uuid::now_v7().as_bytes())
             .to_string(),
+        redis_conn: redis_conn.clone(),
     };
 
     // Use the actual create_app from app module

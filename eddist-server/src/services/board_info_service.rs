@@ -1,4 +1,5 @@
 use eddist_core::domain::board::BoardInfo;
+use uuid::Uuid;
 
 use crate::{domain, repositories::bbs_repository::BbsRepository};
 
@@ -29,6 +30,7 @@ impl<T: BbsRepository + Clone> AppService<BoardInfoServiceInput, BoardInfoServic
             .ok_or_else(|| anyhow::anyhow!("board not found"))?;
 
         Ok(BoardInfoServiceOutput {
+            board_id: board.id,
             board_key: board.board_key,
             name: board.name,
             default_name: board.default_name,
@@ -42,6 +44,7 @@ pub struct BoardInfoServiceInput {
 }
 
 pub struct BoardInfoServiceOutput {
+    pub board_id: Uuid,
     pub board_key: String,
     pub name: String,
     pub default_name: String,

@@ -1,5 +1,6 @@
 export interface ClientConfig {
   enable_user_registration: boolean;
+  enable_safe_mode: boolean;
 }
 
 let _clientConfigCache: { data: ClientConfig; expiresAt: number } | null = null;

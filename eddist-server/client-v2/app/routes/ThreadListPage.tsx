@@ -6,10 +6,12 @@ import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
+import { fetchUnsafeThreadIds } from "~/api-client/safe_mode";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
+import { parseCookie } from "~/utils/cookie";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
 import type { Route } from "./+types/ThreadListPage";
@@ -59,21 +61,35 @@ const calculateThreadSpeed = (
   return Math.round(speed * 100) / 100;
 };
 
-export const loader = async ({ params, context }: Route.LoaderArgs) => {
+export const loader = async ({ params, request, context }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
-  const [threadList, boards, clientConfig] = await Promise.all([
+  const url = new URL(request.url);
+  const isFull = url.searchParams.get("_v") === "full";
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const safeMode = !isFull && parseCookie(cookieHeader, "safe_mode") !== "off";
+
+  const [threadList, boards, clientConfig, unsafeThreadIds] = await Promise.all([
     fetchThreadList(params.boardKey ?? "", { baseUrl }),
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
+      enable_safe_mode: false,
     })),
+    safeMode
+      ? fetchUnsafeThreadIds(params.boardKey ?? "", { baseUrl })
+      : Promise.resolve(new Set<number>()),
   ]);
+
+  const enableSafeMode = clientConfig.enable_safe_mode;
 
   return {
     threadList,
     boards,
     currentTime: Date.now(),
+    safeMode: safeMode && enableSafeMode,
+    enableSafeMode,
+    unsafeThreadIds: Array.from(unsafeThreadIds),
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: clientConfig.enable_user_registration,
@@ -82,6 +98,9 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     threadList: Thread[];
     boards: Board[];
     currentTime: number;
+    safeMode: boolean;
+    enableSafeMode: boolean;
+    unsafeThreadIds: number[];
     eddistData: {
       bbsName: string;
       availableUserRegistration: boolean;
@@ -100,7 +119,15 @@ const Meta = ({ bbsName, boardName }: { bbsName: string; boardName: string }) =>
 );
 
 const ThreadListPage = ({
-  loaderData: { threadList: data, boards, currentTime, eddistData },
+  loaderData: {
+    threadList: data,
+    boards,
+    currentTime,
+    safeMode,
+    enableSafeMode,
+    unsafeThreadIds,
+    eddistData,
+  },
 }: Route.ComponentProps) => {
   const params = useParams();
 
@@ -123,6 +150,7 @@ const ThreadListPage = ({
   const hasEverOpenedNGSettings = useRef(false);
 
   const { shouldFilterThread } = useNGWords();
+  const unsafeSet = useMemo(() => new Set(unsafeThreadIds), [unsafeThreadIds]);
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(null);
   const [selectedTitleText, setSelectedTitleText] = useState<string | null>(null);
@@ -148,6 +176,11 @@ const ThreadListPage = ({
     enabled: true,
     scrollTarget: "window",
   });
+
+  const openNGSettings = () => {
+    hasEverOpenedNGSettings.current = true;
+    setShowNGSettings(true);
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -188,8 +221,10 @@ const ThreadListPage = ({
   }, [threadList, sortKey, sortOrder, currentTime]);
 
   const filteredThreadList = useMemo(() => {
-    return sortedThreadList.filter((thread) => !shouldFilterThread(thread));
-  }, [sortedThreadList, shouldFilterThread]);
+    return sortedThreadList.filter(
+      (thread) => !shouldFilterThread(thread) && !(safeMode && unsafeSet.has(thread.id)),
+    );
+  }, [sortedThreadList, shouldFilterThread, safeMode, unsafeSet]);
 
   return (
     <div className="relative pt-16 min-h-screen dark:bg-gray-900 dark:text-gray-100">
@@ -251,10 +286,7 @@ const ThreadListPage = ({
         </button>
         <button
           type="button"
-          onClick={() => {
-            hasEverOpenedNGSettings.current = true;
-            setShowNGSettings(true);
-          }}
+          onClick={openNGSettings}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
           title="NG設定"
         >
@@ -298,7 +330,11 @@ const ThreadListPage = ({
 
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+              enableSafeMode={enableSafeMode}
+            />
           </Suspense>
         )}
       </header>

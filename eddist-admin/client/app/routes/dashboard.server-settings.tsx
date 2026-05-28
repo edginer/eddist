@@ -55,6 +55,13 @@ const KNOWN_SETTINGS: SettingDefinition[] = [
       "Run OpenAI content moderation on each new thread (title + body) before publishing the creation event.",
     type: "boolean",
   },
+  {
+    key: "bbs.enable_safe_mode",
+    label: "Enable Safe Mode",
+    description:
+      "Enable safe mode thread filtering. Hides threads with unsafe content from clients that support it.",
+    type: "boolean",
+  },
 ];
 
 const MASKED_VALUE = "***";

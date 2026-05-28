@@ -19,6 +19,7 @@ impl Repository {
             SelectionBoardInfo,
             r#"
             SELECT
+                BIN_TO_UUID(b.id) AS "board_id!: Uuid",
                 b.board_key AS board_key,
                 b.default_name AS default_name,
                 bi.threads_archive_cron AS threads_archive_cron,
@@ -36,6 +37,24 @@ impl Repository {
         .fetch_all(&self.0)
         .await?;
         Ok(boards)
+    }
+
+    pub async fn get_inactive_thread_numbers_for_board(
+        &self,
+        board_key: &str,
+    ) -> anyhow::Result<Vec<u64>> {
+        let numbers = sqlx::query_scalar!(
+            r#"
+            SELECT thread_number
+            FROM threads
+            WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
+            AND active = 0
+            "#,
+            board_key,
+        )
+        .fetch_all(&self.0)
+        .await?;
+        Ok(numbers.into_iter().map(|n| n as u64).collect())
     }
 
     pub async fn update_threads_to_inactive(
@@ -373,6 +392,7 @@ struct Res {
 
 #[derive(Debug, Clone)]
 pub struct SelectionBoardInfo {
+    pub board_id: Uuid,
     pub board_key: String,
     pub default_name: String,
     pub threads_archive_cron: Option<String>,
