@@ -3,6 +3,7 @@ pub const KEY_REQUIRE_IDP_LINKING: &str = "user.require_idp_linking";
 pub const KEY_AI_OPENAI_API_KEY: &str = "ai.openai_api_key";
 pub const KEY_AI_MODERATION_ON_RES: &str = "ai.moderation_on_res";
 pub const KEY_AI_MODERATION_ON_THREAD: &str = "ai.moderation_on_thread";
+pub const KEY_ENABLE_SAFE_MODE: &str = "bbs.enable_safe_mode";
 
 pub enum ServerSettingKey {
     EnableIdpLinking,
@@ -10,6 +11,7 @@ pub enum ServerSettingKey {
     AiOpenAiApiKey,
     AiModerationOnRes,
     AiModerationOnThread,
+    EnableSafeMode,
 }
 
 impl ServerSettingKey {
@@ -20,6 +22,7 @@ impl ServerSettingKey {
             Self::AiOpenAiApiKey => KEY_AI_OPENAI_API_KEY,
             Self::AiModerationOnRes => KEY_AI_MODERATION_ON_RES,
             Self::AiModerationOnThread => KEY_AI_MODERATION_ON_THREAD,
+            Self::EnableSafeMode => KEY_ENABLE_SAFE_MODE,
         }
     }
 
@@ -29,6 +32,7 @@ impl ServerSettingKey {
         ServerSettingKey::AiOpenAiApiKey,
         ServerSettingKey::AiModerationOnRes,
         ServerSettingKey::AiModerationOnThread,
+        ServerSettingKey::EnableSafeMode,
     ];
 
     pub const fn description(&self) -> &'static str {
@@ -45,6 +49,9 @@ impl ServerSettingKey {
             }
             Self::AiModerationOnThread => {
                 "Enable OpenAI content moderation for thread creation (true/false)"
+            }
+            Self::EnableSafeMode => {
+                "Enable safe mode thread filtering — hides threads with unsafe content from clients that support it (true/false)"
             }
         }
     }

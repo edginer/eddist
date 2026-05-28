@@ -10,7 +10,11 @@ use serde::Serialize;
 
 use crate::{
     AppState,
-    services::{AppService, board_info_service::BoardInfoServiceInput},
+    services::{
+        AppService,
+        board_info_service::BoardInfoServiceInput,
+        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    },
 };
 
 #[derive(Serialize)]
@@ -22,6 +26,10 @@ pub async fn get_unsafe_thread_ids(
     State(state): State<AppState>,
     Path(board_key): Path<String>,
 ) -> Response {
+    if !get_server_setting_bool(ServerSettingKey::EnableSafeMode).await {
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
+
     if validate_board_key(&board_key).is_err() {
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }

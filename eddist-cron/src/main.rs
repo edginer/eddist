@@ -10,9 +10,7 @@ use aws_sdk_s3::{
 use chrono::{TimeDelta, TimeZone, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{
-    domain::res::get_1001_sjis_bytes,
-    redis_keys::unsafe_threads_key,
-    tracing::init_tracing,
+    domain::res::get_1001_sjis_bytes, redis_keys::unsafe_threads_key, tracing::init_tracing,
     utils::is_prod,
 };
 use redis::AsyncCommands;

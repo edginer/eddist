@@ -189,9 +189,11 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
 async fn get_api_client_config() -> impl IntoResponse {
     let enable_user_registration =
         get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await;
+    let enable_safe_mode = get_server_setting_bool(ServerSettingKey::EnableSafeMode).await;
 
     let mut resp = Json(serde_json::json!({
         "enable_user_registration": enable_user_registration,
+        "enable_safe_mode": enable_safe_mode,
     }))
     .into_response();
     resp.headers_mut()
