@@ -26,6 +26,7 @@ use crate::{
         notice_repository::NoticeRepositoryImpl,
         stats_repository::StatsRepositoryImpl,
         terms_repository::TermsRepositoryImpl,
+        trending_repository::TrendingRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     },
@@ -39,6 +40,7 @@ use crate::{
         stats::get_stats,
         subject_list::{get_subject_txt, get_subject_txt_with_metadent},
         terms::get_terms,
+        trending::get_trending,
         user::user_routes,
     },
     services::server_settings_cache::{ServerSettingKey, get_server_setting_bool},
@@ -63,6 +65,7 @@ pub struct AppState {
     pub notice_repo: NoticeRepositoryImpl,
     pub terms_repo: TermsRepositoryImpl,
     pub stats_repo: StatsRepositoryImpl,
+    pub trending_repo: TrendingRepositoryImpl,
     pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
     pub redis_conn: redis::aio::ConnectionManager,
@@ -260,6 +263,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route("/api/notices/{slug}", get(get_notice_by_slug))
         .route("/api/client-config", get(get_api_client_config))
         .route("/api/stats", get(get_stats))
+        .route("/api/trending", get(get_trending))
         .route(
             "/api/{boardKey}/unsafe-thread-ids",
             get(get_unsafe_thread_ids),
