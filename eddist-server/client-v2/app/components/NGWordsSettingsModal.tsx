@@ -2,6 +2,7 @@ import { Button, Modal, ModalBody, ModalFooter, ModalHeader, Tooltip } from "flo
 import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
+import { useRevalidator } from "react-router";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
 import { parseCookie } from "~/utils/cookie";
@@ -11,6 +12,7 @@ import { Tabs } from "./Tabs";
 interface NGWordsSettingsModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
+  enableSafeMode: boolean;
 }
 
 const ThemeTab = () => {
@@ -46,18 +48,21 @@ const ThemeTab = () => {
 };
 
 const SafeModeTab = () => {
-  const [safeMode] = useState(() => {
+  const { revalidate } = useRevalidator();
+  const [safeMode, setSafeMode] = useState(() => {
     if (typeof document === "undefined") return true;
     return parseCookie(document.cookie, "safe_mode") !== "off";
   });
 
   const handleToggle = () => {
-    if (safeMode) {
-      document.cookie = "safe_mode=off; path=/; max-age=31536000; SameSite=Lax";
-    } else {
+    const next = !safeMode;
+    if (next) {
       document.cookie = "safe_mode=; path=/; max-age=0; SameSite=Lax";
+    } else {
+      document.cookie = "safe_mode=off; path=/; max-age=31536000; SameSite=Lax";
     }
-    window.location.reload();
+    setSafeMode(next);
+    revalidate();
   };
 
   return (
@@ -86,7 +91,11 @@ const SafeModeTab = () => {
   );
 };
 
-export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProps) => {
+export const NGWordsSettingsModal = ({
+  open,
+  setOpen,
+  enableSafeMode,
+}: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
   return (
@@ -168,11 +177,9 @@ export const NGWordsSettingsModal = ({ open, setOpen }: NGWordsSettingsModalProp
               title: "テーマ",
               content: <ThemeTab />,
             },
-            {
-              id: "safe-mode",
-              title: "セーフモード",
-              content: <SafeModeTab />,
-            },
+            ...(enableSafeMode
+              ? [{ id: "safe-mode", title: "セーフモード", content: <SafeModeTab /> }]
+              : []),
           ]}
         />
       </ModalBody>

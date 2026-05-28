@@ -74,17 +74,21 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
+      enable_safe_mode: false,
     })),
     safeMode
       ? fetchUnsafeThreadIds(params.boardKey ?? "", { baseUrl })
       : Promise.resolve(new Set<number>()),
   ]);
 
+  const enableSafeMode = clientConfig.enable_safe_mode;
+
   return {
     threadList,
     boards,
     currentTime: Date.now(),
-    safeMode,
+    safeMode: safeMode && enableSafeMode,
+    enableSafeMode,
     unsafeThreadIds: Array.from(unsafeThreadIds),
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
@@ -95,6 +99,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     boards: Board[];
     currentTime: number;
     safeMode: boolean;
+    enableSafeMode: boolean;
     unsafeThreadIds: number[];
     eddistData: {
       bbsName: string;
@@ -114,7 +119,15 @@ const Meta = ({ bbsName, boardName }: { bbsName: string; boardName: string }) =>
 );
 
 const ThreadListPage = ({
-  loaderData: { threadList: data, boards, currentTime, safeMode, unsafeThreadIds, eddistData },
+  loaderData: {
+    threadList: data,
+    boards,
+    currentTime,
+    safeMode,
+    enableSafeMode,
+    unsafeThreadIds,
+    eddistData,
+  },
 }: Route.ComponentProps) => {
   const params = useParams();
 
@@ -271,16 +284,6 @@ const ThreadListPage = ({
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
-        {safeMode && (
-          <button
-            type="button"
-            onClick={openNGSettings}
-            className="hidden lg:flex px-2 py-1 mx-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 items-center gap-1 cursor-pointer"
-            title="セーフモード有効 — クリックして設定"
-          >
-            セーフモード
-          </button>
-        )}
         <button
           type="button"
           onClick={openNGSettings}
@@ -327,7 +330,11 @@ const ThreadListPage = ({
 
         {hasEverOpenedNGSettings.current && (
           <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal open={showNGSettings} setOpen={setShowNGSettings} />
+            <LazyNGWordsSettingsModal
+              open={showNGSettings}
+              setOpen={setShowNGSettings}
+              enableSafeMode={enableSafeMode}
+            />
           </Suspense>
         )}
       </header>
