@@ -5,10 +5,9 @@ import { useCreateCap } from "~/hooks/queries";
 interface CreateCapModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  refetch: () => Promise<unknown>;
 }
 
-const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
+const CreateCapModal = ({ setOpen, open }: CreateCapModalProps) => {
   const { register, handleSubmit, reset } = useForm();
 
   const createCapMutation = useCreateCap();
@@ -38,7 +37,6 @@ const CreateCapModal = ({ setOpen, refetch, open }: CreateCapModalProps) => {
                 {
                   onSuccess: () => {
                     setOpen(false);
-                    refetch();
                   },
                 },
               );

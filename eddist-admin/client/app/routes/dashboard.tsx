@@ -39,7 +39,6 @@ const Hamburger = () => (
 
 const Layout: React.FC = () => {
   const location = useLocation();
-  const navBarSection = location.pathname.split("/")[2];
   const [isNavbarOpen, setIsNavbarOpen] = useState(false);
 
   return (
@@ -57,7 +56,9 @@ const Layout: React.FC = () => {
               to={`/dashboard/${item.kind}`}
               className={twMerge(
                 "flex items-center py-2 px-8 hover:bg-gray-700",
-                navBarSection === item.kind ? "bg-gray-900 text-gray-400" : "text-gray-400",
+                location.pathname.startsWith(`/dashboard/${item.kind}`)
+                  ? "bg-gray-900 text-gray-400"
+                  : "text-gray-400",
               )}
             >
               <Hamburger />

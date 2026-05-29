@@ -5,10 +5,9 @@ import { useCreateNgWord } from "~/hooks/queries";
 interface CreateNgWordModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  refetch: () => Promise<unknown>;
 }
 
-const CreateNgWordModal = ({ setOpen, refetch, open }: CreateNgWordModalProps) => {
+const CreateNgWordModal = ({ setOpen, open }: CreateNgWordModalProps) => {
   const { register, handleSubmit } = useForm();
 
   const createNgWordMutation = useCreateNgWord();
@@ -30,7 +29,6 @@ const CreateNgWordModal = ({ setOpen, refetch, open }: CreateNgWordModalProps) =
                 {
                   onSuccess: () => {
                     setOpen(false);
-                    refetch();
                   },
                 },
               );

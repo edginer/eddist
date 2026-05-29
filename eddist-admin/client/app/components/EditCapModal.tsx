@@ -1,36 +1,17 @@
 import { Button, Label, Modal, ModalBody, ModalHeader, TextInput } from "flowbite-react";
-import { useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
-import Select from "react-select";
-import { getBoards, useUpdateCap } from "~/hooks/queries";
-import type { Cap } from "~/routes/dashboard.caps";
+import { useForm } from "react-hook-form";
+import BoardMultiSelect from "~/components/BoardMultiSelect";
+import { useUpdateCap } from "~/hooks/queries";
+import type { Cap } from "~/types/entities";
 
 interface EditCapModalProps {
   open: boolean;
   selectedCap: Cap;
   setOpen: (open: boolean) => void;
-  refetch: () => Promise<unknown>;
 }
 
-interface BoardSelectOption {
-  label: string;
-  value: string;
-}
-
-const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps) => {
+const EditCapModal = ({ open, selectedCap, setOpen }: EditCapModalProps) => {
   const { register, handleSubmit, control, reset } = useForm();
-
-  const { data: boards } = getBoards({});
-  const boardSelectOptions = useMemo(() => {
-    if (boards) {
-      return boards.map((board) => ({
-        label: board.board_key,
-        value: board.board_key,
-      }));
-    }
-    return [];
-  }, [boards]);
-
   const updateCapMutation = useUpdateCap();
 
   return (
@@ -46,10 +27,7 @@ const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps
       <ModalBody>
         <form
           onSubmit={handleSubmit((data) => {
-            const boardIds = data.boardKeys.map(
-              (val: BoardSelectOption) =>
-                boards?.find((board) => board.board_key === val.value)?.id,
-            );
+            const boardIds = data.boardKeys.map((v: { value: string }) => v.value);
             const password = data.password ? data.password : undefined;
 
             updateCapMutation.mutate(
@@ -70,7 +48,6 @@ const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps
                 onSuccess: () => {
                   setOpen(false);
                   reset();
-                  refetch();
                 },
               },
             );
@@ -82,9 +59,7 @@ const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps
               placeholder="Name..."
               required
               defaultValue={selectedCap.name}
-              {...register("name", {
-                required: true,
-              })}
+              {...register("name", { required: true })}
             />
           </div>
           <div className="flex flex-col mt-4">
@@ -92,52 +67,18 @@ const EditCapModal = ({ open, selectedCap, setOpen, refetch }: EditCapModalProps
             <TextInput
               placeholder="Description..."
               defaultValue={selectedCap.description}
-              {...register("description", {
-                required: false,
-              })}
+              {...register("description")}
             />
           </div>
           <div className="flex flex-col mt-4">
             <Label>Password</Label>
-            <TextInput
-              placeholder="Password..."
-              type="password"
-              {...register("password", {
-                required: false,
-              })}
-            />
+            <TextInput placeholder="Password..." type="password" {...register("password")} />
           </div>
-          <div>
-            Boards
-            <Controller
-              name="boardKeys"
-              control={control}
-              defaultValue={selectedCap?.boardIds.map((boardId) => {
-                const board = boards?.find((b) => b.id === boardId);
-                return {
-                  label: board?.board_key,
-                  value: board?.board_key,
-                };
-              })}
-              render={({ field }) => (
-                <Select
-                  options={boardSelectOptions}
-                  value={boardSelectOptions
-                    .map((board) => {
-                      if (field.value?.find((v: BoardSelectOption) => v.value === board.value)) {
-                        return board;
-                      }
-                      return null;
-                    })
-                    .filter((board) => board != null)}
-                  onChange={(value) => {
-                    field.onChange(value);
-                  }}
-                  isMulti
-                />
-              )}
-            />
-          </div>
+          <BoardMultiSelect
+            control={control}
+            name="boardKeys"
+            defaultBoardIds={selectedCap.boardIds}
+          />
           <div className="flex justify-end mt-4">
             <Button type="submit">Submit</Button>
           </div>
