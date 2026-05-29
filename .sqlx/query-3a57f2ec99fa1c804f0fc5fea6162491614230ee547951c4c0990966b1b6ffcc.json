@@ -1,15 +1,15 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                BIN_TO_UUID(b.id) AS \"board_id!: Uuid\",\n                b.board_key AS board_key,\n                b.default_name AS default_name,\n                bi.threads_archive_cron AS threads_archive_cron,\n                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,\n                bi.enable_1001_message AS \"enable_1001_message: bool\",\n                bi.custom_1001_message AS custom_1001_message\n            FROM\n                boards AS b\n            JOIN\n                boards_info AS bi\n            ON\n                b.id = bi.id\n            ",
+  "query": "\n            SELECT\n                b.id AS \"board_id!: Uuid\",\n                b.board_key AS board_key,\n                b.default_name AS default_name,\n                bi.threads_archive_cron AS threads_archive_cron,\n                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,\n                bi.enable_1001_message AS \"enable_1001_message: bool\",\n                bi.custom_1001_message AS custom_1001_message\n            FROM\n                boards AS b\n            JOIN\n                boards_info AS bi\n            ON\n                b.id = bi.id\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
         "name": "board_id!: Uuid",
         "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "max_size": 144
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
         }
       },
       {
@@ -71,7 +71,7 @@
       "Right": 0
     },
     "nullable": [
-      true,
+      false,
       false,
       false,
       true,
@@ -80,5 +80,5 @@
       true
     ]
   },
-  "hash": "b802fb7223b80484fdb38c580737983a50b1a47bc3040e3f28e80bb9f742075e"
+  "hash": "3a57f2ec99fa1c804f0fc5fea6162491614230ee547951c4c0990966b1b6ffcc"
 }

@@ -19,7 +19,7 @@ impl Repository {
             SelectionBoardInfo,
             r#"
             SELECT
-                BIN_TO_UUID(b.id) AS "board_id!: Uuid",
+                b.id AS "board_id!: Uuid",
                 b.board_key AS board_key,
                 b.default_name AS default_name,
                 bi.threads_archive_cron AS threads_archive_cron,
