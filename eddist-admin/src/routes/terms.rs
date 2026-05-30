@@ -5,7 +5,7 @@ use axum::{
 };
 
 use crate::{
-    AppState, auth::AdminEmail, error::ApiError, models::Terms,
+    AppState, auth::AdminIdentity, error::ApiError, models::Terms,
     repository::terms_repository::UpdateTermsInput,
 };
 
@@ -25,11 +25,12 @@ pub fn routes() -> Router<AppState> {
 )]
 pub async fn get_terms(State(state): State<AppState>) -> Result<Json<Terms>, ApiError> {
     let terms = state
-        .terms_repo
+        .services
+        .content_admin
         .get_terms()
         .await?
         .ok_or_else(|| ApiError::not_found("Terms not found"))?;
-    Ok(Json(terms.into()))
+    Ok(Json(terms))
 }
 
 #[utoipa::path(
@@ -45,12 +46,13 @@ pub async fn get_terms(State(state): State<AppState>) -> Result<Json<Terms>, Api
 )]
 pub async fn update_terms(
     State(state): State<AppState>,
-    AdminEmail(email): AdminEmail,
+    identity: AdminIdentity,
     Json(input): Json<UpdateTermsInput>,
 ) -> Result<Json<Terms>, ApiError> {
     let terms = state
-        .terms_repo
-        .update_terms(input, Some(email))
+        .services
+        .content_admin
+        .update_terms(&identity, input)
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
@@ -59,5 +61,5 @@ pub async fn update_terms(
                 ApiError::bad_request(format!("Failed to update terms: {e}"))
             }
         })?;
-    Ok(Json(terms.into()))
+    Ok(Json(terms))
 }

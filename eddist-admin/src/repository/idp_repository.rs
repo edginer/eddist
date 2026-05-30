@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use eddist_core::symmetric;
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
@@ -183,3 +184,5 @@ impl IdpAdminRepository for IdpAdminRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(IdpAdminRepositoryImpl, 0, MySql);

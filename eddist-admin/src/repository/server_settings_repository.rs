@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::Utc;
 use eddist_core::{server_settings::KEY_AI_OPENAI_API_KEY, symmetric};
 use sqlx::{MySqlPool, query, query_as};
@@ -111,3 +112,5 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         Ok(setting)
     }
 }
+
+transaction_repository!(ServerSettingsRepositoryImpl, 0, MySql);

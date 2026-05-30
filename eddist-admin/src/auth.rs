@@ -15,7 +15,6 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
-use tracing::info_span;
 
 use crate::{
     AppState,
@@ -82,18 +81,18 @@ pub async fn verify_access_token(
                     .send()
                     .await
                     .map_err(|e| {
-                        log::error!("failed to fetch userinfo: {e:?}");
+                        tracing::error!("failed to fetch userinfo: {e:?}");
                         ErrorKind::InvalidToken
                     })?;
                 let text = res.text().await.map_err(|e| {
-                    log::error!("failed to read userinfo response: {e:?}");
+                    tracing::error!("failed to read userinfo response: {e:?}");
                     ErrorKind::InvalidToken
                 })?;
                 let res = serde_json::from_str::<Auth0UserInfo>(&text);
 
                 let info = match res {
                     Err(e) => {
-                        log::error!("failed to get userinfo: {e:?}");
+                        tracing::error!("failed to get userinfo: {e:?}");
                         return Err(ErrorKind::ExpiredSignature);
                     }
                     Ok(info) => info,
@@ -108,7 +107,7 @@ pub async fn verify_access_token(
                 })
             }
             Err(e) => {
-                log::error!("failed to verify access token: {e:?}");
+                tracing::error!("failed to verify access token: {e:?}");
                 Err(e.kind().clone())
             }
         }
@@ -125,7 +124,7 @@ pub async fn verify_access_token(
         match token {
             Ok(t) => Ok(t.claims),
             Err(e) => {
-                log::error!("failed to verify access token: {e:?}");
+                tracing::error!("failed to verify access token: {e:?}");
                 Err(e.kind().clone())
             }
         }
@@ -145,7 +144,7 @@ pub async fn auth_simple_header(
     if let Some(userinfo) = admin_session.userinfo
         && admin_session.next_refresh_at > Utc::now()
     {
-        log::info!("no need to retrieve userinfo");
+        tracing::info!("no need to retrieve userinfo");
         req.extensions_mut().insert(userinfo);
         return next.run(req).await;
     }
@@ -166,7 +165,7 @@ pub async fn auth_simple_header(
                     ..admin_session
                 };
                 if let Err(e) = session.insert("data", new_session).await {
-                    log::error!("failed to insert session: {e:?}");
+                    tracing::error!("failed to insert session: {e:?}");
                     return Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::empty())
@@ -212,17 +211,17 @@ pub async fn auth_simple_header(
                             ..admin_session
                         };
                         if let Err(e) = session.insert("data", new_session).await {
-                            log::error!("failed to insert session: {e:?}");
+                            tracing::error!("failed to insert session: {e:?}");
                             return Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                                 .body(Body::empty())
                                 .unwrap();
                         }
-                        log::info!("success to verify access token from refresh token");
+                        tracing::info!("success to verify access token from refresh token");
                         userinfo
                     }
                     Err(e) => {
-                        info_span!("failed to verify access token", error = ?e);
+                        tracing::warn!(error = ?e, "failed to verify access token");
                         return Response::builder()
                             .status(StatusCode::UNAUTHORIZED)
                             .body(Body::empty())
@@ -231,7 +230,7 @@ pub async fn auth_simple_header(
                 }
             }
             Err(e) => {
-                log::error!("unexpected token verification error: {e:?}");
+                tracing::error!("unexpected token verification error: {e:?}");
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
                     .body(Body::empty())
@@ -284,8 +283,12 @@ impl AdminSession {
         }
     }
 
-    pub fn get_admin_email(&self) -> Option<String> {
-        self.userinfo.as_ref().map(|info| info.email.clone())
+    pub fn get_admin_identity(&self) -> Option<AdminIdentity> {
+        self.userinfo.as_ref().map(|info| AdminIdentity {
+            sub: info.sub.clone(),
+            email: info.email.clone(),
+            username: info.preferred_username.clone(),
+        })
     }
 }
 
@@ -352,7 +355,7 @@ pub async fn get_login_callback(
 ) -> impl IntoResponse {
     let oauth_session = session.remove::<OAuthSession>("oauth").await;
     let Some(oauth_session) = oauth_session.ok().flatten() else {
-        info_span!("oauth_session is not found");
+        tracing::warn!("oauth_session is not found");
 
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
@@ -364,9 +367,10 @@ pub async fn get_login_callback(
     let csrf_state = CsrfToken::new(query.state.clone());
 
     if csrf_state.secret() != oauth_session.csrf_state.secret() {
-        info_span!("csrf_state is not matched",
-          server_state = ?oauth_session.csrf_state.secret(),
-          client_state = ?csrf_state.secret()
+        tracing::warn!(
+            server_state = ?oauth_session.csrf_state.secret(),
+            client_state = ?csrf_state.secret(),
+            "csrf_state is not matched"
         );
 
         return Response::builder()
@@ -389,14 +393,14 @@ pub async fn get_login_callback(
                 ..admin_session
             };
 
-            log::info!("success to get token from auth server");
+            tracing::info!("success to get token from auth server");
 
             let _ = session.insert("data", new_session).await;
 
             Redirect::to("/dashboard").into_response()
         }
         Err(e) => {
-            info_span!("failed to get token from auth server", error = ?e);
+            tracing::error!(error = ?e, "failed to get token from auth server");
 
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
@@ -438,10 +442,13 @@ where
     }
 }
 
-/// Extractor that pulls admin email from the session, returning 401 if not authenticated.
-pub struct AdminEmail(pub String);
+pub struct AdminIdentity {
+    pub sub: String,
+    pub email: String,
+    pub username: String,
+}
 
-impl<S> FromRequestParts<S> for AdminEmail
+impl<S> FromRequestParts<S> for AdminIdentity
 where
     S: Send + Sync,
 {
@@ -450,8 +457,7 @@ where
     async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let session = AdminSession::from_request_parts(req, state).await?;
         session
-            .get_admin_email()
-            .map(AdminEmail)
+            .get_admin_identity()
             .ok_or((StatusCode::UNAUTHORIZED, "No user information available"))
     }
 }
@@ -489,7 +495,7 @@ pub async fn post_native_session(
     let user_info = match verify_access_token(&req.access_token, true).await {
         Ok(token) => token,
         Err(e) => {
-            info_span!("failed to verify access token for native session", error = ?e);
+            tracing::warn!(error = ?e, "failed to verify access token for native session");
             return Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header("Content-Type", "application/json")
@@ -519,7 +525,7 @@ pub async fn post_native_session(
     // Store the session
     let session_id = uuid::Uuid::from_bytes(admin_session.id).to_string();
     if let Err(e) = session.insert("data", admin_session).await {
-        log::error!("failed to insert native session: {e:?}");
+        tracing::error!("failed to insert native session: {e:?}");
         return Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("Content-Type", "application/json")

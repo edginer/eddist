@@ -4,14 +4,12 @@ use axum::{
     http::StatusCode,
     routing::{delete, get, patch, post},
 };
-use eddist_core::domain::user_restriction::{
-    CreateUserRestrictionRuleInput, UpdateUserRestrictionRuleInput, UserRestrictionRule,
-};
+use eddist_core::domain::user_restriction::{UpdateUserRestrictionRuleInput, UserRestrictionRule};
 use uuid::Uuid;
 
 use crate::{
     AppState,
-    auth::AdminEmail,
+    auth::AdminIdentity,
     error::ApiError,
     models::{
         Cap, CreateRestrictionRuleRequest, CreationCapInput, CreationNgWordInput, NgWord,
@@ -54,7 +52,7 @@ pub fn routes() -> Router<AppState> {
     )
 )]
 pub async fn get_ng_words(State(state): State<AppState>) -> Result<Json<Vec<NgWord>>, ApiError> {
-    let ng_words = state.ng_word_repo.get_ng_words().await?;
+    let ng_words = state.services.moderation.get_ng_words().await?;
     Ok(Json(ng_words))
 }
 
@@ -68,11 +66,13 @@ pub async fn get_ng_words(State(state): State<AppState>) -> Result<Json<Vec<NgWo
 )]
 pub async fn create_ng_word(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Json(body): Json<CreationNgWordInput>,
 ) -> Result<Json<NgWord>, ApiError> {
     let ng_word = state
-        .ng_word_repo
-        .create_ng_word(&body.name, &body.word)
+        .services
+        .moderation
+        .create_ng_word(&identity, body)
         .await?;
     Ok(Json(ng_word))
 }
@@ -90,17 +90,14 @@ pub async fn create_ng_word(
 )]
 pub async fn update_ng_word(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(ng_word_id): Path<Uuid>,
     Json(body): Json<UpdateNgWordInput>,
 ) -> Result<Json<NgWord>, ApiError> {
     let ng_word = state
-        .ng_word_repo
-        .update_ng_word(
-            ng_word_id,
-            body.name.as_deref(),
-            body.word.as_deref(),
-            body.board_ids,
-        )
+        .services
+        .moderation
+        .update_ng_word(&identity, ng_word_id, body)
         .await?;
     Ok(Json(ng_word))
 }
@@ -117,9 +114,14 @@ pub async fn update_ng_word(
 )]
 pub async fn delete_ng_word(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(ng_word_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    state.ng_word_repo.delete_ng_word(ng_word_id).await?;
+    state
+        .services
+        .moderation
+        .delete_ng_word(&identity, ng_word_id)
+        .await?;
     Ok(StatusCode::OK)
 }
 
@@ -132,7 +134,7 @@ pub async fn delete_ng_word(
     )
 )]
 pub async fn get_caps(State(state): State<AppState>) -> Result<Json<Vec<Cap>>, ApiError> {
-    let caps = state.cap_repo.get_caps().await?;
+    let caps = state.services.moderation.get_caps().await?;
     Ok(Json(caps))
 }
 
@@ -146,17 +148,13 @@ pub async fn get_caps(State(state): State<AppState>) -> Result<Json<Vec<Cap>>, A
 )]
 pub async fn create_cap(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Json(body): Json<CreationCapInput>,
 ) -> Result<Json<Cap>, ApiError> {
-    let tinker_secret = std::env::var("TINKER_SECRET")
-        .map_err(|_| ApiError::Internal(anyhow::anyhow!("TINKER_SECRET not configured")))?;
     let cap = state
-        .cap_repo
-        .create_cap(
-            &body.name,
-            &body.description,
-            &eddist_core::domain::cap::calculate_cap_hash(&body.password, &tinker_secret),
-        )
+        .services
+        .moderation
+        .create_cap(&identity, body)
         .await?;
     Ok(Json(cap))
 }
@@ -174,23 +172,14 @@ pub async fn create_cap(
 )]
 pub async fn update_cap(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(cap_id): Path<Uuid>,
     Json(body): Json<UpdateCapInput>,
 ) -> Result<Json<Cap>, ApiError> {
     let cap = state
-        .cap_repo
-        .update_cap(
-            cap_id,
-            body.name.as_deref(),
-            body.description.as_deref(),
-            body.password
-                .map(|x| {
-                    let secret = std::env::var("TINKER_SECRET").unwrap_or_default();
-                    eddist_core::domain::cap::calculate_cap_hash(&x, &secret)
-                })
-                .as_deref(),
-            body.board_ids,
-        )
+        .services
+        .moderation
+        .update_cap(&identity, cap_id, body)
         .await?;
     Ok(Json(cap))
 }
@@ -207,9 +196,14 @@ pub async fn update_cap(
 )]
 pub async fn delete_cap(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(cap_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    state.cap_repo.delete_cap(cap_id).await?;
+    state
+        .services
+        .moderation
+        .delete_cap(&identity, cap_id)
+        .await?;
     Ok(StatusCode::OK)
 }
 
@@ -225,10 +219,10 @@ pub async fn get_restriction_rules(
     State(app_state): State<AppState>,
 ) -> Result<Json<Vec<UserRestrictionRule>>, ApiError> {
     let rules = app_state
-        .user_restriction_repo
-        .get_all_rules()
-        .await
-        .unwrap_or_default();
+        .services
+        .moderation
+        .get_restriction_rules()
+        .await?;
     Ok(Json(rules))
 }
 
@@ -242,18 +236,20 @@ pub async fn get_restriction_rules(
 )]
 pub async fn create_restriction_rule(
     State(app_state): State<AppState>,
-    AdminEmail(admin_email): AdminEmail,
+    identity: AdminIdentity,
     Json(req): Json<CreateRestrictionRuleRequest>,
 ) -> Result<(StatusCode, Json<UserRestrictionRule>), ApiError> {
-    let input = CreateUserRestrictionRuleInput {
-        name: req.name,
-        rule_type: req.rule_type.into(),
-        rule_value: req.rule_value,
-        expires_at: req.expires_at,
-        created_by_email: admin_email,
-    };
-
-    let rule = app_state.user_restriction_repo.create_rule(input).await?;
+    let rule = app_state
+        .services
+        .moderation
+        .create_restriction_rule(
+            &identity,
+            req.name,
+            req.rule_type.into(),
+            req.rule_value,
+            req.expires_at,
+        )
+        .await?;
     Ok((StatusCode::CREATED, Json(rule)))
 }
 
@@ -271,6 +267,7 @@ pub async fn create_restriction_rule(
 pub async fn update_restriction_rule(
     Path(rule_id): Path<Uuid>,
     State(app_state): State<AppState>,
+    identity: AdminIdentity,
     Json(req): Json<UpdateRestrictionRuleRequest>,
 ) -> Result<Json<()>, ApiError> {
     let input = UpdateUserRestrictionRuleInput {
@@ -280,8 +277,11 @@ pub async fn update_restriction_rule(
         rule_value: req.rule_value,
         expires_at: req.expires_at,
     };
-
-    app_state.user_restriction_repo.update_rule(input).await?;
+    app_state
+        .services
+        .moderation
+        .update_restriction_rule(&identity, input)
+        .await?;
     Ok(Json(()))
 }
 
@@ -298,8 +298,13 @@ pub async fn update_restriction_rule(
 pub async fn delete_restriction_rule(
     Path(rule_id): Path<Uuid>,
     State(app_state): State<AppState>,
+    identity: AdminIdentity,
 ) -> Result<Json<()>, ApiError> {
-    app_state.user_restriction_repo.delete_rule(rule_id).await?;
+    app_state
+        .services
+        .moderation
+        .delete_restriction_rule(&identity, rule_id)
+        .await?;
     Ok(Json(()))
 }
 
@@ -318,8 +323,9 @@ pub async fn get_restriction_rule(
     State(app_state): State<AppState>,
 ) -> Result<Json<Option<UserRestrictionRule>>, ApiError> {
     let rule = app_state
-        .user_restriction_repo
-        .get_rule_by_id(rule_id)
+        .services
+        .moderation
+        .get_restriction_rule(rule_id)
         .await?;
     Ok(Json(rule))
 }

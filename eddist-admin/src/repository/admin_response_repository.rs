@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::{TimeZone, Utc};
 use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{MySqlPool, query_as, types::Json};
@@ -330,3 +331,5 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         Ok(selection_res_to_res(res))
     }
 }
+
+transaction_repository!(AdminResponseRepositoryImpl, 0, MySql);

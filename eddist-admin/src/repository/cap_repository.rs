@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use std::collections::HashMap;
 
 use chrono::Utc;
@@ -226,3 +227,5 @@ impl CapRepository for CapRepositoryImpl {
         })
     }
 }
+
+transaction_repository!(CapRepositoryImpl, 0, MySql);

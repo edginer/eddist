@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
-    auth::AdminEmail,
+    auth::AdminIdentity,
     error::ApiError,
     models::{CaptchaConfig, CreateCaptchaConfigInput, UpdateCaptchaConfigInput},
 };
@@ -33,7 +33,7 @@ pub fn routes() -> Router<AppState> {
 pub async fn list_captcha_configs(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CaptchaConfig>>, ApiError> {
-    let configs = state.captcha_config_repo.get_all().await?;
+    let configs = state.services.content_admin.list_captcha_configs().await?;
     Ok(Json(configs))
 }
 
@@ -54,8 +54,9 @@ pub async fn get_captcha_config(
     Path(id): Path<Uuid>,
 ) -> Result<Json<CaptchaConfig>, ApiError> {
     let config = state
-        .captcha_config_repo
-        .get_by_id(id)
+        .services
+        .content_admin
+        .get_captcha_config(id)
         .await?
         .ok_or_else(|| ApiError::not_found("Captcha config not found"))?;
     Ok(Json(config))
@@ -74,12 +75,13 @@ pub async fn get_captcha_config(
 )]
 pub async fn create_captcha_config(
     State(state): State<AppState>,
-    AdminEmail(email): AdminEmail,
+    identity: AdminIdentity,
     Json(input): Json<CreateCaptchaConfigInput>,
 ) -> Result<(StatusCode, Json<CaptchaConfig>), ApiError> {
     let config = state
-        .captcha_config_repo
-        .create(input, Some(email))
+        .services
+        .content_admin
+        .create_captcha_config(&identity, input)
         .await
         .map_err(|e| ApiError::bad_request(format!("Failed to create captcha config: {e}")))?;
     Ok((StatusCode::CREATED, Json(config)))
@@ -102,13 +104,14 @@ pub async fn create_captcha_config(
 )]
 pub async fn update_captcha_config(
     State(state): State<AppState>,
-    AdminEmail(email): AdminEmail,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateCaptchaConfigInput>,
 ) -> Result<Json<CaptchaConfig>, ApiError> {
     let config = state
-        .captcha_config_repo
-        .update(id, input, Some(email))
+        .services
+        .content_admin
+        .update_captcha_config(&identity, id, input)
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
@@ -135,12 +138,13 @@ pub async fn update_captcha_config(
 )]
 pub async fn delete_captcha_config(
     State(state): State<AppState>,
-    AdminEmail(_email): AdminEmail,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .captcha_config_repo
-        .delete(id)
+        .services
+        .content_admin
+        .delete_captcha_config(&identity, id)
         .await
         .map_err(|e| ApiError::not_found(format!("Failed to delete captcha config: {e}")))?;
     Ok(StatusCode::NO_CONTENT)
