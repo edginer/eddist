@@ -14,44 +14,21 @@ import {
   TableRow,
   TextInput,
 } from "flowbite-react";
-import { useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { BiDotsHorizontalRounded } from "react-icons/bi";
 import { FaPlus } from "react-icons/fa";
-import Select from "react-select";
+import BoardMultiSelect from "~/components/BoardMultiSelect";
 import CreateNgWordModal from "~/components/CreateNgWordModal";
-import { getBoards, getNgWords, useDeleteNgWord, useUpdateNgWord } from "~/hooks/queries";
+import { getNgWords, useDeleteNgWord, useUpdateNgWord } from "~/hooks/queries";
 import { useCrudModalState } from "~/hooks/useCrudModalState";
-
-interface NgWord {
-  id: string;
-  name: string;
-  word: string;
-  boardIds: string[];
-}
-
-interface BoardSelectOption {
-  label: string;
-  value: string;
-}
+import type { NgWord } from "~/types/entities";
 
 const NgWords = () => {
-  const { data: ngWords, refetch } = getNgWords({});
+  const { data: ngWords } = getNgWords({});
   const updateMutation = useUpdateNgWord();
   const deleteMutation = useDeleteNgWord();
   const modal = useCrudModalState<NgWord>();
   const { register, handleSubmit, control, reset } = useForm();
-
-  const { data: boards } = getBoards({});
-  const boardSelectOptions = useMemo(() => {
-    if (boards) {
-      return boards.map((board) => ({
-        label: board.board_key,
-        value: board.board_key,
-      }));
-    }
-    return [];
-  }, [boards]);
 
   return (
     <>
@@ -60,7 +37,6 @@ const NgWords = () => {
         setOpen={(v) => {
           if (!v) modal.closeCreate();
         }}
-        refetch={refetch}
       />
       <Modal
         show={modal.isEditOpen}
@@ -74,12 +50,7 @@ const NgWords = () => {
         <ModalBody>
           <form
             onSubmit={handleSubmit((data) => {
-              console.log(data);
-              const boardIds = data.boardKeys.map(
-                (val: BoardSelectOption) =>
-                  boards?.find((board) => board.board_key === val.value)?.id,
-              );
-              console.log(boardIds);
+              const boardIds = data.boardKeys.map((v: { value: string }) => v.value);
 
               updateMutation.mutate(
                 {
@@ -104,15 +75,12 @@ const NgWords = () => {
             })}
           >
             <div className="flex flex-col">
-              <input type="hidden" {...register("id")} value={modal.editingItem?.id} />
               <Label>Name</Label>
               <TextInput
                 placeholder="Name..."
                 required
                 defaultValue={modal.editingItem?.name}
-                {...register("name", {
-                  required: true,
-                })}
+                {...register("name", { required: true })}
               />
             </div>
             <div className="flex flex-col mt-4">
@@ -121,42 +89,14 @@ const NgWords = () => {
                 placeholder="Word..."
                 defaultValue={modal.editingItem?.word}
                 required
-                {...register("word", {
-                  required: true,
-                })}
+                {...register("word", { required: true })}
               />
             </div>
-            <div>
-              Boards
-              <Controller
-                name="boardKeys"
-                control={control}
-                defaultValue={modal.editingItem?.boardIds.map((boardId) => {
-                  const board = boards?.find((b) => b.id === boardId);
-                  return {
-                    label: board?.board_key,
-                    value: board?.board_key,
-                  };
-                })}
-                render={({ field }) => (
-                  <Select
-                    options={boardSelectOptions}
-                    value={boardSelectOptions
-                      .map((board) => {
-                        if (field.value?.find((v: BoardSelectOption) => v.value === board.value)) {
-                          return board;
-                        }
-                        return null;
-                      })
-                      .filter((board) => board != null)}
-                    onChange={(value) => {
-                      field.onChange(value);
-                    }}
-                    isMulti
-                  />
-                )}
-              />
-            </div>
+            <BoardMultiSelect
+              control={control}
+              name="boardKeys"
+              defaultBoardIds={modal.editingItem?.boardIds ?? []}
+            />
             <Button type="submit" className="mt-4">
               Submit
             </Button>

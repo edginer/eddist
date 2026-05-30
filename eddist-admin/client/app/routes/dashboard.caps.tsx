@@ -14,18 +14,11 @@ import CreateCapModal from "~/components/CreateCapModal";
 import EditCapModal from "~/components/EditCapModal";
 import { getCaps, useDeleteCap } from "~/hooks/queries";
 import { useCrudModalState } from "~/hooks/useCrudModalState";
+import type { Cap } from "~/types/entities";
 import { formatDateTime } from "~/utils/format";
 
-export interface Cap {
-  id: string;
-  name: string;
-  description: string;
-  password?: string;
-  boardIds: string[];
-}
-
 const CapPage = () => {
-  const { data: caps, refetch } = getCaps({});
+  const { data: caps } = getCaps({});
   const deleteMutation = useDeleteCap();
 
   const modal = useCrudModalState<Cap>();
@@ -37,7 +30,6 @@ const CapPage = () => {
         setOpen={(v) => {
           if (!v) modal.closeCreate();
         }}
-        refetch={refetch}
       />
 
       {modal.editingItem && (
@@ -47,7 +39,6 @@ const CapPage = () => {
           setOpen={(v) => {
             if (!v) modal.closeEdit();
           }}
-          refetch={refetch}
         />
       )}
 

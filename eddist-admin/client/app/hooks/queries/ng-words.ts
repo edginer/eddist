@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-q
 import { toast } from "react-toastify";
 import client from "~/openapi/client";
 import type { paths } from "~/openapi/schema";
+import { sortById } from "~/utils/sort";
 import type { UseQueryOptions } from "./types";
 
 const GET_NG_WORDS = "/ng_words/";
@@ -15,19 +16,7 @@ export const getNgWords = ({ params }: UseQueryOptions<paths[typeof GET_NG_WORDS
         signal,
       });
 
-      if (data) {
-        data.sort((a, b) => {
-          if (a.id < b.id) {
-            return -1;
-          }
-          if (a.id > b.id) {
-            return 1;
-          }
-          return 0;
-        });
-      }
-
-      return data;
+      return data ? sortById(data) : data;
     },
   });
 };
