@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::Utc;
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
@@ -397,3 +398,5 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(CaptchaConfigRepositoryImpl, 0, MySql);

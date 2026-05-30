@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
-    auth::{AdminEmail, AdminSession},
+    auth::AdminIdentity,
     error::ApiError,
     models::Notice,
     repository::notice_repository::{CreateNoticeInput, UpdateNoticeInput},
@@ -36,31 +36,6 @@ const fn default_limit() -> u32 {
     20
 }
 
-/// Helper function to check if the current admin is the author of a notice
-async fn check_notice_author(
-    state: &AppState,
-    admin_session: &AdminSession,
-    notice_id: Uuid,
-) -> Result<eddist_core::domain::notice::Notice, ApiError> {
-    let current_admin_email = admin_session
-        .get_admin_email()
-        .ok_or_else(ApiError::unauthorized)?;
-
-    let existing_notice = state
-        .notice_repo
-        .get_notice_by_id(notice_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("Notice not found"))?;
-
-    if existing_notice.author_email.as_ref() != Some(&current_admin_email) {
-        return Err(ApiError::forbidden(
-            "You can only modify notices you created",
-        ));
-    }
-
-    Ok(existing_notice)
-}
-
 #[utoipa::path(
     get,
     path = "/notices/",
@@ -74,10 +49,11 @@ pub async fn get_notices(
 ) -> Result<Json<Vec<Notice>>, ApiError> {
     let limit = query.limit.min(100);
     let notices = state
-        .notice_repo
-        .get_notices_paginated(query.page, limit)
+        .services
+        .content_admin
+        .get_notices(query.page, limit)
         .await?;
-    Ok(Json(notices.into_iter().map(Notice::from).collect()))
+    Ok(Json(notices))
 }
 
 #[utoipa::path(
@@ -96,11 +72,12 @@ pub async fn get_notice(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Notice>, ApiError> {
     let notice = state
-        .notice_repo
-        .get_notice_by_id(id)
+        .services
+        .content_admin
+        .get_notice(id)
         .await?
         .ok_or_else(|| ApiError::not_found("Notice not found"))?;
-    Ok(Json(notice.into()))
+    Ok(Json(notice))
 }
 
 #[utoipa::path(
@@ -115,7 +92,7 @@ pub async fn get_notice(
 )]
 pub async fn create_notice(
     State(state): State<AppState>,
-    AdminEmail(email): AdminEmail,
+    identity: AdminIdentity,
     Json(input): Json<CreateNoticeInput>,
 ) -> Result<(StatusCode, Json<Notice>), ApiError> {
     if input.slug == "latest" {
@@ -123,11 +100,12 @@ pub async fn create_notice(
     }
 
     let notice = state
-        .notice_repo
-        .create_notice(input, Some(email))
+        .services
+        .content_admin
+        .create_notice(&identity, input)
         .await
         .map_err(|e| ApiError::bad_request(format!("Failed to create notice: {e}")))?;
-    Ok((StatusCode::CREATED, Json(notice.into())))
+    Ok((StatusCode::CREATED, Json(notice)))
 }
 
 #[utoipa::path(
@@ -147,19 +125,31 @@ pub async fn create_notice(
 )]
 pub async fn update_notice(
     State(state): State<AppState>,
-    admin_session: AdminSession,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateNoticeInput>,
 ) -> Result<Json<Notice>, ApiError> {
-    check_notice_author(&state, &admin_session, id).await?;
+    state
+        .services
+        .content_admin
+        .check_notice_author(&identity, id)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("Forbidden") {
+                ApiError::forbidden(e.to_string())
+            } else {
+                ApiError::not_found(e.to_string())
+            }
+        })?;
 
     if matches!(&input.slug, Some(slug) if slug == "latest") {
         return Err(ApiError::bad_request("'latest' is a reserved slug"));
     }
 
     let notice = state
-        .notice_repo
-        .update_notice(id, input)
+        .services
+        .content_admin
+        .update_notice(&identity, id, input)
         .await
         .map_err(|e| {
             if e.to_string().contains("not found") {
@@ -168,7 +158,7 @@ pub async fn update_notice(
                 ApiError::bad_request(format!("Failed to update notice: {e}"))
             }
         })?;
-    Ok(Json(notice.into()))
+    Ok(Json(notice))
 }
 
 #[utoipa::path(
@@ -186,14 +176,26 @@ pub async fn update_notice(
 )]
 pub async fn delete_notice(
     State(state): State<AppState>,
-    admin_session: AdminSession,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    check_notice_author(&state, &admin_session, id).await?;
+    state
+        .services
+        .content_admin
+        .check_notice_author(&identity, id)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("Forbidden") {
+                ApiError::forbidden(e.to_string())
+            } else {
+                ApiError::not_found(e.to_string())
+            }
+        })?;
 
     state
-        .notice_repo
-        .delete_notice(id)
+        .services
+        .content_admin
+        .delete_notice(&identity, id)
         .await
         .map_err(|e| ApiError::not_found(format!("Failed to delete notice: {e}")))?;
     Ok(StatusCode::NO_CONTENT)

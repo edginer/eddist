@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use async_trait::async_trait;
 use eddist_core::domain::user_restriction::{
     CreateUserRestrictionRuleInput, RestrictionRuleType, UpdateUserRestrictionRuleInput,
@@ -191,3 +192,5 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         Ok(None)
     }
 }
+
+transaction_repository!(UserRestrictionRepositoryImpl, pool, MySql);

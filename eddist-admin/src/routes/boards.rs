@@ -7,6 +7,7 @@ use eddist_core::domain::board::validate_board_key;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::{Board, BoardInfo, CreateBoardInput, EditBoardInput},
 };
@@ -28,7 +29,7 @@ pub fn routes() -> Router<AppState> {
     )
 )]
 pub async fn get_boards(State(state): State<AppState>) -> Result<Json<Vec<Board>>, ApiError> {
-    let boards = state.admin_board_repo.get_boards_by_key(None).await?;
+    let boards = state.services.board.get_boards(None).await?;
     Ok(Json(boards))
 }
 
@@ -48,10 +49,10 @@ pub async fn get_board(
     Path(board_key): Path<String>,
 ) -> Result<Json<Board>, ApiError> {
     let board = state
-        .admin_board_repo
-        .get_boards_by_key(Some(vec![board_key]))
-        .await?;
-    let board = board
+        .services
+        .board
+        .get_boards(Some(vec![board_key]))
+        .await?
         .into_iter()
         .next()
         .ok_or_else(|| ApiError::not_found("Board not found"))?;
@@ -74,15 +75,15 @@ pub async fn get_board_info(
     Path(board_key): Path<String>,
 ) -> Result<Json<BoardInfo>, ApiError> {
     let board = state
-        .admin_board_repo
-        .get_boards_by_key(Some(vec![board_key]))
-        .await?;
-    let board = board
+        .services
+        .board
+        .get_boards(Some(vec![board_key]))
+        .await?
         .into_iter()
         .next()
         .ok_or_else(|| ApiError::not_found("Board not found"))?;
 
-    let board_info = state.admin_board_repo.get_board_info(board.id).await?;
+    let board_info = state.services.board.get_board_info(board.id).await?;
     Ok(Json(board_info))
 }
 
@@ -96,6 +97,7 @@ pub async fn get_board_info(
 )]
 pub async fn create_board(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Json(body): Json<CreateBoardInput>,
 ) -> Result<Json<Board>, ApiError> {
     if validate_board_key(&body.board_key).is_err() {
@@ -104,7 +106,7 @@ pub async fn create_board(
         ));
     }
 
-    let board = state.admin_board_repo.create_board(body).await?;
+    let board = state.services.board.create_board(&identity, body).await?;
     Ok(Json(board))
 }
 
@@ -121,9 +123,14 @@ pub async fn create_board(
 )]
 pub async fn edit_board(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(board_key): Path<String>,
     Json(body): Json<EditBoardInput>,
 ) -> Result<Json<Board>, ApiError> {
-    let board = state.admin_board_repo.edit_board(&board_key, body).await?;
+    let board = state
+        .services
+        .board
+        .edit_board(&identity, &board_key, body)
+        .await?;
     Ok(Json(board))
 }

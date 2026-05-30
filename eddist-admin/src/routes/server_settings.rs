@@ -6,6 +6,7 @@ use axum::{
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::server_settings::{ServerSetting, UpsertServerSettingInput},
 };
@@ -29,7 +30,7 @@ pub fn routes() -> Router<AppState> {
 pub async fn list_server_settings(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ServerSetting>>, ApiError> {
-    let settings = state.server_settings_repo.get_all().await?;
+    let settings = state.services.content_admin.list_server_settings().await?;
     Ok(Json(settings))
 }
 
@@ -45,6 +46,7 @@ pub async fn list_server_settings(
 )]
 pub async fn upsert_server_setting(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Json(input): Json<UpsertServerSettingInput>,
 ) -> Result<Json<ServerSetting>, ApiError> {
     if !ServerSettingKey::ALL
@@ -63,8 +65,9 @@ pub async fn upsert_server_setting(
     }
 
     let setting = state
-        .server_settings_repo
-        .upsert(input)
+        .services
+        .content_admin
+        .upsert_server_setting(&identity, input)
         .await
         .map_err(|e| ApiError::bad_request(format!("Failed to upsert server setting: {e}")))?;
     Ok(Json(setting))

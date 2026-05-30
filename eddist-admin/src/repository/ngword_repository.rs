@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use std::collections::HashMap;
 
 use chrono::Utc;
@@ -263,3 +264,5 @@ impl NgWordRepository for NgWordRepositoryImpl {
         })
     }
 }
+
+transaction_repository!(NgWordRepositoryImpl, 0, MySql);

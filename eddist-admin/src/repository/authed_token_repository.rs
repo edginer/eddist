@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::NaiveDateTime;
 use sqlx::{FromRow, MySql, QueryBuilder, Row, query, query_as};
 use uuid::Uuid;
@@ -267,3 +268,5 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(AuthedTokenRepositoryImpl, 0, MySql);

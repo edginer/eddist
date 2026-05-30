@@ -10,6 +10,7 @@ use utoipa::IntoParams;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::{Res, Thread},
     repository::admin_archive_repository::ArchivedResUpdate,
@@ -80,8 +81,9 @@ pub async fn get_archived_threads(
     }): Query<GetArchivedThreadsQuery>,
 ) -> Result<Json<Vec<Thread>>, ApiError> {
     let threads = state
-        .admin_thread_repo
-        .get_archived_threads_by_filter(
+        .services
+        .archive
+        .get_archived_threads(
             &board_key,
             keyword.as_deref(),
             (
@@ -112,12 +114,10 @@ pub async fn get_archived_thread(
     Path((board_key, thread_id)): Path<(String, u64)>,
 ) -> Result<Json<Thread>, ApiError> {
     let thread = state
-        .admin_thread_repo
-        .get_archived_threads_by_thread_id(&board_key, Some(vec![thread_id]))
-        .await?;
-    let thread = thread
-        .into_iter()
-        .next()
+        .services
+        .archive
+        .get_archived_thread(&board_key, thread_id)
+        .await?
         .ok_or_else(|| ApiError::not_found("Archived thread not found"))?;
     Ok(Json(thread))
 }
@@ -138,8 +138,9 @@ pub async fn get_archived_responses(
     Path((board_key, thread_id)): Path<(String, u64)>,
 ) -> Result<Json<Vec<Res>>, ApiError> {
     let responses = state
-        .admin_response_repo
-        .get_archived_reses_by_thread_id(&board_key, thread_id)
+        .services
+        .archive
+        .get_archived_responses(&board_key, thread_id)
         .await?;
     Ok(Json(responses))
 }
@@ -160,8 +161,9 @@ pub async fn get_dat_archived_thread(
     Path((board_key, thread_number)): Path<(String, u64)>,
 ) -> Result<Json<crate::repository::admin_archive_repository::ArchivedThread>, ApiError> {
     let thread = state
-        .admin_archive_repo
-        .get_thread(&board_key, thread_number)
+        .services
+        .archive
+        .get_dat_archived_thread(&board_key, thread_number)
         .await?;
     Ok(Json(thread))
 }
@@ -182,8 +184,9 @@ pub async fn get_admin_dat_archived_thread(
     Path((board_key, thread_number)): Path<(String, u64)>,
 ) -> Result<Json<crate::repository::admin_archive_repository::ArchivedAdminThread>, ApiError> {
     let thread = state
-        .admin_archive_repo
-        .get_archived_admin_thread(&board_key, thread_number)
+        .services
+        .archive
+        .get_admin_dat_archived_thread(&board_key, thread_number)
         .await?;
     Ok(Json(thread))
 }
@@ -202,12 +205,14 @@ pub async fn get_admin_dat_archived_thread(
 )]
 pub async fn update_archived_res(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path((board_key, thread_number)): Path<(String, u64)>,
     Json(body): Json<Vec<ArchivedResUpdate>>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .admin_archive_repo
-        .update_response(&board_key, thread_number, &body)
+        .services
+        .archive
+        .update_archived_res(&identity, &board_key, thread_number, &body)
         .await?;
     Ok(StatusCode::OK)
 }
@@ -226,11 +231,13 @@ pub async fn update_archived_res(
 )]
 pub async fn delete_archived_res(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path((board_key, thread_number, res_order)): Path<(String, u64, u64)>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .admin_archive_repo
-        .delete_response(&board_key, thread_number, res_order)
+        .services
+        .archive
+        .delete_archived_res(&identity, &board_key, thread_number, res_order)
         .await?;
     Ok(StatusCode::OK)
 }
@@ -248,11 +255,13 @@ pub async fn delete_archived_res(
 )]
 pub async fn delete_archived_thread(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path((board_key, thread_number)): Path<(String, u64)>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .admin_archive_repo
-        .delete_thread(&board_key, thread_number)
+        .services
+        .archive
+        .delete_archived_thread(&identity, &board_key, thread_number)
         .await?;
     Ok(StatusCode::OK)
 }
