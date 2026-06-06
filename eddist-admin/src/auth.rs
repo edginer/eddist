@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KeycloakAccessToken {
+pub struct Auth0Claims {
     pub exp: i64,
     pub sub: String,
     pub email_verified: bool,
@@ -58,7 +58,7 @@ fn get_http_client() -> &'static reqwest::Client {
 pub async fn verify_access_token(
     access_token: &str,
     is_native: bool,
-) -> Result<KeycloakAccessToken, ErrorKind> {
+) -> Result<Auth0Claims, ErrorKind> {
     if let Ok(userinfo_url) = env::var("EDDIST_USER_INFO_URL") {
         let pub_key = if is_native {
             std::env::var("EDDIST_ADMIN_NATIVE_JWT_PUB_KEY").map_err(|_| ErrorKind::InvalidToken)?
@@ -68,6 +68,9 @@ pub async fn verify_access_token(
         let audience = env::var("EDDIST_AUDIENCE").map_err(|_| ErrorKind::InvalidToken)?;
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&[audience.as_str()]);
+        if let Ok(issuer) = std::env::var("EDDIST_ISSUER") {
+            validation.set_issuer(&[issuer.as_str()]);
+        }
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes())
             .map_err(|e| e.kind().clone())?;
         let token =
@@ -92,19 +95,24 @@ pub async fn verify_access_token(
 
                 let info = match res {
                     Err(e) => {
-                        tracing::error!("failed to get userinfo: {e:?}");
-                        return Err(ErrorKind::ExpiredSignature);
+                        tracing::error!("failed to parse userinfo response: {e:?}");
+                        return Err(ErrorKind::InvalidToken);
                     }
                     Ok(info) => info,
                 };
 
-                Ok(KeycloakAccessToken {
+                let claims = Auth0Claims {
                     exp: t.claims.exp,
                     sub: info.sub,
                     email_verified: info.email_verified,
                     preferred_username: info.nickname,
                     email: info.email,
-                })
+                };
+                if !claims.email_verified {
+                    tracing::warn!(sub = %claims.sub, "access denied: email not verified");
+                    return Err(ErrorKind::InvalidToken);
+                }
+                Ok(claims)
             }
             Err(e) => {
                 tracing::error!("failed to verify access token: {e:?}");
@@ -116,13 +124,21 @@ pub async fn verify_access_token(
             std::env::var("EDDIST_ADMIN_JWT_PUB_KEY").map_err(|_| ErrorKind::InvalidToken)?;
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&["account"]);
+        if let Ok(issuer) = std::env::var("EDDIST_ISSUER") {
+            validation.set_issuer(&[issuer.as_str()]);
+        }
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(pub_key.as_bytes())
             .map_err(|e| e.kind().clone())?;
-        let token =
-            jsonwebtoken::decode::<KeycloakAccessToken>(access_token, &decoding_key, &validation);
+        let token = jsonwebtoken::decode::<Auth0Claims>(access_token, &decoding_key, &validation);
 
         match token {
-            Ok(t) => Ok(t.claims),
+            Ok(t) => {
+                if !t.claims.email_verified {
+                    tracing::warn!(sub = %t.claims.sub, "access denied: email not verified");
+                    return Err(ErrorKind::InvalidToken);
+                }
+                Ok(t.claims)
+            }
             Err(e) => {
                 tracing::error!("failed to verify access token: {e:?}");
                 Err(e.kind().clone())
@@ -149,12 +165,7 @@ pub async fn auth_simple_header(
         return next.run(req).await;
     }
     if let Some(access_token) = &admin_session.access_token {
-        let is_native = req
-            .headers()
-            .get("User-Agent")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown")
-            .contains("eddist-manager");
+        let is_native = admin_session.is_native;
 
         let access_token = verify_access_token(access_token, is_native).await;
         let access_token = match access_token {
@@ -262,33 +273,28 @@ pub struct AdminSession {
     logged_ip: String,
     logged_ua: String,
     user_id: Option<[u8; 16]>,
+    #[serde(default)]
+    pub is_native: bool,
     access_token: Option<String>,
     refresh_token: Option<String>,
     next_refresh_at: chrono::DateTime<Utc>,
-    userinfo: Option<KeycloakAccessToken>,
+    userinfo: Option<Auth0Claims>,
 }
 
 impl AdminSession {
-    fn new(logged_ip: String, logged_ua: String) -> Self {
+    fn new(logged_ip: String, logged_ua: String, is_native: bool) -> Self {
         Self {
             id: *uuid::Uuid::now_v7().as_bytes(),
             created_at: Utc::now(),
             logged_ip,
             logged_ua,
             user_id: None,
+            is_native,
             access_token: None,
             refresh_token: None,
             next_refresh_at: Utc::now() + TimeDelta::minutes(1),
             userinfo: None,
         }
-    }
-
-    pub fn get_admin_identity(&self) -> Option<AdminIdentity> {
-        self.userinfo.as_ref().map(|info| AdminIdentity {
-            sub: info.sub.clone(),
-            email: info.email.clone(),
-            username: info.preferred_username.clone(),
-        })
     }
 }
 
@@ -422,6 +428,12 @@ where
         if let Some(session) = session.get::<AdminSession>("data").await.unwrap_or(None) {
             Ok(session)
         } else {
+            let is_native = req
+                .headers
+                .get("User-Agent")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .contains("eddist-manager");
             let ip = req
                 .headers
                 .get("CF-Connecting-IP")
@@ -434,7 +446,7 @@ where
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("Mozilla/5.0")
                 .to_string();
-            let data = AdminSession::new(ip, ua);
+            let data = AdminSession::new(ip, ua, is_native);
             let _ = session.insert("data", data.clone()).await;
 
             Ok(data)
@@ -454,10 +466,14 @@ where
 {
     type Rejection = (http::StatusCode, &'static str);
 
-    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let session = AdminSession::from_request_parts(req, state).await?;
-        session
-            .get_admin_identity()
+    async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        req.extensions
+            .get::<Auth0Claims>()
+            .map(|token| AdminIdentity {
+                sub: token.sub.clone(),
+                email: token.email.clone(),
+                username: token.preferred_username.clone(),
+            })
             .ok_or((StatusCode::UNAUTHORIZED, "No user information available"))
     }
 }
@@ -515,9 +531,10 @@ pub async fn post_native_session(
         created_at: Utc::now(),
         logged_ip: client_ip,
         logged_ua: client_ua,
-        user_id: None, // We don't have user_id mapping yet
+        user_id: None,
+        is_native: true,
         access_token: Some(req.access_token),
-        refresh_token: None, // Native clients don't get refresh tokens in this flow
+        refresh_token: None,
         next_refresh_at: Utc::now() + TimeDelta::minutes(5),
         userinfo: Some(user_info.clone()),
     };
