@@ -105,7 +105,7 @@ const SummarizeTab = ({
     <h3 className="text-lg font-semibold mb-2">スレッド要約</h3>
     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
       ONのとき、スレッド一覧にAI要約ボタンを表示します。ChromiumベースのブラウザのSummarizer
-      APIを使用します。初回使用時にAIモデルの大容量データ（数GB）がダウンロードされる場合があります。モバイル回線などでのご利用はご注意ください。
+      APIを使用します。初回使用時にAIモデルの大容量データ（数GB）がダウンロードされる場合があります。モバイル回線などでのご利用はご注意ください。内容の正確性は保証しません。
     </p>
     <label className="flex items-center gap-3 cursor-pointer select-none">
       <div className="relative">
