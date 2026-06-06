@@ -90,7 +90,7 @@ const convertThreadTextToResponseList = (text: string) => {
     const match = line.match(lineRegex);
     if (match == null) {
       // あぼーん<>あぼーん<><> あぼーん<> てす
-      const aboneRegex = /^(.*)<>(.*)<><> あぼーん<>(.*)$/;
+      const aboneRegex = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
       const aboneMatch = line.match(aboneRegex);
       if (aboneMatch == null) {
         // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
