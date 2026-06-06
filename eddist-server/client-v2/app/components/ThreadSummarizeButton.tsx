@@ -160,7 +160,12 @@ export const ThreadSummarizeButton = ({ boardKey, threadId, threadTitle }: Props
                 <span>要約中...</span>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap leading-relaxed">{summary}</p>
+              <>
+                <p className="whitespace-pre-wrap leading-relaxed">{summary}</p>
+                <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                  内容の正確性は保証しません
+                </p>
+              </>
             )}
           </div>,
           document.body,
