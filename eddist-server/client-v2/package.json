@@ -35,6 +35,7 @@
   "devDependencies": {
     "@react-router/dev": "^7.13.2",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/dom-chromium-ai": "^0.0.16",
     "@types/encoding-japanese": "^2.2.1",
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.1",
