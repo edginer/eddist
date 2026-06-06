@@ -247,7 +247,7 @@ async fn main() {
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false)
+        .with_secure(is_prod())
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::days(14)));
 
