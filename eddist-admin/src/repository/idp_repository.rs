@@ -110,7 +110,7 @@ impl IdpAdminRepository for IdpAdminRepositoryImpl {
         let current = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("IdP not found"))?;
+            .ok_or_else(|| crate::error::ServiceError::NotFound("IdP not found".into()))?;
 
         let idp_display_name = input.idp_display_name.unwrap_or(current.idp_display_name);
         let idp_logo_svg = if input.idp_logo_svg.is_some() {

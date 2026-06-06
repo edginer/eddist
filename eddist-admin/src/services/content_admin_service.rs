@@ -159,11 +159,12 @@ impl ContentAdminService for ContentAdminServiceImpl {
             .notice_repo
             .get_notice_by_id(id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Notice not found"))?;
+            .ok_or_else(|| crate::error::ServiceError::NotFound("Notice not found".into()))?;
         if notice.author_email.as_ref() != Some(&actor.email) {
-            return Err(anyhow::anyhow!(
-                "Forbidden: you can only modify notices you created"
-            ));
+            return Err(crate::error::ServiceError::Forbidden(
+                "you can only modify notices you created".into(),
+            )
+            .into());
         }
         Ok(notice)
     }

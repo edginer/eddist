@@ -45,9 +45,8 @@ impl UserService for UserServiceImpl {
     ) -> anyhow::Result<User> {
         self.repo.update_user_status(user_id, enabled).await?;
         let users = self.repo.search_users(Some(user_id), None, None).await?;
-        users
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("User not found after update"))
+        users.into_iter().next().ok_or_else(|| {
+            crate::error::ServiceError::NotFound("User not found after update".into()).into()
+        })
     }
 }

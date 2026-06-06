@@ -175,7 +175,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         let current = self
             .get_notice_by_id(id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Notice not found"))?;
+            .ok_or_else(|| crate::error::ServiceError::NotFound("Notice not found".into()))?;
 
         let title = input.title.clone().unwrap_or_else(|| current.title.clone());
         let content = input.content.unwrap_or(current.content);

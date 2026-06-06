@@ -103,8 +103,7 @@ pub async fn create_notice(
         .services
         .content_admin
         .create_notice(&identity, input)
-        .await
-        .map_err(|e| ApiError::bad_request(format!("Failed to create notice: {e}")))?;
+        .await?;
     Ok((StatusCode::CREATED, Json(notice)))
 }
 
@@ -133,14 +132,7 @@ pub async fn update_notice(
         .services
         .content_admin
         .check_notice_author(&identity, id)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("Forbidden") {
-                ApiError::forbidden(e.to_string())
-            } else {
-                ApiError::not_found(e.to_string())
-            }
-        })?;
+        .await?;
 
     if matches!(&input.slug, Some(slug) if slug == "latest") {
         return Err(ApiError::bad_request("'latest' is a reserved slug"));
@@ -150,14 +142,7 @@ pub async fn update_notice(
         .services
         .content_admin
         .update_notice(&identity, id, input)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                ApiError::not_found("Notice not found")
-            } else {
-                ApiError::bad_request(format!("Failed to update notice: {e}"))
-            }
-        })?;
+        .await?;
     Ok(Json(notice))
 }
 
@@ -183,20 +168,12 @@ pub async fn delete_notice(
         .services
         .content_admin
         .check_notice_author(&identity, id)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("Forbidden") {
-                ApiError::forbidden(e.to_string())
-            } else {
-                ApiError::not_found(e.to_string())
-            }
-        })?;
+        .await?;
 
     state
         .services
         .content_admin
         .delete_notice(&identity, id)
-        .await
-        .map_err(|e| ApiError::not_found(format!("Failed to delete notice: {e}")))?;
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

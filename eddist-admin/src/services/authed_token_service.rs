@@ -139,9 +139,10 @@ impl AuthedTokenService for AuthedTokenServiceImpl {
     async fn suspend_authed_token(&self, id: Uuid, ttl_seconds: u64) -> anyhow::Result<()> {
         let token = self.repo.get_authed_token(id).await?;
         if !token.validity {
-            return Err(anyhow::anyhow!(
-                "this token has already been permanently revoked"
-            ));
+            return Err(crate::error::ServiceError::BadRequest(
+                "this token has already been permanently revoked".into(),
+            )
+            .into());
         }
         let key = authed_token_suspended_key(&id.to_string());
         let mut conn = self.redis_conn.clone();

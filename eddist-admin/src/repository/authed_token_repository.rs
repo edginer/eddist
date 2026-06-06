@@ -103,8 +103,9 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
             "#,
             id.as_bytes().to_vec(),
         )
-        .fetch_one(&self.0)
-        .await?;
+        .fetch_optional(&self.0)
+        .await?
+        .ok_or_else(|| crate::error::ServiceError::NotFound("Authed token not found".into()))?;
 
         Ok(AuthedToken::from(row))
     }
