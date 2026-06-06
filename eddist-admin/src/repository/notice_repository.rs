@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::{NaiveDateTime, Utc};
 use eddist_core::domain::notice::Notice;
 use sqlx::{MySqlPool, query, query_as};
@@ -239,3 +240,5 @@ impl NoticeRepository for NoticeRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(NoticeRepositoryImpl, 0, MySql);

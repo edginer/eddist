@@ -4,11 +4,11 @@ use axum::{
     http::StatusCode,
     routing::{get, patch, post},
 };
-use eddist_core::domain::res::ResView;
 use uuid::Uuid;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::{Res, Thread, ThreadCompactionInput, UpdateResInput},
 };
@@ -42,10 +42,7 @@ pub async fn get_threads(
     State(state): State<AppState>,
     Path(board_key): Path<String>,
 ) -> Result<Json<Vec<Thread>>, ApiError> {
-    let threads = state
-        .admin_thread_repo
-        .get_threads_by_thread_id(&board_key, None)
-        .await?;
+    let threads = state.services.thread.get_threads(&board_key).await?;
     Ok(Json(threads))
 }
 
@@ -66,12 +63,10 @@ pub async fn get_thread(
     Path((board_key, thread_id)): Path<(String, u64)>,
 ) -> Result<Json<Thread>, ApiError> {
     let thread = state
-        .admin_thread_repo
-        .get_threads_by_thread_id(&board_key, Some(vec![thread_id]))
-        .await?;
-    let thread = thread
-        .into_iter()
-        .next()
+        .services
+        .thread
+        .get_thread(&board_key, thread_id)
+        .await?
         .ok_or_else(|| ApiError::not_found("Thread not found"))?;
     Ok(Json(thread))
 }
@@ -92,8 +87,9 @@ pub async fn get_responses(
     Path((board_key, thread_id)): Path<(String, u64)>,
 ) -> Result<Json<Vec<Res>>, ApiError> {
     let responses = state
-        .admin_response_repo
-        .get_reses_by_thread_id(&board_key, thread_id)
+        .services
+        .thread
+        .get_responses(&board_key, thread_id)
         .await?;
     Ok(Json(responses))
 }
@@ -113,62 +109,16 @@ pub async fn get_responses(
 )]
 pub async fn update_response(
     State(state): State<AppState>,
-    Path((_a, _aa, res_id)): Path<(String, u64, Uuid)>,
+    identity: AdminIdentity,
+    Path((board_key, thread_id, res_id)): Path<(String, u64, Uuid)>,
     Json(body): Json<UpdateResInput>,
 ) -> Result<Json<Res>, ApiError> {
-    let (res, default_name, board_key, thread_number, thread_title) =
-        state.admin_response_repo.get_res(res_id).await?;
-    let updated_res = state
-        .admin_response_repo
-        .update_res(
-            res_id,
-            body.author_name.clone(),
-            body.mail.clone(),
-            body.body.clone(),
-            body.is_abone,
-        )
+    let res = state
+        .services
+        .thread
+        .update_response(&identity, &board_key, thread_id, res_id, body)
         .await?;
-    let author_name = if let Some(author_name) = body.author_name {
-        author_name
-    } else {
-        res.author_name.unwrap_or(default_name.clone())
-    };
-    let mail = if let Some(mail) = body.mail {
-        mail
-    } else {
-        res.mail.unwrap_or_default()
-    };
-    let is_abone = if let Some(is_abone) = body.is_abone {
-        is_abone
-    } else {
-        res.is_abone
-    };
-    let res_body = if let Some(body) = body.body {
-        body
-    } else {
-        res.body
-    };
-
-    let res_view = ResView {
-        author_name,
-        mail,
-        body: res_body,
-        created_at: res.created_at,
-        author_id: res.author_id,
-        is_abone,
-    };
-
-    let res_view = res_view.get_sjis_bytes(&default_name, thread_title.as_deref());
-    let mut conn = state.redis_conn;
-    let _ = conn
-        .send_packed_command(&redis::Cmd::lset(
-            format!("threads:{}:{}", board_key, thread_number),
-            res.res_order as isize - 1,
-            res_view.get_inner(),
-        ))
-        .await;
-
-    Ok(Json(updated_res))
+    Ok(Json(res))
 }
 
 #[utoipa::path(
@@ -184,12 +134,14 @@ pub async fn update_response(
 )]
 pub async fn threads_compaction(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(board_key): Path<String>,
     Json(body): Json<ThreadCompactionInput>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .admin_thread_repo
-        .compact_threads(&board_key, body.target_count)
+        .services
+        .thread
+        .compact_threads(&identity, &board_key, body.target_count)
         .await?;
     Ok(StatusCode::OK)
 }

@@ -4,19 +4,13 @@ use axum::{
     http::StatusCode,
     routing::{delete, get, post},
 };
-use eddist_core::{
-    domain::pubsub_repository::{AuthTokenRevoked, CHANNEL_AUTH_TOKEN_REVOKED},
-    proto::encode_auth_token_revoked,
-    utils::is_authed_token_backup_enabled,
-};
-use redis::AsyncCommands;
 use uuid::Uuid;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::{DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
-    repository::authed_token_repository::ListAuthedTokensParams,
 };
 
 pub fn routes() -> Router<AppState> {
@@ -33,8 +27,6 @@ pub fn routes() -> Router<AppState> {
         )
 }
 
-const ALLOWED_SORT_COLUMNS: &[&str] = &["created_at", "authed_at", "last_wrote_at"];
-
 #[utoipa::path(
     get,
     path = "/authed_tokens",
@@ -49,45 +41,12 @@ pub async fn list_authed_tokens(
     State(state): State<AppState>,
     Query(query): Query<ListAuthedTokensQuery>,
 ) -> Result<Json<PaginatedAuthedTokens>, ApiError> {
-    let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(50).clamp(1, 100);
-    let offset = (page - 1) as u64 * per_page as u64;
-
-    let sort_column = query
-        .sort_by
-        .as_deref()
-        .filter(|s| ALLOWED_SORT_COLUMNS.contains(s))
-        .unwrap_or("created_at");
-    let sort_asc = query
-        .sort_order
-        .as_deref()
-        .map(|s| s == "asc")
-        .unwrap_or(false);
-
-    let (items, total) = state
-        .authed_token_repo
-        .list_authed_tokens(ListAuthedTokensParams {
-            offset,
-            limit: per_page,
-            origin_ip: query.origin_ip.as_deref(),
-            writing_ua: query.writing_ua.as_deref(),
-            authed_ua: query.authed_ua.as_deref(),
-            asn_num: query.asn_num,
-            validity: query.validity,
-            sort_column,
-            sort_asc,
-        })
+    let result = state
+        .services
+        .authed_token
+        .list_authed_tokens(query)
         .await?;
-
-    let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
-
-    Ok(Json(PaginatedAuthedTokens {
-        items,
-        total,
-        page,
-        per_page,
-        total_pages,
-    }))
+    Ok(Json(result))
 }
 
 #[utoipa::path(
@@ -105,7 +64,8 @@ pub async fn get_authed_token(
     Path(authed_token_id): Path<Uuid>,
 ) -> Result<Json<crate::models::AuthedToken>, ApiError> {
     let authed_token = state
-        .authed_token_repo
+        .services
+        .authed_token
         .get_authed_token(authed_token_id)
         .await?;
     Ok(Json(authed_token))
@@ -124,27 +84,15 @@ pub async fn get_authed_token(
 )]
 pub async fn delete_authed_token(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(authed_token_id): Path<Uuid>,
-    Query(DeleteAuthedTokenInput { using_origin_ip }): Query<DeleteAuthedTokenInput>,
+    Query(options): Query<DeleteAuthedTokenInput>,
 ) -> Result<StatusCode, ApiError> {
-    let affected_ids = if !using_origin_ip {
-        state
-            .authed_token_repo
-            .delete_authed_token(authed_token_id)
-            .await?;
-        vec![authed_token_id]
-    } else {
-        state
-            .authed_token_repo
-            .delete_authed_token_by_origin_ip(authed_token_id)
-            .await?
-    };
-    if is_authed_token_backup_enabled() {
-        let mut conn = state.redis_conn.clone();
-        for id in affected_ids {
-            publish_token_revoked(&mut conn, id).await;
-        }
-    }
+    state
+        .services
+        .authed_token
+        .delete_authed_token(&identity, authed_token_id, options)
+        .await?;
     Ok(StatusCode::OK)
 }
 
@@ -163,7 +111,8 @@ pub async fn require_reauth_token(
     Path(authed_token_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .authed_token_repo
+        .services
+        .authed_token
         .set_require_reauth(authed_token_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -184,16 +133,9 @@ pub async fn clear_require_reauth_token(
     Path(authed_token_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .authed_token_repo
+        .services
+        .authed_token
         .clear_require_reauth(authed_token_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-pub(crate) async fn publish_token_revoked(
-    conn: &mut redis::aio::ConnectionManager,
-    authed_token_id: Uuid,
-) {
-    let payload = encode_auth_token_revoked(&AuthTokenRevoked { authed_token_id });
-    let _: Result<(), _> = conn.publish(CHANNEL_AUTH_TOKEN_REVOKED, payload).await;
 }

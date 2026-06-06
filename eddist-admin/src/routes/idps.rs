@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::idp::{CreateIdpInput, Idp, UpdateIdpInput},
 };
@@ -30,7 +31,7 @@ pub fn routes() -> Router<AppState> {
     )
 )]
 pub async fn list_idps(State(state): State<AppState>) -> Result<Json<Vec<Idp>>, ApiError> {
-    let idps = state.idp_repo.get_all().await?;
+    let idps = state.services.content_admin.list_idps().await?;
     Ok(Json(idps))
 }
 
@@ -51,8 +52,9 @@ pub async fn get_idp(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Idp>, ApiError> {
     let idp = state
-        .idp_repo
-        .get_by_id(id)
+        .services
+        .content_admin
+        .get_idp(id)
         .await?
         .ok_or_else(|| ApiError::not_found("IdP not found"))?;
     Ok(Json(idp))
@@ -70,11 +72,13 @@ pub async fn get_idp(
 )]
 pub async fn create_idp(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Json(input): Json<CreateIdpInput>,
 ) -> Result<(StatusCode, Json<Idp>), ApiError> {
     let idp = state
-        .idp_repo
-        .create(input)
+        .services
+        .content_admin
+        .create_idp(&identity, input)
         .await
         .map_err(|e| ApiError::bad_request(format!("Failed to create IdP: {e}")))?;
     Ok((StatusCode::CREATED, Json(idp)))
@@ -96,16 +100,22 @@ pub async fn create_idp(
 )]
 pub async fn update_idp(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateIdpInput>,
 ) -> Result<Json<Idp>, ApiError> {
-    let idp = state.idp_repo.update(id, input).await.map_err(|e| {
-        if e.to_string().contains("not found") {
-            ApiError::not_found("IdP not found")
-        } else {
-            ApiError::bad_request(format!("Failed to update IdP: {e}"))
-        }
-    })?;
+    let idp = state
+        .services
+        .content_admin
+        .update_idp(&identity, id, input)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("not found") {
+                ApiError::not_found("IdP not found")
+            } else {
+                ApiError::bad_request(format!("Failed to update IdP: {e}"))
+            }
+        })?;
     Ok(Json(idp))
 }
 
@@ -123,11 +133,13 @@ pub async fn update_idp(
 )]
 pub async fn delete_idp(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .idp_repo
-        .delete(id)
+        .services
+        .content_admin
+        .delete_idp(&identity, id)
         .await
         .map_err(|e| ApiError::not_found(format!("Failed to delete IdP: {e}")))?;
     Ok(StatusCode::NO_CONTENT)

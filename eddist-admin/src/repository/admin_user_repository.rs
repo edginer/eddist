@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use std::collections::HashMap;
 
 use uuid::Uuid;
@@ -211,6 +212,8 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(AdminUserRepositoryImpl, 0, MySql);
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct UserIdpsSelection {

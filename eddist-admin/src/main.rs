@@ -48,6 +48,8 @@ mod api_doc;
 mod auth;
 pub(crate) mod error;
 mod models;
+mod services;
+pub(crate) mod utils;
 mod repository {
     pub mod admin_archive_repository;
     pub mod admin_bbs_repository;
@@ -129,6 +131,35 @@ async fn internal_secret_auth(
     next.run(req).await
 }
 
+/// Repositories for content management (boards, threads, responses, S3 archives).
+#[derive(Clone)]
+pub(crate) struct ContentRepos {
+    pub board: Arc<dyn AdminBoardRepository>,
+    pub thread: Arc<dyn AdminThreadRepository>,
+    pub response: Arc<dyn AdminResponseRepository>,
+    pub archive: Arc<dyn AdminArchiveRepository>,
+}
+
+/// Repositories for moderation (NG words, caps, user restrictions, authed tokens).
+#[derive(Clone)]
+pub(crate) struct ModerationRepos {
+    pub ng_word: Arc<dyn NgWordRepository>,
+    pub cap: Arc<dyn CapRepository>,
+    pub user_restriction: Arc<dyn UserRestrictionRepository>,
+    pub authed_token: Arc<dyn AuthedTokenRepository>,
+}
+
+/// Repositories for site administration (users, IdPs, notices, terms, captcha, settings).
+#[derive(Clone)]
+pub(crate) struct AdminRepos {
+    pub user: Arc<dyn AdminUserRepository>,
+    pub idp: Arc<dyn IdpAdminRepository>,
+    pub notice: Arc<dyn NoticeRepository>,
+    pub terms: Arc<dyn TermsRepository>,
+    pub captcha_config: Arc<dyn CaptchaConfigRepository>,
+    pub server_settings: Arc<dyn ServerSettingsRepository>,
+}
+
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub oauth2_client: oauth2::basic::BasicClient<
@@ -138,21 +169,7 @@ pub(crate) struct AppState {
         EndpointNotSet,
         EndpointSet,
     >,
-    pub admin_board_repo: Arc<dyn AdminBoardRepository>,
-    pub admin_thread_repo: Arc<dyn AdminThreadRepository>,
-    pub admin_response_repo: Arc<dyn AdminResponseRepository>,
-    pub ng_word_repo: Arc<dyn NgWordRepository>,
-    pub admin_archive_repo: Arc<dyn AdminArchiveRepository>,
-    pub authed_token_repo: Arc<dyn AuthedTokenRepository>,
-    pub cap_repo: Arc<dyn CapRepository>,
-    pub user_repo: Arc<dyn AdminUserRepository>,
-    pub user_restriction_repo: Arc<dyn UserRestrictionRepository>,
-    pub idp_repo: Arc<dyn IdpAdminRepository>,
-    pub notice_repo: Arc<dyn NoticeRepository>,
-    pub terms_repo: Arc<dyn TermsRepository>,
-    pub captcha_config_repo: Arc<dyn CaptchaConfigRepository>,
-    pub server_settings_repo: Arc<dyn ServerSettingsRepository>,
-    pub redis_conn: redis::aio::ConnectionManager,
+    pub services: services::AppServiceContainer,
     pub internal_secret: Option<String>,
 }
 
@@ -237,27 +254,39 @@ async fn main() {
     let api_routes = routes::create_api_routes();
     let internal_routes = routes::create_internal_routes();
 
+    let redis_conn = redis::Client::open(std::env::var("REDIS_URL").unwrap())
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap();
+
+    let service_container = services::AppServiceContainer::new(
+        ContentRepos {
+            board: Arc::new(AdminBoardRepositoryImpl::new(pool.clone())),
+            thread: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
+            response: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
+            archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
+        },
+        ModerationRepos {
+            ng_word: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
+            cap: Arc::new(CapRepositoryImpl::new(pool.clone())),
+            user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
+            authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
+        },
+        AdminRepos {
+            user: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
+            idp: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
+            notice: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
+            terms: Arc::new(TermsRepositoryImpl::new(pool.clone())),
+            captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
+            server_settings: Arc::new(ServerSettingsRepositoryImpl::new(pool)),
+        },
+        redis_conn.clone(),
+    );
+
     let state = AppState {
         oauth2_client: client,
-        admin_board_repo: Arc::new(AdminBoardRepositoryImpl::new(pool.clone())),
-        admin_thread_repo: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
-        admin_response_repo: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
-        ng_word_repo: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
-        redis_conn: redis::Client::open(std::env::var("REDIS_URL").unwrap())
-            .unwrap()
-            .get_connection_manager()
-            .await
-            .unwrap(),
-        admin_archive_repo: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
-        authed_token_repo: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
-        cap_repo: Arc::new(CapRepositoryImpl::new(pool.clone())),
-        user_repo: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
-        user_restriction_repo: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
-        idp_repo: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
-        notice_repo: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
-        terms_repo: Arc::new(TermsRepositoryImpl::new(pool.clone())),
-        captcha_config_repo: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
-        server_settings_repo: Arc::new(ServerSettingsRepositoryImpl::new(pool)),
+        services: service_container,
         internal_secret: std::env::var("EDDIST_INTERNAL_SECRET").ok(),
     };
 

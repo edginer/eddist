@@ -1,6 +1,4 @@
 use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
-use eddist_core::{redis_keys::authed_token_suspended_key, utils::is_authed_token_backup_enabled};
-use redis::AsyncCommands;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -32,29 +30,20 @@ pub async fn suspend_authed_token(
         return Err(ApiError::bad_request("ttl_seconds must be greater than 0"));
     }
 
-    let authed_token = state
-        .authed_token_repo
-        .get_authed_token(input.authed_token_id)
+    state
+        .services
+        .authed_token
+        .suspend_authed_token(input.authed_token_id, input.ttl_seconds)
         .await
         .map_err(|e| {
-            if let Some(sqlx::Error::RowNotFound) = e.downcast_ref::<sqlx::Error>() {
+            if e.to_string().contains("not found") {
                 ApiError::not_found("authed token not found")
+            } else if e.to_string().contains("permanently revoked") {
+                ApiError::bad_request(e.to_string())
             } else {
                 ApiError::Internal(e)
             }
         })?;
-
-    if !authed_token.validity {
-        return Err(ApiError::bad_request(
-            "this token has already been permanently revoked",
-        ));
-    }
-
-    let key = authed_token_suspended_key(&input.authed_token_id.to_string());
-    let mut conn = state.redis_conn.clone();
-    conn.set_ex::<_, _, ()>(&key, "1", input.ttl_seconds)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -68,15 +57,17 @@ pub async fn revoke_authed_token(
     State(state): State<AppState>,
     Json(input): Json<RevokeAuthedTokenInput>,
 ) -> Result<StatusCode, ApiError> {
+    // Internal routes don't have a session-based actor; use a system placeholder.
+    let system_actor = crate::auth::AdminIdentity {
+        sub: "system".to_string(),
+        email: "system@internal".to_string(),
+        username: "system".to_string(),
+    };
     state
-        .authed_token_repo
-        .delete_authed_token(input.authed_token_id)
+        .services
+        .authed_token
+        .revoke_authed_token(&system_actor, input.authed_token_id)
         .await?;
-
-    if is_authed_token_backup_enabled() {
-        let mut conn = state.redis_conn.clone();
-        super::auth_tokens::publish_token_revoked(&mut conn, input.authed_token_id).await;
-    }
 
     Ok(StatusCode::NO_CONTENT)
 }

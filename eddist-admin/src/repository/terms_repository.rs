@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::Utc;
 use eddist_core::domain::terms::Terms;
 use sqlx::{MySqlPool, query, query_as};
@@ -87,3 +88,5 @@ impl TermsRepository for TermsRepositoryImpl {
         Ok(terms)
     }
 }
+
+transaction_repository!(TermsRepositoryImpl, 0, MySql);

@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
+    auth::AdminIdentity,
     error::ApiError,
     models::{User, UserSearchQuery, UserStatusUpdateInput},
 };
@@ -31,10 +32,7 @@ pub async fn search_users(
     State(state): State<AppState>,
     Query(query): Query<UserSearchQuery>,
 ) -> Result<Json<Vec<User>>, ApiError> {
-    let users = state
-        .user_repo
-        .search_users(query.user_id, query.user_name, query.authed_token_id)
-        .await?;
+    let users = state.services.user.search_users(query).await?;
     Ok(Json(users))
 }
 
@@ -51,22 +49,14 @@ pub async fn search_users(
 )]
 pub async fn update_user_status(
     State(state): State<AppState>,
+    identity: AdminIdentity,
     Path(user_id): Path<Uuid>,
     Json(body): Json<UserStatusUpdateInput>,
 ) -> Result<Json<User>, ApiError> {
-    state
-        .user_repo
-        .update_user_status(user_id, body.enabled)
+    let user = state
+        .services
+        .user
+        .update_user_status(&identity, user_id, body.enabled)
         .await?;
-
-    let users = state
-        .user_repo
-        .search_users(Some(user_id), None, None)
-        .await?;
-
-    let user = users
-        .into_iter()
-        .next()
-        .ok_or_else(|| ApiError::not_found("User not found after update"))?;
     Ok(Json(user))
 }

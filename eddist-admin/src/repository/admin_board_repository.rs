@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use sqlx::{MySqlPool, query, query_as};
 use uuid::Uuid;
 
@@ -394,3 +395,5 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             .ok_or(anyhow::anyhow!("Failed to edit board"))
     }
 }
+
+transaction_repository!(AdminBoardRepositoryImpl, 0, MySql);

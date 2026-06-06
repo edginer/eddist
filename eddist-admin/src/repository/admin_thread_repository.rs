@@ -1,3 +1,4 @@
+use crate::transaction_repository;
 use chrono::Utc;
 use sqlx::MySqlPool;
 use uuid::Uuid;
@@ -250,3 +251,5 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
         Ok(())
     }
 }
+
+transaction_repository!(AdminThreadRepositoryImpl, 0, MySql);
