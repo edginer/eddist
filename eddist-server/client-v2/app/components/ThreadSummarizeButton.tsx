@@ -111,6 +111,7 @@ export const ThreadSummarizeButton = ({ boardKey, threadId, threadTitle }: Props
         type: "key-points",
         format: "plain-text",
         length: "short",
+        expectedInputLanguages: ["ja"],
         sharedContext: `日本語の掲示板スレッド「${plainTitle}」`,
       });
       const fittedText = await fitToQuota(summarizer, responses);
