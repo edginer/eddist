@@ -206,6 +206,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.2.2(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.5.0))
+      '@types/dom-chromium-ai':
+        specifier: ^0.0.16
+        version: 0.0.16
       '@types/encoding-japanese':
         specifier: ^2.2.1
         version: 2.2.1
@@ -1155,6 +1158,9 @@ packages:
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
+
+  '@types/dom-chromium-ai@0.0.16':
+    resolution: {integrity: sha512-Z0vOBWckovkc85zctYKGEUUBHaqt9Oz8AUhAVyoNLAsMGlBhMNl/8w1n8JG1y0g7TW03EzWt5RsdcDD70ra58g==}
 
   '@types/encoding-japanese@2.2.1':
     resolution: {integrity: sha512-6jjepuTusvySxMLP7W6usamlbgf0F4sIDvm7EzYePjLHY7zWUv4yz2PLUnu0vuNVtXOTLu2cRdFcDg40J5Owsw==}
@@ -3252,6 +3258,8 @@ snapshots:
   '@types/connect@3.4.38':
     dependencies:
       '@types/node': 22.19.1
+
+  '@types/dom-chromium-ai@0.0.16': {}
 
   '@types/encoding-japanese@2.2.1': {}
 

@@ -11,9 +11,12 @@ import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
+import { useSummarizeEnabled } from "~/hooks/useSummarizeEnabled";
+import { useSummarizerSupported } from "~/hooks/useSummarizer";
 import { parseCookie } from "~/utils/cookie";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
+import { ThreadSummarizeButton } from "../components/ThreadSummarizeButton";
 import type { Route } from "./+types/ThreadListPage";
 
 const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
@@ -170,6 +173,8 @@ const ThreadListPage = ({
 
   const { shouldFilterThread } = useNGWords();
   const unsafeSet = useMemo(() => new Set(unsafeThreadIds), [unsafeThreadIds]);
+  const summarizerSupported = useSummarizerSupported();
+  const { enabled: summarizeEnabled, setEnabled: setSummarizeEnabled } = useSummarizeEnabled();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuThread, setContextMenuThread] = useState<Thread | null>(null);
   const [selectedTitleText, setSelectedTitleText] = useState<string | null>(null);
@@ -353,6 +358,9 @@ const ThreadListPage = ({
               open={showNGSettings}
               setOpen={setShowNGSettings}
               enableSafeMode={enableSafeMode}
+              summarizerSupported={summarizerSupported}
+              summarizeEnabled={summarizeEnabled}
+              onSummarizeEnabledChange={setSummarizeEnabled}
             />
           </Suspense>
         )}
@@ -448,53 +456,61 @@ const ThreadListPage = ({
             {i !== 0 && (
               <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
             )}
-            <Link
-              to={`/${params.boardKey}/${thread.id}`}
-              className="hover:bg-gray-200 dark:hover:bg-gray-700 cursor-default text-left block w-full bg-gray-100 dark:bg-gray-800 p-2 lg:p-3 select-none md:select-auto"
-              data-ng-target="title"
-              data-ng-thread-id={thread.id}
-              {...contextMenuHandlers}
-              onMouseDown={(e) => {
-                // Capture selection before it gets cleared by right-click
-                if (e.button === 2) {
-                  // Right mouse button
-                  capturedSelectionRef.current = getSelectedTextInElement(e.currentTarget);
-                }
-              }}
-              onContextMenu={(e) => {
-                // Use captured selection from mousedown
-                const selectedText = capturedSelectionRef.current;
-                capturedSelectionRef.current = null; // Clear after use
-                contextMenuHandlers.onContextMenu(e);
-                setContextMenuThread(thread);
-                setSelectedTitleText(selectedText);
-              }}
-              onTouchStart={(e) => {
-                const selectedText = getSelectedTextInElement(e.currentTarget);
-                contextMenuHandlers.onTouchStart(e);
-                setContextMenuThread(thread);
-                setSelectedTitleText(selectedText);
-              }}
-            >
-              <div>
-                <span
-                  className="break-all"
-                  // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread title rendered as HTML
-                  dangerouslySetInnerHTML={{
-                    __html: thread.title,
-                  }}
-                />
-                <span> ({thread.responseCount})</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>{convertLinuxTimeToDateString(thread.id)}</span>
-                {thread.authorId && <span>ID:{thread.authorId}</span>}
-                <span className="text-blue-600 font-semibold">
-                  {calculateThreadSpeed(thread.id, thread.responseCount, currentTime)}
-                  /day
-                </span>
-              </div>
-            </Link>
+            <div className="relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700">
+              <Link
+                to={`/${params.boardKey}/${thread.id}`}
+                className="cursor-default text-left block w-full p-2 lg:p-3 select-none md:select-auto"
+                data-ng-target="title"
+                data-ng-thread-id={thread.id}
+                {...contextMenuHandlers}
+                onMouseDown={(e) => {
+                  if (e.button === 2) {
+                    capturedSelectionRef.current = getSelectedTextInElement(e.currentTarget);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  const selectedText = capturedSelectionRef.current;
+                  capturedSelectionRef.current = null;
+                  contextMenuHandlers.onContextMenu(e);
+                  setContextMenuThread(thread);
+                  setSelectedTitleText(selectedText);
+                }}
+                onTouchStart={(e) => {
+                  const selectedText = getSelectedTextInElement(e.currentTarget);
+                  contextMenuHandlers.onTouchStart(e);
+                  setContextMenuThread(thread);
+                  setSelectedTitleText(selectedText);
+                }}
+              >
+                <div className={summarizerSupported && summarizeEnabled ? "pr-7" : ""}>
+                  <span
+                    className="break-all"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread title rendered as HTML
+                    dangerouslySetInnerHTML={{
+                      __html: thread.title,
+                    }}
+                  />
+                  <span> ({thread.responseCount})</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{convertLinuxTimeToDateString(thread.id)}</span>
+                  {thread.authorId && <span>ID:{thread.authorId}</span>}
+                  <span className="text-blue-600 font-semibold">
+                    {calculateThreadSpeed(thread.id, thread.responseCount, currentTime)}
+                    /day
+                  </span>
+                </div>
+              </Link>
+              {summarizerSupported && summarizeEnabled && (
+                <div className="absolute top-2 right-2">
+                  <ThreadSummarizeButton
+                    boardKey={params.boardKey ?? ""}
+                    threadId={thread.id}
+                    threadTitle={thread.title}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>

@@ -13,6 +13,9 @@ interface NGWordsSettingsModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   enableSafeMode: boolean;
+  summarizerSupported?: boolean;
+  summarizeEnabled?: boolean;
+  onSummarizeEnabledChange?: (enabled: boolean) => void;
 }
 
 const ThemeTab = () => {
@@ -91,10 +94,50 @@ const SafeModeTab = () => {
   );
 };
 
+const SummarizeTab = ({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (v: boolean) => void;
+}) => (
+  <div className="py-2 dark:text-gray-100">
+    <h3 className="text-lg font-semibold mb-2">スレッド要約</h3>
+    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+      ONのとき、スレッド一覧にAI要約ボタンを表示します。ChromiumベースのブラウザのSummarizer
+      APIを使用します。初回使用時にAIモデルの大容量データ（数GB）がダウンロードされる場合があります。モバイル回線などでのご利用はご注意ください。
+    </p>
+    <label className="flex items-center gap-3 cursor-pointer select-none">
+      <div className="relative">
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={enabled}
+          onChange={() => onChange(!enabled)}
+        />
+        <div
+          className={`w-11 h-6 rounded-full transition-colors ${
+            enabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+          }`}
+        />
+        <div
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            enabled ? "translate-x-5" : ""
+          }`}
+        />
+      </div>
+      <span className="font-medium">スレッド要約: {enabled ? "ON" : "OFF"}</span>
+    </label>
+  </div>
+);
+
 export const NGWordsSettingsModal = ({
   open,
   setOpen,
   enableSafeMode,
+  summarizerSupported,
+  summarizeEnabled = false,
+  onSummarizeEnabledChange,
 }: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
@@ -179,6 +222,20 @@ export const NGWordsSettingsModal = ({
             },
             ...(enableSafeMode
               ? [{ id: "safe-mode", title: "セーフモード", content: <SafeModeTab /> }]
+              : []),
+            ...(summarizerSupported
+              ? [
+                  {
+                    id: "summarize",
+                    title: "要約",
+                    content: (
+                      <SummarizeTab
+                        enabled={summarizeEnabled}
+                        onChange={onSummarizeEnabledChange ?? (() => {})}
+                      />
+                    ),
+                  },
+                ]
               : []),
           ]}
         />
