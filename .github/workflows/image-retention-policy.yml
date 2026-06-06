@@ -13,7 +13,7 @@ jobs:
     name: Delete old test images
     steps:
       - name: Delete old images (eddist)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -22,7 +22,7 @@ jobs:
           cut-off: 1d
           keep-n-most-recent: 10
       - name: Delete old images (eddist-client)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -31,7 +31,7 @@ jobs:
           cut-off: 1d
           keep-n-most-recent: 10
       - name: Delete old images (eddist-admin)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,7 +40,7 @@ jobs:
           cut-off: 1d
           keep-n-most-recent: 10
       - name: Delete old images (eddist-cron)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
           cut-off: 1d
           keep-n-most-recent: 10
       - name: Delete old images (eddist-persistence)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
