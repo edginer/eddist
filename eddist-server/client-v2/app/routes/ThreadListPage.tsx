@@ -26,6 +26,26 @@ const LazyNGWordsSettingsModal = lazy(() =>
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
 type SortOrder = "asc" | "desc";
 
+// In-memory store: survives SPA navigation, resets on hard reload. Never mutated server-side.
+let memorySortKey: SortKey | null = null;
+let memorySortOrder: SortOrder = "desc";
+
+function useMemorySort() {
+  const [sortKey, _setSortKey] = useState<SortKey | null>(memorySortKey);
+  const [sortOrder, _setSortOrder] = useState<SortOrder>(memorySortOrder);
+
+  const setSortKey = (k: SortKey | null) => {
+    memorySortKey = k;
+    _setSortKey(k);
+  };
+  const setSortOrder = (o: SortOrder) => {
+    memorySortOrder = o;
+    _setSortOrder(o);
+  };
+
+  return { sortKey, sortOrder, setSortKey, setSortOrder };
+}
+
 export const headers = (_: Route.HeadersArgs) => {
   return {
     "X-Frame-Options": "DENY",
@@ -141,8 +161,7 @@ const ThreadListPage = ({
   );
 
   const [creatingThread, setCreatingThread] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const { sortKey, sortOrder, setSortKey, setSortOrder } = useMemorySort();
   const [showSortControls, setShowSortControls] = useState(false);
   const [showNGSettings, setShowNGSettings] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -413,6 +432,7 @@ const ThreadListPage = ({
               type="button"
               onClick={() => {
                 setSortKey(null);
+                setSortOrder("desc");
               }}
               className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
