@@ -131,8 +131,9 @@ impl ModerationService for ModerationServiceImpl {
         _actor: &AdminIdentity,
         input: CreationCapInput,
     ) -> anyhow::Result<Cap> {
-        let tinker_secret = std::env::var("TINKER_SECRET")
-            .map_err(|_| anyhow::anyhow!("TINKER_SECRET not configured"))?;
+        let tinker_secret = std::env::var("TINKER_SECRET").map_err(|_| {
+            crate::error::ServiceError::ConfigError("TINKER_SECRET not configured".into())
+        })?;
         self.cap_repo
             .create_cap(
                 &input.name,

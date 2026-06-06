@@ -299,10 +299,9 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     ) -> anyhow::Result<CaptchaConfig> {
         let now = Utc::now().naive_utc();
 
-        let current = self
-            .get_by_id(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Captcha config not found"))?;
+        let current = self.get_by_id(id).await?.ok_or_else(|| {
+            crate::error::ServiceError::NotFound("Captcha config not found".into())
+        })?;
 
         let name = input.name.unwrap_or(current.name);
         let provider = input.provider.unwrap_or(current.provider);

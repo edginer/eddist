@@ -34,16 +34,7 @@ pub async fn suspend_authed_token(
         .services
         .authed_token
         .suspend_authed_token(input.authed_token_id, input.ttl_seconds)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                ApiError::not_found("authed token not found")
-            } else if e.to_string().contains("permanently revoked") {
-                ApiError::bad_request(e.to_string())
-            } else {
-                ApiError::Internal(e)
-            }
-        })?;
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

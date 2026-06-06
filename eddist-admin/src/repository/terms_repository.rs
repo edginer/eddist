@@ -61,7 +61,7 @@ impl TermsRepository for TermsRepositoryImpl {
         let current = self
             .get_terms()
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Terms not found"))?;
+            .ok_or_else(|| crate::error::ServiceError::NotFound("Terms not found".into()))?;
 
         query!(
             r#"

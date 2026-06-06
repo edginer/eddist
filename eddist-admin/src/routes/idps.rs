@@ -79,8 +79,7 @@ pub async fn create_idp(
         .services
         .content_admin
         .create_idp(&identity, input)
-        .await
-        .map_err(|e| ApiError::bad_request(format!("Failed to create IdP: {e}")))?;
+        .await?;
     Ok((StatusCode::CREATED, Json(idp)))
 }
 
@@ -108,14 +107,7 @@ pub async fn update_idp(
         .services
         .content_admin
         .update_idp(&identity, id, input)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                ApiError::not_found("IdP not found")
-            } else {
-                ApiError::bad_request(format!("Failed to update IdP: {e}"))
-            }
-        })?;
+        .await?;
     Ok(Json(idp))
 }
 
@@ -140,7 +132,6 @@ pub async fn delete_idp(
         .services
         .content_admin
         .delete_idp(&identity, id)
-        .await
-        .map_err(|e| ApiError::not_found(format!("Failed to delete IdP: {e}")))?;
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

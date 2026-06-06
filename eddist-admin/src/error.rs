@@ -5,6 +5,24 @@ use axum::{
 };
 use serde_json::json;
 
+/// Typed errors produced by service and repository layer to convey semantic meaning.
+/// Wrapping these in `anyhow::Error` lets the `From<anyhow::Error> for ApiError`
+/// impl downcast them automatically, so route handlers can just use `?`.
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum ServiceError {
+    #[error("{0}")]
+    NotFound(String),
+
+    #[error("{0}")]
+    Forbidden(String),
+
+    #[error("{0}")]
+    BadRequest(String),
+
+    #[error("{0}")]
+    ConfigError(String),
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ApiError {
     #[error("Not found: {0}")]
@@ -20,7 +38,7 @@ pub enum ApiError {
     Forbidden(String),
 
     #[error(transparent)]
-    Internal(#[from] anyhow::Error),
+    Internal(anyhow::Error),
 }
 
 impl ApiError {
@@ -38,6 +56,26 @@ impl ApiError {
 
     pub fn forbidden(msg: impl Into<String>) -> Self {
         Self::Forbidden(msg.into())
+    }
+}
+
+impl From<anyhow::Error> for ApiError {
+    fn from(e: anyhow::Error) -> Self {
+        // Walk the full source chain so that ServiceErrors wrapped with .context() are still found.
+        // downcast_ref on anyhow::Error alone only matches the outermost error.
+        let service_err = e
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<ServiceError>());
+        match service_err {
+            Some(ServiceError::NotFound(msg)) => ApiError::NotFound(msg.clone()),
+            Some(ServiceError::Forbidden(msg)) => ApiError::Forbidden(msg.clone()),
+            Some(ServiceError::BadRequest(msg)) => ApiError::BadRequest(msg.clone()),
+            Some(ServiceError::ConfigError(_)) => {
+                tracing::error!("Configuration error: {e:?}");
+                ApiError::Internal(e)
+            }
+            None => ApiError::Internal(e),
+        }
     }
 }
 

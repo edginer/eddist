@@ -53,13 +53,6 @@ pub async fn update_terms(
         .services
         .content_admin
         .update_terms(&identity, input)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                ApiError::not_found("Terms not found")
-            } else {
-                ApiError::bad_request(format!("Failed to update terms: {e}"))
-            }
-        })?;
+        .await?;
     Ok(Json(terms))
 }

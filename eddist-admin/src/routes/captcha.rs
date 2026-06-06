@@ -82,8 +82,7 @@ pub async fn create_captcha_config(
         .services
         .content_admin
         .create_captcha_config(&identity, input)
-        .await
-        .map_err(|e| ApiError::bad_request(format!("Failed to create captcha config: {e}")))?;
+        .await?;
     Ok((StatusCode::CREATED, Json(config)))
 }
 
@@ -112,14 +111,7 @@ pub async fn update_captcha_config(
         .services
         .content_admin
         .update_captcha_config(&identity, id, input)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("not found") {
-                ApiError::not_found("Captcha config not found")
-            } else {
-                ApiError::bad_request(format!("Failed to update captcha config: {e}"))
-            }
-        })?;
+        .await?;
     Ok(Json(config))
 }
 
@@ -145,7 +137,6 @@ pub async fn delete_captcha_config(
         .services
         .content_admin
         .delete_captcha_config(&identity, id)
-        .await
-        .map_err(|e| ApiError::not_found(format!("Failed to delete captcha config: {e}")))?;
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
