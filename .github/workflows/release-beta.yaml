@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Check if commenter is in project-eddist/beta-deployer
         id: team-check
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PJ_EDDIST_MEMBERS }}
           script: |
@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         id: checkout
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
@@ -57,10 +57,10 @@ jobs:
           echo "pr_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
       - name: Setup Rust
-        uses: hecrj/setup-rust-action@v2
+        uses: hecrj/setup-rust-action@110f36749599534ca96628b82f52ae67e5d95a3c # v2.0.1
 
       - name: Load Rust & build caches
-        uses: actions/cache@v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cargo/registry
@@ -69,13 +69,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           run_install: false
           version: "latest"
 
       - name: Setup Node.js & cache
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "22"
           cache: pnpm
@@ -100,14 +100,14 @@ jobs:
         run: rm .dockerignore
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push eddist
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker-prod/eddist/Dockerfile
@@ -117,7 +117,7 @@ jobs:
             ghcr.io/edginer/eddist:beta
 
       - name: Build & Push eddist-client
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker-prod/eddist-client/Dockerfile
@@ -127,7 +127,7 @@ jobs:
             ghcr.io/edginer/eddist-client:beta
 
       - name: Build & Push eddist-admin
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker-prod/eddist-admin/Dockerfile
@@ -137,7 +137,7 @@ jobs:
             ghcr.io/edginer/eddist-admin:beta
 
       - name: Build & Push eddist-cron
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker-prod/eddist-cron/Dockerfile
@@ -147,7 +147,7 @@ jobs:
             ghcr.io/edginer/eddist-cron:beta
 
       - name: Build & Push eddist-persistence
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker-prod/eddist-persistence/Dockerfile
@@ -157,14 +157,14 @@ jobs:
             ghcr.io/edginer/eddist-persistence:beta
 
       - name: Dispatch to Beta Repo
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ secrets.DEPLOY_REPO_PAT }}
           repository: ${{ secrets.DEPLOY_REPO_URL2 }}
           event-type: update-image-beta
           client-payload: '{"image-tag":"${{ env.pr_sha }}"}'
       - name: Comment success
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
@@ -178,7 +178,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Comment Denial
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
