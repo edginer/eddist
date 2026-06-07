@@ -1,7 +1,9 @@
 import { Button, Label, Modal, ModalBody, ModalHeader, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useCaptchaPosting } from "../hooks/useCaptchaPosting";
 import AuthCodeModal from "./AuthCodeModal";
+import CaptchaSection from "./CaptchaSection";
 import ErrorModal from "./ErrorModal";
 import { postThread } from "./utils";
 
@@ -19,6 +21,8 @@ const PostThreadModal = (props: PostThreadModalProps) => {
   const [errorMessage, setErrorMessage] = useState("");
 
   const { register, handleSubmit } = useForm();
+
+  const captcha = useCaptchaPosting("thread_creation", props.open);
 
   return (
     <Modal show={props.open} size="5xl" onClose={() => props.setOpen(false)} dismissible>
@@ -44,12 +48,16 @@ const PostThreadModal = (props: PostThreadModalProps) => {
               mail: data.mail,
               body: data.body,
               boardKey: props.boardKey,
+              captchaTokens: captcha.tokens,
             });
             if (!result.success) {
               switch (result.error.kind) {
                 case "auth-code":
                   setAuthCode(result.error.authCode);
                   setOpenAuthCodeModal(true);
+                  return;
+                case "captcha":
+                  captcha.onFailure();
                   return;
                 case "unknown":
                   serErrorModal(true);
@@ -101,8 +109,12 @@ const PostThreadModal = (props: PostThreadModalProps) => {
               />
             </div>
 
+            <CaptchaSection captcha={captcha} />
+
             <div className="w-full">
-              <Button type="submit">書き込む</Button>
+              <Button type="submit" disabled={captcha.isPending}>
+                書き込む
+              </Button>
             </div>
           </div>
         </form>
