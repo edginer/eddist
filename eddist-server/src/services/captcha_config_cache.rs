@@ -57,6 +57,28 @@ pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfi
         .collect()
 }
 
+/// Get cached captcha configs required when creating a new thread
+pub async fn get_cached_captcha_configs_for_thread_creation() -> Vec<CaptchaProviderConfig> {
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
+        .filter(|c| c.endpoint_usage.matches_thread_creation())
+        .cloned()
+        .collect()
+}
+
+/// Get cached captcha configs required when posting a reply
+pub async fn get_cached_captcha_configs_for_response_creation() -> Vec<CaptchaProviderConfig> {
+    let cache = get_global_cache().read().await;
+    cache
+        .configs
+        .iter()
+        .filter(|c| c.endpoint_usage.matches_response_creation())
+        .cloned()
+        .collect()
+}
+
 /// Refresh the cache with new configs from the database
 pub async fn refresh_captcha_config_cache(
     repo: &dyn CaptchaConfigRepository,

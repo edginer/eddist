@@ -45,6 +45,7 @@ pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod metadent_thread_list_service;
 pub(crate) mod openai_moderation_service;
+pub(crate) mod post_captcha_verification;
 pub(crate) mod reauth_service;
 pub(crate) mod res_creation_service;
 pub mod server_settings_cache;

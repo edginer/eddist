@@ -137,10 +137,20 @@ const CaptchaConfigForm = (props: Props) => {
             {...register("endpoint_usage")}
             defaultValue={defaults?.endpoint_usage ?? "auth_code"}
           >
-            <option value="auth_code">auth_code (posting new threads/replies)</option>
+            <option value="auth_code">auth_code (initial posting authentication)</option>
             <option value="re_auth">re_auth (re-authentication)</option>
-            <option value="all">all (both endpoints)</option>
+            <option value="all_auth">all_auth (auth_code + re_auth)</option>
+            <option value="thread_creation">thread_creation (creating new threads)</option>
+            <option value="res_creation">res_creation (posting replies)</option>
+            <option value="all_posting">all_posting (thread_creation + res_creation)</option>
+            <option value="all">all (every endpoint usage above)</option>
           </Select>
+          <p className="text-sm text-gray-500 mt-1">
+            For thread_creation / res_creation / all_posting / all, the client-v2 widget currently
+            only properly supports Cloudflare Turnstile — other providers (e.g. hCaptcha, which
+            reports its token via a hidden &lt;textarea&gt; rather than an &lt;input&gt;) are not
+            yet detected correctly on these posting flows.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
