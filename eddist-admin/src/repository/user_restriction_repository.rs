@@ -115,25 +115,31 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
     async fn update_rule(&self, input: UpdateUserRestrictionRuleInput) -> anyhow::Result<()> {
         let now = chrono::Utc::now().naive_utc();
 
-        if let (Some(name), Some(rule_type), Some(rule_value)) =
-            (&input.name, &input.rule_type, &input.rule_value)
-        {
-            sqlx::query!(
-                r#"
-                UPDATE user_restriction_rules 
-                SET name = ?, rule_type = ?, rule_value = ?, expires_at = ?, updated_at = ?
-                WHERE id = UUID_TO_BIN(?)
-                "#,
-                name,
-                rule_type.as_str(),
-                rule_value,
-                input.expires_at.flatten().map(|dt| dt.naive_utc()),
-                now,
-                input.id.to_string()
-            )
-            .execute(&self.pool)
-            .await?;
-        }
+        let current = self
+            .get_rule_by_id(input.id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("restriction rule not found: {}", input.id))?;
+
+        let name = input.name.unwrap_or(current.name);
+        let rule_type = input.rule_type.unwrap_or(current.rule_type);
+        let rule_value = input.rule_value.unwrap_or(current.rule_value);
+        let expires_at = input.expires_at.unwrap_or(current.expires_at);
+
+        sqlx::query!(
+            r#"
+            UPDATE user_restriction_rules
+            SET name = ?, rule_type = ?, rule_value = ?, expires_at = ?, updated_at = ?
+            WHERE id = UUID_TO_BIN(?)
+            "#,
+            name,
+            rule_type.as_str(),
+            rule_value,
+            expires_at.map(|dt| dt.naive_utc()),
+            now,
+            input.id.to_string()
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }

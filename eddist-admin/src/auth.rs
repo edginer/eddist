@@ -446,10 +446,11 @@ where
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("Mozilla/5.0")
                 .to_string();
-            let data = AdminSession::new(ip, ua, is_native);
-            let _ = session.insert("data", data.clone()).await;
-
-            Ok(data)
+            // Don't persist a session record for unauthenticated requests - that would
+            // create a new MemoryStore entry (and Set-Cookie) on every cookieless
+            // request to /api/*. The session is only persisted once login completes
+            // (see the `session.insert("data", ...)` calls in the callback handlers).
+            Ok(AdminSession::new(ip, ua, is_native))
         }
     }
 }

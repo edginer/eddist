@@ -100,10 +100,13 @@ impl ThreadService for ThreadServiceImpl {
 
         let author_name = input
             .author_name
-            .unwrap_or_else(|| res.author_name.unwrap_or(default_name.clone()));
-        let mail = input.mail.unwrap_or_default();
+            .unwrap_or_else(|| res.author_name.clone().unwrap_or(default_name.clone()));
+        let mail = input
+            .mail
+            .unwrap_or_else(|| res.mail.clone().unwrap_or_default());
         let is_abone = input.is_abone.unwrap_or(res.is_abone);
-        let body = input.body.unwrap_or(res.body);
+        let body = input.body.unwrap_or_else(|| res.body.clone());
+        let res_order = res.res_order;
 
         let res_view = ResView {
             author_name,
@@ -113,17 +116,21 @@ impl ThreadService for ThreadServiceImpl {
             author_id: res.author_id,
             is_abone,
         };
-        let res_view = res_view.get_sjis_bytes(&default_name, thread_title.as_deref());
+        let title_for_view = if res_order == 1 {
+            thread_title.as_deref()
+        } else {
+            None
+        };
+        let res_view = res_view.get_sjis_bytes(&default_name, title_for_view);
 
         let _ = board_key; // use the board_key from the actual DB record
         let mut conn = self.redis_conn.clone();
-        let _ = conn
-            .send_packed_command(&redis::Cmd::lset(
-                format!("threads:{}:{}", board_key_actual, thread_number),
-                res.res_order as isize - 1,
-                res_view.get_inner(),
-            ))
-            .await;
+        conn.send_packed_command(&redis::Cmd::lset(
+            eddist_core::redis_keys::thread_cache_key(&board_key_actual, thread_number),
+            res_order as isize - 1,
+            res_view.get_inner(),
+        ))
+        .await?;
 
         Ok(updated_res)
     }

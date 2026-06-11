@@ -111,11 +111,11 @@ pub async fn get_dat_txt(
             .unwrap();
     };
 
-    let ua = headers.get("User-Agent").map(|x| x.to_str().unwrap());
+    let ua = headers.get("User-Agent").and_then(|x| x.to_str().ok());
+    let range = range.and_then(|x| x.to_str().ok());
 
     let (result, is_partial) = match (range, ua) {
         (Some(range), Some(ua)) if !ua.contains("Xeno") => {
-            let range = range.to_str().unwrap();
             if let Some(range) = range.split('=').nth(1) {
                 let range = range.split('-').collect::<Vec<_>>();
                 let Some(start) = range.first().and_then(|x| x.parse::<usize>().ok()) else {

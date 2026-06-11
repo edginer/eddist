@@ -240,27 +240,23 @@ impl<
             });
         };
 
-        // Check thread:{board_key}:{thread_number} exists. If not, does not rpush to the list but still creates the response in the database.
-        let is_exists = matches!(
-            redis_conn
-                .send_packed_command(&Cmd::exists(thread_cache_key(&input.board_key, input.thread_number)))
-                .await
-                .map_err(|e| BbsCgiError::Other(e.into()))?,
-            Value::Int(i) if i > 0
-        );
-        let order = if is_exists {
-            let Value::Int(order) = redis_conn
-                .send_packed_command(&Cmd::rpush(
-                    thread_cache_key(&input.board_key, input.thread_number),
-                    res.get_sjis_bytes(&board.default_name, None).get_inner(),
-                ))
-                .await
-                .map_err(|e| BbsCgiError::Other(e.into()))?
-            else {
-                return Err(BbsCgiError::Other(anyhow!(
-                    "failed to parse redis response"
-                )));
-            };
+        // RPUSHX only appends if thread:{board_key}:{thread_number} already exists, so the
+        // existence check and the push happen atomically - no race window where the key's
+        // TTL can expire between a separate EXISTS and RPUSH. If the key doesn't exist,
+        // it returns 0 and we still create the response in the database.
+        let Value::Int(order) = redis_conn
+            .send_packed_command(&Cmd::rpush_exists(
+                thread_cache_key(&input.board_key, input.thread_number),
+                res.get_sjis_bytes(&board.default_name, None).get_inner(),
+            ))
+            .await
+            .map_err(|e| BbsCgiError::Other(e.into()))?
+        else {
+            return Err(BbsCgiError::Other(anyhow!(
+                "failed to parse redis response"
+            )));
+        };
+        let order = if order > 0 {
             order as i32
         } else {
             // Sort by order, and then by id (uuidv7), thus the order of non-cache-existence response is over 1000.

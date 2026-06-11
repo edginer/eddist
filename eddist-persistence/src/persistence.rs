@@ -4,7 +4,7 @@ use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_
 use redis::AsyncCommands;
 use sqlx::{Connection, Executor, QueryBuilder, query};
 use tokio::{select, time::sleep};
-use tracing::{error_span, info_span};
+use tracing::{error, info};
 
 pub async fn run_persistence_loop(
     mut conn: redis::aio::ConnectionManager,
@@ -25,18 +25,18 @@ pub async fn run_persistence_loop(
 
         // Check Redis connection health and attempt reconnection if needed
         if !is_redis_connected {
-            error_span!("Redis connection lost, attempting to reconnect");
+            error!("Redis connection lost, attempting to reconnect");
             match redis::Client::open(redis_url.clone()) {
                 Ok(client) => match client.get_connection_manager().await {
                     Ok(new_conn) => {
                         conn = new_conn;
                         redis_error_count = 0;
-                        info_span!("Successfully reconnected to Redis");
+                        info!("Successfully reconnected to Redis");
                     }
                     Err(e) => {
-                        error_span!(
-                            "Failed to reconnect to Redis",
-                            error = e.to_string().as_str()
+                        error!(
+                            error = e.to_string().as_str(),
+                            "Failed to reconnect to Redis"
                         );
                         let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
                         sleep(std::time::Duration::from_secs(backoff_secs)).await;
@@ -45,9 +45,9 @@ pub async fn run_persistence_loop(
                     }
                 },
                 Err(e) => {
-                    error_span!(
-                        "Failed to create Redis client",
-                        error = e.to_string().as_str()
+                    error!(
+                        error = e.to_string().as_str(),
+                        "Failed to create Redis client"
                     );
                     let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
                     sleep(std::time::Duration::from_secs(backoff_secs)).await;
@@ -68,15 +68,12 @@ pub async fn run_persistence_loop(
                 list
             }
             Err(e) => {
-                error_span!("Failed to read from Redis", error = e.to_string().as_str());
+                error!(error = e.to_string().as_str(), "Failed to read from Redis");
                 is_redis_connected = false;
                 redis_error_count = redis_error_count.saturating_add(1);
 
                 let backoff_secs = std::cmp::min(2u64.pow(redis_error_count), 60);
-                error_span!(
-                    "Backing off for {} seconds before retry",
-                    seconds = backoff_secs
-                );
+                error!("Backing off for {backoff_secs} seconds before retry");
                 sleep(std::time::Duration::from_secs(backoff_secs)).await;
                 continue;
             }
@@ -96,19 +93,19 @@ pub async fn run_persistence_loop(
                     )
                     .await
                 {
-                    error_span!(
-                        "failed to set TIME_TRUNCATE_FRACTIONAL mode",
-                        error = e.to_string().as_str()
+                    error!(
+                        error = e.to_string().as_str(),
+                        "failed to set TIME_TRUNCATE_FRACTIONAL mode"
                     );
                 }
                 Some(db_conn)
             }
             Err(sqlx::Error::Io(e)) => {
-                error_span!("failed to connect to db", error = e.to_string().as_str());
+                error!(error = e.to_string().as_str(), "failed to connect to db");
                 None
             }
             Err(sqlx::Error::Tls(e)) => {
-                error_span!("failed to connect to db", error = e.to_string().as_str());
+                error!(error = e.to_string().as_str(), "failed to connect to db");
                 None
             }
             Err(_) => panic!(),
@@ -119,25 +116,36 @@ pub async fn run_persistence_loop(
             None => continue,
         };
 
+        let res_count = res_list.len();
         let res_list = res_list
             .iter()
-            .map(|res| serde_json::from_str::<CreatingRes>(res))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .filter_map(|res| match serde_json::from_str::<CreatingRes>(res) {
+                Ok(res) => Some(res),
+                Err(e) => {
+                    error!(
+                        error = e.to_string().as_str(),
+                        "Failed to parse cached response, dropping it"
+                    );
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
         if let Err(e) = insert_multiple_res(&mut db_conn, &res_list).await {
-            error_span!(
-                "Failed to insert responses to DB",
-                error = e.to_string().as_str()
+            error!(
+                error = e.to_string().as_str(),
+                "Failed to insert responses to DB"
             );
             continue;
         }
 
-        if let Err(e) = conn.del::<'_, _, ()>(DB_FAILED_CACHE_RES_KEY).await {
-            error_span!(
-                "Failed to clear Redis cache",
-                error = e.to_string().as_str()
-            );
+        // Remove only the entries we just read; entries pushed concurrently
+        // (which now sit after index `res_count - 1`) are preserved.
+        if let Err(e) = conn
+            .ltrim::<'_, _, ()>(DB_FAILED_CACHE_RES_KEY, res_count as isize, -1)
+            .await
+        {
+            error!(error = e.to_string().as_str(), "Failed to trim Redis cache");
             is_redis_connected = false;
         }
     }
@@ -162,7 +170,7 @@ async fn insert_multiple_res(
         }
 
         let mut builder = QueryBuilder::new(
-            "INSERT INTO responses (
+            "INSERT IGNORE INTO responses (
                     id,
                     author_name,
                     mail,
@@ -198,19 +206,38 @@ async fn insert_multiple_res(
         let query = builder.build();
 
         if let Err(e) = query.execute(&mut *tx).await {
-            match e {
-                sqlx::Error::Database(ref database_error) => match database_error.kind() {
-                    sqlx::error::ErrorKind::UniqueViolation => {}
-                    _ => return Err(e),
-                },
-                _ => return Err(e),
+            if matches!(&e, sqlx::Error::Database(de) if de.kind() == sqlx::error::ErrorKind::ForeignKeyViolation)
+            {
+                // One row in the chunk references a thread/board that no longer exists
+                // (e.g. the thread was archive-deleted before this response could be
+                // replayed). A multi-row INSERT is atomic, so that single poisoned row
+                // would otherwise abort the whole chunk and retry forever. Fall back to
+                // inserting rows one at a time, dropping only the poisoned ones.
+                for res in chunk {
+                    if let Err(e) = insert_single_res(&mut tx, res).await {
+                        if matches!(&e, sqlx::Error::Database(de) if de.kind() == sqlx::error::ErrorKind::ForeignKeyViolation)
+                        {
+                            error!(
+                                response_id = ?res.id,
+                                thread_id = ?res.thread_id,
+                                "Dropping cached response referencing a deleted thread/board"
+                            );
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            } else {
+                return Err(e);
             }
-        };
+        }
 
         for (thread_id, created_at) in thread_id_to_created_at.iter() {
             // query which is updating to responses_count, last_modified_at and active
             // response_count is calculated by select count(*) from responses where thread_id = ?
-            // active is calculated response_count <= 1000
+            // active is calculated response_count <= 1000, unless the thread was already
+            // archived (in which case it must stay inactive). last_modified_at only moves
+            // forward, so it can't be rewound by replaying older cached responses.
             // NOTE: this query is not crusial, so we can ignore the error
             let query = query!(
                 r#"
@@ -220,8 +247,11 @@ async fn insert_multiple_res(
                 WHERE thread_id = ?
             ) UPDATE threads
             SET response_count = (SELECT cnt FROM response_count),
-                last_modified_at = ?,
-                active = (SELECT cnt FROM response_count) <= 1000
+                last_modified_at = GREATEST(last_modified_at, ?),
+                active = CASE
+                    WHEN archived = 1 THEN 0
+                    ELSE (SELECT cnt FROM response_count) <= 1000
+                END
             WHERE id = ?;
         "#,
                 thread_id,
@@ -233,5 +263,47 @@ async fn insert_multiple_res(
     }
 
     tx.commit().await?;
+    Ok(())
+}
+
+async fn insert_single_res(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    res: &CreatingRes,
+) -> Result<(), sqlx::Error> {
+    let client_info = serde_json::to_string(&res.client_info).unwrap();
+
+    query!(
+        r#"
+        INSERT IGNORE INTO responses (
+            id,
+            author_name,
+            mail,
+            author_id,
+            body,
+            thread_id,
+            board_id,
+            ip_addr,
+            authed_token_id,
+            created_at,
+            client_info,
+            res_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#,
+        res.id,
+        res.name,
+        res.mail,
+        res.author_ch5id,
+        res.body,
+        res.thread_id,
+        res.board_id,
+        res.ip_addr,
+        res.authed_token_id,
+        res.created_at,
+        client_info,
+        res.res_order,
+    )
+    .execute(&mut **tx)
+    .await?;
+
     Ok(())
 }
