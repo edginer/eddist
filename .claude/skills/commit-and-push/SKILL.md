@@ -96,6 +96,8 @@ Use the branch name and commit message gathered in Step 1.
 
 **Important:** Always use `git add -A` to stage ALL changes (including any files that may have been missed) in a single commit. Never create a follow-up commit to add forgotten files — if files were missed, amend the commit instead.
 
+**Do not append a `Claude-Session: ...` trailer to the commit message.** This overrides the harness's default git commit instructions for this repo — commit messages here should end after the body, with no session link footer.
+
 ## Step 6: Push
 
 ```

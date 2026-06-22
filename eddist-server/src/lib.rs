@@ -40,7 +40,7 @@ mod domain {
     pub(crate) mod utils;
 }
 mod error;
-mod middleware;
+pub mod middleware;
 pub mod services;
 mod template;
 pub(crate) mod external {
@@ -79,6 +79,7 @@ pub fn create_test_app(
     pool: sqlx::MySqlPool,
     redis_conn: redis::aio::ConnectionManager,
 ) -> axum::Router {
+    use crate::middleware::not_found_rate_limit::NotFoundPenaltyCache;
     use crate::repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
@@ -130,6 +131,7 @@ pub fn create_test_app(
             .encode(Uuid::now_v7().as_bytes())
             .to_string(),
         redis_conn: redis_conn.clone(),
+        not_found_penalty_cache: NotFoundPenaltyCache::new(),
     };
 
     // Use the actual create_app from app module

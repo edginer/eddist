@@ -18,7 +18,10 @@ use tower_http::{
 use tracing::{Span, info_span};
 
 use crate::{
-    middleware::user_restriction::user_restriction_middleware,
+    middleware::{
+        not_found_rate_limit::{NotFoundPenaltyCache, not_found_rate_limit_middleware},
+        user_restriction::user_restriction_middleware,
+    },
     repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
@@ -66,6 +69,7 @@ pub struct AppState {
     pub template_engine: Arc<Handlebars<'static>>,
     pub tinker_secret: String,
     pub redis_conn: redis::aio::ConnectionManager,
+    pub not_found_penalty_cache: NotFoundPenaltyCache,
 }
 
 impl AppState {
@@ -356,9 +360,16 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         user_restriction_middleware,
     ));
 
-    if let Some(layer) = prometheus_layer {
+    let app = if let Some(layer) = prometheus_layer {
         app.layer(layer)
     } else {
         app
-    }
+    };
+
+    // Add 404 rate limit middleware as the outermost layer so penalized IPs are
+    // rejected as cheaply as possible, before any other request processing.
+    app.layer(axum::middleware::from_fn_with_state(
+        app_state,
+        not_found_rate_limit_middleware,
+    ))
 }
