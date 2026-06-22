@@ -59,11 +59,20 @@ impl NotFoundPenaltyCache {
     }
 }
 
+/// Paths probed internally (e.g. by k8s) without going through the CDN, so they
+/// never carry a `Cf-Connecting-IP`/`X-Forwarded-For` header. Skip the rate
+/// limiter entirely for these rather than letting `get_origin_ip` panic.
+const SKIP_PATHS: [&str; 2] = ["/health-check", "/metrics"];
+
 pub async fn not_found_rate_limit_middleware(
     State(state): State<AppState>,
     request: Request,
     next: Next,
 ) -> Response {
+    if SKIP_PATHS.contains(&request.uri().path()) {
+        return next.run(request).await;
+    }
+
     let ip = get_origin_ip(request.headers()).to_string();
 
     if state.not_found_penalty_cache.is_penalized(&ip) {
