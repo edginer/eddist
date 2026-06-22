@@ -74,6 +74,10 @@ pub fn unsafe_threads_key(board_id: impl std::fmt::Display) -> String {
     format!("bbs:safe_mode:unsafe_threads:{board_id}")
 }
 
+pub fn not_found_access_count_key(ip: &str) -> String {
+    format!("not_found:count:{ip}")
+}
+
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
