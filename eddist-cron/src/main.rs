@@ -82,7 +82,16 @@ async fn main() {
                     b.threads_archive_cron,
                     b.threads_archive_trigger_thread_count,
                 ) {
-                    let schedule = Schedule::from_str(&cron).unwrap();
+                    let schedule = match Schedule::from_str(&cron) {
+                        Ok(schedule) => schedule,
+                        Err(e) => {
+                            log::error!(
+                                "`inactivate` Cronjob for board: {} has an invalid cron expression `{cron}`: {e}",
+                                b.board_key
+                            );
+                            continue;
+                        }
+                    };
                     let next = schedule
                         .after(
                             &Utc::now()

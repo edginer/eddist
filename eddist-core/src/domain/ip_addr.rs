@@ -39,18 +39,27 @@ impl From<IpAddr> for ReducedIpAddr {
 
 impl From<String> for ReducedIpAddr {
     fn from(value: String) -> Self {
-        if value.contains(':') {
-            // v6
-            let split = value.split(':').collect::<Vec<_>>();
+        if let Ok(v6) = value.parse::<std::net::Ipv6Addr>() {
+            // Full (possibly compressed) v6 address: reduce to the /64 prefix.
+            let segments = v6.segments();
             Self::V6([
-                split[0].to_string(),
-                split[1].to_string(),
-                split[2].to_string(),
-                split[3].to_string(),
+                format!("{:x}", segments[0]),
+                format!("{:x}", segments[1]),
+                format!("{:x}", segments[2]),
+                format!("{:x}", segments[3]),
+            ])
+        } else if value.contains(':') {
+            // Already-reduced v6 string (e.g. a stored reduced_origin_ip).
+            let mut parts = value.split(':').map(|s| s.to_string());
+            Self::V6([
+                parts.next().unwrap_or_default(),
+                parts.next().unwrap_or_default(),
+                parts.next().unwrap_or_default(),
+                parts.next().unwrap_or_default(),
             ])
         } else {
             // v4
-            Self::V4(value.to_string())
+            Self::V4(value)
         }
     }
 }
@@ -80,6 +89,21 @@ mod tests {
         let ip = ReducedIpAddr::from("2001:db8:85a3:0".to_string());
         assert!(ip.is_v6());
         assert!(!ip.is_v4());
+        assert_eq!(ip.to_string(), "2001:db8:85a3:0");
+    }
+
+    #[test]
+    fn test_reduced_ip_addr_v6_compressed() {
+        let ip = ReducedIpAddr::from("::1".to_string());
+        assert!(ip.is_v6());
+        assert_eq!(ip.to_string(), "0:0:0:0");
+
+        let ip = ReducedIpAddr::from("fe80::1".to_string());
+        assert!(ip.is_v6());
+        assert_eq!(ip.to_string(), "fe80:0:0:0");
+
+        let ip = ReducedIpAddr::from("2001:db8:85a3:0:0:8a2e:370:7334".to_string());
+        assert!(ip.is_v6());
         assert_eq!(ip.to_string(), "2001:db8:85a3:0");
     }
 

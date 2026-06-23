@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE user_restriction_rules\n            SET name = ?, rule_type = ?, rule_value = ?, expires_at = ?, updated_at = ?\n            WHERE id = UUID_TO_BIN(?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "6db73c99bf85ba21be30d9ab4b2af871a050db843c3731b45aff212ccab4c1a6"
+}

@@ -26,7 +26,7 @@ pub fn routes() -> Router<AppState> {
             patch(update_response),
         )
         .route(
-            "/boards/{boardKey}/threads-compaction/",
+            "/boards/{boardKey}/threads-compaction",
             post(threads_compaction),
         )
 }

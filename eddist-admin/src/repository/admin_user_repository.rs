@@ -184,7 +184,6 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
 
         query.execute(&mut *tx).await?;
 
-        // Enable/Disable all authed tokens associated with the user
         let query = sqlx::query!(
             r#"
             UPDATE

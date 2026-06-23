@@ -11,34 +11,35 @@ use uuid::Uuid;
 pub fn get_origin_ip(headers: &HeaderMap) -> &str {
     let origin_ip = headers
         .get("Cf-Connecting-IP")
-        .or_else(|| headers.get("X-Forwarded-For"))
-        .map(|x| x.to_str());
+        .or_else(|| headers.get("X-Forwarded-For"));
 
     if is_prod() {
-        origin_ip.unwrap().unwrap()
+        origin_ip
+            .expect("Cf-Connecting-IP or X-Forwarded-For header is required in production")
+            .to_str()
+            .unwrap_or("unknown")
     } else {
-        origin_ip.unwrap_or(Ok("localhost")).unwrap()
+        origin_ip
+            .and_then(|x| x.to_str().ok())
+            .unwrap_or("localhost")
     }
 }
 
 pub fn get_ua(headers: &HeaderMap) -> &str {
     headers
         .get("User-Agent")
-        .map(|x| x.to_str())
-        .unwrap_or(Ok("unknown"))
-        .unwrap()
+        .and_then(|x| x.to_str().ok())
+        .unwrap_or("unknown")
 }
 
 pub fn get_asn_num(headers: &HeaderMap) -> u32 {
     let header_name = env::var("ASN_NUMBER_HEADER_NAME").unwrap_or("X-ASN-Num".to_string());
 
-    let header = headers.get(header_name).map(|x| x.to_str());
-
-    if is_prod() {
-        header.unwrap().unwrap().parse::<u32>().unwrap()
-    } else {
-        header.unwrap_or(Ok("0")).unwrap().parse::<u32>().unwrap()
-    }
+    headers
+        .get(header_name)
+        .and_then(|x| x.to_str().ok())
+        .and_then(|x| x.parse::<u32>().ok())
+        .unwrap_or(0)
 }
 
 pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
@@ -48,16 +49,16 @@ pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
     validation.validate_aud = false;
     validation.required_spec_claims.clear();
 
+    let secret_bytes = base64::engine::general_purpose::STANDARD
+        .decode(secret.trim())
+        .ok()?;
+
     let tinker = jsonwebtoken::decode::<Tinker>(
         tinker,
-        &jsonwebtoken::DecodingKey::from_secret(
-            &base64::engine::general_purpose::STANDARD
-                .decode(secret.trim())
-                .unwrap(),
-        ),
+        &jsonwebtoken::DecodingKey::from_secret(&secret_bytes),
         &validation,
     )
-    .unwrap()
+    .ok()?
     .claims;
 
     // Legacy cookies pre-date the internal_level field; promote to level so restrictions are unchanged.
