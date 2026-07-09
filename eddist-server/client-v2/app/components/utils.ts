@@ -6,6 +6,7 @@ interface ResponseInput {
   body: string;
   boardKey: string;
   threadKey: string;
+  captchaTokens?: Record<string, string>;
 }
 
 interface ThreadCreateInput {
@@ -14,6 +15,7 @@ interface ThreadCreateInput {
   mail: string;
   body: string;
   boardKey: string;
+  captchaTokens?: Record<string, string>;
 }
 
 type PostResponseResult = PostResponseSuccess | PostResponseFailure;
@@ -24,7 +26,7 @@ interface PostResponseSuccess {
 
 interface PostResponseFailure {
   success: false;
-  error: PostResponseFailureAuthCode | PostResponseFailureUnknown;
+  error: PostResponseFailureAuthCode | PostResponseFailureCaptcha | PostResponseFailureUnknown;
 }
 
 interface PostResponseFailureAuthCode {
@@ -32,10 +34,19 @@ interface PostResponseFailureAuthCode {
   authCode: string;
 }
 
+interface PostResponseFailureCaptcha {
+  kind: "captcha";
+}
+
 interface PostResponseFailureUnknown {
   kind: "unknown";
   errorHtml: string;
 }
+
+const captchaTokensToQueryString = (captchaTokens?: Record<string, string>): string =>
+  Object.entries(captchaTokens ?? {})
+    .map(([field, token]) => `&${encodeURIComponent(field)}=${encodeURIComponent(token)}`)
+    .join("");
 
 const convertToSjisText = (text: string): string => {
   const resultArray = [];
@@ -97,6 +108,7 @@ export const postResponse = async ({
   body,
   boardKey,
   threadKey,
+  captchaTokens,
 }: ResponseInput): Promise<PostResponseResult> => {
   const params = {
     submit: convertToSjisText("書き込む"),
@@ -124,7 +136,9 @@ export const postResponse = async ({
       "&bbs=" +
       params.bbs +
       "&key=" +
-      params.key,
+      params.key +
+      "&is_browser=1" +
+      captchaTokensToQueryString(captchaTokens),
   });
 
   return await afterPost(res);
@@ -136,6 +150,7 @@ export const postThread = async ({
   mail,
   body,
   boardKey,
+  captchaTokens,
 }: ThreadCreateInput): Promise<PostResponseResult> => {
   const params = {
     submit: convertToSjisText("新規スレッド作成"),
@@ -163,7 +178,9 @@ export const postThread = async ({
       "&bbs=" +
       params.bbs +
       "&subject=" +
-      params.subject,
+      params.subject +
+      "&is_browser=1" +
+      captchaTokensToQueryString(captchaTokens),
   });
 
   return await afterPost(res);
@@ -197,6 +214,8 @@ const afterPost = async (res: Response): Promise<PostResponseResult> => {
     if (text.includes("E-Unauthenticated")) {
       const authCode = extractAuthCodeWhenUnauthenticated(text);
       return { success: false, error: { kind: "auth-code", authCode } };
+    } else if (text.includes("E-CaptchaError")) {
+      return { success: false, error: { kind: "captcha" } };
     } else {
       const doc = new DOMParser().parseFromString(text, "text/html");
       return {

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     body::Body,
     extract::State,
@@ -10,10 +12,15 @@ use jsonwebtoken::EncodingKey;
 
 use crate::{
     AppState,
+    domain::captcha_like::CaptchaProviderConfig,
     error::{BbsCgiError, InsufficientParamType, InvalidParamType},
     services::{
         AppService, BbsCgiService,
         bind_token_to_user_service::BindTokenToUserServiceInput,
+        captcha_config_cache::{
+            get_cached_captcha_configs_for_response_creation,
+            get_cached_captcha_configs_for_thread_creation,
+        },
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
         server_settings_cache::{ServerSettingKey, get_server_setting_bool},
         stats_counter::{increment_board_response_delta, increment_board_thread_delta},
@@ -101,6 +108,27 @@ pub async fn post_bbs_cgi(
     let require_user_registration =
         get_server_setting_bool(ServerSettingKey::RequireIdpLinking).await;
 
+    // Dedicated 2ch-compatible client apps (専ブラ) cannot render a captcha widget,
+    // so only require captcha verification for clients that explicitly identify as
+    // browser-capable (the official client-v2 web app sends `is_browser=1`).
+    let is_browser = form.get("is_browser").is_some_and(|v| v == "1");
+    let captcha_configs: Vec<CaptchaProviderConfig> = if is_browser {
+        if is_thread {
+            get_cached_captcha_configs_for_thread_creation().await
+        } else {
+            get_cached_captcha_configs_for_response_creation().await
+        }
+    } else {
+        Vec::new()
+    };
+    let captcha_responses: HashMap<String, String> = captcha_configs
+        .iter()
+        .filter_map(|c| {
+            form.get(c.widget.form_field_name.as_str())
+                .map(|v| (c.widget.form_field_name.clone(), v.to_string()))
+        })
+        .collect();
+
     let (tinker, res_order, authed_token_id, is_authed_token_bound) = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
             return BbsCgiError::from(InsufficientParamType::Subject).into_response();
@@ -120,6 +148,8 @@ pub async fn post_bbs_cgi(
                 user_agent: ua.to_string(),
                 asn_num,
                 require_user_registration,
+                captcha_like_configs: captcha_configs,
+                captcha_responses,
             })
             .await
         {
@@ -158,6 +188,8 @@ pub async fn post_bbs_cgi(
                 user_agent: ua.to_string(),
                 asn_num,
                 require_user_registration,
+                captcha_like_configs: captcha_configs,
+                captcha_responses,
             })
             .await
         {

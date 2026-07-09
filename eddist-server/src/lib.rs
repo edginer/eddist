@@ -51,6 +51,7 @@ pub(crate) mod utils;
 mod routes {
     pub mod auth_code;
     pub mod bbs_cgi;
+    pub mod captcha_config_api;
     pub mod dat_routing;
     pub mod notice;
     pub mod re_auth;
