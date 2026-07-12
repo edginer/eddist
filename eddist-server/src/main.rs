@@ -10,6 +10,7 @@ use eddist::{
     AppState,
     app::create_app,
     load_template_engine,
+    middleware::not_found_rate_limit::NotFoundPenaltyCache,
     repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
@@ -133,6 +134,7 @@ async fn main() -> anyhow::Result<()> {
         template_engine: Arc::new(template_engine),
         tinker_secret,
         redis_conn: conn_mgr.clone(),
+        not_found_penalty_cache: NotFoundPenaltyCache::new(),
     };
 
     // Start background task for user restriction cache refresh
