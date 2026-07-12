@@ -89,6 +89,7 @@ impl TestContext {
         let mut server = TestServer::new(app);
         server.add_header("CF-Connecting-IP", "localhost");
         server.add_header("X-ASN-Num", "1");
+        server.add_header("User-Agent", "eddist-integration-test");
 
         Self {
             _mysql_container: mysql_container,

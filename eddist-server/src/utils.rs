@@ -23,9 +23,14 @@ pub fn get_origin_ip(headers: &HeaderMap) -> Option<&str> {
     }
 }
 
-/// Returns the request User-Agent, or `None` when it is missing/invalid.
+/// Returns the request User-Agent, or `None` in production when it is
+/// missing/invalid. In non-prod, a missing/invalid header falls back to `unknown`.
 pub fn get_ua(headers: &HeaderMap) -> Option<&str> {
-    headers.get("User-Agent").and_then(|x| x.to_str().ok())
+    match headers.get("User-Agent").and_then(|x| x.to_str().ok()) {
+        Some(ua) => Some(ua),
+        None if !is_prod() => Some("unknown"),
+        None => None,
+    }
 }
 
 /// Returns the client ASN, or `None` in production when no valid CDN-provided
@@ -156,9 +161,6 @@ mod tests {
 
     #[test]
     fn test_get_origin_ip_localhost_fallback() {
-        // Non-prod: a missing IP header falls back to `localhost` for local dev.
-        // The prod path (missing header -> None -> rejected) can't be exercised
-        // here because `is_prod()` reads RUST_ENV once and memoizes it process-wide.
         let headers = HeaderMap::new();
         assert_eq!(get_origin_ip(&headers), Some("localhost"));
     }
@@ -173,13 +175,11 @@ mod tests {
     #[test]
     fn test_get_ua_missing() {
         let headers = HeaderMap::new();
-        assert_eq!(get_ua(&headers), None);
+        assert_eq!(get_ua(&headers), Some("unknown"));
     }
 
     #[test]
     fn test_get_asn_num_missing_fallback() {
-        // Non-prod fallback; see note on the origin-ip test for why the prod
-        // rejection path isn't unit-testable here.
         let headers = HeaderMap::new();
         assert_eq!(get_asn_num(&headers), Some(0));
     }
