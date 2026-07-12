@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::{
     Form,
     extract::State,
+    http::StatusCode,
     response::{Html, IntoResponse},
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
@@ -118,14 +119,21 @@ pub async fn post_auth_code(
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
     let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
+    let (Some(origin_ip), Some(user_agent), Some(asn_num)) = (
+        get_origin_ip(&headers),
+        get_ua(&headers),
+        get_asn_num(&headers),
+    ) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
     let (token, authed_token_id, rate_limit_token, user_reg_url) = match state
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
             code: form["auth-code"].to_string(),
-            origin_ip: get_origin_ip(&headers).to_string(),
-            user_agent: get_ua(&headers).to_string(),
-            asn_num: get_asn_num(&headers),
+            origin_ip: origin_ip.to_string(),
+            user_agent: user_agent.to_string(),
+            asn_num,
             captcha_like_configs: captcha_configs,
             responses: form,
             rate_limit_token,

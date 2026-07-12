@@ -30,9 +30,13 @@ pub async fn user_restriction_middleware(
     }
 
     let headers = request.headers();
-    let ip = get_origin_ip(headers);
-    let asn = get_asn_num(headers);
-    let ua = get_ua(headers);
+    let (Some(ip), Some(asn), Some(ua)) = (
+        get_origin_ip(headers),
+        get_asn_num(headers),
+        get_ua(headers),
+    ) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
 
     let restriction_service = state.get_container().user_restriction();
 

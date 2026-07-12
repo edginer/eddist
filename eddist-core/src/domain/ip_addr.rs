@@ -108,6 +108,35 @@ mod tests {
     }
 
     #[test]
+    fn test_reduced_ip_addr_already_reduced() {
+        // An already-reduced /64 string (4 groups) is not a full IPv6 address, so it
+        // takes the `else if value.contains(':')` branch and is preserved verbatim.
+        // This is the shape stored as `reduced_origin_ip`, replayed back through `From`.
+        for reduced in ["2001:db8:85a3:0", "fe80:0:0:0", "0:0:0:0"] {
+            let ip = ReducedIpAddr::from(reduced.to_string());
+            assert!(ip.is_v6());
+            assert!(!ip.is_v4());
+            assert_eq!(ip.to_string(), reduced);
+        }
+    }
+
+    #[test]
+    fn test_reduced_ip_addr_v6_idempotent() {
+        // Reducing a full address and then reducing the resulting stored string again
+        // must yield the same value - otherwise past data would drift on re-reduction.
+        for full in [
+            "2001:db8:85a3:0:0:8a2e:370:7334",
+            "fe80::1",
+            "::1",
+            "2001:db8::",
+        ] {
+            let once = ReducedIpAddr::from(full.to_string()).to_string();
+            let twice = ReducedIpAddr::from(once.clone()).to_string();
+            assert_eq!(once, twice, "re-reducing {full} changed the value");
+        }
+    }
+
+    #[test]
     fn test_ip_addr_conversion() {
         let ip = IpAddr::new("10.0.0.1".to_string());
         let reduced: ReducedIpAddr = ip.into();

@@ -240,10 +240,8 @@ impl<
             });
         };
 
-        // RPUSHX only appends if thread:{board_key}:{thread_number} already exists, so the
-        // existence check and the push happen atomically - no race window where the key's
-        // TTL can expire between a separate EXISTS and RPUSH. If the key doesn't exist,
-        // it returns 0 and we still create the response in the database.
+        // RPUSHX appends only if the thread cache key exists, so the check and push are
+        // atomic (no EXISTS/RPUSH TTL race). Returns 0 if absent; we still persist to the DB.
         let Value::Int(order) = redis_conn
             .send_packed_command(&Cmd::rpush_exists(
                 thread_cache_key(&input.board_key, input.thread_number),
