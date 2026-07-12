@@ -16,6 +16,7 @@ use crate::{
         thread_retrieval_service::ThreadRetrievalServiceInput,
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
+    utils::get_ua,
 };
 
 /// Extracts the byte-size suffix from a dat ETag of the form `W/"board-thread-SIZE"`.
@@ -111,7 +112,7 @@ pub async fn get_dat_txt(
             .unwrap();
     };
 
-    let ua = headers.get("User-Agent").and_then(|x| x.to_str().ok());
+    let ua = get_ua(&headers);
     let range = range.and_then(|x| x.to_str().ok());
 
     let (result, is_partial) = match (range, ua) {
