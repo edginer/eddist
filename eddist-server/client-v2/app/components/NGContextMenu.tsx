@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
+import { addSharedNgId } from "~/api-client/ng_id";
 import { type NGCategory, useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
 
 interface NGContextMenuProps {
   x: number;
   y: number;
+  boardKey: string;
   onClose: () => void;
   options: {
     label: string;
@@ -20,7 +22,14 @@ interface NGContextMenuProps {
   }[];
 }
 
-export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContextMenuProps) => {
+export const NGContextMenu = ({
+  x,
+  y,
+  boardKey,
+  onClose,
+  options,
+  actions = [],
+}: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { addRule } = useNGWords();
   const { showToast } = useToast();
@@ -118,12 +127,21 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
     hideMode?: "hidden" | "collapsed",
   ) => {
     try {
+      // NG IDs from the response list are shared with the server; stamp the board
+      // key so the settings dialog can retract them later.
+      const isSharedNgId = category === "response.authorIds";
+
       addRule(category, {
         pattern: value,
         matchType: "partial",
         enabled: true,
         ...(hideMode ? { hideMode } : {}),
+        ...(isSharedNgId ? { sharedBoardKey: boardKey } : {}),
       });
+
+      if (isSharedNgId) {
+        void addSharedNgId(boardKey, value);
+      }
 
       // Visual feedback
       showToast(`NGワードに追加: ${value}`, "success");

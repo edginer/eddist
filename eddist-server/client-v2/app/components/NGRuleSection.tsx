@@ -12,6 +12,7 @@ interface NGRuleFormData {
 
 interface NGRuleSectionProps {
   title: string;
+  description?: string;
   rules: NGRule[];
   onAdd: (rule: Omit<NGRule, "id">) => void;
   onUpdate: (ruleId: string, updates: Partial<Omit<NGRule, "id">>) => void;
@@ -23,6 +24,7 @@ interface NGRuleSectionProps {
 
 export const NGRuleSection = ({
   title,
+  description,
   rules,
   onAdd,
   onUpdate,
@@ -110,6 +112,9 @@ export const NGRuleSection = ({
   return (
     <div className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0 dark:text-gray-100">
       <h3 className="text-lg font-semibold mb-3">{title}</h3>
+      {description && (
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{description}</p>
+      )}
 
       {/* Add new rule */}
       <form onSubmit={handleAdd} className="mb-4">
