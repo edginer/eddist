@@ -308,6 +308,16 @@ const ThreadListPage = ({
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
+        {safeMode && (
+          <button
+            type="button"
+            onClick={openNGSettings}
+            className="hidden lg:flex px-2 py-1 mx-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 items-center gap-1 cursor-pointer"
+            title="セーフモード有効 — クリックして設定"
+          >
+            セーフモード
+          </button>
+        )}
         <button
           type="button"
           onClick={openNGSettings}

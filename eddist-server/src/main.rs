@@ -19,6 +19,7 @@ use eddist::{
         notice_repository::NoticeRepositoryImpl,
         stats_repository::StatsRepositoryImpl,
         terms_repository::TermsRepositoryImpl,
+        trending_repository::TrendingRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     },
@@ -110,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
     let stats_repo = StatsRepositoryImpl::new(pool.clone());
     let stats_repo_for_flush = stats_repo.clone();
     let stats_repo_for_shutdown = stats_repo.clone();
+    let trending_repo = TrendingRepositoryImpl::new(pool.clone());
 
     // Load initial server settings from database and initialize cache
     refresh_server_settings_cache(&pool).await?;
@@ -131,6 +133,7 @@ async fn main() -> anyhow::Result<()> {
         notice_repo,
         terms_repo,
         stats_repo,
+        trending_repo,
         template_engine: Arc::new(template_engine),
         tinker_secret,
         redis_conn: conn_mgr.clone(),
