@@ -19,6 +19,8 @@ export interface NGRule {
   matchType: "partial" | "regex";
   enabled: boolean;
   hideMode?: "hidden" | "collapsed";
+  // Set only for rules added from the response-list context menu (shared NG ID).
+  sharedBoardKey?: string;
 }
 
 export interface NGWordsConfig {
