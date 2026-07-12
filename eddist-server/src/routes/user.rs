@@ -374,9 +374,16 @@ async fn get_user_authz_idp_callback(
     }
 
     let browser_edge_token = jar.get("edge-token").map(|c| c.value().to_string());
-    let ip_addr = get_origin_ip(&headers);
-    let user_agent = get_ua(&headers);
-    let asn_num = get_asn_num(&headers);
+    let (Some(ip_addr), Some(user_agent), Some(asn_num)) = (
+        get_origin_ip(&headers),
+        get_ua(&headers),
+        get_asn_num(&headers),
+    ) else {
+        return Response::builder()
+            .status(403)
+            .body(Body::from("Access denied"))
+            .unwrap();
+    };
 
     let (user_sid, edge_token) = match state
         .services

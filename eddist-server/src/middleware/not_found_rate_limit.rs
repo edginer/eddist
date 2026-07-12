@@ -61,7 +61,7 @@ impl NotFoundPenaltyCache {
 
 /// Paths probed internally (e.g. by k8s) without going through the CDN, so they
 /// never carry a `Cf-Connecting-IP`/`X-Forwarded-For` header. Skip the rate
-/// limiter entirely for these rather than letting `get_origin_ip` panic.
+/// limiter entirely for these so health/metrics probes are never penalized.
 const SKIP_PATHS: [&str; 2] = ["/health-check", "/metrics"];
 
 pub async fn not_found_rate_limit_middleware(
@@ -73,7 +73,12 @@ pub async fn not_found_rate_limit_middleware(
         return next.run(request).await;
     }
 
-    let ip = get_origin_ip(request.headers()).to_string();
+    // No CDN-provided IP means the request bypassed the CDN (internal/probe
+    // traffic); there's nothing to key the 404 rate limiter on, so let it through.
+    let Some(ip) = get_origin_ip(request.headers()) else {
+        return next.run(request).await;
+    };
+    let ip = ip.to_string();
 
     if state.not_found_penalty_cache.is_penalized(&ip) {
         tracing::warn!("IP {ip} hit 404 rate limit penalty; rejecting with 429");

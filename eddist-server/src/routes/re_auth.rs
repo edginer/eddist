@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::{
     Form,
     extract::State,
+    http::StatusCode,
     response::{Html, IntoResponse},
 };
 use http::{HeaderMap, HeaderValue};
@@ -42,12 +43,15 @@ pub async fn post_re_auth(
 ) -> impl IntoResponse {
     let captcha_configs = get_cached_captcha_configs_for_reauth().await;
     let temp_key = form.get("temp_key").cloned().unwrap_or_default();
+    let Some(origin_ip) = get_origin_ip(&headers) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
     match state
         .services
         .reauth()
         .execute(ReAuthServiceInput {
             temp_key,
-            origin_ip: get_origin_ip(&headers).to_string(),
+            origin_ip: origin_ip.to_string(),
             captcha_configs,
             responses: form,
         })

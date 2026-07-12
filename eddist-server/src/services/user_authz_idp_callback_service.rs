@@ -156,7 +156,7 @@ impl<
                 PkceCodeVerifier::new(user_reg_state.code_verifier.unwrap()),
                 Nonce::new(user_reg_state.nonce.unwrap()),
             )
-            .await;
+            .await?;
 
         let sub = id_token_claims.subject().to_string();
         let authed_token_uuid = Uuid::parse_str(&authed_token_id)?;
@@ -251,7 +251,7 @@ impl<
                 PkceCodeVerifier::new(user_login_state.code_verifier),
                 Nonce::new(user_login_state.nonce),
             )
-            .await;
+            .await?;
 
         let user = self
             .user_repo

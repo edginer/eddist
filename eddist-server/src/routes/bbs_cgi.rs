@@ -1,6 +1,7 @@
 use axum::{
     body::Body,
     extract::State,
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::CookieJar;
@@ -44,12 +45,23 @@ pub async fn post_bbs_cgi(
         }
     };
 
-    let origin_ip = get_origin_ip(&headers);
-    let ua = get_ua(&headers);
-    let asn_num = get_asn_num(&headers);
-    let tinker = jar
-        .get("tinker-token")
-        .and_then(|x| get_tinker(x.value(), state.tinker_secret()));
+    let (Some(origin_ip), Some(ua), Some(asn_num)) = (
+        get_origin_ip(&headers),
+        get_ua(&headers),
+        get_asn_num(&headers),
+    ) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
+    // A missing tinker-token cookie is normal (new/anonymous user), but a cookie
+    // that is present yet fails to decode is a malformed request - reject it rather
+    // than silently treating the client as if it had no tinker.
+    let tinker = match jar.get("tinker-token") {
+        Some(cookie) => match get_tinker(cookie.value(), state.tinker_secret()) {
+            Some(tinker) => Some(tinker),
+            None => return (StatusCode::BAD_REQUEST, "invalid tinker-token").into_response(),
+        },
+        None => None,
+    };
     let user_sid = jar.get("user-sid").map(|x| x.value().to_string());
     let edge_token = jar.get("edge-token").map(|x| x.value().to_string());
 

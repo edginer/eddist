@@ -164,16 +164,13 @@ impl NgWordRepository for NgWordRepositoryImpl {
         board_ids: Option<Vec<Uuid>>,
     ) -> anyhow::Result<NgWord> {
         let mut sets = Vec::new();
-        let mut values = Vec::new();
-
-        if let Some(name) = name {
+        if name.is_some() {
             sets.push("name = ?");
-            values.push(name);
         }
-        if let Some(word) = word {
+        if word.is_some() {
             sets.push("word = ?");
-            values.push(word);
         }
+        sets.push("updated_at = ?");
 
         let query = format!(
             r#"
@@ -188,10 +185,13 @@ impl NgWordRepository for NgWordRepositoryImpl {
         );
 
         let mut query = sqlx::query(&query);
-        for v in values {
-            query = query.bind(v);
+        if let Some(name) = name {
+            query = query.bind(name);
         }
-        let query = query.bind(id);
+        if let Some(word) = word {
+            query = query.bind(word);
+        }
+        let query = query.bind(Utc::now()).bind(id);
         query.execute(&self.0).await?;
 
         if let Some(board_ids) = board_ids {
@@ -252,7 +252,10 @@ impl NgWordRepository for NgWordRepositoryImpl {
             .iter()
             .filter_map(|selection| selection.board_id)
             .collect::<Vec<_>>();
-        let selection = selections.into_iter().next().unwrap();
+        let selection = selections
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("ng word not found: {id}"))?;
 
         Ok(NgWord {
             id: selection.id,

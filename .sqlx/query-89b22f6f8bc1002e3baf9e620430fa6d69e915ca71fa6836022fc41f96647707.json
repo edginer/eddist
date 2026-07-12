@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n        INSERT IGNORE INTO responses (\n            id,\n            author_name,\n            mail,\n            author_id,\n            body,\n            thread_id,\n            board_id,\n            ip_addr,\n            authed_token_id,\n            created_at,\n            client_info,\n            res_order\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "89b22f6f8bc1002e3baf9e620430fa6d69e915ca71fa6836022fc41f96647707"
+}

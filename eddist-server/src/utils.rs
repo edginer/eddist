@@ -8,36 +8,45 @@ use http::HeaderMap;
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
 
-pub fn get_origin_ip(headers: &HeaderMap) -> &str {
+/// Returns the client origin IP, or `None` in production when no valid CDN-provided
+/// header is present. In non-prod, a missing/invalid header falls back to `localhost`.
+pub fn get_origin_ip(headers: &HeaderMap) -> Option<&str> {
     let origin_ip = headers
         .get("Cf-Connecting-IP")
         .or_else(|| headers.get("X-Forwarded-For"))
-        .map(|x| x.to_str());
+        .and_then(|x| x.to_str().ok());
 
-    if is_prod() {
-        origin_ip.unwrap().unwrap()
-    } else {
-        origin_ip.unwrap_or(Ok("localhost")).unwrap()
+    match origin_ip {
+        Some(ip) => Some(ip),
+        None if !is_prod() => Some("localhost"),
+        None => None,
     }
 }
 
-pub fn get_ua(headers: &HeaderMap) -> &str {
-    headers
-        .get("User-Agent")
-        .map(|x| x.to_str())
-        .unwrap_or(Ok("unknown"))
-        .unwrap()
+/// Returns the request User-Agent, or `None` in production when it is
+/// missing/invalid. In non-prod, a missing/invalid header falls back to `unknown`.
+pub fn get_ua(headers: &HeaderMap) -> Option<&str> {
+    match headers.get("User-Agent").and_then(|x| x.to_str().ok()) {
+        Some(ua) => Some(ua),
+        None if !is_prod() => Some("unknown"),
+        None => None,
+    }
 }
 
-pub fn get_asn_num(headers: &HeaderMap) -> u32 {
+/// Returns the client ASN, or `None` in production when no valid CDN-provided
+/// header is present. In non-prod, a missing/invalid header falls back to `0`.
+pub fn get_asn_num(headers: &HeaderMap) -> Option<u32> {
     let header_name = env::var("ASN_NUMBER_HEADER_NAME").unwrap_or("X-ASN-Num".to_string());
 
-    let header = headers.get(header_name).map(|x| x.to_str());
+    let asn = headers
+        .get(header_name)
+        .and_then(|x| x.to_str().ok())
+        .and_then(|x| x.parse::<u32>().ok());
 
-    if is_prod() {
-        header.unwrap().unwrap().parse::<u32>().unwrap()
-    } else {
-        header.unwrap_or(Ok("0")).unwrap().parse::<u32>().unwrap()
+    match asn {
+        Some(asn) => Some(asn),
+        None if !is_prod() => Some(0),
+        None => None,
     }
 }
 
@@ -48,16 +57,16 @@ pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
     validation.validate_aud = false;
     validation.required_spec_claims.clear();
 
+    let secret_bytes = base64::engine::general_purpose::STANDARD
+        .decode(secret.trim())
+        .ok()?;
+
     let tinker = jsonwebtoken::decode::<Tinker>(
         tinker,
-        &jsonwebtoken::DecodingKey::from_secret(
-            &base64::engine::general_purpose::STANDARD
-                .decode(secret.trim())
-                .unwrap(),
-        ),
+        &jsonwebtoken::DecodingKey::from_secret(&secret_bytes),
         &validation,
     )
-    .unwrap()
+    .ok()?
     .claims;
 
     // Legacy cookies pre-date the internal_level field; promote to level so restrictions are unchanged.
@@ -136,7 +145,7 @@ mod tests {
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
 
         unsafe { std::env::set_var("ENV", "production") };
-        assert_eq!(get_origin_ip(&headers), "203.0.113.1");
+        assert_eq!(get_origin_ip(&headers), Some("203.0.113.1"));
         unsafe { std::env::remove_var("ENV") };
     }
 
@@ -146,26 +155,32 @@ mod tests {
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
 
         unsafe { std::env::set_var("ENV", "production") };
-        assert_eq!(get_origin_ip(&headers), "198.51.100.1");
+        assert_eq!(get_origin_ip(&headers), Some("198.51.100.1"));
         unsafe { std::env::remove_var("ENV") };
     }
 
     #[test]
     fn test_get_origin_ip_localhost_fallback() {
         let headers = HeaderMap::new();
-        assert_eq!(get_origin_ip(&headers), "localhost");
+        assert_eq!(get_origin_ip(&headers), Some("localhost"));
     }
 
     #[test]
     fn test_get_ua_present() {
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "Mozilla/5.0 Test".parse().unwrap());
-        assert_eq!(get_ua(&headers), "Mozilla/5.0 Test");
+        assert_eq!(get_ua(&headers), Some("Mozilla/5.0 Test"));
     }
 
     #[test]
     fn test_get_ua_missing() {
         let headers = HeaderMap::new();
-        assert_eq!(get_ua(&headers), "unknown");
+        assert_eq!(get_ua(&headers), Some("unknown"));
+    }
+
+    #[test]
+    fn test_get_asn_num_missing_fallback() {
+        let headers = HeaderMap::new();
+        assert_eq!(get_asn_num(&headers), Some(0));
     }
 }

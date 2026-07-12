@@ -70,7 +70,7 @@ impl OidcClient {
         authz_code: AuthorizationCode,
         pkce_verifier: PkceCodeVerifier,
         nonce: Nonce,
-    ) -> IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim> {
+    ) -> anyhow::Result<IdTokenClaims<EmptyAdditionalClaims, CoreGenderClaim>> {
         let client = CoreClient::from_provider_metadata(
             self.metadata.clone(),
             self.client_id.clone(),
@@ -79,19 +79,21 @@ impl OidcClient {
 
         let res = client
             .exchange_code(authz_code)
-            .unwrap()
+            .map_err(|e| anyhow::anyhow!("failed to build code exchange request: {e}"))?
             .set_pkce_verifier(pkce_verifier)
             .set_redirect_uri(std::borrow::Cow::Borrowed(&self.redirect_url))
             .request_async(&reqwest::Client::new())
             .await
-            .unwrap();
+            .map_err(|e| anyhow::anyhow!("failed to exchange code with idp: {e}"))?;
 
-        let id_token = res.id_token().unwrap();
+        let id_token = res
+            .id_token()
+            .ok_or_else(|| anyhow::anyhow!("idp response did not contain an id token"))?;
 
         let claims = id_token
             .claims(&client.id_token_verifier(), &nonce)
-            .unwrap();
+            .map_err(|e| anyhow::anyhow!("failed to verify id token claims: {e}"))?;
 
-        claims.clone()
+        Ok(claims.clone())
     }
 }
