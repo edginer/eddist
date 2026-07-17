@@ -169,7 +169,7 @@ export const NGWordsSettingsModal = ({
       <ModalHeader className="border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <span className="lg:text-2xl">設定</span>
-          <Tooltip content="この設定は端末内（ローカルストレージ）に保存されます。ただしレス一覧から追加したNG IDはサーバーにも共有されます。">
+          <Tooltip content="この設定は端末内（ローカルストレージ）に保存されます。">
             <HiInformationCircle className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" />
           </Tooltip>
         </div>

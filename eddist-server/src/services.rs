@@ -2,6 +2,7 @@ use auth_with_code_service::AuthWithCodeService;
 use aws_sdk_s3::Client;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
+use edge_token_validation_service::EdgeTokenValidationService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
 use metadent_thread_list_service::MetadentThreadListService;
@@ -41,6 +42,7 @@ pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
 pub mod captcha_config_cache;
+pub(crate) mod edge_token_validation_service;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
 pub(crate) mod metadent_thread_list_service;
@@ -86,6 +88,7 @@ pub struct AppServiceContainer<
     auth_with_code: AuthWithCodeService<B, E>,
     reauth: ReAuthService<B>,
     board_info: BoardInfoService<B>,
+    edge_token_validation: EdgeTokenValidationService<B>,
     list_boards: ListBoardsService<B>,
     res_creation: ResCreationService<B, U, P, E>,
     thread_creation: ThreadCreationService<B, U, E>,
@@ -132,6 +135,7 @@ impl<
             ),
             reauth: ReAuthService::new(bbs_repo.clone(), redis_conn.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone()),
+            edge_token_validation: EdgeTokenValidationService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
                 bbs_repo.clone(),
@@ -203,6 +207,10 @@ impl<
 
     pub fn board_info(&self) -> &BoardInfoService<B> {
         &self.board_info
+    }
+
+    pub fn edge_token_validation(&self) -> &EdgeTokenValidationService<B> {
+        &self.edge_token_validation
     }
 
     pub fn res_creation(&self) -> &ResCreationService<B, U, P, E> {
