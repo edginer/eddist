@@ -3,6 +3,7 @@ import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
 import { useRevalidator } from "react-router";
+import { deleteSharedNgId } from "~/api-client/ng_id";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
 import { parseCookie } from "~/utils/cookie";
@@ -141,12 +142,34 @@ export const NGWordsSettingsModal = ({
 }: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
+  // Removing a synced response 投稿者ID rule also retracts its shared NG ID.
+  const removeResponseAuthorId = (ruleId: string) => {
+    const rule = config.response.authorIds.find((r) => r.id === ruleId);
+    if (rule?.sharedBoardKey) {
+      void deleteSharedNgId(rule.sharedBoardKey, rule.pattern);
+    }
+    removeRule("response.authorIds", ruleId);
+  };
+
+  const handleClearAll = () => {
+    if (!window.confirm("すべてのNG設定をクリアしますか？\nこの操作は取り消せません。")) {
+      return;
+    }
+    // Retract synced shared NG IDs before wiping local config.
+    for (const rule of config.response.authorIds) {
+      if (rule.sharedBoardKey) {
+        void deleteSharedNgId(rule.sharedBoardKey, rule.pattern);
+      }
+    }
+    clearAllRules();
+  };
+
   return (
     <Modal show={open} size="5xl" onClose={() => setOpen(false)} dismissible>
       <ModalHeader className="border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <span className="lg:text-2xl">設定</span>
-          <Tooltip content="この設定はローカルストレージに保存されます">
+          <Tooltip content="この設定は端末内（ローカルストレージ）に保存されます。ただしレス一覧から追加したNG IDはサーバーにも共有されます。">
             <HiInformationCircle className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" />
           </Tooltip>
         </div>
@@ -190,7 +213,7 @@ export const NGWordsSettingsModal = ({
                     rules={config.response.authorIds}
                     onAdd={(rule) => addRule("response.authorIds", rule)}
                     onUpdate={(id, updates) => updateRule("response.authorIds", id, updates)}
-                    onRemove={(id) => removeRule("response.authorIds", id)}
+                    onRemove={removeResponseAuthorId}
                     onToggle={(id) => toggleRule("response.authorIds", id)}
                     isResponseRule={true}
                   />
@@ -241,14 +264,7 @@ export const NGWordsSettingsModal = ({
         />
       </ModalBody>
       <ModalFooter className="flex justify-between mt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button
-          color="gray"
-          onClick={() => {
-            if (window.confirm("すべてのNG設定をクリアしますか？\nこの操作は取り消せません。")) {
-              clearAllRules();
-            }
-          }}
-        >
+        <Button color="gray" onClick={handleClearAll}>
           すべてクリア
         </Button>
         <Button onClick={() => setOpen(false)}>閉じる</Button>

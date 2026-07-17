@@ -12,6 +12,7 @@ interface NGRuleFormData {
 
 interface NGRuleSectionProps {
   title: string;
+  description?: string;
   rules: NGRule[];
   onAdd: (rule: Omit<NGRule, "id">) => void;
   onUpdate: (ruleId: string, updates: Partial<Omit<NGRule, "id">>) => void;
@@ -23,6 +24,7 @@ interface NGRuleSectionProps {
 
 export const NGRuleSection = ({
   title,
+  description,
   rules,
   onAdd,
   onUpdate,
@@ -81,6 +83,10 @@ export const NGRuleSection = ({
   });
 
   const handleStartEdit = (rule: NGRule) => {
+    // Shared NG IDs are delete-only: editing the pattern would leave the contribution
+    // recorded under the original pattern with no rule left to retract it.
+    if (rule.sharedBoardKey) return;
+
     setEditingId(rule.id);
     editReset({
       pattern: rule.pattern,
@@ -110,6 +116,9 @@ export const NGRuleSection = ({
   return (
     <div className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0 dark:text-gray-100">
       <h3 className="text-lg font-semibold mb-3">{title}</h3>
+      {description && (
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{description}</p>
+      )}
 
       {/* Add new rule */}
       <form onSubmit={handleAdd} className="mb-4">
@@ -280,14 +289,16 @@ export const NGRuleSection = ({
                     </div>
                   </div>
                   <div className="flex gap-1 ml-2 shrink-0">
-                    <button
-                      onClick={() => handleStartEdit(rule)}
-                      className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
-                      type="button"
-                      title="編集"
-                    >
-                      <HiPencil className="w-4 h-4" />
-                    </button>
+                    {!rule.sharedBoardKey && (
+                      <button
+                        onClick={() => handleStartEdit(rule)}
+                        className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
+                        type="button"
+                        title="編集"
+                      >
+                        <HiPencil className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onRemove(rule.id)}
                       className="text-red-500 hover:text-red-700 text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900 transition-colors"

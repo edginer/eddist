@@ -78,6 +78,14 @@ pub fn not_found_access_count_key(ip: &str) -> String {
     format!("not_found:count:{ip}")
 }
 
+pub fn shared_ng_id_key(board_key: &str, ng_id: &str) -> String {
+    format!("shared_ng_id:{board_key}:{ng_id}")
+}
+
+pub fn shared_ng_id_rate_limit_key(token_hash: &str) -> String {
+    format!("shared_ng_id:rate_limit:{token_hash}")
+}
+
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";

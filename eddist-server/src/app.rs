@@ -5,7 +5,7 @@ use axum::{
     body::{Body, Bytes},
     extract::{MatchedPath, Path, State},
     response::{IntoResponse, Redirect, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use axum_prometheus::PrometheusMetricLayer;
 use eddist_core::domain::board::{BoardInfo, validate_board_key};
@@ -36,6 +36,7 @@ use crate::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
+        ng_id::{delete_ng_id, post_ng_id},
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         re_auth::{get_re_auth, post_re_auth},
         safe_mode::get_unsafe_thread_ids,
@@ -268,6 +269,8 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
             "/api/{boardKey}/unsafe-thread-ids",
             get(get_unsafe_thread_ids),
         )
+        .route("/api/{boardKey}/ng-ids", post(post_ng_id))
+        .route("/api/{boardKey}/ng-ids/{ngId}", delete(delete_ng_id))
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",

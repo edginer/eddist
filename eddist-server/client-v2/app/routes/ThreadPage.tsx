@@ -570,6 +570,7 @@ const ThreadPage = ({
         <NGContextMenu
           x={menuState.x}
           y={menuState.y}
+          boardKey={params.boardKey ?? ""}
           onClose={closeMenu}
           options={(() => {
             if (contextMenuType === "authorId") {

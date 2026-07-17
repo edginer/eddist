@@ -19,6 +19,8 @@ export interface NGRule {
   matchType: "partial" | "regex";
   enabled: boolean;
   hideMode?: "hidden" | "collapsed";
+  // Set only for rules added from the response-list context menu (shared NG ID).
+  sharedBoardKey?: string;
 }
 
 export interface NGWordsConfig {
@@ -208,7 +210,22 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
       id: isBrowser && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
     };
 
-    setConfig((prev) => updateRulesByCategory(prev, category, (rules) => [...rules, newRule]));
+    setConfig((prev) =>
+      updateRulesByCategory(prev, category, (rules) => {
+        const existing = rules.find(
+          (r) => r.pattern === newRule.pattern && r.matchType === newRule.matchType,
+        );
+        if (!existing) {
+          return [...rules, newRule];
+        }
+        if (!newRule.sharedBoardKey || existing.sharedBoardKey) {
+          return rules;
+        }
+        return rules.map((r) =>
+          r.id === existing.id ? { ...r, sharedBoardKey: newRule.sharedBoardKey } : r,
+        );
+      }),
+    );
   }, []);
 
   const updateRule = useCallback(
