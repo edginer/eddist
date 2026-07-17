@@ -83,6 +83,10 @@ export const NGRuleSection = ({
   });
 
   const handleStartEdit = (rule: NGRule) => {
+    // Shared NG IDs are delete-only: editing the pattern would leave the contribution
+    // recorded under the original pattern with no rule left to retract it.
+    if (rule.sharedBoardKey) return;
+
     setEditingId(rule.id);
     editReset({
       pattern: rule.pattern,
@@ -285,14 +289,16 @@ export const NGRuleSection = ({
                     </div>
                   </div>
                   <div className="flex gap-1 ml-2 shrink-0">
-                    <button
-                      onClick={() => handleStartEdit(rule)}
-                      className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
-                      type="button"
-                      title="編集"
-                    >
-                      <HiPencil className="w-4 h-4" />
-                    </button>
+                    {!rule.sharedBoardKey && (
+                      <button
+                        onClick={() => handleStartEdit(rule)}
+                        className="text-blue-500 hover:text-blue-700 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
+                        type="button"
+                        title="編集"
+                      >
+                        <HiPencil className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onRemove(rule.id)}
                       className="text-red-500 hover:text-red-700 text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900 transition-colors"

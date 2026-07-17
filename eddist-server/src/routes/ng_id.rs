@@ -13,7 +13,10 @@ use redis::AsyncCommands as _;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::AppState;
+use crate::{
+    AppState,
+    services::{AppService, edge_token_validation_service::EdgeTokenValidationServiceInput},
+};
 
 // TTL for a shared NG ID entry, refreshed on every add.
 const SHARED_NG_ID_TTL_SECS: i64 = 3 * 24 * 60 * 60;
@@ -40,6 +43,32 @@ fn hash_edge_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+/// Resolves the caller's `edge-token` cookie to the hash stored in Redis.
+///
+/// The cookie is attacker-controlled, so it is validated against `authed_tokens`
+/// first: without that, any client could mint unlimited distinct hashes, which are
+/// both the unit the contributor sets count and the rate limit's key.
+async fn resolve_contributor_hash(state: &AppState, jar: &CookieJar) -> Result<String, Response> {
+    let Some(edge_token) = jar.get("edge-token").map(|c| c.value().to_string()) else {
+        return Err(empty(401));
+    };
+
+    let authed_token = state
+        .get_container()
+        .edge_token_validation()
+        .execute(EdgeTokenValidationServiceInput { edge_token })
+        .await;
+
+    match authed_token {
+        Ok(Some(token)) => Ok(hash_edge_token(&token.token)),
+        Ok(None) => Err(empty(401)),
+        Err(e) => {
+            log::error!("Failed to validate edge-token for shared NG ID: {e:?}");
+            Err(empty(500))
+        }
+    }
 }
 
 fn is_valid_ng_id(ng_id: &str) -> bool {
@@ -69,9 +98,6 @@ pub async fn post_ng_id(
     jar: CookieJar,
     Json(req): Json<AddNgIdRequest>,
 ) -> Response {
-    let Some(edge_token) = jar.get("edge-token").map(|c| c.value().to_string()) else {
-        return empty(401);
-    };
     if validate_board_key(&board_key).is_err() {
         return empty(404);
     }
@@ -79,8 +105,12 @@ pub async fn post_ng_id(
         return empty(400);
     }
 
+    let hash = match resolve_contributor_hash(&state, &jar).await {
+        Ok(hash) => hash,
+        Err(resp) => return resp,
+    };
+
     let key = shared_ng_id_key(&board_key, &req.ng_id);
-    let hash = hash_edge_token(&edge_token);
     let mut conn = state.redis_conn.clone();
 
     match within_shared_ng_id_rate_limit(&mut conn, &hash).await {
@@ -110,9 +140,6 @@ pub async fn delete_ng_id(
     Path((board_key, ng_id)): Path<(String, String)>,
     jar: CookieJar,
 ) -> Response {
-    let Some(edge_token) = jar.get("edge-token").map(|c| c.value().to_string()) else {
-        return empty(401);
-    };
     if validate_board_key(&board_key).is_err() {
         return empty(404);
     }
@@ -120,8 +147,12 @@ pub async fn delete_ng_id(
         return empty(400);
     }
 
+    let hash = match resolve_contributor_hash(&state, &jar).await {
+        Ok(hash) => hash,
+        Err(resp) => return resp,
+    };
+
     let key = shared_ng_id_key(&board_key, &ng_id);
-    let hash = hash_edge_token(&edge_token);
     let mut conn = state.redis_conn.clone();
 
     // SREM is a no-op if the member/key is missing.

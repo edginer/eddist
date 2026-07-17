@@ -31,7 +31,7 @@ export const NGContextMenu = ({
   actions = [],
 }: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { addRule } = useNGWords();
+  const { config, addRule } = useNGWords();
   const { showToast } = useToast();
 
   // Truncate long text for display
@@ -129,7 +129,15 @@ export const NGContextMenu = ({
     try {
       // NG IDs from the response list are shared with the server; stamp the board
       // key so the settings dialog can retract them later.
-      const isSharedNgId = category === "response.authorIds";
+      // A rule can only carry one board key, so if this pattern is already shared with
+      // another board, leave it alone: sharing it here too would record a contribution
+      // that no rule deletion could retract.
+      const existing =
+        category === "response.authorIds"
+          ? config.response.authorIds.find((r) => r.pattern === value && r.matchType === "partial")
+          : undefined;
+      const isSharedNgId =
+        category === "response.authorIds" && (existing?.sharedBoardKey ?? boardKey) === boardKey;
 
       addRule(category, {
         pattern: value,
