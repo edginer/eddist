@@ -13,6 +13,7 @@ pub struct ResView {
     pub created_at: DateTime<Utc>,
     pub author_id: String,
     pub is_abone: bool,
+    pub is_abone_keep_id: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub struct ResViewRef<'a> {
     pub created_at: DateTime<Utc>,
     pub author_id: &'a str,
     pub is_abone: bool,
+    pub is_abone_keep_id: bool,
 }
 
 pub fn get_sjis_bytes(
@@ -32,13 +34,29 @@ pub fn get_sjis_bytes(
 ) -> SJisStr {
     let mail = if res_view.mail == "sage" { "sage" } else { "" };
     if res_view.is_abone {
-        SJisStr::from(
-            format!(
-                "あぼーん<>あぼーん<><> あぼーん <>{}\n",
-                thread_title.unwrap_or_default()
+        if res_view.is_abone_keep_id {
+            // The date sub-field is replaced with a fixed "あぼーん" sentinel instead of
+            // the real timestamp. Unlike name/mail/body, the date is never derived from
+            // any user- or admin-editable input in any rendering path, so this sentinel
+            // can never collide with a genuine post — see convert_dat_file_to_res in
+            // eddist-admin for the matching detection logic on the archived-dat side.
+            SJisStr::from(
+                format!(
+                    "あぼーん<>あぼーん<>あぼーん ID:{}<> あぼーん <>{}\n",
+                    &res_view.author_id,
+                    thread_title.unwrap_or_default()
+                )
+                .as_str(),
             )
-            .as_str(),
-        )
+        } else {
+            SJisStr::from(
+                format!(
+                    "あぼーん<>あぼーん<><> あぼーん <>{}\n",
+                    thread_title.unwrap_or_default()
+                )
+                .as_str(),
+            )
+        }
     } else {
         SJisStr::from(
             format!(
@@ -98,6 +116,7 @@ impl ResView {
                 created_at: self.created_at,
                 author_id: &self.author_id,
                 is_abone: self.is_abone,
+                is_abone_keep_id: self.is_abone_keep_id,
             },
             default_name,
             thread_title,
@@ -145,6 +164,7 @@ mod tests {
             created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
             author_id: "ABC123",
             is_abone: false,
+            is_abone_keep_id: false,
         };
 
         let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
@@ -165,6 +185,7 @@ mod tests {
             created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
             author_id: "DEF456",
             is_abone: false,
+            is_abone_keep_id: false,
         };
 
         let result = get_sjis_bytes(res_view, "名無しさん", None);
@@ -183,6 +204,7 @@ mod tests {
             created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
             author_id: "XYZ789",
             is_abone: true,
+            is_abone_keep_id: false,
         };
 
         let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
@@ -191,5 +213,30 @@ mod tests {
         assert!(output.contains("あぼーん"));
         assert!(!output.contains("荒らし"));
         assert!(!output.contains("削除対象"));
+        assert!(!output.contains("ID:XYZ789"));
+    }
+
+    #[test]
+    fn test_get_sjis_bytes_abone_keep_id() {
+        let res_view = ResViewRef {
+            author_name: "荒らし",
+            mail: "",
+            body: "削除対象",
+            created_at: Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap(),
+            author_id: "XYZ789",
+            is_abone: true,
+            is_abone_keep_id: true,
+        };
+
+        let result = get_sjis_bytes(res_view, "名無しさん", Some("テストスレッド"));
+        let output = result.to_string();
+
+        assert!(output.contains("あぼーん"));
+        assert!(!output.contains("荒らし"));
+        assert!(!output.contains("削除対象"));
+        assert!(output.contains("ID:XYZ789"));
+        // date sub-field is replaced with the "あぼーん" sentinel, not the real timestamp
+        assert!(output.contains("あぼーん ID:XYZ789"));
+        assert!(!output.contains("2023"));
     }
 }

@@ -23,7 +23,8 @@ impl ResponseRepository for BbsRepositoryImpl {
                 body,
                 created_at,
                 author_id,
-                is_abone AS "is_abone: bool"
+                is_abone AS "is_abone: bool",
+                is_abone_keep_id AS "is_abone_keep_id: bool"
             FROM responses WHERE thread_id = ?
             ORDER BY res_order, id"#,
             thread_id
@@ -40,6 +41,7 @@ impl ResponseRepository for BbsRepositoryImpl {
                 created_at: Utc.from_utc_datetime(&x.created_at),
                 author_id: x.author_id,
                 is_abone: x.is_abone,
+                is_abone_keep_id: x.is_abone_keep_id,
             })
             .collect())
     }
@@ -126,4 +128,5 @@ struct SelectionRes {
     created_at: NaiveDateTime,
     author_id: String,
     is_abone: bool,
+    is_abone_keep_id: bool,
 }

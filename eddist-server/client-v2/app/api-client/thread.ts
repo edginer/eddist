@@ -86,13 +86,52 @@ const convertThreadTextToResponseList = (text: string) => {
   const referredMap = new Map<number, number[]>();
 
   const responses: Response[] = lines.map((line, idx) => {
+    // あぼーん, author_id kept: あぼーん<>あぼーん<>あぼーん ID:{authorId}<> あぼーん <>{title}
+    // The date sub-field is a fixed "あぼーん" sentinel, not the real timestamp — see
+    // eddist-core's get_sjis_bytes / eddist-admin's convert_reses_to_dat_file for why:
+    // unlike name/mail/body (user- or admin-editable free text), date is never derived
+    // from any editable input, so it can't collide with a genuine post that spoofs
+    // name="あぼーん"/body="あぼーん" to mimic a deleted line.
+    const aboneKeepIdRegex = /^あぼーん<>あぼーん<>あぼーん ID:(.*)<> あぼーん <>(.*)$/;
+    const aboneKeepIdMatch = line.match(aboneKeepIdRegex);
+    if (aboneKeepIdMatch != null) {
+      const authorId = aboneKeepIdMatch[1];
+      if (idx === 0) {
+        threadTitle = aboneKeepIdMatch[2];
+      }
+
+      if (authorIdAppearBeforeCountMap.has(authorId)) {
+        const count = authorIdAppearBeforeCountMap.get(authorId) ?? 0;
+        authorIdAppearBeforeCountMap.set(authorId, count + 1);
+      } else {
+        authorIdAppearBeforeCountMap.set(authorId, 1);
+      }
+
+      const response = {
+        name: "あぼーん",
+        mail: "",
+        date: "",
+        authorId,
+        bodyParts: [{ text: "あぼーん", isMatch: false }],
+        id: idx + 1,
+        authorIdAppearBeforeCount: authorIdAppearBeforeCountMap.get(authorId) ?? 0,
+      };
+
+      if (!idMap.has(authorId)) {
+        idMap.set(authorId, []);
+      }
+      idMap.get(authorId)?.push([response, idx]);
+
+      return response;
+    }
+
     const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
     const match = line.match(lineRegex);
     if (match == null) {
-      // あぼーん<>あぼーん<><> あぼーん<> てす
-      const aboneRegex = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
-      const aboneMatch = line.match(aboneRegex);
-      if (aboneMatch == null) {
+      // あぼーん, author_id stripped: あぼーん<>あぼーん<><> あぼーん <>{title}
+      const aboneStripRegex = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
+      const aboneStripMatch = line.match(aboneStripRegex);
+      if (aboneStripMatch == null) {
         // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
         const stopperRegex = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
         const stopperMatch = line.match(stopperRegex);
@@ -111,11 +150,11 @@ const convertThreadTextToResponseList = (text: string) => {
       }
 
       if (idx === 0) {
-        threadTitle = aboneMatch[3];
+        threadTitle = aboneStripMatch[3];
       }
 
       return {
-        name: aboneMatch[1],
+        name: aboneStripMatch[1],
         mail: "",
         date: "",
         authorId: "",

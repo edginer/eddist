@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                thread_id = (\n                    SELECT\n                        id\n                    FROM\n                        threads\n                    WHERE\n                        board_id = (\n                        SELECT\n                            id\n                        FROM\n                            boards\n                        WHERE\n                            board_key = ?\n                        )\n                    AND\n                        thread_number = ?\n                )\n            ORDER BY\n                res_order ASC, id ASC\n            ",
+  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                is_abone_keep_id,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                thread_id = (\n                    SELECT\n                        id\n                    FROM\n                        threads\n                    WHERE\n                        board_id = (\n                        SELECT\n                            id\n                        FROM\n                            boards\n                        WHERE\n                            board_key = ?\n                        )\n                    AND\n                        thread_number = ?\n                )\n            ORDER BY\n                res_order ASC, id ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -104,6 +104,15 @@
       },
       {
         "ordinal": 11,
+        "name": "is_abone_keep_id",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "client_info!: Json<ClientInfo>",
         "type_info": {
           "type": "Json",
@@ -112,7 +121,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "res_order",
         "type_info": {
           "type": "Long",
@@ -137,8 +146,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "e84889e6b37e6f6aeb58a19e50579c52bab45779ac6bc14b1f310c1324b31095"
+  "hash": "c8780718526298ff2ab02d6889ff332a2c8073c78fdf15eb407c0c32f48622f5"
 }

@@ -248,13 +248,16 @@ const Page = () => {
               res_order: idx,
             });
           }}
-          onClieckAbon={(idx) => {
+          onClieckAbon={(idx, keepId) => {
             deleteDatResponseMutation.mutate({
               params: {
                 path: {
                   board_key: params.boardKey ?? "",
                   thread_number: Number(params.threadId),
                   res_order: idx,
+                },
+                query: {
+                  keep_id: keepId,
                 },
               },
             });

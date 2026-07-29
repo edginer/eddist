@@ -8,7 +8,7 @@ interface Props {
   adminResponses: components["schemas"]["ArchivedAdminRes"][];
   selectedResponsesOrder: number[];
   setSelectedResponsesOrder: React.Dispatch<React.SetStateAction<number[]>>;
-  onClieckAbon: (resOrder: number) => void;
+  onClieckAbon: (resOrder: number, keepId: boolean) => void;
   onClickDeleteAuthedToken: (authedToken: string) => void;
   onClickDeleteAuthedTokensAssociatedWithIp: (authedToken: string) => void;
   onClickEditResponse: (resOrder: number) => void;
@@ -71,7 +71,8 @@ const DatArchiveResponseList = ({
               inline
             >
               <DropdownItem onClick={() => onClickEditResponse(idx)}>Edit</DropdownItem>
-              <DropdownItem onClick={() => onClieckAbon(idx)}>Abon</DropdownItem>
+              <DropdownItem onClick={() => onClieckAbon(idx, false)}>Abon</DropdownItem>
+              <DropdownItem onClick={() => onClieckAbon(idx, true)}>Abon, keep ID</DropdownItem>
               <DropdownItem onClick={() => onClickDeleteAuthedToken(response.authed_token_id)}>
                 Delete Authed Token
               </DropdownItem>

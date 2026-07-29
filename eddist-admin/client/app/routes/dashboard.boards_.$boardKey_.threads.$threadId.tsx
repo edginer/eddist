@@ -10,6 +10,7 @@ export interface ResInput {
   author_name?: string;
   body?: string;
   is_abone?: boolean;
+  is_abone_keep_id?: boolean;
   mail?: string;
   id: string;
 }
@@ -24,6 +25,7 @@ export interface Res {
   ip_addr: string;
   authed_token_id: string;
   is_abone: boolean;
+  is_abone_keep_id: boolean;
   client_info: ClientInfo;
 }
 
@@ -89,6 +91,7 @@ const Page = () => {
           author_name: res.author_name,
           body: res.body,
           is_abone: res.is_abone,
+          is_abone_keep_id: res.is_abone_keep_id,
           mail: res.mail,
         },
       });
@@ -198,13 +201,13 @@ const Page = () => {
           </span>
         </Breadcrumb>
         <ResponseList
-          onClickAbon={async (responseId) => {
+          onClickAbon={async (responseId, keepId) => {
             const res = responses?.find((res) => res.id === responseId);
-            console.log(res?.id, responseId);
             if (res) {
               const abonedRes = {
                 id: res.id,
                 is_abone: true,
+                is_abone_keep_id: keepId,
               } satisfies ResInput;
               await updateResp(abonedRes, res.id);
             }

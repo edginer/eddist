@@ -8,7 +8,7 @@ interface Props {
   responses: Res[];
   selectedResponses?: ResInput[];
   setSelectedResponses?: React.Dispatch<React.SetStateAction<ResInput[]>>;
-  onClickAbon?: (responseId: string) => void;
+  onClickAbon?: (responseId: string, keepId: boolean) => void;
   onClickDeleteAuthedToken: (authedToken: string) => void;
   onClickDeleteAuthedTokensAssociatedWithIp: (authedToken: string) => void;
   onClickEditResponse?: (response: ResInput) => void;
@@ -86,10 +86,19 @@ const ResponseList = ({
             {onClickAbon && (
               <DropdownItem
                 onClick={() => {
-                  onClickAbon(response.id);
+                  onClickAbon(response.id, false);
                 }}
               >
                 Delete Response (Abon)
+              </DropdownItem>
+            )}
+            {onClickAbon && (
+              <DropdownItem
+                onClick={() => {
+                  onClickAbon(response.id, true);
+                }}
+              >
+                Delete Response, keep ID (Abon)
               </DropdownItem>
             )}
             <DropdownItem

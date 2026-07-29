@@ -61,6 +61,7 @@ pub struct SelectionRes {
     pub board_id: Vec<u8>,
     pub thread_id: Vec<u8>,
     pub is_abone: i8,
+    pub is_abone_keep_id: i8,
     pub res_order: i32,
     pub client_info: Json<ClientInfo>,
 }

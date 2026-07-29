@@ -883,6 +883,7 @@ export interface components {
             id: string;
             ip_addr: string;
             is_abone: boolean;
+            is_abone_keep_id: boolean;
             mail?: string | null;
             /** Format: int32 */
             res_order: number;
@@ -1001,6 +1002,11 @@ export interface components {
             author_name?: string | null;
             body?: string | null;
             is_abone?: boolean | null;
+            /**
+             * @description Only meaningful when `is_abone` is (or already is) true: keeps the poster's author_id
+             *     visible on the abone'd line instead of blanking it out too.
+             */
+            is_abone_keep_id?: boolean | null;
             mail?: string | null;
         };
         UpdateRestrictionRuleRequest: {
@@ -1512,7 +1518,10 @@ export interface operations {
     };
     delete_archived_res: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Keep the poster's author_id visible on the abone'd line instead of blanking it out too. */
+                keep_id?: boolean | null;
+            };
             header?: never;
             path: {
                 /** @description Board ID */

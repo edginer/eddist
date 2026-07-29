@@ -19,6 +19,7 @@ pub struct Res {
     pub board_id: Uuid,
     pub thread_id: Uuid,
     pub is_abone: bool,
+    pub is_abone_keep_id: bool,
     pub client_info: ClientInfo,
     pub res_order: i32,
 }
@@ -75,4 +76,7 @@ pub struct UpdateResInput {
     pub mail: Option<String>,
     pub body: Option<String>,
     pub is_abone: Option<bool>,
+    /// Only meaningful when `is_abone` is (or already is) true: keeps the poster's author_id
+    /// visible on the abone'd line instead of blanking it out too.
+    pub is_abone_keep_id: Option<bool>,
 }

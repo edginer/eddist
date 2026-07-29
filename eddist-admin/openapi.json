@@ -803,6 +803,18 @@
               "format": "int64",
               "minimum": 0
             }
+          },
+          {
+            "name": "keep_id",
+            "in": "query",
+            "description": "Keep the poster's author_id visible on the abone'd line instead of blanking it out too.",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3358,6 +3370,7 @@
           "board_id",
           "thread_id",
           "is_abone",
+          "is_abone_keep_id",
           "client_info",
           "res_order"
         ],
@@ -3397,6 +3410,9 @@
             "type": "string"
           },
           "is_abone": {
+            "type": "boolean"
+          },
+          "is_abone_keep_id": {
             "type": "boolean"
           },
           "mail": {
@@ -3861,6 +3877,13 @@
               "boolean",
               "null"
             ]
+          },
+          "is_abone_keep_id": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Only meaningful when `is_abone` is (or already is) true: keeps the poster's author_id\nvisible on the abone'd line instead of blanking it out too."
           },
           "mail": {
             "type": [

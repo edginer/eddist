@@ -200,6 +200,7 @@ impl Repository {
                 created_at,
                 author_id,
                 is_abone,
+                is_abone_keep_id,
                 authed_token_id AS "authed_token_id: Uuid",
                 client_info AS "client_info: Json<ClientInfo>"
             FROM
@@ -224,6 +225,7 @@ impl Repository {
                         created_at: Utc.from_utc_datetime(&r.created_at),
                         author_id: r.author_id,
                         is_abone: r.is_abone == 1,
+                        is_abone_keep_id: r.is_abone_keep_id == 1,
                     },
                     r.client_info.0,
                     r.authed_token_id,
@@ -248,6 +250,7 @@ impl Repository {
                 created_at,
                 author_id,
                 is_abone,
+                0 AS "is_abone_keep_id: i8",
                 authed_token_id AS "authed_token_id: Uuid",
                 client_info AS "client_info: Json<ClientInfo>"
             FROM
@@ -272,6 +275,7 @@ impl Repository {
                         created_at: Utc.from_utc_datetime(&r.created_at),
                         author_id: r.author_id,
                         is_abone: r.is_abone == 1,
+                        is_abone_keep_id: r.is_abone_keep_id == 1,
                     },
                     r.client_info.0,
                     r.authed_token_id,
@@ -386,6 +390,7 @@ struct Res {
     created_at: chrono::NaiveDateTime,
     author_id: String,
     is_abone: i8,
+    is_abone_keep_id: i8,
     authed_token_id: Uuid,
     client_info: Json<ClientInfo>,
 }

@@ -217,6 +217,12 @@ pub async fn update_archived_res(
     Ok(StatusCode::OK)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, IntoParams)]
+pub struct DeleteArchivedResQuery {
+    /// Keep the poster's author_id visible on the abone'd line instead of blanking it out too.
+    keep_id: Option<bool>,
+}
+
 #[utoipa::path(
     delete,
     path = "/boards/{board_key}/dat-archives/{thread_number}/responses/{res_order}/",
@@ -227,17 +233,25 @@ pub async fn update_archived_res(
         ("board_key" = String, Path, description = "Board ID"),
         ("thread_number" = u64, Path, description = "Thread ID"),
         ("res_order" = u64, Path, description = "Response order"),
+        DeleteArchivedResQuery
     ),
 )]
 pub async fn delete_archived_res(
     State(state): State<AppState>,
     identity: AdminIdentity,
     Path((board_key, thread_number, res_order)): Path<(String, u64, u64)>,
+    Query(query): Query<DeleteArchivedResQuery>,
 ) -> Result<StatusCode, ApiError> {
     state
         .services
         .archive
-        .delete_archived_res(&identity, &board_key, thread_number, res_order)
+        .delete_archived_res(
+            &identity,
+            &board_key,
+            thread_number,
+            res_order,
+            query.keep_id.unwrap_or(false),
+        )
         .await?;
     Ok(StatusCode::OK)
 }
