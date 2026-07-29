@@ -131,6 +131,9 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
     ) -> anyhow::Result<Vec<Res>> {
         let pool = &self.0;
 
+        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant
+        // 0 here. Whether an archived response kept its author_id is encoded in the dat text in
+        // S3 (see admin_archive_repository), which is the source of truth for archived threads.
         let query = query_as!(
             SelectionRes,
             r#"

@@ -240,6 +240,9 @@ impl Repository {
     ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
         let thread_id = Vec::<u8>::from(thread_id);
 
+        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant 0
+        // here. This only feeds `backfill-convert`, which regenerates a dat solely when the S3
+        // object is missing, so an already-published keep-id line is never overwritten by it.
         let responses = sqlx::query_as!(
             Res,
             r#"

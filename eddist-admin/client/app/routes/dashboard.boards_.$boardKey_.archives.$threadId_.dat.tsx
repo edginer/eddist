@@ -248,7 +248,7 @@ const Page = () => {
               res_order: idx,
             });
           }}
-          onClieckAbon={(idx, keepId) => {
+          onClickAbon={(idx, keepId) => {
             deleteDatResponseMutation.mutate({
               params: {
                 path: {

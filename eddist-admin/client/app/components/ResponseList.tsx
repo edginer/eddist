@@ -84,22 +84,22 @@ const ResponseList = ({
             inline
           >
             {onClickAbon && (
-              <DropdownItem
-                onClick={() => {
-                  onClickAbon(response.id, false);
-                }}
-              >
-                Delete Response (Abon)
-              </DropdownItem>
-            )}
-            {onClickAbon && (
-              <DropdownItem
-                onClick={() => {
-                  onClickAbon(response.id, true);
-                }}
-              >
-                Delete Response, keep ID (Abon)
-              </DropdownItem>
+              <>
+                <DropdownItem
+                  onClick={() => {
+                    onClickAbon(response.id, false);
+                  }}
+                >
+                  Delete Response (Abon)
+                </DropdownItem>
+                <DropdownItem
+                  onClick={() => {
+                    onClickAbon(response.id, true);
+                  }}
+                >
+                  Delete Response, keep ID (Abon)
+                </DropdownItem>
+              </>
             )}
             <DropdownItem
               disabled={response.authed_token_id == null}

@@ -77,6 +77,17 @@ export const fetchThread = async (
   return result;
 };
 
+// name<>mail<>{date} ID:{authorId}<>{body}<>{title}
+const LINE_REGEX = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
+// あぼーん, author_id kept: あぼーん<>あぼーん<>あぼーん ID:{authorId}<> あぼーん <>{title}
+// Date is a fixed "あぼーん" sentinel, not the real timestamp — unlike name/mail/body
+// it's never user-editable, so it can't be spoofed by a real post (see get_sjis_bytes).
+const ABONE_KEEP_ID_REGEX = /^あぼーん<>あぼーん<>あぼーん ID:(.*)<> あぼーん <>(.*)$/;
+// あぼーん, author_id stripped: あぼーん<>あぼーん<><> あぼーん <>{title}
+const ABONE_STRIP_ID_REGEX = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
+// 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
+const STOPPER_REGEX = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
+
 const convertThreadTextToResponseList = (text: string) => {
   const lines = text.split("\n").filter((x) => x !== "");
   let threadTitle = "";
@@ -86,11 +97,7 @@ const convertThreadTextToResponseList = (text: string) => {
   const referredMap = new Map<number, number[]>();
 
   const responses: Response[] = lines.map((line, idx) => {
-    // あぼーん, author_id kept: あぼーん<>あぼーん<>あぼーん ID:{authorId}<> あぼーん <>{title}
-    // Date is a fixed "あぼーん" sentinel, not the real timestamp — unlike name/mail/body
-    // it's never user-editable, so it can't be spoofed by a real post (see get_sjis_bytes).
-    const aboneKeepIdRegex = /^あぼーん<>あぼーん<>あぼーん ID:(.*)<> あぼーん <>(.*)$/;
-    const aboneKeepIdMatch = line.match(aboneKeepIdRegex);
+    const aboneKeepIdMatch = line.match(ABONE_KEEP_ID_REGEX);
     if (aboneKeepIdMatch != null) {
       const authorId = aboneKeepIdMatch[1];
       if (idx === 0) {
@@ -122,16 +129,11 @@ const convertThreadTextToResponseList = (text: string) => {
       return response;
     }
 
-    const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
-    const match = line.match(lineRegex);
+    const match = line.match(LINE_REGEX);
     if (match == null) {
-      // あぼーん, author_id stripped: あぼーん<>あぼーん<><> あぼーん <>{title}
-      const aboneStripRegex = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
-      const aboneStripMatch = line.match(aboneStripRegex);
+      const aboneStripMatch = line.match(ABONE_STRIP_ID_REGEX);
       if (aboneStripMatch == null) {
-        // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
-        const stopperRegex = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
-        const stopperMatch = line.match(stopperRegex);
+        const stopperMatch = line.match(STOPPER_REGEX);
         if (stopperMatch == null) {
           throw new Error(`Invalid response line: ${line}`);
         }

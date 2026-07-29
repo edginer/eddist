@@ -351,7 +351,7 @@ fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec
                         author_id, title
                     ) as &str),
                     None => SJisStr::from(
-                        &format!("あぼーん<>あぼーん<><> あぼーん<>{}\n", title) as &str
+                        &format!("あぼーん<>あぼーん<><> あぼーん <>{}\n", title) as &str,
                     ),
                 }
             } else {
@@ -438,6 +438,65 @@ mod tests {
         assert_eq!(abone_res.author_id.as_deref(), Some("XYZ789012"));
         assert!(!abone_res.body.contains("削除対象"));
         assert!(!abone_res.name.contains("荒らし"));
+    }
+
+    /// The dat rewritten here has to be byte-identical to what eddist-cron writes through
+    /// eddist-core, otherwise an admin edit silently reformats every abone'd line in the file.
+    fn core_abone_line(author_id: Option<&str>, thread_title: &str) -> String {
+        use chrono::{TimeZone, Utc};
+        use eddist_core::domain::res::ResView;
+
+        ResView {
+            author_name: "荒らし".to_string(),
+            mail: "".to_string(),
+            body: "削除対象".to_string(),
+            created_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
+            author_id: author_id.unwrap_or_default().to_string(),
+            is_abone: true,
+            is_abone_keep_id: author_id.is_some(),
+        }
+        .get_sjis_bytes("名無しさん", Some(thread_title))
+        .to_string()
+    }
+
+    fn admin_abone_line(author_id: Option<&str>, thread_title: &str) -> String {
+        let res = ArchivedRes {
+            name: "荒らし".to_string(),
+            mail: "".to_string(),
+            date: "2024/01/01(月) 00:00:00.00".to_string(),
+            author_id: author_id.map(|s| s.to_string()),
+            body: "削除対象".to_string(),
+            is_abone: true,
+            order: 0,
+        };
+
+        String::from_utf8(convert_reses_to_dat_file(vec![res], thread_title)).unwrap()
+    }
+
+    /// Dat files already in S3 were written with no space before the closing `<>`.
+    #[test]
+    fn test_legacy_strip_id_abone_line_is_still_detected() {
+        let parsed = convert_dat_file_to_res("あぼーん<>あぼーん<><> あぼーん<>テストスレッド\n");
+        let res = &parsed.responses[0];
+
+        assert!(res.is_abone);
+        assert_eq!(res.author_id, None);
+    }
+
+    #[test]
+    fn test_abone_strip_id_line_matches_eddist_core() {
+        assert_eq!(
+            admin_abone_line(None, "テストスレッド"),
+            core_abone_line(None, "テストスレッド")
+        );
+    }
+
+    #[test]
+    fn test_abone_keep_id_line_matches_eddist_core() {
+        assert_eq!(
+            admin_abone_line(Some("XYZ789012"), "テストスレッド"),
+            core_abone_line(Some("XYZ789012"), "テストスレッド")
+        );
     }
 
     #[test]
