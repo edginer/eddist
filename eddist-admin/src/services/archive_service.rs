@@ -57,6 +57,7 @@ pub trait AdminArchiveService: Send + Sync {
         board_key: &str,
         thread_number: u64,
         res_order: u64,
+        keep_id: bool,
     ) -> anyhow::Result<()>;
     async fn delete_archived_thread(
         &self,
@@ -159,9 +160,10 @@ impl AdminArchiveService for ArchiveServiceImpl {
         board_key: &str,
         thread_number: u64,
         res_order: u64,
+        keep_id: bool,
     ) -> anyhow::Result<()> {
         self.archive_repo
-            .delete_response(board_key, thread_number, res_order)
+            .delete_response(board_key, thread_number, res_order, keep_id)
             .await
     }
 

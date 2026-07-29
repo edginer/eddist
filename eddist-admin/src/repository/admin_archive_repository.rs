@@ -28,6 +28,7 @@ pub(crate) trait AdminArchiveRepository: Send + Sync {
         board_key: &str,
         thread_number: u64,
         res_order: u64,
+        keep_id: bool,
     ) -> anyhow::Result<()>;
     async fn delete_thread(&self, board_key: &str, thread_number: u64) -> anyhow::Result<()>;
 }
@@ -181,6 +182,7 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
         board_key: &str,
         thread_number: u64,
         res_order: u64,
+        keep_id: bool,
     ) -> anyhow::Result<()> {
         let mut a_thread = self.get_thread(board_key, thread_number).await?;
         let resp = a_thread
@@ -192,6 +194,9 @@ impl AdminArchiveRepository for AdminArchiveRepositoryImpl {
                 thread_number
             ))?;
         resp.is_abone = true;
+        if !keep_id {
+            resp.author_id = None;
+        }
 
         let dat = convert_reses_to_dat_file(a_thread.responses, &a_thread.title);
 
@@ -255,15 +260,30 @@ fn convert_dat_file_to_res(dat_file: &str) -> ArchivedThread {
             }
 
             let date_and_author_id_split: Vec<&str> = split[2].split(" ID:").collect();
+            let date = date_and_author_id_split[0];
+            let author_id = date_and_author_id_split.get(1).map(|s| s.to_string());
+            let body = split[3];
+
+            // name/mail/body are editable text, so a post could spoof "あぼーん" there.
+            // ID-absence (id-stripped) and the date sentinel (id-kept, see
+            // get_sjis_bytes) aren't editable, so they can't be spoofed.
+            let is_abone = if author_id.is_none() {
+                split[0] == "あぼーん" && body.trim() == "あぼーん"
+            } else {
+                date == "あぼーん"
+            };
+
             Some(ArchivedRes {
                 name: split[0].to_string(),
                 mail: split[1].to_string(),
-                date: date_and_author_id_split[0].to_string(),
-                author_id: date_and_author_id_split.get(1).map(|s| s.to_string()),
-                body: split[3].to_string(),
-                is_abone: date_and_author_id_split.get(1).is_none()
-                    && split[0] == "あぼーん"
-                    && split[3].trim() == "あぼーん",
+                date: date.to_string(),
+                author_id,
+                body: if is_abone {
+                    "あぼーん".to_string()
+                } else {
+                    body.to_string()
+                },
+                is_abone,
                 order: idx as u64,
             })
         })
@@ -318,14 +338,22 @@ fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec
         .enumerate()
         .map(|(idx, res)| {
             if res.is_abone {
-                SJisStr::from(&format!(
-                    "あぼーん<>あぼーん<><> あぼーん<>{}\n",
-                    if idx == 0 {
-                        thread_title.to_string()
-                    } else {
-                        "".to_string()
-                    }
-                ) as &str)
+                let title = if idx == 0 {
+                    thread_title.to_string()
+                } else {
+                    "".to_string()
+                };
+                match res.author_id.as_deref() {
+                    // Date replaced with an "あぼーん" sentinel (matches get_sjis_bytes)
+                    // instead of the real timestamp — see convert_dat_file_to_res.
+                    Some(author_id) => SJisStr::from(&format!(
+                        "あぼーん<>あぼーん<>あぼーん ID:{}<> あぼーん <>{}\n",
+                        author_id, title
+                    ) as &str),
+                    None => SJisStr::from(
+                        &format!("あぼーん<>あぼーん<><> あぼーん <>{}\n", title) as &str,
+                    ),
+                }
             } else {
                 SJisStr::from(&format!(
                     "{}<>{}<>{} ID:{}<>{}<>{}\n",
@@ -352,4 +380,145 @@ fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec
         .0
         .into_owned()
         .into_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_reses() -> Vec<ArchivedRes> {
+        vec![
+            ArchivedRes {
+                name: "名無しさん".to_string(),
+                mail: "".to_string(),
+                date: "2024/01/01(月) 00:00:00.00".to_string(),
+                author_id: Some("ABC123456".to_string()),
+                body: "本文1".to_string(),
+                is_abone: false,
+                order: 0,
+            },
+            ArchivedRes {
+                name: "荒らし".to_string(),
+                mail: "".to_string(),
+                date: "2024/01/01(月) 00:01:00.00".to_string(),
+                author_id: Some("XYZ789012".to_string()),
+                body: "削除対象".to_string(),
+                is_abone: true,
+                order: 1,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_abone_strip_id_round_trip() {
+        let mut reses = sample_reses();
+        reses[1].author_id = None; // strip id (current default behavior)
+
+        let dat = convert_reses_to_dat_file(reses, "テストスレッド");
+        let dat_str = String::from_utf8(dat).unwrap();
+
+        let parsed = convert_dat_file_to_res(&dat_str);
+        let abone_res = &parsed.responses[1];
+
+        assert!(abone_res.is_abone);
+        assert_eq!(abone_res.author_id, None);
+    }
+
+    #[test]
+    fn test_abone_keep_id_round_trip() {
+        let reses = sample_reses(); // second response is abone with author_id kept
+
+        let dat = convert_reses_to_dat_file(reses, "テストスレッド");
+        let dat_str = String::from_utf8(dat).unwrap();
+
+        let parsed = convert_dat_file_to_res(&dat_str);
+        let abone_res = &parsed.responses[1];
+
+        assert!(abone_res.is_abone);
+        assert_eq!(abone_res.author_id.as_deref(), Some("XYZ789012"));
+        assert!(!abone_res.body.contains("削除対象"));
+        assert!(!abone_res.name.contains("荒らし"));
+    }
+
+    /// The dat rewritten here has to be byte-identical to what eddist-cron writes through
+    /// eddist-core, otherwise an admin edit silently reformats every abone'd line in the file.
+    fn core_abone_line(author_id: Option<&str>, thread_title: &str) -> String {
+        use chrono::{TimeZone, Utc};
+        use eddist_core::domain::res::ResView;
+
+        ResView {
+            author_name: "荒らし".to_string(),
+            mail: "".to_string(),
+            body: "削除対象".to_string(),
+            created_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
+            author_id: author_id.unwrap_or_default().to_string(),
+            is_abone: true,
+            is_abone_keep_id: author_id.is_some(),
+        }
+        .get_sjis_bytes("名無しさん", Some(thread_title))
+        .to_string()
+    }
+
+    fn admin_abone_line(author_id: Option<&str>, thread_title: &str) -> String {
+        let res = ArchivedRes {
+            name: "荒らし".to_string(),
+            mail: "".to_string(),
+            date: "2024/01/01(月) 00:00:00.00".to_string(),
+            author_id: author_id.map(|s| s.to_string()),
+            body: "削除対象".to_string(),
+            is_abone: true,
+            order: 0,
+        };
+
+        String::from_utf8(convert_reses_to_dat_file(vec![res], thread_title)).unwrap()
+    }
+
+    /// Dat files already in S3 were written with no space before the closing `<>`.
+    #[test]
+    fn test_legacy_strip_id_abone_line_is_still_detected() {
+        let parsed = convert_dat_file_to_res("あぼーん<>あぼーん<><> あぼーん<>テストスレッド\n");
+        let res = &parsed.responses[0];
+
+        assert!(res.is_abone);
+        assert_eq!(res.author_id, None);
+    }
+
+    #[test]
+    fn test_abone_strip_id_line_matches_eddist_core() {
+        assert_eq!(
+            admin_abone_line(None, "テストスレッド"),
+            core_abone_line(None, "テストスレッド")
+        );
+    }
+
+    #[test]
+    fn test_abone_keep_id_line_matches_eddist_core() {
+        assert_eq!(
+            admin_abone_line(Some("XYZ789012"), "テストスレッド"),
+            core_abone_line(Some("XYZ789012"), "テストスレッド")
+        );
+    }
+
+    #[test]
+    fn test_genuine_post_spoofing_abone_text_is_not_misdetected() {
+        let spoofing_res = ArchivedRes {
+            name: "あぼーん".to_string(),
+            mail: "あぼーん".to_string(),
+            date: "2024/01/01(月) 00:00:00.00".to_string(),
+            author_id: Some("SPOOF12345".to_string()),
+            body: "あぼーん".to_string(),
+            is_abone: false,
+            order: 0,
+        };
+
+        let dat = convert_reses_to_dat_file(vec![spoofing_res], "テストスレッド");
+        let dat_str = String::from_utf8(dat).unwrap();
+
+        let parsed = convert_dat_file_to_res(&dat_str);
+        let res = &parsed.responses[0];
+
+        assert!(!res.is_abone);
+        assert_eq!(res.author_id.as_deref(), Some("SPOOF12345"));
+        assert_eq!(res.body, "あぼーん");
+    }
 }

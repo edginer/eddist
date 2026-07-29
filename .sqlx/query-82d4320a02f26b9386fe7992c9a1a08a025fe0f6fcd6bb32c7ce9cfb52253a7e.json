@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone,\n                authed_token_id AS \"authed_token_id: Uuid\",\n                client_info AS \"client_info: Json<ClientInfo>\"\n            FROM\n                archived_responses\n            WHERE\n                thread_id = ?\n            ORDER BY res_order, id\n            ",
+  "query": "SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone AS \"is_abone: bool\",\n                is_abone_keep_id AS \"is_abone_keep_id: bool\"\n            FROM responses WHERE thread_id = ?\n            ORDER BY res_order, id",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
         "name": "created_at",
         "type_info": {
           "type": "Datetime",
-          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
           "max_size": 23
         }
       },
@@ -50,7 +50,7 @@
       },
       {
         "ordinal": 5,
-        "name": "is_abone",
+        "name": "is_abone: bool",
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
@@ -59,20 +59,11 @@
       },
       {
         "ordinal": 6,
-        "name": "authed_token_id: Uuid",
+        "name": "is_abone_keep_id: bool",
         "type_info": {
-          "type": "String",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 16
-        }
-      },
-      {
-        "ordinal": 7,
-        "name": "client_info: Json<ClientInfo>",
-        "type_info": {
-          "type": "Json",
-          "flags": "NOT_NULL | BLOB | BINARY | NO_DEFAULT_VALUE",
-          "max_size": 4294967295
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
         }
       }
     ],
@@ -86,9 +77,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "5cb194b77feb20a5c2969b40969ce0c619d54faeceae73ffafb958b7e64f2c65"
+  "hash": "82d4320a02f26b9386fe7992c9a1a08a025fe0f6fcd6bb32c7ce9cfb52253a7e"
 }

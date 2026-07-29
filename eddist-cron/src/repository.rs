@@ -200,6 +200,7 @@ impl Repository {
                 created_at,
                 author_id,
                 is_abone,
+                is_abone_keep_id,
                 authed_token_id AS "authed_token_id: Uuid",
                 client_info AS "client_info: Json<ClientInfo>"
             FROM
@@ -224,6 +225,7 @@ impl Repository {
                         created_at: Utc.from_utc_datetime(&r.created_at),
                         author_id: r.author_id,
                         is_abone: r.is_abone == 1,
+                        is_abone_keep_id: r.is_abone_keep_id == 1,
                     },
                     r.client_info.0,
                     r.authed_token_id,
@@ -238,6 +240,9 @@ impl Repository {
     ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
         let thread_id = Vec::<u8>::from(thread_id);
 
+        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant 0
+        // here. This only feeds `backfill-convert`, which regenerates a dat solely when the S3
+        // object is missing, so an already-published keep-id line is never overwritten by it.
         let responses = sqlx::query_as!(
             Res,
             r#"
@@ -248,6 +253,7 @@ impl Repository {
                 created_at,
                 author_id,
                 is_abone,
+                0 AS "is_abone_keep_id: i8",
                 authed_token_id AS "authed_token_id: Uuid",
                 client_info AS "client_info: Json<ClientInfo>"
             FROM
@@ -272,6 +278,7 @@ impl Repository {
                         created_at: Utc.from_utc_datetime(&r.created_at),
                         author_id: r.author_id,
                         is_abone: r.is_abone == 1,
+                        is_abone_keep_id: r.is_abone_keep_id == 1,
                     },
                     r.client_info.0,
                     r.authed_token_id,
@@ -386,6 +393,7 @@ struct Res {
     created_at: chrono::NaiveDateTime,
     author_id: String,
     is_abone: i8,
+    is_abone_keep_id: i8,
     authed_token_id: Uuid,
     client_info: Json<ClientInfo>,
 }

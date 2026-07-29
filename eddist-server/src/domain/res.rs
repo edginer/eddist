@@ -49,6 +49,7 @@ pub struct Res<T: ResState> {
     metadent_type: MetadentType,
     client_info: ClientInfo,
     is_abone: bool,
+    is_abone_keep_id: bool,
     is_email_authed: bool,
     board_key: String,
     urls: Option<Vec<String>>,
@@ -248,6 +249,7 @@ impl Res<AuthorIdUninitialized> {
             metadent_type,
             client_info,
             is_abone,
+            is_abone_keep_id: false,
             is_email_authed,
             board_key: board_key.to_string(),
             urls: None,
@@ -350,6 +352,7 @@ impl Res<AuthorIdUninitialized> {
             metadent_type: self.metadent_type,
             client_info: self.client_info,
             is_abone: self.is_abone,
+            is_abone_keep_id: self.is_abone_keep_id,
             is_email_authed: self.is_email_authed,
             board_key: self.board_key,
             urls: self.urls,
@@ -410,6 +413,7 @@ impl Res<AuthorIdInitialized> {
             created_at: self.created_at,
             author_id: self.author_id(),
             is_abone: self.is_abone,
+            is_abone_keep_id: self.is_abone_keep_id,
         };
 
         eddist_core::domain::res::get_sjis_bytes(res_view_ref, default_name, thread_title)
@@ -425,6 +429,7 @@ impl From<Res<AuthorIdInitialized>> for ResView {
             created_at: res.created_at,
             author_id: res.author_id.unwrap(),
             is_abone: res.is_abone,
+            is_abone_keep_id: res.is_abone_keep_id,
         }
     }
 }
@@ -649,6 +654,7 @@ plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
                 tinker: None,
             },
             is_abone: false,
+            is_abone_keep_id: false,
             is_email_authed: false,
             board_key: "".to_string(),
             urls: None,
@@ -692,6 +698,7 @@ plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
                 tinker: None,
             },
             is_abone: false,
+            is_abone_keep_id: false,
             is_email_authed: false,
             board_key: "".to_string(),
             urls: None,

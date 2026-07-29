@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone,\n                authed_token_id AS \"authed_token_id: Uuid\",\n                client_info AS \"client_info: Json<ClientInfo>\"\n            FROM\n                responses\n            WHERE\n                thread_id = ?\n            ORDER BY res_order, id\n            ",
+  "query": "\n            SELECT\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                is_abone,\n                0 AS \"is_abone_keep_id: i8\",\n                authed_token_id AS \"authed_token_id: Uuid\",\n                client_info AS \"client_info: Json<ClientInfo>\"\n            FROM\n                archived_responses\n            WHERE\n                thread_id = ?\n            ORDER BY res_order, id\n            ",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
         "name": "created_at",
         "type_info": {
           "type": "Datetime",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
           "max_size": 23
         }
       },
@@ -59,6 +59,15 @@
       },
       {
         "ordinal": 6,
+        "name": "is_abone_keep_id: i8",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 2
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "authed_token_id: Uuid",
         "type_info": {
           "type": "String",
@@ -67,7 +76,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "client_info: Json<ClientInfo>",
         "type_info": {
           "type": "Json",
@@ -87,8 +96,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "456440488c7ebf7a85d93ff582b40e65aac63fd98d9d5019d12a2bf250748bfd"
+  "hash": "8c07a34719ad5ca2f7c0acdbb90ea1a7cd2e6062c7b48d26666250d9f4539417"
 }

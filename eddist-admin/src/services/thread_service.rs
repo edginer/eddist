@@ -95,6 +95,7 @@ impl ThreadService for ThreadServiceImpl {
                 input.mail.clone(),
                 input.body.clone(),
                 input.is_abone,
+                input.is_abone_keep_id,
             )
             .await?;
 
@@ -105,6 +106,7 @@ impl ThreadService for ThreadServiceImpl {
             .mail
             .unwrap_or_else(|| res.mail.clone().unwrap_or_default());
         let is_abone = input.is_abone.unwrap_or(res.is_abone);
+        let is_abone_keep_id = input.is_abone_keep_id.unwrap_or(res.is_abone_keep_id);
         let body = input.body.unwrap_or_else(|| res.body.clone());
         let res_order = res.res_order;
 
@@ -115,6 +117,7 @@ impl ThreadService for ThreadServiceImpl {
             created_at: res.created_at,
             author_id: res.author_id,
             is_abone,
+            is_abone_keep_id,
         };
         let title_for_view = if res_order == 1 {
             thread_title.as_deref()

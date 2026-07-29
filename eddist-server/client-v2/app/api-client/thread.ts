@@ -77,6 +77,17 @@ export const fetchThread = async (
   return result;
 };
 
+// name<>mail<>{date} ID:{authorId}<>{body}<>{title}
+const LINE_REGEX = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
+// あぼーん, author_id kept: あぼーん<>あぼーん<>あぼーん ID:{authorId}<> あぼーん <>{title}
+// Date is a fixed "あぼーん" sentinel, not the real timestamp — unlike name/mail/body
+// it's never user-editable, so it can't be spoofed by a real post (see get_sjis_bytes).
+const ABONE_KEEP_ID_REGEX = /^あぼーん<>あぼーん<>あぼーん ID:(.*)<> あぼーん <>(.*)$/;
+// あぼーん, author_id stripped: あぼーん<>あぼーん<><> あぼーん <>{title}
+const ABONE_STRIP_ID_REGEX = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
+// 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
+const STOPPER_REGEX = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
+
 const convertThreadTextToResponseList = (text: string) => {
   const lines = text.split("\n").filter((x) => x !== "");
   let threadTitle = "";
@@ -86,16 +97,43 @@ const convertThreadTextToResponseList = (text: string) => {
   const referredMap = new Map<number, number[]>();
 
   const responses: Response[] = lines.map((line, idx) => {
-    const lineRegex = /^(.*)<>(.*)<>(.*) ID:(.*)<>(.*)<>(.*)$/;
-    const match = line.match(lineRegex);
+    const aboneKeepIdMatch = line.match(ABONE_KEEP_ID_REGEX);
+    if (aboneKeepIdMatch != null) {
+      const authorId = aboneKeepIdMatch[1];
+      if (idx === 0) {
+        threadTitle = aboneKeepIdMatch[2];
+      }
+
+      if (authorIdAppearBeforeCountMap.has(authorId)) {
+        const count = authorIdAppearBeforeCountMap.get(authorId) ?? 0;
+        authorIdAppearBeforeCountMap.set(authorId, count + 1);
+      } else {
+        authorIdAppearBeforeCountMap.set(authorId, 1);
+      }
+
+      const response = {
+        name: "あぼーん",
+        mail: "",
+        date: "",
+        authorId,
+        bodyParts: [{ text: "あぼーん", isMatch: false }],
+        id: idx + 1,
+        authorIdAppearBeforeCount: authorIdAppearBeforeCountMap.get(authorId) ?? 0,
+      };
+
+      if (!idMap.has(authorId)) {
+        idMap.set(authorId, []);
+      }
+      idMap.get(authorId)?.push([response, idx]);
+
+      return response;
+    }
+
+    const match = line.match(LINE_REGEX);
     if (match == null) {
-      // あぼーん<>あぼーん<><> あぼーん<> てす
-      const aboneRegex = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
-      const aboneMatch = line.match(aboneRegex);
-      if (aboneMatch == null) {
-        // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
-        const stopperRegex = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
-        const stopperMatch = line.match(stopperRegex);
+      const aboneStripMatch = line.match(ABONE_STRIP_ID_REGEX);
+      if (aboneStripMatch == null) {
+        const stopperMatch = line.match(STOPPER_REGEX);
         if (stopperMatch == null) {
           throw new Error(`Invalid response line: ${line}`);
         }
@@ -111,11 +149,11 @@ const convertThreadTextToResponseList = (text: string) => {
       }
 
       if (idx === 0) {
-        threadTitle = aboneMatch[3];
+        threadTitle = aboneStripMatch[3];
       }
 
       return {
-        name: aboneMatch[1],
+        name: aboneStripMatch[1],
         mail: "",
         date: "",
         authorId: "",

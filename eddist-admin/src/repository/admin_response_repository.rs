@@ -31,6 +31,7 @@ pub trait AdminResponseRepository: Send + Sync {
         mail: Option<String>,
         body: Option<String>,
         is_abone: Option<bool>,
+        is_abone_keep_id: Option<bool>,
     ) -> anyhow::Result<Res>;
 }
 
@@ -56,6 +57,7 @@ fn selection_res_to_res(res: SelectionRes) -> Res {
         board_id: Uuid::from_slice(&res.board_id).unwrap(),
         thread_id: Uuid::from_slice(&res.thread_id).unwrap(),
         is_abone: res.is_abone != 0,
+        is_abone_keep_id: res.is_abone_keep_id != 0,
         client_info: res.client_info.0.into(),
         res_order: res.res_order,
     }
@@ -85,6 +87,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                 board_id,
                 thread_id,
                 is_abone,
+                is_abone_keep_id,
                 client_info AS "client_info!: Json<ClientInfo>",
                 res_order
             FROM
@@ -128,6 +131,9 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
     ) -> anyhow::Result<Vec<Res>> {
         let pool = &self.0;
 
+        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant
+        // 0 here. Whether an archived response kept its author_id is encoded in the dat text in
+        // S3 (see admin_archive_repository), which is the source of truth for archived threads.
         let query = query_as!(
             SelectionRes,
             r#"
@@ -143,6 +149,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                 board_id,
                 thread_id,
                 is_abone,
+                0 AS "is_abone_keep_id: i8",
                 client_info AS "client_info!: Json<ClientInfo>",
                 res_order
             FROM
@@ -200,6 +207,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                 board_id,
                 thread_id,
                 is_abone,
+                is_abone_keep_id,
                 client_info AS "client_info!: Json<ClientInfo>",
                 res_order
             FROM
@@ -256,6 +264,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         mail: Option<String>,
         body: Option<String>,
         is_abone: Option<bool>,
+        is_abone_keep_id: Option<bool>,
     ) -> anyhow::Result<Res> {
         let pool = &self.0;
 
@@ -277,6 +286,9 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         if is_abone.is_some() {
             sets.push("is_abone = ?");
         }
+        if is_abone_keep_id.is_some() {
+            sets.push("is_abone_keep_id = ?");
+        }
 
         let query = format!(
             r#"
@@ -297,6 +309,9 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         if let Some(is_abone) = is_abone {
             query = query.bind(is_abone);
         }
+        if let Some(is_abone_keep_id) = is_abone_keep_id {
+            query = query.bind(is_abone_keep_id);
+        }
         let query = query.bind(id.as_bytes().to_vec());
 
         query.execute(pool).await?;
@@ -316,6 +331,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
                 board_id,
                 thread_id,
                 is_abone,
+                is_abone_keep_id,
                 client_info AS "client_info!: Json<ClientInfo>",
                 res_order
             FROM

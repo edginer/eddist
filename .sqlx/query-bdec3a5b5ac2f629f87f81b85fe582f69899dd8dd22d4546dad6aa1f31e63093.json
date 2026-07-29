@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                id = ?\n            ",
+  "query": "\n            SELECT\n                id,\n                author_name,\n                mail,\n                body,\n                created_at,\n                author_id,\n                ip_addr,\n                authed_token_id,\n                board_id,\n                thread_id,\n                is_abone,\n                is_abone_keep_id,\n                client_info AS \"client_info!: Json<ClientInfo>\",\n                res_order\n            FROM\n                responses\n            WHERE\n                id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -104,6 +104,15 @@
       },
       {
         "ordinal": 11,
+        "name": "is_abone_keep_id",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "client_info!: Json<ClientInfo>",
         "type_info": {
           "type": "Json",
@@ -112,7 +121,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "res_order",
         "type_info": {
           "type": "Long",
@@ -137,8 +146,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "28336cbf8b782bdf6eb00430e8dc7de3540e4c3fd9859192a8bcda1558fd0f9c"
+  "hash": "bdec3a5b5ac2f629f87f81b85fe582f69899dd8dd22d4546dad6aa1f31e63093"
 }
