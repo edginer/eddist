@@ -264,19 +264,9 @@ fn convert_dat_file_to_res(dat_file: &str) -> ArchivedThread {
             let author_id = date_and_author_id_split.get(1).map(|s| s.to_string());
             let body = split[3];
 
-            // A real post's name/mail/body are free-form user (or, via the edit API,
-            // admin) text, so a poster could deliberately write name="あぼーん",
-            // body="あぼーん" to spoof an abone line. To tell a genuine abone apart:
-            // - id-stripped abone never has an " ID:" segment, which a real post
-            //   always has (the renderer always appends the real author_id), so
-            //   ID-absence alone is an unspoofable, server-controlled signal.
-            // - id-kept abone does carry a real ID, so that signal is unavailable.
-            //   Instead it replaces the date sub-field with a fixed "あぼーん"
-            //   sentinel. Unlike name/mail/body, the date is never derived from any
-            //   user- or admin-editable input in any rendering path (eddist-core's
-            //   renderer, used by eddist-cron to write the original archived dat,
-            //   uses the identical sentinel — see get_sjis_bytes), so it can never
-            //   collide with a genuine post's real timestamp.
+            // name/mail/body are editable text, so a post could spoof "あぼーん" there.
+            // ID-absence (id-stripped) and the date sentinel (id-kept, see
+            // get_sjis_bytes) aren't editable, so they can't be spoofed.
             let is_abone = if author_id.is_none() {
                 split[0] == "あぼーん" && body.trim() == "あぼーん"
             } else {
@@ -354,13 +344,8 @@ fn convert_reses_to_dat_file(reses: Vec<ArchivedRes>, thread_title: &str) -> Vec
                     "".to_string()
                 };
                 match res.author_id.as_deref() {
-                    // The date sub-field is replaced with a fixed "あぼーん" sentinel
-                    // (matching eddist-core's get_sjis_bytes, which eddist-cron uses to
-                    // write the original archived dat) instead of the real timestamp.
-                    // Unlike name/mail/body, date is never derived from any user- or
-                    // admin-editable input, so it can never collide with a genuine
-                    // post's real timestamp — see convert_dat_file_to_res for the
-                    // matching detection logic.
+                    // Date replaced with an "あぼーん" sentinel (matches get_sjis_bytes)
+                    // instead of the real timestamp — see convert_dat_file_to_res.
                     Some(author_id) => SJisStr::from(&format!(
                         "あぼーん<>あぼーん<>あぼーん ID:{}<> あぼーん <>{}\n",
                         author_id, title
@@ -457,12 +442,6 @@ mod tests {
 
     #[test]
     fn test_genuine_post_spoofing_abone_text_is_not_misdetected() {
-        // A real (non-deleted) post whose author deliberately set name="あぼーん"
-        // and body="あぼーん" to mimic an abone line must NOT be misdetected as
-        // abone: the real timestamp in the date sub-field is never producible via
-        // any user- or admin-editable input, so it disambiguates this from a
-        // genuine id-kept abone line (whose date sub-field is the "あぼーん"
-        // sentinel, not a real timestamp).
         let spoofing_res = ArchivedRes {
             name: "あぼーん".to_string(),
             mail: "あぼーん".to_string(),

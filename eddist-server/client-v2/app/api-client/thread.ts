@@ -87,11 +87,8 @@ const convertThreadTextToResponseList = (text: string) => {
 
   const responses: Response[] = lines.map((line, idx) => {
     // あぼーん, author_id kept: あぼーん<>あぼーん<>あぼーん ID:{authorId}<> あぼーん <>{title}
-    // The date sub-field is a fixed "あぼーん" sentinel, not the real timestamp — see
-    // eddist-core's get_sjis_bytes / eddist-admin's convert_reses_to_dat_file for why:
-    // unlike name/mail/body (user- or admin-editable free text), date is never derived
-    // from any editable input, so it can't collide with a genuine post that spoofs
-    // name="あぼーん"/body="あぼーん" to mimic a deleted line.
+    // Date is a fixed "あぼーん" sentinel, not the real timestamp — unlike name/mail/body
+    // it's never user-editable, so it can't be spoofed by a real post (see get_sjis_bytes).
     const aboneKeepIdRegex = /^あぼーん<>あぼーん<>あぼーん ID:(.*)<> あぼーん <>(.*)$/;
     const aboneKeepIdMatch = line.match(aboneKeepIdRegex);
     if (aboneKeepIdMatch != null) {

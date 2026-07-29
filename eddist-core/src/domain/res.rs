@@ -35,15 +35,12 @@ pub fn get_sjis_bytes(
     let mail = if res_view.mail == "sage" { "sage" } else { "" };
     if res_view.is_abone {
         if res_view.is_abone_keep_id {
-            // The date sub-field is replaced with a fixed "あぼーん" sentinel instead of
-            // the real timestamp. Unlike name/mail/body, the date is never derived from
-            // any user- or admin-editable input in any rendering path, so this sentinel
-            // can never collide with a genuine post — see convert_dat_file_to_res in
-            // eddist-admin for the matching detection logic on the archived-dat side.
+            // Date replaced with an "あぼーん" sentinel instead of the real timestamp —
+            // unlike name/mail/body it's never user-editable, so it can't be spoofed.
             SJisStr::from(
                 format!(
                     "あぼーん<>あぼーん<>あぼーん ID:{}<> あぼーん <>{}\n",
-                    &res_view.author_id,
+                    res_view.author_id,
                     thread_title.unwrap_or_default()
                 )
                 .as_str(),
