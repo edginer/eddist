@@ -1,39 +1,21 @@
-use std::sync::LazyLock;
-
 use axum::{
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use redis::Script;
 
 use eddist_core::{domain::ip_addr::ReducedIpAddr, redis_keys::shared_ng_id_ip_rate_limit_key};
 
-use crate::{AppState, utils::get_origin_ip};
+use crate::{
+    AppState,
+    utils::{get_origin_ip, incr_fixed_window},
+};
 
 const NG_ID_WINDOW_SECS: i64 = 60;
 
-/// Sized for すべてクリア, which fires one unbatched DELETE per stored rule -
-/// a legitimate burst far larger than interactive use.
-const NG_ID_THRESHOLD: i64 = 300;
+const NG_ID_THRESHOLD: i64 = 60;
 
-/// One script so `INCR` and `EXPIRE` cannot be split: a failed `EXPIRE` would
-/// leave a key that never expires.
-static RATE_LIMIT_SCRIPT: LazyLock<Script> = LazyLock::new(|| {
-    Script::new(
-        r"
-        local count = redis.call('INCR', KEYS[1])
-        if count == 1 then
-            redis.call('EXPIRE', KEYS[1], ARGV[1])
-        end
-        return count
-        ",
-    )
-});
-
-/// Keyed on the source, not the authed token: `post_ng_id`'s per-token limit
-/// needs the DB lookup it would be protecting, and `delete_ng_id` has none.
 pub async fn ng_id_rate_limit_middleware(
     State(state): State<AppState>,
     request: Request,
@@ -46,12 +28,7 @@ pub async fn ng_id_rate_limit_middleware(
     let key = shared_ng_id_ip_rate_limit_key(&ip);
 
     let mut redis_conn = state.redis_conn.clone();
-    let count: i64 = match RATE_LIMIT_SCRIPT
-        .key(&key)
-        .arg(NG_ID_WINDOW_SECS)
-        .invoke_async(&mut redis_conn)
-        .await
-    {
+    let count = match incr_fixed_window(&mut redis_conn, &key, NG_ID_WINDOW_SECS).await {
         Ok(count) => count,
         Err(e) => {
             tracing::error!("Failed to check shared NG ID rate limit for {ip}: {e}");

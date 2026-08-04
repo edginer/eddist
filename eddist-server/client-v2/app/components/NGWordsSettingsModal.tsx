@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
 import { useRevalidator } from "react-router";
-import { deleteSharedNgId } from "~/api-client/ng_id";
+import { deleteSharedNgIds } from "~/api-client/ng_id";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
 import { parseCookie } from "~/utils/cookie";
@@ -142,11 +142,10 @@ export const NGWordsSettingsModal = ({
 }: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
 
-  // Removing a synced response 投稿者ID rule also retracts its shared NG ID.
   const removeResponseAuthorId = (ruleId: string) => {
     const rule = config.response.authorIds.find((r) => r.id === ruleId);
     if (rule?.sharedBoardKey) {
-      void deleteSharedNgId(rule.sharedBoardKey, rule.pattern);
+      void deleteSharedNgIds(rule.sharedBoardKey, [rule.pattern]);
     }
     removeRule("response.authorIds", ruleId);
   };
@@ -155,12 +154,19 @@ export const NGWordsSettingsModal = ({
     if (!window.confirm("すべてのNG設定をクリアしますか？\nこの操作は取り消せません。")) {
       return;
     }
-    // Retract synced shared NG IDs before wiping local config.
+
+    const byBoardKey = new Map<string, string[]>();
     for (const rule of config.response.authorIds) {
       if (rule.sharedBoardKey) {
-        void deleteSharedNgId(rule.sharedBoardKey, rule.pattern);
+        const patterns = byBoardKey.get(rule.sharedBoardKey) ?? [];
+        patterns.push(rule.pattern);
+        byBoardKey.set(rule.sharedBoardKey, patterns);
       }
     }
+    for (const [boardKey, patterns] of byBoardKey) {
+      void deleteSharedNgIds(boardKey, patterns);
+    }
+
     clearAllRules();
   };
 

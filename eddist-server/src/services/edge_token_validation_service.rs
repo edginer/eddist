@@ -2,12 +2,6 @@ use crate::{domain::authed_token::AuthedToken, repositories::bbs_repository::Bbs
 
 use super::AppService;
 
-/// Resolves an `edge-token` cookie to its authed token, rejecting values that do
-/// not exist or are no longer valid.
-///
-/// Read-only endpoints use this rather than `BbsCgiAuthService::check_validity`,
-/// which is posting-specific: it mints a new token when the cookie is absent and
-/// reports its errors as auth-code challenges.
 #[derive(Clone)]
 pub struct EdgeTokenValidationService<T: BbsRepository>(T);
 

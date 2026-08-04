@@ -127,9 +127,8 @@ export const NGContextMenu = ({
     hideMode?: "hidden" | "collapsed",
   ) => {
     try {
-      // A rule carries one board key, so if this pattern is already shared with
-      // another board, leave it alone: sharing it here too would record a
-      // contribution that no rule deletion could retract.
+      // A rule holds one board key, so re-sharing a pattern already shared with
+      // another board would record a contribution nothing could retract.
       const existing =
         category === "response.authorIds"
           ? config.response.authorIds.find((r) => r.pattern === value && r.matchType === "partial")
