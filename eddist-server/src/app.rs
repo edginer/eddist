@@ -19,6 +19,7 @@ use tracing::{Span, info_span};
 
 use crate::{
     middleware::{
+        ng_id_rate_limit::ng_id_rate_limit_middleware,
         not_found_rate_limit::{NotFoundPenaltyCache, not_found_rate_limit_middleware},
         user_restriction::user_restriction_middleware,
     },
@@ -231,6 +232,14 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         (layer, Some(handle))
     };
 
+    let ng_id_routes = Router::new()
+        .route("/api/{boardKey}/ng-ids", post(post_ng_id))
+        .route("/api/{boardKey}/ng-ids/{ngId}", delete(delete_ng_id))
+        .route_layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            ng_id_rate_limit_middleware,
+        ));
+
     let app = Router::new()
         .route("/health-check", get(health_check))
         .route(
@@ -269,8 +278,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
             "/api/{boardKey}/unsafe-thread-ids",
             get(get_unsafe_thread_ids),
         )
-        .route("/api/{boardKey}/ng-ids", post(post_ng_id))
-        .route("/api/{boardKey}/ng-ids/{ngId}", delete(delete_ng_id))
+        .merge(ng_id_routes)
         .nest("/user", user_routes())
         .route(
             "/{boardKey}",

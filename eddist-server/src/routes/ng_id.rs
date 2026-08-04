@@ -18,12 +18,10 @@ use crate::{
     services::{AppService, edge_token_validation_service::EdgeTokenValidationServiceInput},
 };
 
-// TTL for a shared NG ID entry, refreshed on every add.
 const SHARED_NG_ID_TTL_SECS: i64 = 3 * 24 * 60 * 60;
 
 const MAX_NG_ID_LEN: usize = 64;
 
-// Max shared NG ID adds per authed token per rolling day.
 const SHARED_NG_ID_RATE_LIMIT: i64 = 25;
 const SHARED_NG_ID_RATE_LIMIT_WINDOW_SECS: i64 = 24 * 60 * 60;
 
@@ -91,7 +89,6 @@ async fn within_shared_ng_id_rate_limit(
     Ok(count <= SHARED_NG_ID_RATE_LIMIT)
 }
 
-// POST /api/{boardKey}/ng-ids — record that the caller marked `ng_id` as NG.
 pub async fn post_ng_id(
     State(state): State<AppState>,
     Path(board_key): Path<String>,
@@ -134,7 +131,6 @@ pub async fn post_ng_id(
     empty(204)
 }
 
-// DELETE /api/{boardKey}/ng-ids/{ngId} — retract the caller's shared NG ID mark.
 pub async fn delete_ng_id(
     State(state): State<AppState>,
     Path((board_key, ng_id)): Path<(String, String)>,

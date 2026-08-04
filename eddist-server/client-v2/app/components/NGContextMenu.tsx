@@ -127,11 +127,9 @@ export const NGContextMenu = ({
     hideMode?: "hidden" | "collapsed",
   ) => {
     try {
-      // NG IDs from the response list are shared with the server; stamp the board
-      // key so the settings dialog can retract them later.
-      // A rule can only carry one board key, so if this pattern is already shared with
-      // another board, leave it alone: sharing it here too would record a contribution
-      // that no rule deletion could retract.
+      // A rule carries one board key, so if this pattern is already shared with
+      // another board, leave it alone: sharing it here too would record a
+      // contribution that no rule deletion could retract.
       const existing =
         category === "response.authorIds"
           ? config.response.authorIds.find((r) => r.pattern === value && r.matchType === "partial")
