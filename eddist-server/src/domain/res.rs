@@ -574,13 +574,48 @@ pub fn calculate_trip(target: &str) -> String {
     }
 }
 
+/// Named only: `new_from_res` eats the first `#` as the trip delimiter, so a
+/// numeric reference can never arrive here.
+const LOOKALIKE_CHAR_REFS: &[(&str, &str)] = &[
+    ("&starf;", "★"),
+    ("&bigstar;", "★"),
+    ("&Star;", "⋆"),
+    ("&sstarf;", "⋆"),
+    ("&diams;", "♦"),
+    ("&diamondsuit;", "♦"),
+    ("&diamsuit;", "♦"),
+    ("&lozf;", "⧫"),
+    ("&blacklozenge;", "⧫"),
+];
+
+/// `pretty_author_name` appends ` ★{cap}` and ` ◆{trip}` after this runs, so
+/// nothing a reader could take for those markers may survive it.
+fn fold_cap_trip_lookalikes(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c {
+            '★' | '✫' | '✭' | '✮' | '✯' => '☆',
+            '⭑' | '⋆' => '⭒',
+            '◆' | '❖' => '◇',
+            '♦' => '♢',
+            '⬥' => '⬦',
+            '⬧' => '⬨',
+            '⧫' => '◊',
+            '⬩' => '⋄',
+            '⬪' => '⬫',
+            c => c,
+        })
+        .collect()
+}
+
 fn sanitize_author_name(author_name: &str) -> String {
-    // Don't need to replace numeric character references because author_name doesn't contain it
-    sanitize_base(author_name, false)
-        .replace("★", "☆")
-        .replace("◆", "◇")
-        .replace("&starf;", "☆")
-        .replace("&bigstar;", "☆")
+    let decoded = LOOKALIKE_CHAR_REFS
+        .iter()
+        .fold(sanitize_base(author_name, false), |acc, (name, ch)| {
+            acc.replace(name, ch)
+        });
+
+    fold_cap_trip_lookalikes(&decoded)
 }
 
 fn sanitize_email(email: &str) -> String {
@@ -624,6 +659,72 @@ mod tests {
             sanitize_body("normal\n&#60;script&#62;alert()&#60;/script&#62;"),
             "normal<br>&lt;script&gt;alert()&lt;/script&gt;"
         );
+    }
+
+    #[test]
+    fn test_sanitize_author_name_folds_marker_lookalikes() {
+        assert_eq!(sanitize_author_name("◆deadbeef01"), "◇deadbeef01");
+        assert_eq!(sanitize_author_name("★cap"), "☆cap");
+
+        assert_eq!(sanitize_author_name("\u{2666}abc"), "\u{2662}abc"); // ♦ -> ♢
+        assert_eq!(sanitize_author_name("\u{2B25}abc"), "\u{2B26}abc"); // ⬥ -> ⬦
+        assert_eq!(sanitize_author_name("\u{2B27}abc"), "\u{2B28}abc"); // ⬧ -> ⬨
+        assert_eq!(sanitize_author_name("\u{29EB}abc"), "\u{25CA}abc"); // ⧫ -> ◊
+        assert_eq!(sanitize_author_name("\u{2756}abc"), "\u{25C7}abc"); // ❖ -> ◇
+        assert_eq!(sanitize_author_name("\u{2B29}abc"), "\u{22C4}abc"); // ⬩ -> ⋄
+        assert_eq!(sanitize_author_name("\u{2B2A}abc"), "\u{2B2B}abc"); // ⬪ -> ⬫
+
+        assert_eq!(sanitize_author_name("\u{272B}cap"), "\u{2606}cap"); // ✫ -> ☆
+        assert_eq!(sanitize_author_name("\u{272D}cap"), "\u{2606}cap"); // ✭ -> ☆
+        assert_eq!(sanitize_author_name("\u{272E}cap"), "\u{2606}cap"); // ✮ -> ☆
+        assert_eq!(sanitize_author_name("\u{272F}cap"), "\u{2606}cap"); // ✯ -> ☆
+        assert_eq!(sanitize_author_name("\u{2B51}cap"), "\u{2B52}cap"); // ⭑ -> ⭒
+        assert_eq!(sanitize_author_name("\u{22C6}cap"), "\u{2B52}cap"); // ⋆ -> ⭒
+
+        assert_eq!(sanitize_author_name("普通の名無し"), "普通の名無し");
+    }
+
+    #[test]
+    fn test_sanitize_author_name_folds_named_char_refs() {
+        assert_eq!(sanitize_author_name("&starf;"), "☆");
+        assert_eq!(sanitize_author_name("&bigstar;"), "☆");
+        assert_eq!(sanitize_author_name("&diams;"), "\u{2662}"); // ♦ -> ♢
+        assert_eq!(sanitize_author_name("&diamondsuit;"), "\u{2662}");
+        assert_eq!(sanitize_author_name("&diamsuit;"), "\u{2662}");
+        assert_eq!(sanitize_author_name("&lozf;"), "\u{25CA}"); // ⧫ -> ◊
+        assert_eq!(sanitize_author_name("&blacklozenge;"), "\u{25CA}");
+        assert_eq!(sanitize_author_name("&Star;"), "\u{2B52}"); // ⋆ -> ⭒
+        assert_eq!(sanitize_author_name("&sstarf;"), "\u{2B52}");
+
+        // `&` stays raw: escaping it would surface as `R&amp;B` on client-v2
+        assert_eq!(sanitize_author_name("R&B好き"), "R&B好き");
+        assert_eq!(sanitize_author_name("<a>"), "&lt;a&gt;");
+    }
+
+    #[test]
+    fn test_numeric_char_refs_cannot_reach_author_name() {
+        // `&#9670;` is ◆, but the `#` splits it into a name and a trip seed
+        let res = Res::new_from_res(
+            ResCore {
+                from: "名無し&#9670;deadbeef01",
+                mail: "",
+                body: Cow::Borrowed("body"),
+            },
+            "board",
+            Utc::now(),
+            MetadentType::None,
+            ClientInfo {
+                user_agent: String::new(),
+                asn_num: 0,
+                ip_addr: "127.0.0.1".to_string(),
+                tinker: None,
+            },
+            None,
+            false,
+        );
+
+        assert_eq!(res.author_name, "名無し&");
+        assert!(res.trip.is_some());
     }
 
     #[test]
