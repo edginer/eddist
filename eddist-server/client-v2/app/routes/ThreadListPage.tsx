@@ -519,6 +519,7 @@ const ThreadListPage = ({
         <NGContextMenu
           x={menuState.x}
           y={menuState.y}
+          boardKey={params.boardKey ?? ""}
           onClose={closeMenu}
           actions={[
             {

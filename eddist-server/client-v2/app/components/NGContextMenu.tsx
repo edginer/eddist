@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
+import { addSharedNgId } from "~/api-client/ng_id";
 import { type NGCategory, useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
 
 interface NGContextMenuProps {
   x: number;
   y: number;
+  boardKey: string;
   onClose: () => void;
   options: {
     label: string;
@@ -20,9 +22,16 @@ interface NGContextMenuProps {
   }[];
 }
 
-export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContextMenuProps) => {
+export const NGContextMenu = ({
+  x,
+  y,
+  boardKey,
+  onClose,
+  options,
+  actions = [],
+}: NGContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { addRule } = useNGWords();
+  const { config, addRule } = useNGWords();
   const { showToast } = useToast();
 
   // Truncate long text for display
@@ -118,12 +127,26 @@ export const NGContextMenu = ({ x, y, onClose, options, actions = [] }: NGContex
     hideMode?: "hidden" | "collapsed",
   ) => {
     try {
+      // A rule holds one board key, so re-sharing a pattern already shared with
+      // another board would record a contribution nothing could retract.
+      const existing =
+        category === "response.authorIds"
+          ? config.response.authorIds.find((r) => r.pattern === value && r.matchType === "partial")
+          : undefined;
+      const isSharedNgId =
+        category === "response.authorIds" && (existing?.sharedBoardKey ?? boardKey) === boardKey;
+
       addRule(category, {
         pattern: value,
         matchType: "partial",
         enabled: true,
         ...(hideMode ? { hideMode } : {}),
+        ...(isSharedNgId ? { sharedBoardKey: boardKey } : {}),
       });
+
+      if (isSharedNgId) {
+        void addSharedNgId(boardKey, value);
+      }
 
       // Visual feedback
       showToast(`NGワードに追加: ${value}`, "success");

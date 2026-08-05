@@ -78,6 +78,18 @@ pub fn not_found_access_count_key(ip: &str) -> String {
     format!("not_found:count:{ip}")
 }
 
+pub fn shared_ng_id_key(board_key: &str, ng_id: &str) -> String {
+    format!("shared_ng_id:{board_key}:{ng_id}")
+}
+
+pub fn shared_ng_id_rate_limit_key(token_hash: &str) -> String {
+    format!("shared_ng_id:rate_limit:{token_hash}")
+}
+
+pub fn shared_ng_id_ip_rate_limit_key(reduced_ip: &str) -> String {
+    format!("shared_ng_id:ip_rate_limit:{reduced_ip}")
+}
+
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
@@ -86,3 +98,24 @@ pub use crate::domain::pubsub_repository::{
     CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_REVOKED,
     CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shared_ng_id_ip_rate_limit_key_v4() {
+        assert_eq!(
+            shared_ng_id_ip_rate_limit_key("203.0.113.1"),
+            "shared_ng_id:ip_rate_limit:203.0.113.1"
+        );
+    }
+
+    #[test]
+    fn test_shared_ng_id_ip_rate_limit_key_reduced_v6() {
+        assert_eq!(
+            shared_ng_id_ip_rate_limit_key("2001:db8:85a3:0"),
+            "shared_ng_id:ip_rate_limit:2001:db8:85a3:0"
+        );
+    }
+}

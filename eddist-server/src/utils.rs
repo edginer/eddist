@@ -74,6 +74,24 @@ pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
     Some(tinker.patch_internal_level_if_missing(level))
 }
 
+pub async fn incr_fixed_window(
+    conn: &mut ::redis::aio::ConnectionManager,
+    key: &str,
+    window_secs: i64,
+) -> ::redis::RedisResult<i64> {
+    let (count,): (i64,) = ::redis::pipe()
+        .incr(key, 1)
+        .cmd("EXPIRE")
+        .arg(key)
+        .arg(window_secs)
+        .arg(::redis::ExpireOption::NX)
+        .ignore()
+        .query_async(conn)
+        .await?;
+
+    Ok(count)
+}
+
 #[async_trait::async_trait]
 pub trait TransactionRepository<T: Database> {
     async fn begin(&self) -> anyhow::Result<Transaction<'_, T>>;
