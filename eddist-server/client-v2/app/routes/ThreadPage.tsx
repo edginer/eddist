@@ -48,9 +48,13 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
 
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
-  const [thread, boards, clientConfig] = await Promise.all([
+  const boards = await fetchBoards({ baseUrl });
+  if (!boards.some((board) => board.board_key === params.boardKey)) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
+  const [thread, clientConfig] = await Promise.all([
     fetchThread(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
-    fetchBoards({ baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
       enable_safe_mode: false,
