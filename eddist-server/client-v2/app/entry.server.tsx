@@ -16,6 +16,7 @@ export default function handleRequest(
 ) {
   return new Promise((resolve, reject) => {
     let shellRendered = false;
+    let abortTimeout: ReturnType<typeof setTimeout>;
     const userAgent = request.headers.get("user-agent");
     // Bots get onAllReady (full HTML including serialized data before sending).
     // Regular users get onShellReady (thread content is in the shell — no Suspense
@@ -27,6 +28,7 @@ export default function handleRequest(
       {
         [readyOption]() {
           shellRendered = true;
+          clearTimeout(abortTimeout);
           const body = new PassThrough();
           const stream = createReadableStreamFromReadable(body);
           responseHeaders.set("Content-Type", "text/html");
@@ -39,6 +41,7 @@ export default function handleRequest(
           pipe(body);
         },
         onShellError(error: unknown) {
+          clearTimeout(abortTimeout);
           reject(error);
         },
         onError(error: unknown) {
@@ -49,6 +52,6 @@ export default function handleRequest(
         },
       },
     );
-    setTimeout(abort, ABORT_DELAY);
+    abortTimeout = setTimeout(abort, ABORT_DELAY);
   });
 }

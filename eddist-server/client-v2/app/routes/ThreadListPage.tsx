@@ -466,10 +466,10 @@ const ThreadListPage = ({
             {i !== 0 && (
               <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
             )}
-            <div className="relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700">
+            <div className="thread-row">
               <Link
                 to={`/${params.boardKey}/${thread.id}`}
-                className="cursor-default text-left block w-full p-2 lg:p-3 select-none md:select-auto"
+                className="thread-row-link"
                 data-ng-target="title"
                 data-ng-thread-id={thread.id}
                 {...contextMenuHandlers}
@@ -502,7 +502,7 @@ const ThreadListPage = ({
                   />
                   <span> ({thread.responseCount})</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="thread-row-meta">
                   <span>{convertLinuxTimeToDateString(thread.id)}</span>
                   {thread.authorId && <span>ID:{thread.authorId}</span>}
                   <span className="text-blue-600 font-semibold">

@@ -14,12 +14,16 @@ export interface BodyAnchorPart {
   isMatch: boolean;
 }
 
-const THREAD_CACHE_MAX = 20;
+const THREAD_CACHE_MAX_BYTES = 24 * 1024 * 1024;
 const THREAD_CACHE_TTL_MS = 30_000;
 type ThreadCacheData = ReturnType<typeof convertThreadTextToResponseList> & {
   redirected: boolean;
 };
-let _threadCache: Map<string, { data: ThreadCacheData; expiresAt: number }> | null = null;
+// Weight is the source .dat byte size; the LRU is bounded by total bytes so a few
+// large (1000-res) threads can't starve the many small active ones or blow the heap.
+type ThreadCacheEntry = { data: ThreadCacheData; expiresAt: number; bytes: number };
+let _threadCache: Map<string, ThreadCacheEntry> | null = null;
+let _threadCacheBytes = 0;
 
 export const fetchThread = async (
   boardKey: string,
@@ -34,7 +38,16 @@ export const fetchThread = async (
     const key = `${boardKey}:${threadKey}`;
     if (!_threadCache) _threadCache = new Map();
     const cached = _threadCache.get(key);
-    if (cached && cached.expiresAt > Date.now()) return cached.data;
+    if (cached) {
+      if (cached.expiresAt > Date.now()) {
+        // Re-insert to mark most-recently-used (Map preserves insertion order).
+        _threadCache.delete(key);
+        _threadCache.set(key, cached);
+        return cached.data;
+      }
+      _threadCache.delete(key);
+      _threadCacheBytes -= cached.bytes;
+    }
   }
 
   const res = await fetch(
@@ -60,18 +73,33 @@ export const fetchThread = async (
   };
 
   if (import.meta.env.SSR) {
+    if (!_threadCache) _threadCache = new Map();
     const key = `${boardKey}:${threadKey}`;
-    for (const [k, v] of _threadCache ?? []) {
-      if (v.expiresAt <= Date.now()) _threadCache?.delete(k);
+    const now = Date.now();
+
+    const prev = _threadCache.get(key);
+    if (prev) {
+      _threadCache.delete(key);
+      _threadCacheBytes -= prev.bytes;
     }
-    if ((_threadCache?.size ?? 0) >= THREAD_CACHE_MAX) {
-      const oldestKey = _threadCache?.keys().next().value;
-      if (oldestKey) _threadCache?.delete(oldestKey);
+    for (const [k, v] of _threadCache) {
+      if (v.expiresAt <= now) {
+        _threadCache.delete(k);
+        _threadCacheBytes -= v.bytes;
+      }
     }
-    _threadCache?.set(key, {
-      data: result,
-      expiresAt: Date.now() + THREAD_CACHE_TTL_MS,
-    });
+
+    const bytes = arrayBuffer.byteLength;
+    _threadCache.set(key, { data: result, expiresAt: now + THREAD_CACHE_TTL_MS, bytes });
+    _threadCacheBytes += bytes;
+
+    while (_threadCacheBytes > THREAD_CACHE_MAX_BYTES) {
+      const oldestKey = _threadCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      const oldest = _threadCache.get(oldestKey);
+      _threadCache.delete(oldestKey);
+      if (oldest) _threadCacheBytes -= oldest.bytes;
+    }
   }
 
   return result;

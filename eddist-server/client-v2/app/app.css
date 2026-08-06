@@ -3,3 +3,15 @@
 @source "../.flowbite-react/class-list.json";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+@layer components {
+  .thread-row {
+    @apply relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700;
+  }
+  .thread-row-link {
+    @apply cursor-default text-left block w-full p-2 lg:p-3 select-none md:select-auto;
+  }
+  .thread-row-meta {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+  }
+}
