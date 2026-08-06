@@ -84,23 +84,33 @@ const calculateThreadSpeed = (
   return Math.round(speed * 100) / 100;
 };
 
+const boardKeyRegex = /^[a-z0-9\-_]{1,63}$/;
+
 export const loader = async ({ params, request, context }: Route.LoaderArgs) => {
+  if (!params.boardKey || !boardKeyRegex.test(params.boardKey)) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
+
+  const boards = await fetchBoards({ baseUrl });
+  if (!boards.some((board) => board.board_key === params.boardKey)) {
+    throw new Response("Not Found", { status: 404 });
+  }
 
   const url = new URL(request.url);
   const isFull = url.searchParams.get("_v") === "full";
   const cookieHeader = request.headers.get("cookie") ?? "";
   const safeMode = !isFull && parseCookie(cookieHeader, "safe_mode") !== "off";
 
-  const [threadList, boards, clientConfig, unsafeThreadIds] = await Promise.all([
-    fetchThreadList(params.boardKey ?? "", { baseUrl }),
-    fetchBoards({ baseUrl }),
+  const [threadList, clientConfig, unsafeThreadIds] = await Promise.all([
+    fetchThreadList(params.boardKey, { baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
       enable_safe_mode: false,
     })),
     safeMode
-      ? fetchUnsafeThreadIds(params.boardKey ?? "", { baseUrl })
+      ? fetchUnsafeThreadIds(params.boardKey, { baseUrl })
       : Promise.resolve(new Set<number>()),
   ]);
 
