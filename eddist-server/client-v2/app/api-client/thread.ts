@@ -16,16 +16,16 @@ export interface BodyAnchorPart {
 
 const THREAD_CACHE_MAX_BYTES = 24 * 1024 * 1024;
 const THREAD_CACHE_TTL_MS = 30_000;
-type ThreadCacheData = ReturnType<typeof convertThreadTextToResponseList> & {
-  redirected: boolean;
-};
 // Weight is the source .dat byte size; the LRU is bounded by total bytes so a few
 // large (1000-res) threads can't starve the many small active ones or blow the heap.
-type ThreadCacheEntry = { data: ThreadCacheData; expiresAt: number; bytes: number };
-let _threadCache: Map<string, ThreadCacheEntry> | null = null;
+type ThreadTextEntry = { text: string; redirected: boolean; expiresAt: number; bytes: number };
+let _threadCache: Map<string, ThreadTextEntry> | null = null;
 let _threadCacheBytes = 0;
 
-export const fetchThread = async (
+// The SSR cache holds the raw .dat text, not the parsed structure: the parse is
+// cheap, and the raw text is what gets serialized into the hydration payload, so
+// keeping it unexpanded is both smaller on the wire and byte-stable under append.
+export const fetchThreadText = async (
   boardKey: string,
   threadKey: string,
   options?:
@@ -33,7 +33,7 @@ export const fetchThread = async (
         baseUrl: string;
       }
     | undefined,
-) => {
+): Promise<{ text: string; redirected: boolean }> => {
   if (import.meta.env.SSR) {
     const key = `${boardKey}:${threadKey}`;
     if (!_threadCache) _threadCache = new Map();
@@ -43,7 +43,7 @@ export const fetchThread = async (
         // Re-insert to mark most-recently-used (Map preserves insertion order).
         _threadCache.delete(key);
         _threadCache.set(key, cached);
-        return cached.data;
+        return { text: cached.text, redirected: cached.redirected };
       }
       _threadCache.delete(key);
       _threadCacheBytes -= cached.bytes;
@@ -67,10 +67,7 @@ export const fetchThread = async (
   const sjisText = await res.blob();
   const arrayBuffer = await sjisText.arrayBuffer();
   const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-  const result = {
-    ...convertThreadTextToResponseList(text),
-    redirected: res.redirected,
-  };
+  const redirected = res.redirected;
 
   if (import.meta.env.SSR) {
     if (!_threadCache) _threadCache = new Map();
@@ -90,7 +87,7 @@ export const fetchThread = async (
     }
 
     const bytes = arrayBuffer.byteLength;
-    _threadCache.set(key, { data: result, expiresAt: now + THREAD_CACHE_TTL_MS, bytes });
+    _threadCache.set(key, { text, redirected, expiresAt: now + THREAD_CACHE_TTL_MS, bytes });
     _threadCacheBytes += bytes;
 
     while (_threadCacheBytes > THREAD_CACHE_MAX_BYTES) {
@@ -102,7 +99,20 @@ export const fetchThread = async (
     }
   }
 
-  return result;
+  return { text, redirected };
+};
+
+export const fetchThread = async (
+  boardKey: string,
+  threadKey: string,
+  options?:
+    | {
+        baseUrl: string;
+      }
+    | undefined,
+) => {
+  const { text, redirected } = await fetchThreadText(boardKey, threadKey, options);
+  return { ...convertThreadTextToResponseList(text), redirected };
 };
 
 // name<>mail<>{date} ID:{authorId}<>{body}<>{title}
@@ -116,7 +126,7 @@ const ABONE_STRIP_ID_REGEX = /^(.*)<>(.*)<><> あぼーん <>(.*)$/;
 // 1001 stopper line: "1001<><>Over 1000 Thread<>{body}<>"
 const STOPPER_REGEX = /^(.*)<>(.*)<>Over 1000 Thread<>(.*)<>(.*)$/;
 
-const convertThreadTextToResponseList = (text: string) => {
+export const convertThreadTextToResponseList = (text: string) => {
   const lines = text.split("\n").filter((x) => x !== "");
   let threadTitle = "";
 
