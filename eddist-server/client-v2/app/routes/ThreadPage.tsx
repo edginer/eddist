@@ -27,6 +27,11 @@ const LazyNGWordsSettingsModal = lazy(() =>
   })),
 );
 
+// SSR/hydrate this many leading res; the client fills the rest by refetching the
+// full .dat on mount. Kept small so the hydration payload is a bounded prefix, not
+// the whole thread — the tradeoff is that res beyond it appear once that fetch lands.
+const SSR_INITIAL_RES = 50;
+
 export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
   const responseCount = parseInt(loaderHeaders.get("X-Response-Count") ?? "0", 10);
   const sMaxAge = responseCount > 100 ? 300 : 30;
@@ -67,14 +72,14 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     })),
   ]);
 
-  // Ship the raw .dat text and parse it isomorphically in the component; the parser
-  // maps each non-empty line to one response, so the line count is the response count
-  // for the cache-TTL header without an extra parse here.
-  const responseCount = threadResult.text.split("\n").filter((x) => x !== "").length;
+  // Ship only the first SSR_INITIAL_RES lines; the parser maps each non-empty line to
+  // one response. The full line count still drives the cache-TTL header.
+  const lines = threadResult.text.split("\n").filter((x) => x !== "");
+  const initialText = lines.slice(0, SSR_INITIAL_RES).join("\n");
 
   return data(
     {
-      threadText: threadResult.text,
+      threadText: initialText,
       threadRedirected: threadResult.redirected,
       boards,
       enableSafeMode: clientConfig.enable_safe_mode ?? false,
@@ -92,7 +97,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
         availableUserRegistration: boolean;
       };
     },
-    { headers: { "X-Response-Count": String(responseCount) } },
+    { headers: { "X-Response-Count": String(lines.length) } },
   );
 };
 
@@ -251,9 +256,8 @@ const ThreadPage = ({
     },
   );
 
-  const [isHydrated, setIsHydrated] = useState(false);
+  // Fill the res beyond the SSR prefix by refetching the full .dat on mount.
   useEffect(() => {
-    setIsHydrated(true);
     mutate();
   }, [mutate]);
 
@@ -273,8 +277,7 @@ const ThreadPage = ({
     [posts?.responses, shouldFilterResponse],
   );
 
-  const allResponses = posts?.responses ?? [];
-  const responsesToRender = isHydrated ? allResponses : allResponses.slice(0, 100);
+  const responsesToRender = posts?.responses ?? [];
 
   if (
     thread.redirected &&
