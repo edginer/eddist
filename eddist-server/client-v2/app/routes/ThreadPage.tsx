@@ -6,7 +6,13 @@ import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
-import { type BodyAnchorPart, fetchThread, type Response } from "~/api-client/thread";
+import {
+  type BodyAnchorPart,
+  convertThreadTextToResponseList,
+  fetchThread,
+  fetchThreadText,
+  type Response,
+} from "~/api-client/thread";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
@@ -20,6 +26,11 @@ const LazyNGWordsSettingsModal = lazy(() =>
     default: m.NGWordsSettingsModal,
   })),
 );
+
+// SSR/hydrate this many leading res; the client fills the rest by refetching the
+// full .dat on mount. Kept small so the hydration payload is a bounded prefix, not
+// the whole thread — the tradeoff is that res beyond it appear once that fetch lands.
+const SSR_INITIAL_RES = 50;
 
 export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
   const responseCount = parseInt(loaderHeaders.get("X-Response-Count") ?? "0", 10);
@@ -53,17 +64,23 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const [thread, clientConfig] = await Promise.all([
-    fetchThread(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
+  const [threadResult, clientConfig] = await Promise.all([
+    fetchThreadText(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
       enable_safe_mode: false,
     })),
   ]);
 
+  // Ship only the first SSR_INITIAL_RES lines; the parser maps each non-empty line to
+  // one response. The full line count still drives the cache-TTL header.
+  const lines = threadResult.text.split("\n").filter((x) => x !== "");
+  const initialText = lines.slice(0, SSR_INITIAL_RES).join("\n");
+
   return data(
     {
-      thread,
+      threadText: initialText,
+      threadRedirected: threadResult.redirected,
       boards,
       enableSafeMode: clientConfig.enable_safe_mode ?? false,
       eddistData: {
@@ -71,7 +88,8 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
         availableUserRegistration: clientConfig.enable_user_registration,
       },
     } satisfies {
-      thread: { threadName: string; responses: Response[] };
+      threadText: string;
+      threadRedirected: boolean;
       boards: Board[];
       enableSafeMode: boolean;
       eddistData: {
@@ -79,7 +97,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
         availableUserRegistration: boolean;
       };
     },
-    { headers: { "X-Response-Count": String(thread.responses.length) } },
+    { headers: { "X-Response-Count": String(lines.length) } },
   );
 };
 
@@ -124,9 +142,16 @@ const Meta = ({ bbsName, threadName }: { bbsName: string; threadName: string }) 
 );
 
 const ThreadPage = ({
-  loaderData: { boards, thread, enableSafeMode, eddistData },
+  loaderData: { boards, threadText, threadRedirected, enableSafeMode, eddistData },
 }: Route.ComponentProps) => {
   const params = useParams();
+
+  // Parse the raw .dat here (runs on both SSR render and client hydration) so the
+  // hydration payload carries only the compact text, not the expanded structure.
+  const thread = useMemo(
+    () => ({ ...convertThreadTextToResponseList(threadText), redirected: threadRedirected }),
+    [threadText, threadRedirected],
+  );
 
   const [popups, setPopups] = useState<Popup[]>([]);
   const popupCounter = useRef(0);
@@ -231,9 +256,8 @@ const ThreadPage = ({
     },
   );
 
-  const [isHydrated, setIsHydrated] = useState(false);
+  // Fill the res beyond the SSR prefix by refetching the full .dat on mount.
   useEffect(() => {
-    setIsHydrated(true);
     mutate();
   }, [mutate]);
 
@@ -253,8 +277,7 @@ const ThreadPage = ({
     [posts?.responses, shouldFilterResponse],
   );
 
-  const allResponses = posts?.responses ?? [];
-  const responsesToRender = isHydrated ? allResponses : allResponses.slice(0, 100);
+  const responsesToRender = posts?.responses ?? [];
 
   if (
     thread.redirected &&
