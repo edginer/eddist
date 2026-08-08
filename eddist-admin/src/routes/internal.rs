@@ -1,5 +1,10 @@
-use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
-use serde::Deserialize;
+use axum::{
+    Json, Router,
+    extract::State,
+    http::StatusCode,
+    routing::{get, post},
+};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{AppState, error::ApiError};
@@ -9,6 +14,11 @@ use super::auth_tokens::{clear_require_reauth_token, require_reauth_token};
 pub fn create_internal_routes() -> Router<AppState> {
     Router::new()
         .route("/authed-tokens/suspend", post(suspend_authed_token))
+        .route("/authed-tokens/unsuspend", post(unsuspend_authed_token))
+        .route(
+            "/authed-tokens/suspended",
+            get(list_suspended_authed_tokens),
+        )
         .route("/authed-tokens/revoke", post(revoke_authed_token))
         .route(
             "/authed-tokens/require-reauth/{authedTokenId}",
@@ -37,6 +47,48 @@ pub async fn suspend_authed_token(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+pub struct UnsuspendAuthedTokenInput {
+    pub authed_token_id: Uuid,
+}
+
+pub async fn unsuspend_authed_token(
+    State(state): State<AppState>,
+    Json(input): Json<UnsuspendAuthedTokenInput>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .services
+        .authed_token
+        .unsuspend_authed_token(input.authed_token_id)
+        .await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Serialize)]
+pub struct SuspendedAuthedToken {
+    pub authed_token_id: Uuid,
+    pub ttl_seconds: i64,
+}
+
+pub async fn list_suspended_authed_tokens(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SuspendedAuthedToken>>, ApiError> {
+    let items = state
+        .services
+        .authed_token
+        .list_suspended_authed_tokens()
+        .await?
+        .into_iter()
+        .map(|(authed_token_id, ttl_seconds)| SuspendedAuthedToken {
+            authed_token_id,
+            ttl_seconds,
+        })
+        .collect();
+
+    Ok(Json(items))
 }
 
 #[derive(Deserialize)]

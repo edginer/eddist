@@ -18,6 +18,7 @@ pub struct AuthedToken {
     pub last_wrote_at: Option<NaiveDateTime>,
     pub additional_info: Option<serde_json::Value>,
     pub require_reauth: bool,
+    pub is_suspended: Option<bool>,
 }
 
 #[derive(Debug, Clone, IntoParams, Serialize, Deserialize)]
@@ -45,6 +46,11 @@ pub struct PaginatedAuthedTokens {
 #[derive(Debug, Clone, ToSchema, IntoParams, Serialize, Deserialize)]
 pub struct DeleteAuthedTokenInput {
     pub using_origin_ip: bool,
+}
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct SuspendAuthedTokenBody {
+    pub ttl_seconds: u64,
 }
 
 #[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]

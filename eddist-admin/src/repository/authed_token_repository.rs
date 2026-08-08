@@ -38,6 +38,8 @@ impl From<AuthedTokenRow> for AuthedToken {
             last_wrote_at: row.last_wrote_at,
             additional_info: row.additional_info,
             require_reauth: row.require_reauth,
+            // Suspension lives in Redis, not this table; callers fill this in from there.
+            is_suspended: None,
         }
     }
 }

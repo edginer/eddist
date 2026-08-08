@@ -75,3 +75,38 @@ export const useClearReAuth = () => {
     onError: () => toast.error("Failed to clear re-auth requirement"),
   });
 };
+
+const SUSPEND_TOKEN = "/authed_tokens/{authed_token_id}/suspend";
+
+export const useSuspendToken = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { authedTokenId: string; ttlSeconds: number }) => {
+      await client.POST(SUSPEND_TOKEN, {
+        params: { path: { authed_token_id: args.authedTokenId } },
+        body: { ttl_seconds: args.ttlSeconds },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_AUTHED_TOKENS] });
+      toast.success("Token suspended");
+    },
+    onError: () => toast.error("Failed to suspend token"),
+  });
+};
+
+export const useUnsuspendToken = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (authedTokenId: string) => {
+      await client.DELETE(SUSPEND_TOKEN, {
+        params: { path: { authed_token_id: authedTokenId } },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_AUTHED_TOKENS] });
+      toast.success("Token unsuspended");
+    },
+    onError: () => toast.error("Failed to unsuspend token"),
+  });
+};
