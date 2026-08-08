@@ -15,14 +15,18 @@ import {
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
+import { intentPrefetch, schedulePrefetch } from "~/utils/prefetch";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { Button } from "../components/ui/Button";
 import type { Route } from "./+types/ThreadPage";
 
-const LazyPostResponseModal = lazy(() => import("../components/PostResponseModal"));
+const loadPostResponseModal = () => import("../components/PostResponseModal");
+const loadNGWordsSettingsModal = () => import("../components/NGWordsSettingsModal");
+
+const LazyPostResponseModal = lazy(loadPostResponseModal);
 const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
+  loadNGWordsSettingsModal().then((m) => ({
     default: m.NGWordsSettingsModal,
   })),
 );
@@ -261,6 +265,8 @@ const ThreadPage = ({
     mutate();
   }, [mutate]);
 
+  useEffect(() => schedulePrefetch([loadPostResponseModal, loadNGWordsSettingsModal]), []);
+
   // Find current board
   const currentBoard = boards?.find(
     (board: { board_key: string }) => board.board_key === params.boardKey,
@@ -375,6 +381,7 @@ const ThreadPage = ({
             hasEverOpenedNGSettings.current = true;
             setShowNGSettings(true);
           }}
+          {...intentPrefetch(loadNGWordsSettingsModal)}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="NG設定"
         >
@@ -385,6 +392,7 @@ const ThreadPage = ({
             hasEverOpenedResponse.current = true;
             setCreatingResponse(true);
           }}
+          {...intentPrefetch(loadPostResponseModal)}
           className={twMerge(
             "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
             params.boardKey || params.threadKey || "hidden",

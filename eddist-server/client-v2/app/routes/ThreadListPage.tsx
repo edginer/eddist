@@ -13,15 +13,19 @@ import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { useSummarizeEnabled } from "~/hooks/useSummarizeEnabled";
 import { useSummarizerSupported } from "~/hooks/useSummarizer";
 import { parseCookie } from "~/utils/cookie";
+import { intentPrefetch, schedulePrefetch } from "~/utils/prefetch";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { ThreadSummarizeButton } from "../components/ThreadSummarizeButton";
 import { Button } from "../components/ui/Button";
 import type { Route } from "./+types/ThreadListPage";
 
-const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
+const loadPostThreadModal = () => import("../components/PostThreadModal");
+const loadNGWordsSettingsModal = () => import("../components/NGWordsSettingsModal");
+
+const LazyPostThreadModal = lazy(loadPostThreadModal);
 const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
+  loadNGWordsSettingsModal().then((m) => ({
     default: m.NGWordsSettingsModal,
   })),
 );
@@ -274,6 +278,8 @@ const ThreadListPage = ({
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(true), []);
 
+  useEffect(() => schedulePrefetch([loadPostThreadModal, loadNGWordsSettingsModal]), []);
+
   const visibleThreadList = expanded ? filteredThreadList : ssrBaseList.slice(0, SSR_INITIAL_ROWS);
 
   return (
@@ -337,6 +343,7 @@ const ThreadListPage = ({
         <button
           type="button"
           onClick={openNGSettings}
+          {...intentPrefetch(loadNGWordsSettingsModal)}
           className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
           title="NG設定"
         >
@@ -372,6 +379,7 @@ const ThreadListPage = ({
             hasEverOpenedThread.current = true;
             setCreatingThread(true);
           }}
+          {...intentPrefetch(loadPostThreadModal)}
           className={twMerge("px-4 py-2 lg:px-6 lg:py-3 mx-2", params.boardKey || "hidden")}
         >
           <FaPen className="lg:mr-3" />
