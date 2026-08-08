@@ -33,6 +33,8 @@ pub trait AuthedTokenService: Send + Sync {
     async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
     async fn suspend_authed_token(&self, id: Uuid, ttl_seconds: u64) -> anyhow::Result<()>;
+    async fn unsuspend_authed_token(&self, id: Uuid) -> anyhow::Result<()>;
+    async fn list_suspended_authed_tokens(&self) -> anyhow::Result<Vec<(Uuid, i64)>>;
     async fn revoke_authed_token(&self, actor: &AdminIdentity, id: Uuid) -> anyhow::Result<()>;
 }
 
@@ -104,7 +106,11 @@ impl AuthedTokenService for AuthedTokenServiceImpl {
     }
 
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken> {
-        self.repo.get_authed_token(id).await
+        let mut token = self.repo.get_authed_token(id).await?;
+        let key = authed_token_suspended_key(&id.to_string());
+        let mut conn = self.redis_conn.clone();
+        token.is_suspended = Some(conn.exists(&key).await.unwrap_or(false));
+        Ok(token)
     }
 
     async fn delete_authed_token(
@@ -149,6 +155,47 @@ impl AuthedTokenService for AuthedTokenServiceImpl {
         conn.set_ex::<_, _, ()>(&key, "1", ttl_seconds)
             .await
             .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn unsuspend_authed_token(&self, id: Uuid) -> anyhow::Result<()> {
+        let key = authed_token_suspended_key(&id.to_string());
+        let mut conn = self.redis_conn.clone();
+        conn.del::<_, ()>(&key)
+            .await
+            .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn list_suspended_authed_tokens(&self) -> anyhow::Result<Vec<(Uuid, i64)>> {
+        let mut conn = self.redis_conn.clone();
+        let prefix = authed_token_suspended_key("");
+        let pattern = format!("{prefix}*");
+
+        let keys: Vec<String> = {
+            let mut iter: redis::AsyncIter<String> = conn
+                .scan_match(&pattern)
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+            let mut keys = Vec::new();
+            while let Some(key) = iter.next_item().await {
+                keys.push(key.map_err(|e| anyhow::anyhow!(e))?);
+            }
+            keys
+        };
+
+        let mut suspended = Vec::with_capacity(keys.len());
+        for key in keys {
+            let Some(id) = key
+                .strip_prefix(&prefix)
+                .and_then(|id_str| Uuid::parse_str(id_str).ok())
+            else {
+                continue;
+            };
+            let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
+            if ttl > 0 {
+                suspended.push((id, ttl));
+            }
+        }
+        Ok(suspended)
     }
 
     async fn revoke_authed_token(&self, _actor: &AdminIdentity, id: Uuid) -> anyhow::Result<()> {

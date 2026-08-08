@@ -280,6 +280,64 @@
         }
       }
     },
+    "/authed_tokens/{authed_token_id}/suspend": {
+      "post": {
+        "tags": [
+          "auth_tokens"
+        ],
+        "operationId": "suspend_token",
+        "parameters": [
+          {
+            "name": "authed_token_id",
+            "in": "path",
+            "description": "Authed token ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendAuthedTokenBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Suspended token successfully"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "auth_tokens"
+        ],
+        "operationId": "unsuspend_token",
+        "parameters": [
+          {
+            "name": "authed_token_id",
+            "in": "path",
+            "description": "Authed token ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unsuspended token successfully"
+          }
+        }
+      }
+    },
     "/boards/": {
       "get": {
         "tags": [
@@ -2353,6 +2411,12 @@
             "type": "string",
             "format": "uuid"
           },
+          "is_suspended": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "last_wrote_at": {
             "type": [
               "string",
@@ -3473,6 +3537,19 @@
           },
           "value": {
             "type": "string"
+          }
+        }
+      },
+      "SuspendAuthedTokenBody": {
+        "type": "object",
+        "required": [
+          "ttl_seconds"
+        ],
+        "properties": {
+          "ttl_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },

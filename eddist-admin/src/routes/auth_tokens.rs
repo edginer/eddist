@@ -10,7 +10,10 @@ use crate::{
     AppState,
     auth::AdminIdentity,
     error::ApiError,
-    models::{DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens},
+    models::{
+        DeleteAuthedTokenInput, ListAuthedTokensQuery, PaginatedAuthedTokens,
+        SuspendAuthedTokenBody,
+    },
 };
 
 pub fn routes() -> Router<AppState> {
@@ -24,6 +27,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/authed_tokens/{authedTokenId}/require-reauth",
             post(require_reauth_token).delete(clear_require_reauth_token),
+        )
+        .route(
+            "/authed_tokens/{authedTokenId}/suspend",
+            post(suspend_token).delete(unsuspend_token),
         )
 }
 
@@ -136,6 +143,55 @@ pub async fn clear_require_reauth_token(
         .services
         .authed_token
         .clear_require_reauth(authed_token_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    post,
+    path = "/authed_tokens/{authed_token_id}/suspend",
+    responses(
+        (status = 204, description = "Suspended token successfully"),
+    ),
+    params(
+        ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
+    ),
+    request_body = SuspendAuthedTokenBody
+)]
+pub async fn suspend_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+    Json(body): Json<SuspendAuthedTokenBody>,
+) -> Result<StatusCode, ApiError> {
+    if body.ttl_seconds == 0 {
+        return Err(ApiError::bad_request("ttl_seconds must be greater than 0"));
+    }
+    state
+        .services
+        .authed_token
+        .suspend_authed_token(authed_token_id, body.ttl_seconds)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/authed_tokens/{authed_token_id}/suspend",
+    responses(
+        (status = 204, description = "Unsuspended token successfully"),
+    ),
+    params(
+        ("authed_token_id" = Uuid, Path, description = "Authed token ID"),
+    ),
+)]
+pub async fn unsuspend_token(
+    State(state): State<AppState>,
+    Path(authed_token_id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .services
+        .authed_token
+        .unsuspend_authed_token(authed_token_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }

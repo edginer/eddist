@@ -30,6 +30,8 @@ import {
   useClearReAuth,
   useDeleteAuthedToken,
   useRequireReAuth,
+  useSuspendToken,
+  useUnsuspendToken,
 } from "~/hooks/queries";
 import client from "~/openapi/client";
 import type { components } from "~/openapi/schema";
@@ -42,6 +44,8 @@ const Page = () => {
   const deleteAuthedTokenMutation = useDeleteAuthedToken();
   const requireReAuthMutation = useRequireReAuth();
   const clearReAuthMutation = useClearReAuth();
+  const suspendTokenMutation = useSuspendToken();
+  const unsuspendTokenMutation = useUnsuspendToken();
 
   // Open detail modal when navigating with ?token=<id> from responses page
   useEffect(() => {
@@ -99,6 +103,14 @@ const Page = () => {
   // Detail modal
   const [selectedToken, setSelectedToken] = useState<AuthedToken | null>(null);
   const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+  const [suspendTtlMinutes, setSuspendTtlMinutes] = useState("60");
+
+  const handleSelectToken = useCallback(async (authedTokenId: string) => {
+    const { data } = await client.GET("/authed_tokens/{authed_token_id}/", {
+      params: { path: { authed_token_id: authedTokenId } },
+    });
+    if (data) setSelectedToken(data);
+  }, []);
 
   const queryParams = useMemo(
     () => ({
@@ -150,6 +162,24 @@ const Page = () => {
       { onSuccess: () => setSelectedToken(null) },
     );
   }, [selectedToken?.id, selectedToken?.origin_ip, deleteAuthedTokenMutation]);
+
+  const handleSuspendToken = useCallback(() => {
+    if (!selectedToken?.id) return;
+    const ttlSeconds = Number(suspendTtlMinutes) * 60;
+    if (!ttlSeconds || ttlSeconds <= 0) return;
+    if (!confirm(`Suspend this token for ${suspendTtlMinutes} minute(s)?`)) return;
+    suspendTokenMutation.mutate(
+      { authedTokenId: selectedToken.id, ttlSeconds },
+      { onSuccess: () => setSelectedToken({ ...selectedToken, is_suspended: true }) },
+    );
+  }, [selectedToken, suspendTtlMinutes, suspendTokenMutation]);
+
+  const handleUnsuspendToken = useCallback(() => {
+    if (!selectedToken?.id) return;
+    unsuspendTokenMutation.mutate(selectedToken.id, {
+      onSuccess: () => setSelectedToken({ ...selectedToken, is_suspended: false }),
+    });
+  }, [selectedToken, unsuspendTokenMutation]);
 
   const columns = useMemo<ColumnDef<AuthedToken>[]>(
     () => [
@@ -402,7 +432,7 @@ const Page = () => {
                 <TableRow
                   key={row.id}
                   className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => setSelectedToken(row.original)}
+                  onClick={() => handleSelectToken(row.original.id)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -474,6 +504,11 @@ const Page = () => {
             {selectedToken && (
               <Badge color={selectedToken.validity ? "success" : "failure"} size="sm">
                 {selectedToken.validity ? "Valid" : "Revoked"}
+              </Badge>
+            )}
+            {selectedToken?.is_suspended && (
+              <Badge color="warning" size="sm">
+                Suspended
               </Badge>
             )}
           </div>
@@ -635,6 +670,37 @@ const Page = () => {
                       Clear Re-Auth
                     </Button>
                   )}
+                  {selectedToken.is_suspended ? (
+                    <Button color="gray" size="sm" onClick={handleUnsuspendToken}>
+                      Unsuspend
+                    </Button>
+                  ) : (
+                    <div className="flex items-end gap-2">
+                      <div>
+                        <Label htmlFor="suspend-ttl" className="mb-1 block text-xs">
+                          Suspend for (minutes)
+                        </Label>
+                        <TextInput
+                          id="suspend-ttl"
+                          sizing="sm"
+                          type="number"
+                          min={1}
+                          className="w-28"
+                          value={suspendTtlMinutes}
+                          onChange={(e) => setSuspendTtlMinutes(e.target.value)}
+                          disabled={selectedToken.validity === false}
+                        />
+                      </div>
+                      <Button
+                        color="warning"
+                        size="sm"
+                        onClick={handleSuspendToken}
+                        disabled={selectedToken.validity === false}
+                      >
+                        Suspend
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 {selectedToken.validity === false && (
                   <p className="text-sm text-gray-500 mt-2">This token has already been revoked.</p>
@@ -642,6 +708,11 @@ const Page = () => {
                 {selectedToken.require_reauth && (
                   <p className="text-sm text-yellow-600 mt-2">
                     This token requires re-authentication before posting.
+                  </p>
+                )}
+                {selectedToken.is_suspended && (
+                  <p className="text-sm text-yellow-600 mt-2">
+                    This token is temporarily suspended from posting.
                   </p>
                 )}
               </div>

@@ -69,6 +69,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/authed_tokens/{authed_token_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["suspend_token"];
+        delete: operations["unsuspend_token"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/boards/": {
         parameters: {
             query?: never;
@@ -614,6 +630,7 @@ export interface components {
             created_at: string;
             /** Format: uuid */
             id: string;
+            is_suspended?: boolean | null;
             /** Format: date-time */
             last_wrote_at?: string | null;
             origin_ip: string;
@@ -902,6 +919,10 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             value: string;
+        };
+        SuspendAuthedTokenBody: {
+            /** Format: int64 */
+            ttl_seconds: number;
         };
         /** @description Terms model for API documentation */
         Terms: {
@@ -1213,6 +1234,52 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Cleared require re-auth successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    suspend_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Authed token ID */
+                authed_token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendAuthedTokenBody"];
+            };
+        };
+        responses: {
+            /** @description Suspended token successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unsuspend_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Authed token ID */
+                authed_token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unsuspended token successfully */
             204: {
                 headers: {
                     [name: string]: unknown;

@@ -49,6 +49,8 @@ use crate::{
         auth_tokens::delete_authed_token,
         auth_tokens::require_reauth_token,
         auth_tokens::clear_require_reauth_token,
+        auth_tokens::suspend_token,
+        auth_tokens::unsuspend_token,
 
         // Moderation routes
         moderation::get_ng_words,
@@ -125,6 +127,7 @@ use crate::{
         AuthedToken,
         PaginatedAuthedTokens,
         DeleteAuthedTokenInput,
+        SuspendAuthedTokenBody,
         NativeSessionRequest,
         NativeSessionResponse,
         NativeUserInfo,
