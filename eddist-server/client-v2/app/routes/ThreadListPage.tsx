@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
 import { Link, useParams } from "react-router";
 import useSWR from "swr";
@@ -28,6 +28,10 @@ const LazyNGWordsSettingsModal = lazy(() =>
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
 type SortOrder = "asc" | "desc";
+
+// Rows SSR'd before hydration; the rest are rendered client-side on mount to cut
+// single-threaded SSR render cost. 40 covers the fold up to a 4K portrait display.
+const SSR_INITIAL_ROWS = 40;
 
 // In-memory store: survives SPA navigation, resets on hard reload. Never mutated server-side.
 let memorySortKey: SortKey | null = null;
@@ -260,6 +264,18 @@ const ThreadListPage = ({
     );
   }, [sortedThreadList, shouldFilterThread, safeMode, unsafeSet]);
 
+  // Collapsed phase excludes NG (localStorage-only) so SSR and the hydration render match
+  // for every user; safeMode comes from the loader so it is consistent across both.
+  const ssrBaseList = useMemo(
+    () => sortedThreadList.filter((thread) => !(safeMode && unsafeSet.has(thread.id))),
+    [sortedThreadList, safeMode, unsafeSet],
+  );
+
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(true), []);
+
+  const visibleThreadList = expanded ? filteredThreadList : ssrBaseList.slice(0, SSR_INITIAL_ROWS);
+
   return (
     <div className="relative pt-16 min-h-screen dark:bg-gray-900 dark:text-gray-100">
       {/* Pull-to-refresh indicator */}
@@ -461,7 +477,7 @@ const ThreadListPage = ({
       )}
 
       <div className="flex flex-col lg:grow">
-        {filteredThreadList.map((thread, i) => (
+        {visibleThreadList.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (
               <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
