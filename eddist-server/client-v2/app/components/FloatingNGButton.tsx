@@ -1,8 +1,8 @@
-import { Button } from "flowbite-react";
 import { useEffect, useState } from "react";
 import { FaBan } from "react-icons/fa";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
+import { Button } from "./ui/Button";
 
 interface SelectionInfo {
   text: string;

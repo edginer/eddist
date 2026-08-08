@@ -1,4 +1,3 @@
-import { Toast } from "flowbite-react";
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { HiCheck, HiX } from "react-icons/hi";
 
@@ -48,7 +47,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       {/* Toast container - fixed position at top-right */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
-          <Toast key={toast.id}>
+          <div
+            key={toast.id}
+            className="flex items-center w-full max-w-xs p-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"
+          >
             <div
               className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                 toast.type === "success"
@@ -71,7 +73,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             >
               <HiX className="h-5 w-5" />
             </button>
-          </Toast>
+          </div>
         ))}
       </div>
     </ToastContext.Provider>
