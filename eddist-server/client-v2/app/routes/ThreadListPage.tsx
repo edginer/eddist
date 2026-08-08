@@ -1,4 +1,3 @@
-import { Button } from "flowbite-react";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
 import { Link, useParams } from "react-router";
@@ -17,6 +16,7 @@ import { parseCookie } from "~/utils/cookie";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { ThreadSummarizeButton } from "../components/ThreadSummarizeButton";
+import { Button } from "../components/ui/Button";
 import type { Route } from "./+types/ThreadListPage";
 
 const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));

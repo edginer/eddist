@@ -1,4 +1,3 @@
-import { Button } from "flowbite-react";
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { data, Link, useParams } from "react-router";
@@ -18,6 +17,7 @@ import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import { NGContextMenu } from "../components/NGContextMenu";
+import { Button } from "../components/ui/Button";
 import type { Route } from "./+types/ThreadPage";
 
 const LazyPostResponseModal = lazy(() => import("../components/PostResponseModal"));
