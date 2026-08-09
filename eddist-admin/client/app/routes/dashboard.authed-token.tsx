@@ -1,9 +1,11 @@
 import {
   type ColumnDef,
+  columnSizingFeature,
   flexRender,
-  getCoreRowModel,
+  rowSortingFeature,
   type SortingState,
-  useReactTable,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -38,6 +40,13 @@ import type { components } from "~/openapi/schema";
 import { formatDateTime } from "~/utils/format";
 
 type AuthedToken = components["schemas"]["AuthedToken"];
+
+// rowSorting drives the header sort handlers; columnSizing backs the `size` column
+// option and header.getSize(). Sorting itself is server-side (manualSorting).
+const tableFeaturesConfig = tableFeatures({
+  rowSortingFeature,
+  columnSizingFeature,
+});
 
 const Page = () => {
   const [searchParams] = useSearchParams();
@@ -181,7 +190,7 @@ const Page = () => {
     });
   }, [selectedToken, unsuspendTokenMutation]);
 
-  const columns = useMemo<ColumnDef<AuthedToken>[]>(
+  const columns = useMemo<ColumnDef<typeof tableFeaturesConfig, AuthedToken>[]>(
     () => [
       {
         accessorKey: "id",
@@ -240,15 +249,13 @@ const Page = () => {
 
   const tableData = useMemo(() => data?.items ?? [], [data]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features: tableFeaturesConfig,
     data: tableData,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
     manualSorting: true,
-    manualPagination: true,
-    rowCount: data?.total ?? 0,
   });
 
   const { rows } = table.getRowModel();
@@ -434,7 +441,7 @@ const Page = () => {
                   className="cursor-pointer hover:bg-gray-50"
                   onClick={() => handleSelectToken(row.original.id)}
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
