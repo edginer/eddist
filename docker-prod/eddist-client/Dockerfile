@@ -1,4 +1,4 @@
-FROM --platform=amd64 node:22-bookworm-slim AS dependencies
+FROM --platform=amd64 node:24-bookworm-slim AS dependencies
 
 # Setup pnpm using Corepack
 ENV PNPM_HOME="/pnpm"
@@ -14,7 +14,7 @@ WORKDIR /app
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
 
-FROM --platform=amd64 node:22-bookworm-slim
+FROM --platform=amd64 node:24-bookworm-slim
 
 # Setup pnpm using Corepack
 ENV PNPM_HOME="/pnpm"

@@ -30,7 +30,7 @@ services:
     depends_on:
       - mysql
   client-v2:
-    image: node:22-bookworm-slim
+    image: node:24-bookworm-slim
     container_name: client_v2_container
     working_dir: /workspace
     command: bash -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm -F eddist-client-v2 dev"
