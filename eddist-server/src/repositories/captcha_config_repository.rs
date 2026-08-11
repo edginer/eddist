@@ -70,6 +70,8 @@ fn get_default_widget_config(
             widget_html: String::new(),
             // Intercept form submission manually so token injection is not sensitive
             // to when the async script finishes loading relative to DOMContentLoaded.
+            // Uses requestSubmit() (not submit()) so other async captcha handlers on the
+            // same form still get their submit listener re-invoked instead of being bypassed.
             script_handler: Some(
                 r#"(function() {
   var form = document.getElementById('login-form');
@@ -84,8 +86,8 @@ fn get_default_widget_config(
       input.name = 'tripwire_token';
       input.value = result.token;
       self.appendChild(input);
-      self.submit();
-    }).catch(function() { self.submit(); });
+      self.requestSubmit();
+    }).catch(function() { self.requestSubmit(); });
   });
 })();"#
                     .to_string(),
