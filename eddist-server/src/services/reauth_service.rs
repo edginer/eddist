@@ -64,6 +64,11 @@ impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
                 Some(r) => r.clone(),
                 None => {
                     counter!("reauth_failure", "reason" => "missing_captcha_response").increment(1);
+                    tracing::error!(
+                        provider = %config.provider,
+                        field = %form_field_name,
+                        "captcha response not found in form"
+                    );
                     return Err(BbsPostAuthWithCodeError::CaptchaError(
                         CaptchaLikeError::FailedToVerifyCaptcha,
                     )
