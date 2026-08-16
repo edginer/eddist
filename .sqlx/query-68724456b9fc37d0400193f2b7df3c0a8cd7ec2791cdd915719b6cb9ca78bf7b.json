@@ -9,7 +9,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "id"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "name"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "password_hash"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "description"
+          }
         }
       },
       {
@@ -45,7 +73,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "created_at"
+          }
         }
       },
       {
@@ -54,7 +89,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.caps",
+            "name": "updated_at"
+          }
         }
       }
     ],

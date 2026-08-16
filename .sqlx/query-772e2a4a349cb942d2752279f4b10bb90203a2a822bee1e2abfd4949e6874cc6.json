@@ -9,7 +9,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "id"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "author_name"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "mail"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "body"
+          }
         }
       },
       {
@@ -45,7 +73,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "created_at"
+          }
         }
       },
       {
@@ -54,7 +89,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "author_id"
+          }
         }
       },
       {
@@ -63,7 +105,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "ip_addr"
+          }
         }
       },
       {
@@ -72,7 +121,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "authed_token_id"
+          }
         }
       },
       {
@@ -81,7 +137,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "board_id"
+          }
         }
       },
       {
@@ -90,7 +153,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "thread_id"
+          }
         }
       },
       {
@@ -99,7 +169,14 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 1
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "is_abone"
+          }
         }
       },
       {
@@ -108,8 +185,10 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
+          "collation": 63,
           "max_size": 2
-        }
+        },
+        "origin": "Expression"
       },
       {
         "ordinal": 12,
@@ -117,7 +196,14 @@
         "type_info": {
           "type": "Json",
           "flags": "NOT_NULL | BLOB | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 4294967295
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "client_info"
+          }
         }
       },
       {
@@ -126,7 +212,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.archived_responses",
+            "name": "res_order"
+          }
         }
       }
     ],

@@ -9,7 +9,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | PRIMARY_KEY",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.daily_stats",
+            "name": "board_key"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "Date",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 10
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.daily_stats",
+            "name": "date"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 20
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.daily_stats",
+            "name": "total_responses"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 20
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.daily_stats",
+            "name": "new_threads"
+          }
         }
       }
     ],

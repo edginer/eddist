@@ -69,6 +69,7 @@ toml.workspace = true
 mimalloc = { workspace = true }
 
 [dev-dependencies]
+eddist-core = { workspace = true, features = ["test-utils"] }
 testcontainers.workspace = true
 testcontainers-modules.workspace = true
 axum-test.workspace = true

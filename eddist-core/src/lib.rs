@@ -20,5 +20,7 @@ pub mod redis_keys;
 pub mod server_settings;
 pub mod simple_rate_limiter;
 pub mod symmetric;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 pub mod tracing;
 pub mod utils;

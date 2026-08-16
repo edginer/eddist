@@ -9,7 +9,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "id"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | UNIQUE_KEY | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "slug"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "title"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "content"
+          }
         }
       },
       {
@@ -45,7 +73,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "created_at"
+          }
         }
       },
       {
@@ -54,7 +89,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "updated_at"
+          }
         }
       },
       {
@@ -63,7 +105,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "published_at"
+          }
         }
       },
       {
@@ -72,7 +121,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "MULTIPLE_KEY",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "author_email"
+          }
         }
       }
     ],

@@ -156,15 +156,15 @@ impl CsrfState {
 mod tests {
     use super::*;
     use axum::http::HeaderMap;
+    use eddist_core::test_utils::EnvGuard;
 
     #[test]
     fn test_get_origin_ip_cloudflare() {
         let mut headers = HeaderMap::new();
         headers.insert("Cf-Connecting-IP", "203.0.113.1".parse().unwrap());
 
-        unsafe { std::env::set_var("ENV", "production") };
+        let _env = EnvGuard::set(&[("ENV", "production")]);
         assert_eq!(get_origin_ip(&headers), Some("203.0.113.1"));
-        unsafe { std::env::remove_var("ENV") };
     }
 
     #[test]
@@ -172,14 +172,15 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("X-Forwarded-For", "198.51.100.1".parse().unwrap());
 
-        unsafe { std::env::set_var("ENV", "production") };
+        let _env = EnvGuard::set(&[("ENV", "production")]);
         assert_eq!(get_origin_ip(&headers), Some("198.51.100.1"));
-        unsafe { std::env::remove_var("ENV") };
     }
 
     #[test]
     fn test_get_origin_ip_localhost_fallback() {
         let headers = HeaderMap::new();
+
+        let _env = EnvGuard::apply(&[("ENV", None)]);
         assert_eq!(get_origin_ip(&headers), Some("localhost"));
     }
 
@@ -200,5 +201,14 @@ mod tests {
     fn test_get_asn_num_missing_fallback() {
         let headers = HeaderMap::new();
         assert_eq!(get_asn_num(&headers), Some(0));
+    }
+
+    #[test]
+    fn decodes_tinker_jwt_from_before_jsonwebtoken_bump() {
+        let secret = "cHJvYmUtdGlua2VyLXNlY3JldC0zMi1ieXRlcyEh";
+        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdXRoZWRfdG9rZW4iOiJhdXRoZWQtdG9rZW4tYWJjIiwid3JvdGVfY291bnQiOjMsImNyZWF0ZWRfdGhyZWFkX2NvdW50IjoxLCJsZXZlbCI6MiwiaWx2bCI6MiwibGFzdF9sZXZlbF91cF9hdCI6MTcwMDAwMDAwMCwibGFzdF93cm90ZV9hdCI6MTcwMDAwMDUwMCwibGFzdF9jcmVhdGVkX3RocmVhZF9hdCI6bnVsbH0.PmpA-TzAgUH0bxUXpMTcOlp6c6D_tjnl_WoJRO1sqUA";
+
+        let tinker = get_tinker(token, secret).expect("token should decode");
+        assert_eq!(tinker.level(), 2);
     }
 }

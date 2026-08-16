@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::OnceLock;
 
 use chrono::{DateTime, Datelike, TimeDelta, Weekday};
@@ -70,6 +71,15 @@ pub fn convert_weekday_to_ja(weekday: Weekday) -> &'static str {
     }
 }
 
+pub fn to_hex(bytes: impl AsRef<[u8]>) -> String {
+    let bytes = bytes.as_ref();
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        write!(s, "{b:02x}").unwrap();
+    }
+    s
+}
+
 /// Slugify a string for use in HTML attributes and form field names.
 /// Converts to lowercase, replaces non-alphanumeric chars with hyphens,
 /// collapses consecutive hyphens, and trims leading/trailing hyphens.
@@ -83,4 +93,17 @@ pub fn slugify(s: &str) -> String {
         }
     }
     result.trim_matches('-').to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_hex_pads_and_lowercases_each_byte() {
+        assert_eq!(to_hex([]), "");
+        assert_eq!(to_hex([0x00, 0x0f, 0xa5, 0xff]), "000fa5ff");
+        assert_eq!(to_hex(b"eddist"), "656464697374");
+        assert_eq!(to_hex(vec![0xde, 0xad, 0xbe, 0xef]), "deadbeef");
+    }
 }

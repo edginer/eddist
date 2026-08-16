@@ -8,6 +8,7 @@ use axum_extra::extract::CookieJar;
 use eddist_core::{
     domain::board::validate_board_key,
     redis_keys::{shared_ng_id_key, shared_ng_id_rate_limit_key},
+    utils::to_hex,
 };
 use redis::{AsyncCommands as _, pipe};
 use serde::Deserialize;
@@ -48,7 +49,7 @@ fn empty(status: u16) -> Response {
 fn hash_edge_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
-    format!("{:x}", hasher.finalize())
+    to_hex(hasher.finalize())
 }
 
 async fn resolve_contributor_hash(state: &AppState, jar: &CookieJar) -> Result<String, Response> {
@@ -166,4 +167,17 @@ pub async fn delete_ng_ids(
     }
 
     empty(204)
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+
+    #[test]
+    fn known_vector_stable_across_digest_crate_bump() {
+        assert_eq!(
+            hash_edge_token("some-edge-token"),
+            "2160da207a387b8210efd4de4d0c25645d9cd17f9747fa4e69f23a8bff8874b4"
+        );
+    }
 }

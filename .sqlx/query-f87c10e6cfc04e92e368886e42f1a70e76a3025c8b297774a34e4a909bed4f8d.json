@@ -9,7 +9,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "id"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "local_rules"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "base_thread_creation_span_sec"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "base_response_creation_span_sec"
+          }
         }
       },
       {
@@ -45,7 +73,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "max_thread_name_byte_length"
+          }
         }
       },
       {
@@ -54,7 +89,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "max_author_name_byte_length"
+          }
         }
       },
       {
@@ -63,7 +105,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "max_email_byte_length"
+          }
         }
       },
       {
@@ -72,7 +121,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "max_response_body_byte_length"
+          }
         }
       },
       {
@@ -81,7 +137,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "max_response_body_lines"
+          }
         }
       },
       {
@@ -90,7 +153,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "threads_archive_cron"
+          }
         }
       },
       {
@@ -99,7 +169,14 @@
         "type_info": {
           "type": "Long",
           "flags": "",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "threads_archive_trigger_thread_count"
+          }
         }
       },
       {
@@ -108,7 +185,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "created_at"
+          }
         }
       },
       {
@@ -117,7 +201,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "updated_at"
+          }
         }
       },
       {
@@ -126,7 +217,14 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 1
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "read_only"
+          }
         }
       },
       {
@@ -135,7 +233,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
+          "collation": 255,
           "max_size": 40
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "force_metadent_type"
+          }
         }
       },
       {
@@ -144,7 +249,14 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
+          "collation": 63,
           "max_size": 1
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "enable_1001_message"
+          }
         }
       },
       {
@@ -153,7 +265,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "BLOB",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.boards_info",
+            "name": "custom_1001_message"
+          }
         }
       }
     ],

@@ -181,7 +181,8 @@ impl CapRepository for CapRepositoryImpl {
             sets.join(", ")
         );
 
-        let mut query = sqlx::query(&query);
+        // Dynamic part is only fixed column names; values are bound below.
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
         for value in values {
             query = query.bind(value);
         }

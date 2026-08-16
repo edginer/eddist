@@ -99,7 +99,8 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             "#
         );
 
-        let mut query = sqlx::query_as::<_, SelectionThread>(&query);
+        // Dynamic part is only fixed clause fragments / `?` counts; values are bound below.
+        let mut query = sqlx::query_as::<_, SelectionThread>(sqlx::AssertSqlSafe(query));
 
         query = query.bind(board_key);
         if let Some(thread_numbers) = &thread_numbers {
@@ -156,7 +157,8 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             "#
         );
 
-        let mut query = sqlx::query_as::<_, SelectionThread>(&query);
+        // Dynamic part is only fixed clause fragments / `?` counts; values are bound below.
+        let mut query = sqlx::query_as::<_, SelectionThread>(sqlx::AssertSqlSafe(query));
 
         query = query.bind(board_key);
         if let Some(thread_numbers) = &thread_numbers {
@@ -210,7 +212,8 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
         query.push_str("ORDER BY last_modified_at DESC ");
         query.push_str("LIMIT ? OFFSET ?");
 
-        let mut query = sqlx::query_as::<_, SelectionThread>(&query);
+        // Dynamic part is only fixed clause fragments / `?` counts; values are bound below.
+        let mut query = sqlx::query_as::<_, SelectionThread>(sqlx::AssertSqlSafe(query));
 
         query = query.bind(board_key);
         if let Some(keyword) = keyword {

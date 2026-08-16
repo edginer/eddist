@@ -57,7 +57,9 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             "#
         );
 
-        let mut query = sqlx::query_as::<_, SelectionBoardWithThreadCount>(&query);
+        // Dynamic part is only fixed clause fragments / `?` counts; values are bound below.
+        let mut query =
+            sqlx::query_as::<_, SelectionBoardWithThreadCount>(sqlx::AssertSqlSafe(query));
 
         if let Some(keys) = keys {
             for key in keys {
@@ -205,7 +207,10 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             sets.join(", "),
             sets.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
         );
-        let mut query = sqlx::query(&query).bind(board_id).bind(board.local_rule);
+        // Dynamic part is only fixed column names / `?` counts; values are bound below.
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(query))
+            .bind(board_id)
+            .bind(board.local_rule);
 
         for v in values {
             query = query.bind(v as i32);
@@ -345,7 +350,8 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             "#,
                 sets.join(", ")
             );
-            let mut query = sqlx::query(&query);
+            // Dynamic part is only fixed column names; values are bound below.
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
 
             for v in values_str {
                 query = query.bind(v);
@@ -376,7 +382,8 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             "#,
                 board_sets.join(", ")
             );
-            let mut query = sqlx::query(&query);
+            // Dynamic part is only fixed column names; values are bound below.
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
 
             for v in board_values {
                 query = query.bind(v);

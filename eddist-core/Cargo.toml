@@ -3,6 +3,9 @@ name = "eddist-core"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test-utils = []
+
 [dependencies]
 serde.workspace = true
 chrono.workspace = true

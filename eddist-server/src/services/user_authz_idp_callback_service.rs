@@ -22,8 +22,9 @@ use crate::{
     },
     utils::TransactionRepository,
 };
-use eddist_core::redis_keys::{
-    user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key,
+use eddist_core::{
+    redis_keys::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
+    utils::to_hex,
 };
 
 use super::AppService;
@@ -212,7 +213,7 @@ impl<
 
         let mut hasher = sha3::Sha3_512::new();
         hasher.update(Uuid::now_v7().to_string());
-        let user_sid = format!("{:x}", hasher.finalize());
+        let user_sid = to_hex(hasher.finalize());
 
         redis_conn
             .set_ex::<_, _, ()>(
@@ -263,7 +264,7 @@ impl<
             Some(user) => {
                 let mut hasher = sha3::Sha3_512::new();
                 hasher.update(Uuid::now_v7().to_string());
-                let user_sid = format!("{:x}", hasher.finalize());
+                let user_sid = to_hex(hasher.finalize());
 
                 redis_conn
                     .set_ex::<_, _, ()>(
@@ -511,4 +512,21 @@ fn user_name_generator() -> String {
     );
 
     user_name
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use eddist_core::utils::to_hex;
+    use sha3::Digest;
+
+    /// user_sid is a fresh Redis session key, not a persisted/compared value across
+    /// restarts, so only the hex shape needs to stay stable, not the exact digits.
+    #[test]
+    fn hex_output_shape_stable_across_digest_crate_bump() {
+        let mut hasher = sha3::Sha3_512::new();
+        hasher.update("fixed-uuid-for-probe");
+        let user_sid = to_hex(hasher.finalize());
+        assert_eq!(user_sid.len(), 128);
+        assert!(user_sid.chars().all(|c| c.is_ascii_hexdigit()));
+    }
 }

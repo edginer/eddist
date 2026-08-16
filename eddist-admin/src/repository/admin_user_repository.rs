@@ -78,7 +78,8 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
             sets.join(" OR ")
         );
 
-        let mut query = sqlx::query_as::<_, UserIdpsSelection>(&query);
+        // Dynamic part is only fixed clause fragments; values are bound below.
+        let mut query = sqlx::query_as::<_, UserIdpsSelection>(sqlx::AssertSqlSafe(query));
         for value in values {
             query = query.bind(value);
         }

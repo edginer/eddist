@@ -589,3 +589,35 @@ fn get_client_info(headers: &http::HeaderMap) -> ClientInfo {
         client_ua,
     }
 }
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+    use eddist_core::test_utils::EnvGuard;
+
+    #[tokio::test]
+    async fn decodes_independently_constructed_rs256_token() {
+        let pub_key_pem = "-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsHuHd9NJ9JyKocJxrTq3\n\
+IkqOQvjZKOeqnlY+Y1CCPkb2u2HQbfPphjjXEEB6P8l90wCRtphvODx8IsTc5Av5\n\
+V1NlHfAvYQ5DAdlxxqiDaVn/kHz2QhMkhKPeviTZPEWTjKzg7iS/c1X8NUhEux+L\n\
+AO7a1x3VLobHNJw0N3/GDG4lMUEqKwVGFkqVO46kVqk9xyrJstFSInyMfxTyvUHl\n\
+7Cd9hWmCH+UW4EwNMVql7BXrj2++ysCLaszHaXBasURHtFuPTnUJjdkvI8S/oJmF\n\
+3bxNCRYvOcRcjO9CeOZx4H2xICZDrsprJlxaUD3khEIIQtndg1JUNMD6zHTXK48i\n\
+NQIDAQAB\n\
+-----END PUBLIC KEY-----\n";
+        let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsInN1YiI6ImF1dGgwfHByb2JlLXVzZXIiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoicHJvYmV1c2VyIiwiZW1haWwiOiJwcm9iZUBleGFtcGxlLmNvbSIsImF1ZCI6ImFjY291bnQifQ.EFr-syTXg0UOJPY7F8EyOOIYZ4yAgbHx982nyBJHAbunzocnLC51yXvHGfJUdWinP0RfICBFB7SRwnh4JoXjZ80j7kHdfPzIq_2U_5m633geFvJWyoXExDBO2FtHHaw8USxF3IIzbaWlLMJGkVCcBHeZ9S1DSwD4IG0Tw1ur4_ZjSVreDAfim1GFR9yyMR_nY-Z0vyFe2MdGiSxK5Hpq8VVgQ7jSqF-3it5q6L84N3S8fiDjTjdOaFMdbplpPbLll6oci27V4hLOE-TqaxTCPLZxEMnTHzawZYrcxckJkklXPigyGAutisbjNeNf1OXr_uYThEfY2QiMMs9FVZ8YsQ";
+
+        let _env = EnvGuard::apply(&[
+            ("EDDIST_USER_INFO_URL", None),
+            ("EDDIST_ISSUER", None),
+            ("EDDIST_ADMIN_JWT_PUB_KEY", Some(pub_key_pem)),
+        ]);
+
+        let claims = verify_access_token(token, false).await.unwrap();
+        assert_eq!(claims.sub, "auth0|probe-user");
+        assert_eq!(claims.email, "probe@example.com");
+        assert_eq!(claims.preferred_username, "probeuser");
+        assert!(claims.email_verified);
+    }
+}

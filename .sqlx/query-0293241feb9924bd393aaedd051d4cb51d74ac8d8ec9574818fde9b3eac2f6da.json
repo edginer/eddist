@@ -9,7 +9,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.threads",
+            "name": "title"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 20
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.threads",
+            "name": "thread_number"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.threads",
+            "name": "id"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.threads",
+            "name": "last_modified_at"
+          }
         }
       }
     ],

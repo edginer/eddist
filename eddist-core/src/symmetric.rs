@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use base64::Engine;
-use chacha20poly1305::{KeyInit, aead::Aead};
+use chacha20poly1305::{Key, KeyInit, Nonce, aead::Aead};
 
 static KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
@@ -23,10 +23,10 @@ pub fn encrypt(plain: &str) -> String {
     let key = derived_key();
     let nonce_bytes: [u8; 12] = rand::random();
     let ciphertext = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(key),
+        <&Key>::try_from(key).expect("TINKER_SECRET must be at least 32 bytes"),
     )
     .encrypt(
-        chacha20poly1305::Nonce::from_slice(&nonce_bytes),
+        <&Nonce>::try_from(nonce_bytes.as_slice()).expect("nonce is a fixed 12 bytes"),
         chacha20poly1305::aead::Payload {
             msg: plain.as_bytes(),
             aad: b"",
@@ -54,10 +54,10 @@ pub fn decrypt(b64: &str) -> anyhow::Result<String> {
 
     let (nonce_bytes, ciphertext) = data.split_at(12);
     let plaintext = chacha20poly1305::ChaCha20Poly1305::new(
-        md5::digest::generic_array::GenericArray::from_slice(key),
+        <&Key>::try_from(key).expect("TINKER_SECRET must be at least 32 bytes"),
     )
     .decrypt(
-        chacha20poly1305::Nonce::from_slice(nonce_bytes),
+        <&Nonce>::try_from(nonce_bytes).map_err(|_| anyhow::anyhow!("malformed nonce"))?,
         chacha20poly1305::aead::Payload {
             msg: ciphertext,
             aad: b"",
@@ -71,10 +71,11 @@ pub fn decrypt(b64: &str) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::EnvGuard;
 
     #[test]
     fn round_trip() {
-        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
+        let _env = EnvGuard::set(&[("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")]);
         let plain = "my_secret_value";
         let encrypted = encrypt(plain);
         assert!(encrypted.starts_with("v1:"));
@@ -83,7 +84,7 @@ mod tests {
 
     #[test]
     fn different_nonces_each_call() {
-        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
+        let _env = EnvGuard::set(&[("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")]);
         let a = encrypt("same");
         let b = encrypt("same");
         assert_ne!(a, b);
@@ -91,7 +92,16 @@ mod tests {
 
     #[test]
     fn rejects_missing_prefix() {
-        unsafe { std::env::set_var("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!") };
+        let _env = EnvGuard::set(&[("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")]);
         assert!(decrypt("not_v1_prefixed").is_err());
+    }
+
+    #[test]
+    fn decrypts_ciphertext_from_before_digest_crate_bump() {
+        let _env = EnvGuard::set(&[("TINKER_SECRET", "a_very_secret_key_that_is_not_32_bytes!")]);
+        assert_eq!(
+            decrypt("v1:AQIDBAUGBwgJCgsMV/kChHx8funxupixSVb+8Fo/+MPvyDuoxNN9AFN4Iw==").unwrap(),
+            "probe-plaintext"
+        );
     }
 }
