@@ -184,7 +184,8 @@ impl NgWordRepository for NgWordRepositoryImpl {
             sets.join(", ")
         );
 
-        let mut query = sqlx::query(&query);
+        // Dynamic part is only fixed column names; values are bound below.
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
         if let Some(name) = name {
             query = query.bind(name);
         }

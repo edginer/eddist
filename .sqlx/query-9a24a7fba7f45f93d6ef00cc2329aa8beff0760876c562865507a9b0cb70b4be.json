@@ -9,7 +9,14 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 16
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "id"
+          }
         }
       },
       {
@@ -18,7 +25,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 400
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "name"
+          }
         }
       },
       {
@@ -27,7 +41,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 200
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "provider"
+          }
         }
       },
       {
@@ -36,7 +57,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "site_key"
+          }
         }
       },
       {
@@ -45,7 +73,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "secret"
+          }
         }
       },
       {
@@ -54,7 +89,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "base_url"
+          }
         }
       },
       {
@@ -63,7 +105,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
+          "collation": 255,
           "max_size": 400
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "widget_form_field_name"
+          }
         }
       },
       {
@@ -72,7 +121,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "BLOB",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "widget_script_url"
+          }
         }
       },
       {
@@ -81,7 +137,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "BLOB",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "widget_html"
+          }
         }
       },
       {
@@ -90,7 +153,14 @@
         "type_info": {
           "type": "Blob",
           "flags": "BLOB",
+          "collation": 255,
           "max_size": 262140
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "widget_script_handler"
+          }
         }
       },
       {
@@ -99,7 +169,14 @@
         "type_info": {
           "type": "Json",
           "flags": "BLOB | BINARY",
+          "collation": 63,
           "max_size": 4294967295
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "capture_fields"
+          }
         }
       },
       {
@@ -108,7 +185,14 @@
         "type_info": {
           "type": "Json",
           "flags": "BLOB | BINARY",
+          "collation": 63,
           "max_size": 4294967295
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "verification"
+          }
         }
       },
       {
@@ -117,7 +201,14 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL | MULTIPLE_KEY",
+          "collation": 63,
           "max_size": 1
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "is_active"
+          }
         }
       },
       {
@@ -126,7 +217,14 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | MULTIPLE_KEY",
+          "collation": 63,
           "max_size": 11
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "display_order"
+          }
         }
       },
       {
@@ -135,7 +233,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL",
+          "collation": 255,
           "max_size": 64
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "endpoint_usage"
+          }
         }
       },
       {
@@ -144,7 +249,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "created_at"
+          }
         }
       },
       {
@@ -153,7 +265,14 @@
         "type_info": {
           "type": "Datetime",
           "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "collation": 63,
           "max_size": 23
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "updated_at"
+          }
         }
       },
       {
@@ -162,7 +281,14 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
+          "collation": 255,
           "max_size": 1020
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.captcha_configs",
+            "name": "updated_by"
+          }
         }
       }
     ],

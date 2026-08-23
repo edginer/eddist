@@ -225,4 +225,12 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn known_vector_stable_across_digest_crate_bump() {
+        assert_eq!(
+            generate_meta_ident(12345, "127.0.0.1", "Mozilla/5.0", 12345),
+            "QEFB-4GU0"
+        );
+    }
 }

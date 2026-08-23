@@ -379,103 +379,111 @@ impl Layer3IntelTripwireClient {
 
     /// Decrypt a JWE compact serialization (ECDH-ES + A256GCM) using the configured private key.
     fn decrypt_jwe(&self, jwe: &str) -> Result<Vec<u8>, CaptchaLikeError> {
-        let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-
-        // 1. Split into 5 base64url parts
-        let parts = jwe.splitn(6, '.').collect::<Vec<&str>>();
-        if parts.len() != 5 {
-            log::info!("Tripwire JWE: expected 5 parts, got {}", parts.len());
-            return Err(CaptchaLikeError::FailedToVerifyCaptcha);
-        }
-        let (b64_header, _b64_enc_key, b64_iv, b64_ciphertext, b64_tag) =
-            (parts[0], parts[1], parts[2], parts[3], parts[4]);
-
-        // 2. Decode header JSON → extract epk x/y coords
-        let header_bytes = engine
-            .decode(b64_header)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let header: serde_json::Value = serde_json::from_slice(&header_bytes)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let epk = header
-            .get("epk")
-            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let x_b64 = epk
-            .get("x")
-            .and_then(|v| v.as_str())
-            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let y_b64 = epk
-            .get("y")
-            .and_then(|v| v.as_str())
-            .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
-
-        // 3. Reconstruct ephemeral public key: 0x04 || x (32 bytes) || y (32 bytes)
-        let x_bytes = engine
-            .decode(x_b64)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let y_bytes = engine
-            .decode(y_b64)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        if x_bytes.len() != 32 || y_bytes.len() != 32 {
-            return Err(CaptchaLikeError::FailedToVerifyCaptcha);
-        }
-        let mut uncompressed = Vec::with_capacity(65);
-        uncompressed.push(0x04u8);
-        uncompressed.extend_from_slice(&x_bytes);
-        uncompressed.extend_from_slice(&y_bytes);
-        let epk_pk = P256PublicKey::from_sec1_bytes(&uncompressed)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-
-        // 4. ECDH → 32-byte shared secret Z
-        let scalar = self.private_key.to_nonzero_scalar();
-        let shared = diffie_hellman(&scalar, epk_pk.as_affine());
-        let z_bytes = shared.raw_secret_bytes();
-
-        // 5. ConcatKDF (RFC 7518 §4.6.2) — single SHA-256 round → 32-byte CEK
-        //    SHA-256(0x00000001 || Z || len32("A256GCM") || "A256GCM" || 0x00000000 || 0x00000000 || 0x00000100)
-        let alg_id = b"A256GCM";
-        let mut hasher = Sha256::new();
-        hasher.update(1u32.to_be_bytes());
-        hasher.update(z_bytes);
-        hasher.update((alg_id.len() as u32).to_be_bytes());
-        hasher.update(alg_id);
-        hasher.update(0u32.to_be_bytes()); // PartyUInfo: empty
-        hasher.update(0u32.to_be_bytes()); // PartyVInfo: empty
-        hasher.update(256u32.to_be_bytes()); // keydatalen = 256 bits
-        let cek = hasher.finalize();
-
-        // 6. AES-256-GCM decrypt (AAD = raw base64url protected header bytes)
-        let iv = engine
-            .decode(b64_iv)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let ciphertext = engine
-            .decode(b64_ciphertext)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let tag = engine
-            .decode(b64_tag)
-            .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-
-        let mut ct_with_tag = ciphertext;
-        ct_with_tag.extend_from_slice(&tag);
-
-        let cipher =
-            Aes256Gcm::new_from_slice(&cek).map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
-        let nonce = aes_gcm::Nonce::from_slice(&iv);
-
-        cipher
-            .decrypt(
-                nonce,
-                Payload {
-                    msg: &ct_with_tag,
-                    aad: b64_header.as_bytes(),
-                },
-            )
-            .map_err(|_| {
-                log::info!(
-                    "Tripwire JWE: AES-GCM decryption failed (tag mismatch or corrupt token)"
-                );
-                CaptchaLikeError::FailedToVerifyCaptcha
-            })
+        decrypt_jwe_with_key(&self.private_key, jwe)
     }
+}
+
+/// Pure ECDH-ES + A256GCM JWE decryption, split out from [`Layer3IntelTripwireClient::decrypt_jwe`]
+/// so it's testable without a live Redis connection.
+fn decrypt_jwe_with_key(
+    private_key: &P256SecretKey,
+    jwe: &str,
+) -> Result<Vec<u8>, CaptchaLikeError> {
+    let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    // 1. Split into 5 base64url parts
+    let parts = jwe.splitn(6, '.').collect::<Vec<&str>>();
+    if parts.len() != 5 {
+        log::info!("Tripwire JWE: expected 5 parts, got {}", parts.len());
+        return Err(CaptchaLikeError::FailedToVerifyCaptcha);
+    }
+    let (b64_header, _b64_enc_key, b64_iv, b64_ciphertext, b64_tag) =
+        (parts[0], parts[1], parts[2], parts[3], parts[4]);
+
+    // 2. Decode header JSON → extract epk x/y coords
+    let header_bytes = engine
+        .decode(b64_header)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let header: serde_json::Value = serde_json::from_slice(&header_bytes)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let epk = header
+        .get("epk")
+        .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let x_b64 = epk
+        .get("x")
+        .and_then(|v| v.as_str())
+        .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let y_b64 = epk
+        .get("y")
+        .and_then(|v| v.as_str())
+        .ok_or(CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+    // 3. Reconstruct ephemeral public key: 0x04 || x (32 bytes) || y (32 bytes)
+    let x_bytes = engine
+        .decode(x_b64)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let y_bytes = engine
+        .decode(y_b64)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    if x_bytes.len() != 32 || y_bytes.len() != 32 {
+        return Err(CaptchaLikeError::FailedToVerifyCaptcha);
+    }
+    let mut uncompressed = Vec::with_capacity(65);
+    uncompressed.push(0x04u8);
+    uncompressed.extend_from_slice(&x_bytes);
+    uncompressed.extend_from_slice(&y_bytes);
+    let epk_pk = P256PublicKey::from_sec1_bytes(&uncompressed)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+    // 4. ECDH → 32-byte shared secret Z
+    let scalar = private_key.to_nonzero_scalar();
+    let shared = diffie_hellman(&scalar, epk_pk.as_affine());
+    let z_bytes = shared.raw_secret_bytes();
+
+    // 5. ConcatKDF (RFC 7518 §4.6.2) — single SHA-256 round → 32-byte CEK
+    //    SHA-256(0x00000001 || Z || len32("A256GCM") || "A256GCM" || 0x00000000 || 0x00000000 || 0x00000100)
+    let alg_id = b"A256GCM";
+    let mut hasher = Sha256::new();
+    hasher.update(1u32.to_be_bytes());
+    hasher.update(z_bytes);
+    hasher.update((alg_id.len() as u32).to_be_bytes());
+    hasher.update(alg_id);
+    hasher.update(0u32.to_be_bytes()); // PartyUInfo: empty
+    hasher.update(0u32.to_be_bytes()); // PartyVInfo: empty
+    hasher.update(256u32.to_be_bytes()); // keydatalen = 256 bits
+    let cek = hasher.finalize();
+
+    // 6. AES-256-GCM decrypt (AAD = raw base64url protected header bytes)
+    let iv = engine
+        .decode(b64_iv)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let ciphertext = engine
+        .decode(b64_ciphertext)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let tag = engine
+        .decode(b64_tag)
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+    let mut ct_with_tag = ciphertext;
+    ct_with_tag.extend_from_slice(&tag);
+
+    let cipher =
+        Aes256Gcm::new_from_slice(&cek).map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+    let nonce = <&aes_gcm::Nonce<_>>::try_from(iv.as_slice())
+        .map_err(|_| CaptchaLikeError::FailedToVerifyCaptcha)?;
+
+    cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &ct_with_tag,
+                aad: b64_header.as_bytes(),
+            },
+        )
+        .map_err(|_| {
+            log::info!("Tripwire JWE: AES-GCM decryption failed (tag mismatch or corrupt token)");
+            CaptchaLikeError::FailedToVerifyCaptcha
+        })
 }
 
 #[async_trait::async_trait]
@@ -943,4 +951,24 @@ pub enum CaptchaLikeError {
 pub enum CaptchaLikeResult {
     Success,
     Failure(CaptchaLikeError),
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+
+    #[test]
+    fn decrypts_independently_constructed_jwe_vector() {
+        let pem = "-----BEGIN PRIVATE KEY-----\n\
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgABI0VniQq83vEjRW\n\
+eJCrze8SNFZ4kKvN7xI0VniQq82hRANCAAQtViphfp37BDfWYToDhvu5wkGOjolX\n\
+1Nep/XsVGIgyejjs19m2sWZ0bYW5dPuKa5/SurOLmkDt22AIo4DQeGzP\n\
+-----END PRIVATE KEY-----\n";
+        let private_key = P256SecretKey::from_pkcs8_pem(pem).unwrap();
+
+        let jwe = "eyJhbGciOiJFQ0RILUVTIiwiZW5jIjoiQTI1NkdDTSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InF2N0xJRGZ5UzhCU2xRc1QtRGtRQ29CRkRUbjFjMkVFRzFkdFVyYS1RcFEiLCJ5IjoiVG4yWlZlV0dkM2xmY1VDZGJyRS1DZG5KMjdRUG5IQmJoU0o3T08tUDV6ZyJ9fQ..AAECAwQFBgcICQoL.WQlb-L839vrzTC6zO8yfSTbP1qLFQ9JRgd_-MA.OYy6UbCUIRfGqSbkE-U7fQ";
+
+        let plaintext = decrypt_jwe_with_key(&private_key, jwe).unwrap();
+        assert_eq!(plaintext, b"probe-tripwire-jwe-plaintext");
+    }
 }

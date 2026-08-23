@@ -914,4 +914,15 @@ plainexample.com appears and finally ttp://fake.com/aaa.vvv for a test
         assert_ne!(ids[1], ids[2], "Day 2 and Day 3 IDs should be different");
         assert_ne!(ids[0], ids[2], "Day 1 and Day 3 IDs should be different");
     }
+
+    #[test]
+    fn known_vectors_stable_across_digest_crate_bump() {
+        assert_eq!(
+            calculate_trip("this is a long tripcode source string over 12 bytes"),
+            "Px6jwtw25R0H"
+        );
+        assert_eq!(calculate_trip("abc"), "GmgU93SCyE");
+        assert_eq!(Md5::digest(b"Mozilla/5.0")[0], 14);
+        assert_eq!(Md5::digest(b"192")[0], 88);
+    }
 }

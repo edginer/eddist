@@ -33,16 +33,16 @@ toml = "1.1.0"
 
 # Web framework
 axum = "0.8.8"
-axum-extra = { version = "0.10.3", features = ["cookie"] }
+axum-extra = { version = "0.12.6", features = ["cookie"] }
 tower = "0.5.3"
-tower-http = { version = "0.6.8" }
+tower-http = { version = "0.7.0" }
 tower-layer = "0.3.3"
 hyper = "1.8.1"
 hyper-util = "0.1.20"
 http = "1.4.0"
 
 # Database
-sqlx = { version = "0.8.6", default-features = false, features = [
+sqlx = { version = "0.9.0", default-features = false, features = [
     "runtime-tokio",
     "tls-rustls",
     "mysql",
@@ -75,14 +75,14 @@ encoding_rs = "0.8.35"
 base64 = "0.22.1"
 
 # Cryptography
-sha3 = "0.10.8"
-sha2 = "0.10.9"
-sha1 = { version = "0.10.6", default-features = false }
-md-5 = "0.10.6"
-jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
-chacha20poly1305 = "0.10.1"
-p256 = { version = "0.13", features = ["ecdh", "pkcs8", "pem"] }
-aes-gcm = "0.10"
+sha3 = "0.12.0"
+sha2 = "0.11.0"
+sha1 = { version = "0.11.0", default-features = false }
+md-5 = "0.11.0"
+jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
+chacha20poly1305 = "0.11.0"
+p256 = { version = "0.14", features = ["ecdh", "pkcs8", "pem"] }
+aes-gcm = "0.11"
 pwhash = "1.0.0"
 
 # Cloud storage
@@ -114,17 +114,17 @@ url = "2.5.8"
 rand = "0.10.0"
 ipnet = "2.12.0"
 handlebars = "6.4.0"
-cron = "0.16.0"
+cron = "0.17.0"
 
 # Auth
 openidconnect = "4.0.1"
 oauth2 = { version = "5.0.0", features = ["reqwest"] }
 
 # Testing
-mockall = "0.14.0"
+mockall = "0.15.0"
 testcontainers = "0.27.2"
 testcontainers-modules = { version = "0.15.0", features = ["mysql", "redis"] }
-axum-test = "19.1.1"
+axum-test = "21.0.0"
 
 # Admin specific
 utoipa = { version = "5.4.0", features = ["uuid", "axum_extras", "chrono"] }

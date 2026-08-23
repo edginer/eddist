@@ -32,3 +32,6 @@ tower-layer.workspace = true
 aws-sdk-s3.workspace = true
 encoding_rs.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+eddist-core = { workspace = true, features = ["test-utils"] }
