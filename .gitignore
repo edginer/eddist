@@ -6,10 +6,11 @@ node_modules/
 .idea/
 .pnpm-store/
 
-# Claude Code files
-.claude/
+# Claude Code local state. Its project skills path is a symlink to Codex's source.
+.claude/*
+!.claude/skills
+!.claude/skills/**
 .cursor/
-CLAUDE.md
 .serena/
 
 tmp/
