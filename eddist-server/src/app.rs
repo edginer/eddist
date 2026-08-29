@@ -37,7 +37,7 @@ use crate::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
-        ng_id::{delete_ng_ids, post_ng_id},
+        ng_id::{delete_ng_ids, delete_thread_metadents, post_ng_id, post_thread_metadent},
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         re_auth::{get_re_auth, post_re_auth},
         safe_mode::get_unsafe_thread_ids,
@@ -236,6 +236,10 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route(
             "/api/{boardKey}/ng-ids",
             post(post_ng_id).delete(delete_ng_ids),
+        )
+        .route(
+            "/api/{boardKey}/ng-thread-metadents",
+            post(post_thread_metadent).delete(delete_thread_metadents),
         )
         .route_layer(axum::middleware::from_fn_with_state(
             app_state.clone(),

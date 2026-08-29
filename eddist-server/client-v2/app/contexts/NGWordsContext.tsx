@@ -19,7 +19,7 @@ export interface NGRule {
   matchType: "partial" | "regex";
   enabled: boolean;
   hideMode?: "hidden" | "collapsed";
-  // Set only for rules added from the response-list context menu (shared NG ID).
+  // Set only for rules added from a context menu and synchronized with the server.
   sharedBoardKey?: string;
 }
 

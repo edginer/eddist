@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { addSharedNgId } from "~/api-client/ng_id";
-import { type NGCategory, useNGWords } from "~/contexts/NGWordsContext";
+import { addSharedNgId, addSharedThreadMetadent } from "~/api-client/ng_id";
+import { type NGCategory, type NGRule, useNGWords } from "~/contexts/NGWordsContext";
 import { useToast } from "~/contexts/ToastContext";
 
 interface NGContextMenuProps {
@@ -127,25 +127,33 @@ export const NGContextMenu = ({
     hideMode?: "hidden" | "collapsed",
   ) => {
     try {
+      // Shared author IDs and thread metadents carry the board key so the settings
+      // dialog can retract the contribution from the corresponding namespace later.
       // A rule holds one board key, so re-sharing a pattern already shared with
       // another board would record a contribution nothing could retract.
-      const existing =
-        category === "response.authorIds"
-          ? config.response.authorIds.find((r) => r.pattern === value && r.matchType === "partial")
-          : undefined;
-      const isSharedNgId =
-        category === "response.authorIds" && (existing?.sharedBoardKey ?? boardKey) === boardKey;
+      const sharedRules: Partial<Record<NGCategory, NGRule[]>> = {
+        "response.authorIds": config.response.authorIds,
+        "thread.authorIds": config.thread.authorIds,
+      };
+      const candidates = sharedRules[category];
+      const existing = candidates?.find((r) => r.pattern === value && r.matchType === "partial");
+      const isSharedTarget =
+        candidates !== undefined && (existing?.sharedBoardKey ?? boardKey) === boardKey;
 
       addRule(category, {
         pattern: value,
         matchType: "partial",
         enabled: true,
         ...(hideMode ? { hideMode } : {}),
-        ...(isSharedNgId ? { sharedBoardKey: boardKey } : {}),
+        ...(isSharedTarget ? { sharedBoardKey: boardKey } : {}),
       });
 
-      if (isSharedNgId) {
-        void addSharedNgId(boardKey, value);
+      if (isSharedTarget) {
+        if (category === "response.authorIds") {
+          void addSharedNgId(boardKey, value);
+        } else {
+          void addSharedThreadMetadent(boardKey, value);
+        }
       }
 
       // Visual feedback

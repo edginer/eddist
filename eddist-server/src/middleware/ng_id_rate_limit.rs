@@ -12,9 +12,9 @@ use crate::{
     utils::{get_origin_ip, incr_fixed_window},
 };
 
-const NG_ID_WINDOW_SECS: i64 = 60;
+const SHARED_NG_WINDOW_SECS: i64 = 60;
 
-const NG_ID_THRESHOLD: i64 = 60;
+const SHARED_NG_THRESHOLD: i64 = 60;
 
 pub async fn ng_id_rate_limit_middleware(
     State(state): State<AppState>,
@@ -28,17 +28,17 @@ pub async fn ng_id_rate_limit_middleware(
     let key = shared_ng_id_ip_rate_limit_key(&ip);
 
     let mut redis_conn = state.redis_conn.clone();
-    let count = match incr_fixed_window(&mut redis_conn, &key, NG_ID_WINDOW_SECS).await {
+    let count = match incr_fixed_window(&mut redis_conn, &key, SHARED_NG_WINDOW_SECS).await {
         Ok(count) => count,
         Err(e) => {
-            tracing::error!("Failed to check shared NG ID rate limit for {ip}: {e}");
+            tracing::error!("Failed to check shared NG mutation rate limit for {ip}: {e}");
             return next.run(request).await;
         }
     };
 
-    if count > NG_ID_THRESHOLD {
+    if count > SHARED_NG_THRESHOLD {
         tracing::warn!(
-            "IP {ip} exceeded shared NG ID rate limit ({count} requests within {NG_ID_WINDOW_SECS}s); rejecting with 429"
+            "IP {ip} exceeded shared NG mutation rate limit ({count} requests within {SHARED_NG_WINDOW_SECS}s); rejecting with 429"
         );
         return (StatusCode::TOO_MANY_REQUESTS, "Too Many Requests").into_response();
     }

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FaDesktop, FaMoon, FaSun } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
 import { useRevalidator } from "react-router";
-import { deleteSharedNgIds } from "~/api-client/ng_id";
+import { deleteSharedNgIds, deleteSharedThreadMetadents } from "~/api-client/ng_id";
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useTheme } from "~/contexts/ThemeContext";
 import { parseCookie } from "~/utils/cookie";
@@ -150,6 +150,16 @@ export const NGWordsSettingsModal = ({
     removeRule("response.authorIds", ruleId);
   };
 
+  // `thread.authorIds` is the existing client-side name for the metadent parsed
+  // from subject-metadent.txt. Its server contribution has a separate namespace.
+  const removeThreadAuthorId = (ruleId: string) => {
+    const rule = config.thread.authorIds.find((r) => r.id === ruleId);
+    if (rule?.sharedBoardKey) {
+      void deleteSharedThreadMetadents(rule.sharedBoardKey, [rule.pattern]);
+    }
+    removeRule("thread.authorIds", ruleId);
+  };
+
   const handleClearAll = () => {
     if (!window.confirm("すべてのNG設定をクリアしますか？\nこの操作は取り消せません。")) {
       return;
@@ -165,6 +175,18 @@ export const NGWordsSettingsModal = ({
     }
     for (const [boardKey, patterns] of byBoardKey) {
       void deleteSharedNgIds(boardKey, patterns);
+    }
+
+    const metadentsByBoardKey = new Map<string, string[]>();
+    for (const rule of config.thread.authorIds) {
+      if (rule.sharedBoardKey) {
+        const metadents = metadentsByBoardKey.get(rule.sharedBoardKey) ?? [];
+        metadents.push(rule.pattern);
+        metadentsByBoardKey.set(rule.sharedBoardKey, metadents);
+      }
+    }
+    for (const [boardKey, metadents] of metadentsByBoardKey) {
+      void deleteSharedThreadMetadents(boardKey, metadents);
     }
 
     clearAllRules();
@@ -193,7 +215,7 @@ export const NGWordsSettingsModal = ({
                     rules={config.thread.authorIds}
                     onAdd={(rule) => addRule("thread.authorIds", rule)}
                     onUpdate={(id, updates) => updateRule("thread.authorIds", id, updates)}
-                    onRemove={(id) => removeRule("thread.authorIds", id)}
+                    onRemove={removeThreadAuthorId}
                     onToggle={(id) => toggleRule("thread.authorIds", id)}
                     isResponseRule={false}
                   />

@@ -82,6 +82,10 @@ pub fn shared_ng_id_key(board_key: &str, ng_id: &str) -> String {
     format!("shared_ng_id:{board_key}:{ng_id}")
 }
 
+pub fn shared_ng_thread_metadent_key(board_key: &str, metadent: &str) -> String {
+    format!("shared_ng_thread_metadent:{board_key}:{metadent}")
+}
+
 pub fn shared_ng_id_rate_limit_key(token_hash: &str) -> String {
     format!("shared_ng_id:rate_limit:{token_hash}")
 }
@@ -116,6 +120,14 @@ mod tests {
         assert_eq!(
             shared_ng_id_ip_rate_limit_key("2001:db8:85a3:0"),
             "shared_ng_id:ip_rate_limit:2001:db8:85a3:0"
+        );
+    }
+
+    #[test]
+    fn test_shared_ng_thread_metadent_key() {
+        assert_eq!(
+            shared_ng_thread_metadent_key("news", "abcd1234"),
+            "shared_ng_thread_metadent:news:abcd1234"
         );
     }
 }
