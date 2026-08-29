@@ -24,7 +24,7 @@ allowed-tools:
 model: Haiku
 ---
 
-# Commit and Push Skill
+# Commit and Push Workflow
 
 This skill handles the full pre-commit formatting and git workflow for the eddist monorepo.
 
