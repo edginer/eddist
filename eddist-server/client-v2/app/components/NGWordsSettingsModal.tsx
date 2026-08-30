@@ -95,6 +95,65 @@ const SafeModeTab = () => {
   );
 };
 
+const SharedNGTab = () => {
+  const { config, updateSharedNgSettings } = useNGWords();
+  const { enabled, hideMode } = config.sharedNg;
+
+  return (
+    <div className="py-2 dark:text-gray-100">
+      <h3 className="text-lg font-semibold mb-2">共有NG</h3>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        ONのとき、一定人数以上がNGに追加した投稿者ID・スレッドを自動的にNG扱いにします。対象は板ごとに集計されます。
+      </p>
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <div className="relative">
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={enabled}
+            onChange={() => updateSharedNgSettings({ enabled: !enabled })}
+          />
+          <div
+            className={`w-11 h-6 rounded-full transition-colors ${
+              enabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+            }`}
+          />
+          <div
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              enabled ? "translate-x-5" : ""
+            }`}
+          />
+        </div>
+        <span className="font-medium">共有NG: {enabled ? "ON" : "OFF"}</span>
+      </label>
+
+      <fieldset className="mt-6" disabled={!enabled}>
+        <legend className="text-sm font-medium mb-2">共有NGに一致したレスの表示</legend>
+        <div className={`flex flex-col gap-3 ${enabled ? "" : "opacity-50"}`}>
+          {(
+            [
+              ["collapsed", "折りたたむ"],
+              ["hidden", "非表示"],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="shared-ng-hide-mode"
+                value={value}
+                checked={hideMode === value}
+                onChange={() => updateSharedNgSettings({ hideMode: value })}
+                className="cursor-pointer"
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </div>
+  );
+};
+
 const SummarizeTab = ({
   enabled,
   onChange,
@@ -129,6 +188,39 @@ const SummarizeTab = ({
       </div>
       <span className="font-medium">スレッド要約: {enabled ? "ON" : "OFF"}</span>
     </label>
+  </div>
+);
+
+const OtherSettingsTab = ({
+  enableSafeMode,
+  summarizerSupported,
+  summarizeEnabled,
+  onSummarizeEnabledChange,
+}: {
+  enableSafeMode: boolean;
+  summarizerSupported?: boolean;
+  summarizeEnabled: boolean;
+  onSummarizeEnabledChange?: (enabled: boolean) => void;
+}) => (
+  <div className="flex flex-col gap-8">
+    <SharedNGTab />
+    <hr className="border-gray-200 dark:border-gray-700" />
+    <ThemeTab />
+    {enableSafeMode && (
+      <>
+        <hr className="border-gray-200 dark:border-gray-700" />
+        <SafeModeTab />
+      </>
+    )}
+    {summarizerSupported && (
+      <>
+        <hr className="border-gray-200 dark:border-gray-700" />
+        <SummarizeTab
+          enabled={summarizeEnabled}
+          onChange={onSummarizeEnabledChange ?? (() => {})}
+        />
+      </>
+    )}
   </div>
 );
 
@@ -267,27 +359,17 @@ export const NGWordsSettingsModal = ({
               ),
             },
             {
-              id: "theme",
-              title: "テーマ",
-              content: <ThemeTab />,
+              id: "other",
+              title: "その他",
+              content: (
+                <OtherSettingsTab
+                  enableSafeMode={enableSafeMode}
+                  summarizerSupported={summarizerSupported}
+                  summarizeEnabled={summarizeEnabled}
+                  onSummarizeEnabledChange={onSummarizeEnabledChange}
+                />
+              ),
             },
-            ...(enableSafeMode
-              ? [{ id: "safe-mode", title: "セーフモード", content: <SafeModeTab /> }]
-              : []),
-            ...(summarizerSupported
-              ? [
-                  {
-                    id: "summarize",
-                    title: "要約",
-                    content: (
-                      <SummarizeTab
-                        enabled={summarizeEnabled}
-                        onChange={onSummarizeEnabledChange ?? (() => {})}
-                      />
-                    ),
-                  },
-                ]
-              : []),
           ]}
         />
       </ModalBody>

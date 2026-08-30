@@ -86,6 +86,14 @@ pub fn shared_ng_thread_metadent_key(board_key: &str, metadent: &str) -> String 
     format!("shared_ng_thread_metadent:{board_key}:{metadent}")
 }
 
+pub fn shared_ng_id_active_key(board_key: &str) -> String {
+    format!("shared_ng_id_active:{board_key}")
+}
+
+pub fn shared_ng_thread_metadent_active_key(board_key: &str) -> String {
+    format!("shared_ng_thread_metadent_active:{board_key}")
+}
+
 pub fn shared_ng_id_rate_limit_key(token_hash: &str) -> String {
     format!("shared_ng_id:rate_limit:{token_hash}")
 }
@@ -120,6 +128,19 @@ mod tests {
         assert_eq!(
             shared_ng_id_ip_rate_limit_key("2001:db8:85a3:0"),
             "shared_ng_id:ip_rate_limit:2001:db8:85a3:0"
+        );
+    }
+
+    #[test]
+    fn test_active_keys_do_not_collide_with_contributor_sets() {
+        assert_eq!(shared_ng_id_active_key("news"), "shared_ng_id_active:news");
+        assert_ne!(
+            shared_ng_id_active_key("news"),
+            shared_ng_id_key("active", "news")
+        );
+        assert_eq!(
+            shared_ng_thread_metadent_active_key("news"),
+            "shared_ng_thread_metadent_active:news"
         );
     }
 

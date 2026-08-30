@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
+import { fetchSharedNg, type SharedNgList } from "~/api-client/ng_id";
 import {
   type BodyAnchorPart,
   convertThreadTextToResponseList,
@@ -64,12 +65,13 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const [threadResult, clientConfig] = await Promise.all([
+  const [threadResult, clientConfig, sharedNg] = await Promise.all([
     fetchThreadText(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
       enable_safe_mode: false,
     })),
+    fetchSharedNg(params.boardKey, { baseUrl }),
   ]);
 
   // Ship only the first SSR_INITIAL_RES lines; the parser maps each non-empty line to
@@ -83,6 +85,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
       threadRedirected: threadResult.redirected,
       boards,
       enableSafeMode: clientConfig.enable_safe_mode ?? false,
+      sharedNg,
       eddistData: {
         bbsName: context.BBS_NAME ?? "エッヂ掲示板",
         availableUserRegistration: clientConfig.enable_user_registration,
@@ -92,6 +95,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
       threadRedirected: boolean;
       boards: Board[];
       enableSafeMode: boolean;
+      sharedNg: SharedNgList;
       eddistData: {
         bbsName: string;
         availableUserRegistration: boolean;
@@ -142,7 +146,7 @@ const Meta = ({ bbsName, threadName }: { bbsName: string; threadName: string }) 
 );
 
 const ThreadPage = ({
-  loaderData: { boards, threadText, threadRedirected, enableSafeMode, eddistData },
+  loaderData: { boards, threadText, threadRedirected, enableSafeMode, sharedNg, eddistData },
 }: Route.ComponentProps) => {
   const params = useParams();
 
@@ -221,7 +225,10 @@ const ThreadPage = ({
   const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { shouldFilterResponse } = useNGWords();
+  const { shouldFilterResponse, setSharedNgList } = useNGWords();
+  useEffect(() => {
+    setSharedNgList(sharedNg);
+  }, [sharedNg, setSharedNgList]);
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
   const [contextMenuResponse, setContextMenuResponse] = useState<Response | null>(null);
   const [contextMenuType, setContextMenuType] = useState<"authorId" | "name" | null>(null);
@@ -437,7 +444,12 @@ const ThreadPage = ({
                     className="border-b border-gray-300 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800"
                   >
                     <div className="text-sm text-gray-400 dark:text-gray-500 flex justify-between items-center">
-                      <span>{post.id}. このレスはNG設定により非表示</span>
+                      <span>
+                        {post.id}.{" "}
+                        {filterResult.source === "shared"
+                          ? "このレスは共有NGにより非表示"
+                          : "このレスはNG設定により非表示"}
+                      </span>
                       <button
                         onClick={() =>
                           setExpandedNGPosts((prev) => {
