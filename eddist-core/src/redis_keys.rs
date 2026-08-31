@@ -95,6 +95,7 @@ pub fn shared_ng_id_ip_rate_limit_key(reduced_ip: &str) -> String {
 }
 
 pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
+pub const TRENDING_THREADS_CACHE_KEY: &str = "bbs:trending_threads";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
 pub const CHANNEL_THREAD_CREATED: &str = "bbs:event:thread_created";

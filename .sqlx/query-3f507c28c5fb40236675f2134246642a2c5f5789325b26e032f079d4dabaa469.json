@@ -1,0 +1,94 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT\n                BIN_TO_UUID(t.id)       AS \"thread_id!: String\",\n                BIN_TO_UUID(t.board_id) AS \"board_id!: String\",\n                b.board_key             AS board_key,\n                b.name                  AS board_name,\n                t.thread_number         AS thread_number,\n                t.title                 AS title,\n                t.response_count        AS response_count,\n                COUNT(r.id)             AS \"recent_response_count: i64\"\n            FROM threads t\n            INNER JOIN boards b ON b.id = t.board_id\n            INNER JOIN responses r\n                   ON r.thread_id = t.id\n                   AND r.created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)\n                   AND r.is_abone = FALSE\n            WHERE t.active   = TRUE\n              AND t.archived = FALSE\n            GROUP BY t.id, t.board_id, b.board_key, b.name, t.thread_number, t.title, t.response_count\n            ORDER BY COUNT(r.id) DESC\n            LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "thread_id!: String",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 144
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "board_id!: String",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 144
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "board_key",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "board_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "thread_number",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 20
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | NO_DEFAULT_VALUE",
+          "max_size": 262140
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "response_count",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "recent_response_count: i64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3f507c28c5fb40236675f2134246642a2c5f5789325b26e032f079d4dabaa469"
+}
