@@ -1,3 +1,32 @@
+export interface SharedNgList {
+  ngIds: string[];
+  threadMetadents: string[];
+}
+
+export const EMPTY_SHARED_NG_LIST: SharedNgList = {
+  ngIds: [],
+  threadMetadents: [],
+};
+
+export const fetchSharedNg = async (
+  boardKey: string,
+  options?: { baseUrl?: string },
+): Promise<SharedNgList> => {
+  const base = (import.meta.env.SSR && options?.baseUrl) || "";
+  try {
+    const res = await fetch(`${base}/api/${boardKey}/shared-ng`);
+    if (!res.ok) return EMPTY_SHARED_NG_LIST;
+    const data = await res.json();
+    return {
+      ngIds: data.ng_ids ?? [],
+      threadMetadents: data.thread_metadents ?? [],
+    };
+  } catch (e) {
+    console.error("[sharedNg] fetch failed", e);
+    return EMPTY_SHARED_NG_LIST;
+  }
+};
+
 export const addSharedNgId = async (boardKey: string, ngId: string): Promise<void> => {
   try {
     await fetch(`/api/${boardKey}/ng-ids`, {

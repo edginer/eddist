@@ -405,3 +405,76 @@ async fn test_dat_cache_and_db_parity() {
         "Cache and DB must return identical dat bytes"
     );
 }
+
+/// Shared NG: a value is served board-wide only once enough distinct contributors
+/// have marked it, and stays board-wide even after a contributor retracts — it only
+/// expires via TTL.
+#[tokio::test]
+async fn test_shared_ng_promotion_threshold() {
+    const BOARD_KEY: &str = "sharedng";
+    const NG_ID: &str = "AbCdEf01";
+
+    async fn mark(server: &axum_test::TestServer, token: &str, add: bool) -> u16 {
+        let (req, body) = if add {
+            (
+                server.post(&format!("/api/{BOARD_KEY}/ng-ids")),
+                serde_json::json!({ "ng_id": NG_ID }),
+            )
+        } else {
+            (
+                server.delete(&format!("/api/{BOARD_KEY}/ng-ids")),
+                serde_json::json!({ "ng_ids": [NG_ID] }),
+            )
+        };
+
+        req.add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={token}")).unwrap(),
+        )
+        .json(&body)
+        .await
+        .status_code()
+        .as_u16()
+    }
+
+    async fn shared_ng_ids(server: &axum_test::TestServer) -> Vec<String> {
+        let response = server.get(&format!("/api/{BOARD_KEY}/shared-ng")).await;
+        assert_eq!(response.status_code(), 200);
+        let body: serde_json::Value = response.json();
+        body["ng_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect()
+    }
+
+    let ctx = TestContext::new().await;
+    create_test_board(&ctx.pool, BOARD_KEY, "共有NG板").await;
+
+    let mut tokens = Vec::new();
+    for i in 0..5 {
+        let (_, token) =
+            create_test_authed_token(&ctx.pool, &format!("192.168.50.{i}"), &format!("sng-{i}"))
+                .await;
+        tokens.push(token);
+    }
+
+    for token in tokens.iter().take(4) {
+        assert_eq!(mark(&ctx.server, token, true).await, 204);
+    }
+    assert!(
+        shared_ng_ids(&ctx.server).await.is_empty(),
+        "4 contributors must not reach the threshold"
+    );
+
+    assert_eq!(mark(&ctx.server, &tokens[4], true).await, 204);
+    assert_eq!(shared_ng_ids(&ctx.server).await, vec![NG_ID.to_string()]);
+
+    assert_eq!(mark(&ctx.server, &tokens[0], false).await, 204);
+    assert_eq!(
+        shared_ng_ids(&ctx.server).await,
+        vec![NG_ID.to_string()],
+        "a promoted value must stay board-wide even after a contributor retracts"
+    );
+}

@@ -4,9 +4,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
+import { EMPTY_SHARED_NG_LIST, type SharedNgList } from "~/api-client/ng_id";
 import type { Response } from "~/api-client/thread";
 import type { Thread } from "~/api-client/thread_list";
 
@@ -23,6 +25,13 @@ export interface NGRule {
   sharedBoardKey?: string;
 }
 
+// How the reader consumes the board-wide list assembled from other readers'
+// contributions. The threshold that puts a value on that list lives on the server.
+export interface SharedNGSettings {
+  enabled: boolean;
+  hideMode: "hidden" | "collapsed";
+}
+
 export interface NGWordsConfig {
   version: number;
   thread: {
@@ -34,6 +43,7 @@ export interface NGWordsConfig {
     names: NGRule[];
     bodies: NGRule[];
   };
+  sharedNg: SharedNGSettings;
 }
 
 export type NGCategory =
@@ -46,10 +56,14 @@ export type NGCategory =
 interface FilterResult {
   filtered: boolean;
   hideMode: "hidden" | "collapsed" | null;
+  source: "user" | "shared" | null;
 }
 
 interface NGWordsContextValue {
   config: NGWordsConfig;
+  sharedNgList: SharedNgList;
+  setSharedNgList: (list: SharedNgList) => void;
+  updateSharedNgSettings: (updates: Partial<SharedNGSettings>) => void;
   addRule: (category: NGCategory, rule: Omit<NGRule, "id">) => void;
   updateRule: (category: NGCategory, ruleId: string, updates: Partial<Omit<NGRule, "id">>) => void;
   removeRule: (category: NGCategory, ruleId: string) => void;
@@ -58,6 +72,11 @@ interface NGWordsContextValue {
   shouldFilterThread: (thread: Thread) => boolean;
   shouldFilterResponse: (response: Response) => FilterResult;
 }
+
+const getDefaultSharedNgSettings = (): SharedNGSettings => ({
+  enabled: true,
+  hideMode: "collapsed",
+});
 
 const getDefaultConfig = (): NGWordsConfig => ({
   version: 1,
@@ -70,6 +89,7 @@ const getDefaultConfig = (): NGWordsConfig => ({
     names: [],
     bodies: [],
   },
+  sharedNg: getDefaultSharedNgSettings(),
 });
 
 type Scope = "thread" | "response";
@@ -120,7 +140,7 @@ const loadConfig = (): NGWordsConfig => {
       return getDefaultConfig();
     }
 
-    return parsed;
+    return { ...parsed, sharedNg: { ...getDefaultSharedNgSettings(), ...parsed.sharedNg } };
   } catch (error) {
     console.error("Failed to parse NG config, resetting:", error);
     return getDefaultConfig();
@@ -146,6 +166,7 @@ const NGWordsContext = createContext<NGWordsContextValue | null>(null);
 
 export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
   const [config, setConfig] = useState<NGWordsConfig>(loadConfig);
+  const [sharedNgList, setSharedNgListState] = useState<SharedNgList>(EMPTY_SHARED_NG_LIST);
   const isExternalUpdateRef = useRef(false);
   const isInitialMountRef = useRef(true);
   const regexCache = useRef<Map<string, RegExp | null>>(new Map());
@@ -157,7 +178,10 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
         try {
           const newConfig = JSON.parse(e.newValue);
           isExternalUpdateRef.current = true;
-          setConfig(newConfig);
+          setConfig({
+            ...newConfig,
+            sharedNg: { ...getDefaultSharedNgSettings(), ...newConfig.sharedNg },
+          });
         } catch (error) {
           console.error("[NGWordsProvider] Failed to parse storage change:", error);
         }
@@ -254,8 +278,33 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const clearAllRules = useCallback(() => {
-    setConfig(getDefaultConfig());
+    setConfig((prev) => ({ ...getDefaultConfig(), sharedNg: prev.sharedNg }));
   }, []);
+
+  const updateSharedNgSettings = useCallback((updates: Partial<SharedNGSettings>) => {
+    setConfig((prev) => ({ ...prev, sharedNg: { ...prev.sharedNg, ...updates } }));
+  }, []);
+
+  // Board pages push the list they loaded on every render pass; bail out when it is
+  // unchanged so navigating within one board does not re-render every response.
+  const setSharedNgList = useCallback((list: SharedNgList) => {
+    setSharedNgListState((prev) =>
+      prev.ngIds.length === list.ngIds.length &&
+      prev.threadMetadents.length === list.threadMetadents.length &&
+      prev.ngIds.every((id, i) => id === list.ngIds[i]) &&
+      prev.threadMetadents.every((m, i) => m === list.threadMetadents[i])
+        ? prev
+        : list,
+    );
+  }, []);
+
+  // Shared entries are whole author IDs / metadents, so they match exactly rather
+  // than as substrings the way user-authored partial rules do.
+  const sharedNgIdSet = useMemo(() => new Set(sharedNgList.ngIds), [sharedNgList.ngIds]);
+  const sharedMetadentSet = useMemo(
+    () => new Set(sharedNgList.threadMetadents),
+    [sharedNgList.threadMetadents],
+  );
 
   // matchesRule with regex caching for performance
   const matchesRule = useCallback((text: string, rule: NGRule): boolean => {
@@ -302,9 +351,13 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
+      if (config.sharedNg.enabled && thread.authorId && sharedMetadentSet.has(thread.authorId)) {
+        return true;
+      }
+
       return false;
     },
-    [config, matchesRule],
+    [config, matchesRule, sharedMetadentSet],
   );
 
   const shouldFilterResponse = useCallback(
@@ -315,6 +368,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
             return {
               filtered: true,
               hideMode: rule.hideMode || "collapsed",
+              source: "user",
             };
           }
         }
@@ -326,6 +380,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
             return {
               filtered: true,
               hideMode: rule.hideMode || "collapsed",
+              source: "user",
             };
           }
         }
@@ -338,21 +393,35 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
             return {
               filtered: true,
               hideMode: rule.hideMode || "collapsed",
+              source: "user",
             };
           }
         }
       }
 
+      // Checked after the reader's own rules so an explicit rule keeps its hideMode.
+      if (config.sharedNg.enabled && sharedNgIdSet.has(response.authorId)) {
+        return {
+          filtered: true,
+          hideMode: config.sharedNg.hideMode,
+          source: "shared",
+        };
+      }
+
       return {
         filtered: false,
         hideMode: null,
+        source: null,
       };
     },
-    [config, matchesRule],
+    [config, matchesRule, sharedNgIdSet],
   );
 
   const value: NGWordsContextValue = {
     config,
+    sharedNgList,
+    setSharedNgList,
+    updateSharedNgSettings,
     addRule,
     updateRule,
     removeRule,

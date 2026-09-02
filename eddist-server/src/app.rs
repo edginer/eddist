@@ -37,7 +37,9 @@ use crate::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
-        ng_id::{delete_ng_ids, delete_thread_metadents, post_ng_id, post_thread_metadent},
+        ng_id::{
+            delete_ng_ids, delete_thread_metadents, get_shared_ng, post_ng_id, post_thread_metadent,
+        },
         notice::{get_latest_notices, get_notice_by_slug, get_notices_paginated},
         re_auth::{get_re_auth, post_re_auth},
         safe_mode::get_unsafe_thread_ids,
@@ -284,6 +286,9 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
             "/api/{boardKey}/unsafe-thread-ids",
             get(get_unsafe_thread_ids),
         )
+        // Kept out of `ng_id_routes`: that layer budgets mutations per IP, and reads
+        // happen on every board page load.
+        .route("/api/{boardKey}/shared-ng", get(get_shared_ng))
         .merge(ng_id_routes)
         .nest("/user", user_routes())
         .route(

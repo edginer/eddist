@@ -7,11 +7,14 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use eddist_core::{
     domain::board::validate_board_key,
-    redis_keys::{shared_ng_id_key, shared_ng_id_rate_limit_key, shared_ng_thread_metadent_key},
+    redis_keys::{
+        shared_ng_id_active_key, shared_ng_id_key, shared_ng_id_rate_limit_key,
+        shared_ng_thread_metadent_active_key, shared_ng_thread_metadent_key,
+    },
     utils::to_hex,
 };
-use redis::{AsyncCommands as _, pipe};
-use serde::Deserialize;
+use redis::pipe;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -32,6 +35,12 @@ const MAX_NG_IDS_PER_DELETE: usize = 200;
 
 const SHARED_NG_RATE_LIMIT: i64 = 25;
 const SHARED_NG_RATE_LIMIT_WINDOW_SECS: i64 = 24 * 60 * 60;
+
+// How many distinct contributors a value needs before it is served to every reader
+// of the board.
+const SHARED_NG_PROMOTION_THRESHOLD: usize = 5;
+
+const MAX_SHARED_NG_RESPONSE_LEN: isize = 500;
 
 #[derive(Deserialize)]
 pub struct AddNgIdRequest {
@@ -115,7 +124,14 @@ async fn within_shared_ng_rate_limit(
     Ok(count <= SHARED_NG_RATE_LIMIT)
 }
 
-async fn add_shared_value(state: &AppState, jar: &CookieJar, key: String, kind: &str) -> Response {
+async fn add_shared_value(
+    state: &AppState,
+    jar: &CookieJar,
+    key: String,
+    active_key: String,
+    value: &str,
+    kind: &str,
+) -> Response {
     let hash = match resolve_contributor_hash(state, jar).await {
         Ok(hash) => hash,
         Err(resp) => return resp,
@@ -134,13 +150,34 @@ async fn add_shared_value(state: &AppState, jar: &CookieJar, key: String, kind: 
         }
     }
 
-    if let Err(e) = conn.sadd::<_, _, ()>(&key, &hash).await {
-        log::error!("Failed to add shared {kind} to Redis: {e:?}");
-        return empty(500);
-    }
-    if let Err(e) = conn.expire::<_, ()>(&key, SHARED_NG_TTL_SECS).await {
-        log::error!("Failed to set TTL on shared {kind}: {e:?}");
-        return empty(500);
+    let contributors = match pipe()
+        .sadd(&key, &hash)
+        .ignore()
+        .expire(&key, SHARED_NG_TTL_SECS)
+        .ignore()
+        .scard(&key)
+        .query_async::<(usize,)>(&mut conn)
+        .await
+    {
+        Ok((contributors,)) => contributors,
+        Err(e) => {
+            log::error!("Failed to add shared {kind} to Redis: {e:?}");
+            return empty(500);
+        }
+    };
+
+    if contributors >= SHARED_NG_PROMOTION_THRESHOLD
+        && let Err(e) = pipe()
+            .zadd(&active_key, value, chrono::Utc::now().timestamp())
+            .ignore()
+            .expire(&active_key, SHARED_NG_TTL_SECS)
+            .ignore()
+            .query_async::<()>(&mut conn)
+            .await
+    {
+        // The contribution itself landed, so report success and let the next
+        // contribution re-attempt the promotion.
+        log::error!("Failed to promote shared {kind} to the board-wide list: {e:?}");
     }
 
     empty(204)
@@ -159,7 +196,7 @@ async fn remove_shared_values(
 
     let mut conn = state.redis_conn.clone();
     let mut pipe = pipe();
-    for key in keys {
+    for key in &keys {
         // SREM is a no-op if the member/key is missing.
         pipe.srem(key, &hash).ignore();
     }
@@ -170,6 +207,64 @@ async fn remove_shared_values(
     }
 
     empty(204)
+}
+
+#[derive(Serialize)]
+pub struct SharedNgResponse {
+    pub ng_ids: Vec<String>,
+    pub thread_metadents: Vec<String>,
+}
+
+pub async fn get_shared_ng(
+    State(state): State<AppState>,
+    Path(board_key): Path<String>,
+) -> Response {
+    if validate_board_key(&board_key).is_err() {
+        return empty(404);
+    }
+
+    let ng_id_key = shared_ng_id_active_key(&board_key);
+    let metadent_key = shared_ng_thread_metadent_active_key(&board_key);
+    // Promotions are only refreshed on contribution, so entries older than the
+    // contributor sets' own TTL are dropped here rather than being served forever.
+    let cutoff = chrono::Utc::now().timestamp() - SHARED_NG_TTL_SECS;
+    let last = MAX_SHARED_NG_RESPONSE_LEN - 1;
+
+    let mut conn = state.redis_conn.clone();
+    let (ng_ids, thread_metadents) = match pipe()
+        .zrembyscore(&ng_id_key, "-inf", cutoff)
+        .ignore()
+        .zrembyscore(&metadent_key, "-inf", cutoff)
+        .ignore()
+        .zrevrange(&ng_id_key, 0, last)
+        .zrevrange(&metadent_key, 0, last)
+        .query_async::<(Vec<String>, Vec<String>)>(&mut conn)
+        .await
+    {
+        Ok(lists) => lists,
+        Err(e) => {
+            log::error!("Failed to read shared NG lists from Redis: {e:?}");
+            return empty(500);
+        }
+    };
+
+    let body = SharedNgResponse {
+        ng_ids,
+        thread_metadents,
+    };
+
+    match serde_json::to_vec(&body) {
+        Ok(json) => Response::builder()
+            .status(200)
+            .header("Content-Type", "application/json")
+            .header("Cache-Control", "public, max-age=60")
+            .body(Body::from(json))
+            .unwrap(),
+        Err(e) => {
+            log::error!("Failed to serialize shared NG lists: {e:?}");
+            empty(500)
+        }
+    }
 }
 
 pub async fn post_ng_id(
@@ -186,7 +281,8 @@ pub async fn post_ng_id(
     }
 
     let key = shared_ng_id_key(&board_key, &req.ng_id);
-    add_shared_value(&state, &jar, key, "NG ID").await
+    let active_key = shared_ng_id_active_key(&board_key);
+    add_shared_value(&state, &jar, key, active_key, &req.ng_id, "NG ID").await
 }
 
 pub async fn delete_ng_ids(
@@ -227,7 +323,16 @@ pub async fn post_thread_metadent(
     }
 
     let key = shared_ng_thread_metadent_key(&board_key, &req.metadent);
-    add_shared_value(&state, &jar, key, "thread metadent").await
+    let active_key = shared_ng_thread_metadent_active_key(&board_key);
+    add_shared_value(
+        &state,
+        &jar,
+        key,
+        active_key,
+        &req.metadent,
+        "thread metadent",
+    )
+    .await
 }
 
 pub async fn delete_thread_metadents(

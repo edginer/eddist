@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { twMerge } from "tailwind-merge";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
+import { fetchSharedNg, type SharedNgList } from "~/api-client/ng_id";
 import { fetchUnsafeThreadIds } from "~/api-client/safe_mode";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
 import { useNGWords } from "~/contexts/NGWordsContext";
@@ -107,7 +108,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
   const cookieHeader = request.headers.get("cookie") ?? "";
   const safeMode = !isFull && parseCookie(cookieHeader, "safe_mode") !== "off";
 
-  const [threadList, clientConfig, unsafeThreadIds] = await Promise.all([
+  const [threadList, clientConfig, unsafeThreadIds, sharedNg] = await Promise.all([
     fetchThreadList(params.boardKey, { baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
@@ -116,6 +117,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     safeMode
       ? fetchUnsafeThreadIds(params.boardKey, { baseUrl })
       : Promise.resolve(new Set<number>()),
+    fetchSharedNg(params.boardKey, { baseUrl }),
   ]);
 
   const enableSafeMode = clientConfig.enable_safe_mode;
@@ -127,6 +129,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     safeMode: safeMode && enableSafeMode,
     enableSafeMode,
     unsafeThreadIds: Array.from(unsafeThreadIds),
+    sharedNg,
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: clientConfig.enable_user_registration,
@@ -138,6 +141,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     safeMode: boolean;
     enableSafeMode: boolean;
     unsafeThreadIds: number[];
+    sharedNg: SharedNgList;
     eddistData: {
       bbsName: string;
       availableUserRegistration: boolean;
@@ -163,6 +167,7 @@ const ThreadListPage = ({
     safeMode,
     enableSafeMode,
     unsafeThreadIds,
+    sharedNg,
     eddistData,
   },
 }: Route.ComponentProps) => {
@@ -185,7 +190,10 @@ const ThreadListPage = ({
   const hasEverOpenedThread = useRef(false);
   const hasEverOpenedNGSettings = useRef(false);
 
-  const { shouldFilterThread } = useNGWords();
+  const { shouldFilterThread, setSharedNgList } = useNGWords();
+  useEffect(() => {
+    setSharedNgList(sharedNg);
+  }, [sharedNg, setSharedNgList]);
   const unsafeSet = useMemo(() => new Set(unsafeThreadIds), [unsafeThreadIds]);
   const summarizerSupported = useSummarizerSupported();
   const { enabled: summarizeEnabled, setEnabled: setSummarizeEnabled } = useSummarizeEnabled();
