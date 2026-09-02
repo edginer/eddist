@@ -2992,11 +2992,15 @@
           "title",
           "slug",
           "content",
-          "published_at"
+          "published_at",
+          "hide_from_list"
         ],
         "properties": {
           "content": {
             "type": "string"
+          },
+          "hide_from_list": {
+            "type": "boolean"
           },
           "published_at": {
             "type": "string",
@@ -3339,7 +3343,8 @@
           "content",
           "created_at",
           "updated_at",
-          "published_at"
+          "published_at",
+          "hide_from_list"
         ],
         "properties": {
           "author_email": {
@@ -3354,6 +3359,9 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "hide_from_list": {
+            "type": "boolean"
           },
           "id": {
             "type": "string",
@@ -3909,6 +3917,12 @@
           "content": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "hide_from_list": {
+            "type": [
+              "boolean",
               "null"
             ]
           },

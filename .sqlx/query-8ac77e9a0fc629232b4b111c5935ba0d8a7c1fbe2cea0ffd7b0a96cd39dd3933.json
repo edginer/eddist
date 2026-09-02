@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id AS \"id: Uuid\",\n                slug,\n                title,\n                content,\n                created_at,\n                updated_at,\n                published_at,\n                author_email\n            FROM notices\n            WHERE slug = ? AND published_at <= NOW()\n            ",
+  "query": "\n            SELECT\n                id AS \"id: Uuid\",\n                slug,\n                title,\n                content,\n                created_at,\n                updated_at,\n                published_at,\n                author_email,\n                hide_from_list AS \"hide_from_list: bool\"\n            FROM notices\n            ORDER BY published_at DESC\n            LIMIT ? OFFSET ?\n            ",
   "describe": {
     "columns": [
       {
@@ -130,10 +130,26 @@
             "name": "author_email"
           }
         }
+      },
+      {
+        "ordinal": 8,
+        "name": "hide_from_list: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "collation": 63,
+          "max_size": 1
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.notices",
+            "name": "hide_from_list"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -143,8 +159,9 @@
       false,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "f4f2d5d311d796cb4605ed73775822d6b16cb26954656a75094f6634b06e5d04"
+  "hash": "8ac77e9a0fc629232b4b111c5935ba0d8a7c1fbe2cea0ffd7b0a96cd39dd3933"
 }

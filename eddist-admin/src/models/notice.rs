@@ -14,6 +14,7 @@ pub struct Notice {
     pub updated_at: NaiveDateTime,
     pub published_at: NaiveDateTime,
     pub author_email: Option<String>,
+    pub hide_from_list: bool,
 }
 
 // Conversion from core Notice to admin Notice
@@ -28,6 +29,7 @@ impl From<eddist_core::domain::notice::Notice> for Notice {
             updated_at: notice.updated_at,
             published_at: notice.published_at,
             author_email: notice.author_email,
+            hide_from_list: notice.hide_from_list,
         }
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE notices\n            SET slug = ?, title = ?, content = ?, published_at = ?, updated_at = ?, hide_from_list = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "01bcc0850f5a170d8c95d35cea9a3753fac003d483d6d5a6489ed79bf9e2a6cf"
+}

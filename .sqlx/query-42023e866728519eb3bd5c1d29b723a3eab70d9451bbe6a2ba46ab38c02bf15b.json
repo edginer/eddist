@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id AS \"id: Uuid\",\n                slug,\n                title,\n                published_at\n            FROM notices\n            WHERE published_at <= NOW()\n            ORDER BY published_at DESC\n            LIMIT ? OFFSET ?\n            ",
+  "query": "\n            SELECT\n                id AS \"id: Uuid\",\n                slug,\n                title,\n                published_at\n            FROM notices\n            WHERE published_at <= NOW() AND hide_from_list = FALSE\n            ORDER BY published_at DESC\n            LIMIT ? OFFSET ?\n            ",
   "describe": {
     "columns": [
       {
@@ -78,5 +78,5 @@
       false
     ]
   },
-  "hash": "dce1c04c0d8db38e0261c81206d540d35b758d086de694cad7c629e904eed93c"
+  "hash": "42023e866728519eb3bd5c1d29b723a3eab70d9451bbe6a2ba46ab38c02bf15b"
 }

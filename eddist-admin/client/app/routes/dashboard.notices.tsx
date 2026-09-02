@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Modal,
   ModalBody,
@@ -50,6 +51,7 @@ const Notices = () => {
             <TableHeadCell>Title</TableHeadCell>
             <TableHeadCell>Slug</TableHeadCell>
             <TableHeadCell>Published At</TableHeadCell>
+            <TableHeadCell>Visibility</TableHeadCell>
             <TableHeadCell>Actions</TableHeadCell>
           </TableHead>
           <TableBody>
@@ -60,6 +62,13 @@ const Notices = () => {
                   <code className="text-sm text-gray-600">{notice.slug}</code>
                 </TableCell>
                 <TableCell>{formatDateTime(notice.published_at)}</TableCell>
+                <TableCell>
+                  {notice.hide_from_list ? (
+                    <Badge color="warning">Hidden from list</Badge>
+                  ) : (
+                    <Badge color="success">Listed</Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button size="xs" onClick={() => modal.openEdit(notice)}>

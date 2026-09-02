@@ -12,6 +12,7 @@ pub struct Notice {
     pub updated_at: NaiveDateTime,
     pub published_at: NaiveDateTime,
     pub author_email: Option<String>,
+    pub hide_from_list: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
