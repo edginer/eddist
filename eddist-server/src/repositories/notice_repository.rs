@@ -41,7 +41,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
                 title,
                 published_at
             FROM notices
-            WHERE published_at <= NOW()
+            WHERE published_at <= NOW() AND hide_from_list = FALSE
             ORDER BY published_at DESC
             LIMIT ? OFFSET ?
             "#,
@@ -66,7 +66,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
                 created_at,
                 updated_at,
                 published_at,
-                author_email
+                author_email,
+                hide_from_list AS "hide_from_list: bool"
             FROM notices
             WHERE slug = ? AND published_at <= NOW()
             "#,
@@ -83,7 +84,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             r#"
             SELECT COUNT(*) as count
             FROM notices
-            WHERE published_at <= NOW()
+            WHERE published_at <= NOW() AND hide_from_list = FALSE
             "#
         )
         .fetch_one(&self.pool)

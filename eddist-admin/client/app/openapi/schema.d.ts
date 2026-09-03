@@ -770,6 +770,7 @@ export interface components {
         };
         CreateNoticeInput: {
             content: string;
+            hide_from_list: boolean;
             /** Format: date-time */
             published_at: string;
             slug: string;
@@ -860,6 +861,7 @@ export interface components {
             content: string;
             /** Format: date-time */
             created_at: string;
+            hide_from_list: boolean;
             /** Format: uuid */
             id: string;
             /** Format: date-time */
@@ -1013,6 +1015,7 @@ export interface components {
         };
         UpdateNoticeInput: {
             content?: string | null;
+            hide_from_list?: boolean | null;
             /** Format: date-time */
             published_at?: string | null;
             /** @description Optional custom slug. If not provided and title is updated, will be auto-generated from new title. */

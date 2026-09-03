@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT COUNT(*) as count\n            FROM notices\n            WHERE published_at <= NOW()\n            ",
+  "query": "\n            SELECT COUNT(*) as count\n            FROM notices\n            WHERE published_at <= NOW() AND hide_from_list = FALSE\n            ",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "77c4c85608b0433a18a06573ebcf95681be699832ea33107043ab3895bd44eeb"
+  "hash": "8800a417fbd3cbeb729d0062ea6b97c4ace37362eca420338b91a0b132632730"
 }

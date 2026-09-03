@@ -10,6 +10,7 @@ pub struct CreateNoticeInput {
     pub slug: String,
     pub content: String,
     pub published_at: NaiveDateTime,
+    pub hide_from_list: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
@@ -19,6 +20,7 @@ pub struct UpdateNoticeInput {
     pub published_at: Option<NaiveDateTime>,
     /// Optional custom slug. If not provided and title is updated, will be auto-generated from new title.
     pub slug: Option<String>,
+    pub hide_from_list: Option<bool>,
 }
 
 #[async_trait::async_trait]
@@ -59,7 +61,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
                 created_at,
                 updated_at,
                 published_at,
-                author_email
+                author_email,
+                hide_from_list AS "hide_from_list: bool"
             FROM notices
             ORDER BY published_at DESC
             LIMIT ? OFFSET ?
@@ -85,7 +88,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
                 created_at,
                 updated_at,
                 published_at,
-                author_email
+                author_email,
+                hide_from_list AS "hide_from_list: bool"
             FROM notices
             WHERE id = ?
             "#,
@@ -109,7 +113,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
                 created_at,
                 updated_at,
                 published_at,
-                author_email
+                author_email,
+                hide_from_list AS "hide_from_list: bool"
             FROM notices
             WHERE slug = ?
             "#,
@@ -140,8 +145,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
 
         query!(
             r#"
-            INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email, hide_from_list)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             id,
             input.slug,
@@ -150,7 +155,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
             now,
             now,
             input.published_at,
-            author_email
+            author_email,
+            input.hide_from_list
         )
         .execute(&self.0)
         .await?;
@@ -164,6 +170,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             updated_at: now,
             published_at: input.published_at,
             author_email,
+            hide_from_list: input.hide_from_list,
         };
 
         Ok(notice)
@@ -180,6 +187,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         let title = input.title.clone().unwrap_or_else(|| current.title.clone());
         let content = input.content.unwrap_or(current.content);
         let published_at = input.published_at.unwrap_or(current.published_at);
+        let hide_from_list = input.hide_from_list.unwrap_or(current.hide_from_list);
 
         let new_slug = if let Some(custom_slug) = input.slug {
             if custom_slug.trim().is_empty() {
@@ -199,7 +207,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         query!(
             r#"
             UPDATE notices
-            SET slug = ?, title = ?, content = ?, published_at = ?, updated_at = ?
+            SET slug = ?, title = ?, content = ?, published_at = ?, updated_at = ?, hide_from_list = ?
             WHERE id = ?
             "#,
             new_slug,
@@ -207,6 +215,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             content,
             published_at,
             now,
+            hide_from_list,
             id
         )
         .execute(&self.0)
@@ -221,6 +230,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             updated_at: now,
             published_at,
             author_email: current.author_email,
+            hide_from_list,
         };
 
         Ok(notice)

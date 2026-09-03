@@ -1,4 +1,4 @@
-import { Button, Label, Textarea, TextInput } from "flowbite-react";
+import { Button, Checkbox, Label, Textarea, TextInput } from "flowbite-react";
 import { useForm } from "react-hook-form";
 import { FaSync } from "react-icons/fa";
 import type { paths } from "~/openapi/schema";
@@ -19,6 +19,7 @@ interface DefaultValues {
   slug: string;
   content: string;
   published_at: string;
+  hide_from_list: boolean;
 }
 
 type Props =
@@ -113,6 +114,14 @@ const NoticeForm = (props: Props) => {
                 : ""
             }
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="hide_from_list"
+            {...register("hide_from_list")}
+            defaultChecked={defaults?.hide_from_list}
+          />
+          <Label htmlFor="hide_from_list">Hide from list (still reachable via direct link)</Label>
         </div>
         <Button type="submit">{isCreate ? "Create" : "Update"}</Button>
       </div>
