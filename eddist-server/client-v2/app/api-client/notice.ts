@@ -55,6 +55,10 @@ export async function fetchNoticeBySlug({
 }): Promise<Notice> {
   const response = await fetch(`${baseUrl}/api/notices/${slug}`);
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Response("Not Found", { status: 404 });
+    }
+
     throw new Error("Failed to fetch notice");
   }
   return response.json();
