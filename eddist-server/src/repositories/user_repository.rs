@@ -9,6 +9,7 @@ use crate::{
 #[async_trait::async_trait]
 pub trait UserRepository: Send + Sync + 'static {
     async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>>;
+    /// `idp_sub` must already be hashed (see `hash_idp_sub`).
     async fn get_user_by_idp_sub(
         &self,
         idp_name: &str,
@@ -354,5 +355,6 @@ pub struct CreatingUser {
     pub user_id: Uuid,
     pub user_name: String,
     pub idp_id: Uuid,
+    /// Must already be hashed (see `hash_idp_sub`), not the raw IdP `sub` claim.
     pub idp_sub: String,
 }

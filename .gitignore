@@ -14,3 +14,4 @@ node_modules/
 .serena/
 
 tmp/
+__pycache__/

@@ -3,6 +3,7 @@ use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
 use rand::{RngExt, distr::Alphanumeric};
 use redis::{AsyncCommands, aio::ConnectionManager};
+use sha2::Sha256;
 use sqlx::MySql;
 use uuid::Uuid;
 
@@ -159,12 +160,15 @@ impl<
             )
             .await?;
 
-        let sub = id_token_claims.subject().to_string();
+        let sub_hash = hash_idp_sub(
+            &id_token_claims.subject().to_string(),
+            &id_token_claims.issuer().to_string(),
+        );
         let authed_token_uuid = Uuid::parse_str(&authed_token_id)?;
 
         let user_id = if let Some(u) = self
             .user_repo
-            .get_user_by_idp_sub(&idp.idp_name, &sub)
+            .get_user_by_idp_sub(&idp.idp_name, &sub_hash)
             .await?
         {
             // Already user is registered
@@ -186,7 +190,7 @@ impl<
                         user_id,
                         user_name: user_name_generator(),
                         idp_id: idp.id,
-                        idp_sub: sub,
+                        idp_sub: sub_hash,
                     },
                     tx,
                 )
@@ -254,9 +258,14 @@ impl<
             )
             .await?;
 
+        let sub_hash = hash_idp_sub(
+            &id_token_claims.subject().to_string(),
+            &id_token_claims.issuer().to_string(),
+        );
+
         let user = self
             .user_repo
-            .get_user_by_idp_sub(&idp.idp_name, &id_token_claims.subject().to_string())
+            .get_user_by_idp_sub(&idp.idp_name, &sub_hash)
             .await?;
 
         match user {
@@ -337,6 +346,15 @@ pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
     /// The edge-token to set for the user (used in Register flow)
     pub edge_token: Option<String>,
+}
+
+/// Hashes an IdP `sub` claim with its issuer so the raw value is never persisted.
+fn hash_idp_sub(sub: &str, issuer: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(sub.as_bytes());
+    hasher.update(b"|");
+    hasher.update(issuer.as_bytes());
+    to_hex(hasher.finalize())
 }
 
 fn user_name_generator() -> String {
@@ -528,5 +546,20 @@ mod probe_tests {
         let user_sid = to_hex(hasher.finalize());
         assert_eq!(user_sid.len(), 128);
         assert!(user_sid.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hash_idp_sub_is_deterministic_and_namespaced_by_issuer() {
+        use super::hash_idp_sub;
+
+        let a = hash_idp_sub("108234567890123456789", "https://accounts.google.com");
+        let b = hash_idp_sub("108234567890123456789", "https://accounts.google.com");
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Same sub, different issuer must not collide — sub alone is not a safe key.
+        let c = hash_idp_sub("108234567890123456789", "https://example.auth0.com/");
+        assert_ne!(a, c);
     }
 }

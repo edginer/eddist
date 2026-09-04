@@ -21,6 +21,7 @@ pub struct UserIdp {
     pub idp_id: Uuid,
     pub idp_name: String,
     pub idp_display_name: String,
+    /// SHA-256(sub || issuer) instead of raw IdP `sub` claim
     pub idp_sub: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
