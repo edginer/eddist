@@ -179,6 +179,10 @@ const ThreadListPage = ({
     {
       fallbackData: data,
       revalidateOnMount: false,
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 0,
     },
   );
 
