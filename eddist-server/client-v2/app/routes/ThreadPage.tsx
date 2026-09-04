@@ -430,6 +430,8 @@ const ThreadPage = ({
             {responsesToRender.map((post) => {
               const filterResult = filterResults[post.id - 1];
               const isExpanded = expandedNGPosts.has(post.id);
+              const visibleRefs =
+                post.refs?.filter((refId) => !filterResults[refId - 1]?.filtered) ?? [];
 
               // Completely hidden
               if (filterResult.filtered && filterResult.hideMode === "hidden") {
@@ -472,7 +474,8 @@ const ThreadPage = ({
               return (
                 <div key={post.id} className="border-b border-gray-300 dark:border-gray-700 p-4">
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {post.id} {post.refs && constructReferredNum(post.refs, openPopup)}.{" "}
+                    {post.id}{" "}
+                    {visibleRefs.length > 0 && constructReferredNum(visibleRefs, openPopup)}.{" "}
                     {/* biome-ignore lint/a11y/noStaticElementInteractions: BBS name element with context menu for NG word filtering */}
                     <span
                       className="select-none md:select-auto"
