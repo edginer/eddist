@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSync } from "react-icons/fa";
 import { data, Link, useParams } from "react-router";
 import useSWR from "swr";
@@ -18,15 +18,9 @@ import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import { NGContextMenu } from "../components/NGContextMenu";
-import { Button } from "../components/ui/Button";
+import { NGSettingsLauncher } from "../components/NGSettingsLauncher";
+import { PostResponseLauncher } from "../components/PostResponseLauncher";
 import type { Route } from "./+types/ThreadPage";
-
-const LazyPostResponseModal = lazy(() => import("../components/PostResponseModal"));
-const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
-    default: m.NGWordsSettingsModal,
-  })),
-);
 
 // SSR/hydrate this many leading res; the client fills the rest by refetching the
 // full .dat on mount. Kept small so the hydration payload is a bounded prefix, not
@@ -159,8 +153,6 @@ const ThreadPage = ({
 
   const [popups, setPopups] = useState<Popup[]>([]);
   const popupCounter = useRef(0);
-  const hasEverOpenedResponse = useRef(false);
-  const hasEverOpenedNGSettings = useRef(false);
 
   useEffect(() => {
     const htmlEl = document.documentElement;
@@ -220,8 +212,6 @@ const ThreadPage = ({
     ]);
   };
 
-  const [creatingResponse, setCreatingResponse] = useState(false);
-  const [showNGSettings, setShowNGSettings] = useState(false);
   const [expandedNGPosts, setExpandedNGPosts] = useState<Set<number>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -376,22 +366,17 @@ const ThreadPage = ({
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            hasEverOpenedNGSettings.current = true;
-            setShowNGSettings(true);
-          }}
-          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        <NGSettingsLauncher
+          enableSafeMode={enableSafeMode}
           title="NG設定"
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
           <FaCog className="w-4 h-4" />
-        </button>
-        <Button
-          onClick={() => {
-            hasEverOpenedResponse.current = true;
-            setCreatingResponse(true);
-          }}
+        </NGSettingsLauncher>
+        <PostResponseLauncher
+          boardKey={params.boardKey ?? ""}
+          threadKey={params.threadKey ?? ""}
+          refetchThread={mutate}
           className={twMerge(
             "px-3 py-2 lg:px-6 lg:py-3 lg:mx-2 w-12 h-10 lg:w-35",
             params.boardKey || params.threadKey || "hidden",
@@ -399,30 +384,8 @@ const ThreadPage = ({
         >
           <FaPen className="lg:mr-3" />
           <span className="lg:block hidden">書き込み</span>
-        </Button>
-
-        {hasEverOpenedNGSettings.current && (
-          <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal
-              open={showNGSettings}
-              setOpen={setShowNGSettings}
-              enableSafeMode={enableSafeMode}
-            />
-          </Suspense>
-        )}
+        </PostResponseLauncher>
       </header>
-
-      {hasEverOpenedResponse.current && (
-        <Suspense fallback={null}>
-          <LazyPostResponseModal
-            open={creatingResponse}
-            setOpen={setCreatingResponse}
-            boardKey={params.boardKey ?? ""}
-            threadKey={params.threadKey ?? ""}
-            refetchThread={mutate}
-          />
-        </Suspense>
-      )}
 
       <main className="grow pt-18 lg:pt-16">
         <div className="max-w-7xl mx-auto">

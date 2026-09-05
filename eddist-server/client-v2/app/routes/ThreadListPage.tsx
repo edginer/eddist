@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
 import { Link, useParams } from "react-router";
 import useSWR from "swr";
@@ -16,16 +16,10 @@ import { useSummarizerSupported } from "~/hooks/useSummarizer";
 import { parseCookie } from "~/utils/cookie";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
+import { NGSettingsLauncher } from "../components/NGSettingsLauncher";
+import { PostThreadLauncher } from "../components/PostThreadLauncher";
 import { ThreadSummarizeButton } from "../components/ThreadSummarizeButton";
-import { Button } from "../components/ui/Button";
 import type { Route } from "./+types/ThreadListPage";
-
-const LazyPostThreadModal = lazy(() => import("../components/PostThreadModal"));
-const LazyNGWordsSettingsModal = lazy(() =>
-  import("../components/NGWordsSettingsModal").then((m) => ({
-    default: m.NGWordsSettingsModal,
-  })),
-);
 
 type SortKey = "responseCount" | "speed" | "creationTime" | "lastUpdated";
 type SortOrder = "asc" | "desc";
@@ -186,13 +180,9 @@ const ThreadListPage = ({
     },
   );
 
-  const [creatingThread, setCreatingThread] = useState(false);
   const { sortKey, sortOrder, setSortKey, setSortOrder } = useMemorySort();
   const [showSortControls, setShowSortControls] = useState(false);
-  const [showNGSettings, setShowNGSettings] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const hasEverOpenedThread = useRef(false);
-  const hasEverOpenedNGSettings = useRef(false);
 
   const { shouldFilterThread, setSharedNgList } = useNGWords();
   useEffect(() => {
@@ -226,11 +216,6 @@ const ThreadListPage = ({
     enabled: true,
     scrollTarget: "window",
   });
-
-  const openNGSettings = () => {
-    hasEverOpenedNGSettings.current = true;
-    setShowNGSettings(true);
-  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -346,14 +331,16 @@ const ThreadListPage = ({
             className={twMerge("w-4 h-4", (isRefreshing || isPullRefreshing) && "animate-spin")}
           />
         </button>
-        <button
-          type="button"
-          onClick={openNGSettings}
-          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+        <NGSettingsLauncher
+          enableSafeMode={enableSafeMode}
+          summarizerSupported={summarizerSupported}
+          summarizeEnabled={summarizeEnabled}
+          onSummarizeEnabledChange={setSummarizeEnabled}
           title="NG設定"
+          className="px-3 py-2 lg:px-4 lg:py-2 mx-1 lg:mx-2 text-sm lg:text-base rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
         >
           <FaCog className="w-4 h-4" />
-        </button>
+        </NGSettingsLauncher>
         <button
           type="button"
           onClick={() => setShowSortControls(!showSortControls)}
@@ -379,41 +366,15 @@ const ThreadListPage = ({
               : "ソート順"}
           </span>
         </button>
-        <Button
-          onClick={() => {
-            hasEverOpenedThread.current = true;
-            setCreatingThread(true);
-          }}
+        <PostThreadLauncher
+          boardKey={params.boardKey ?? ""}
+          refetchThreadList={mutate}
           className={twMerge("px-4 py-2 lg:px-6 lg:py-3 mx-2", params.boardKey || "hidden")}
         >
           <FaPen className="lg:mr-3" />
           <span className="lg:block hidden">スレッド作成</span>
-        </Button>
-
-        {hasEverOpenedNGSettings.current && (
-          <Suspense fallback={null}>
-            <LazyNGWordsSettingsModal
-              open={showNGSettings}
-              setOpen={setShowNGSettings}
-              enableSafeMode={enableSafeMode}
-              summarizerSupported={summarizerSupported}
-              summarizeEnabled={summarizeEnabled}
-              onSummarizeEnabledChange={setSummarizeEnabled}
-            />
-          </Suspense>
-        )}
+        </PostThreadLauncher>
       </header>
-
-      {hasEverOpenedThread.current && (
-        <Suspense fallback={null}>
-          <LazyPostThreadModal
-            boardKey={params.boardKey ?? ""}
-            open={creatingThread}
-            setOpen={setCreatingThread}
-            refetchThreadList={mutate}
-          />
-        </Suspense>
-      )}
 
       {showSortControls && (
         <div className="bg-white dark:bg-gray-900 border-b border-gray-300 dark:border-gray-700 p-3 flex flex-wrap gap-2 items-center">
