@@ -37,7 +37,15 @@ services:
     ports:
       - "5173:5173"
     volumes:
+      # Generated output is kept in volumes so the container never writes into
+      # the shared tree: its Linux artifacts would otherwise replace the host's.
       - ..:/workspace
+      - node_modules_root:/workspace/node_modules
+      - node_modules_client_v2:/workspace/eddist-server/client-v2/node_modules
+      - node_modules_admin_client:/workspace/eddist-admin/client/node_modules
+      - client_v2_react_router:/workspace/eddist-server/client-v2/.react-router
+      - client_v2_flowbite:/workspace/eddist-server/client-v2/.flowbite-react
+      - client_v2_build:/workspace/eddist-server/client-v2/build
       - pnpm_store:/root/.local/share/pnpm/store
     environment:
       NODE_ENV: development
@@ -66,3 +74,9 @@ services:
 volumes:
   mysql_data:
   pnpm_store:
+  node_modules_root:
+  node_modules_client_v2:
+  node_modules_admin_client:
+  client_v2_react_router:
+  client_v2_flowbite:
+  client_v2_build:
