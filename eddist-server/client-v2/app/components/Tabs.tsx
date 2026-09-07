@@ -10,11 +10,17 @@ export interface Tab {
 interface TabsProps {
   tabs: Tab[];
   defaultTab?: string;
+  onTabChange?: (tabId: string) => void;
 }
 
-export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
+export const Tabs = ({ tabs, defaultTab, onTabChange }: TabsProps) => {
   const [activeTab, setActiveTab] = useState(defaultTab ?? tabs[0]?.id);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  const selectTab = (tabId: string) => {
+    setActiveTab(tabId);
+    onTabChange?.(tabId);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
     let newIndex = currentIndex;
@@ -36,7 +42,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
     }
 
     const newTab = tabs[newIndex];
-    setActiveTab(newTab.id);
+    selectTab(newTab.id);
     tabRefs.current.get(newTab.id)?.focus();
   };
 
@@ -58,7 +64,7 @@ export const Tabs = ({ tabs, defaultTab }: TabsProps) => {
               id={`tab-${tab.id}`}
               tabIndex={isActive ? 0 : -1}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectTab(tab.id)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               className={twMerge(
                 "px-4 py-2 font-medium transition-colors",

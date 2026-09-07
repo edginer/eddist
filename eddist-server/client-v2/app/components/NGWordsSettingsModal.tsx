@@ -233,6 +233,7 @@ export const NGWordsSettingsModal = ({
   onSummarizeEnabledChange,
 }: NGWordsSettingsModalProps) => {
   const { config, addRule, updateRule, removeRule, toggleRule, clearAllRules } = useNGWords();
+  const [activeTab, setActiveTab] = useState("thread");
 
   const removeResponseAuthorId = (ruleId: string) => {
     const rule = config.response.authorIds.find((r) => r.id === ruleId);
@@ -296,6 +297,7 @@ export const NGWordsSettingsModal = ({
       </ModalHeader>
       <ModalBody className="pb-0">
         <Tabs
+          onTabChange={setActiveTab}
           tabs={[
             {
               id: "thread",
@@ -374,9 +376,13 @@ export const NGWordsSettingsModal = ({
         />
       </ModalBody>
       <ModalFooter className="flex justify-between mt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button color="gray" onClick={handleClearAll}>
-          すべてクリア
-        </Button>
+        {activeTab === "thread" || activeTab === "response" ? (
+          <Button color="gray" onClick={handleClearAll}>
+            すべてクリア
+          </Button>
+        ) : (
+          <div />
+        )}
         <Button onClick={() => setOpen(false)}>閉じる</Button>
       </ModalFooter>
     </Modal>
