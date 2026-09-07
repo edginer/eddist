@@ -104,6 +104,9 @@ pub enum BbsCgiError {
     ReAuthRequired { temp_key: String, base_url: String },
 
     #[error(transparent)]
+    CaptchaError(#[from] CaptchaLikeError),
+
+    #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
@@ -135,6 +138,7 @@ impl BbsCgiError {
             BbsCgiError::EmailAuthenticatedUnsupportedUserAgent => StatusCode::OK,
             BbsCgiError::TemporarilySuspended => StatusCode::FORBIDDEN,
             BbsCgiError::ReAuthRequired { .. } => StatusCode::FORBIDDEN,
+            BbsCgiError::CaptchaError(_) => StatusCode::OK,
             BbsCgiError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -168,6 +172,7 @@ impl BbsCgiError {
             }
             BbsCgiError::TemporarilySuspended => "TemporarilySuspended",
             BbsCgiError::ReAuthRequired { .. } => "ReAuthRequired",
+            BbsCgiError::CaptchaError(_) => "CaptchaError",
             BbsCgiError::Other(_) => "InternalError",
         }
     }

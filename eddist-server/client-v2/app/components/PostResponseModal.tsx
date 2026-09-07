@@ -1,7 +1,9 @@
 import { Button, Label, Modal, ModalBody, ModalHeader, Textarea, TextInput } from "flowbite-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useCaptchaPosting } from "../hooks/useCaptchaPosting";
 import AuthCodeModal from "./AuthCodeModal";
+import CaptchaSection from "./CaptchaSection";
 import ErrorModal from "./ErrorModal";
 import { postResponse } from "./utils";
 
@@ -21,6 +23,8 @@ const PostResponseModal = (props: PostResponseModalProps) => {
   const [authCode, setAuthCode] = useState("");
   const [errorModal, serErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const captcha = useCaptchaPosting("res_creation", props.open);
 
   return (
     <Modal
@@ -52,6 +56,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
               body: data.body,
               boardKey: props.boardKey,
               threadKey: props.threadKey,
+              captchaTokens: captcha.tokens,
             });
 
             if (!result.success) {
@@ -59,6 +64,9 @@ const PostResponseModal = (props: PostResponseModalProps) => {
                 case "auth-code":
                   setAuthCode(result.error.authCode);
                   setOpenAuthCodeModal(true);
+                  return;
+                case "captcha":
+                  captcha.onFailure();
                   return;
                 case "unknown":
                   serErrorModal(true);
@@ -101,8 +109,12 @@ const PostResponseModal = (props: PostResponseModalProps) => {
               />
             </div>
 
+            <CaptchaSection captcha={captcha} />
+
             <div className="w-full">
-              <Button type="submit">書き込む</Button>
+              <Button type="submit" disabled={captcha.isPending}>
+                書き込む
+              </Button>
             </div>
           </div>
         </form>
