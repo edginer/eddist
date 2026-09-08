@@ -256,6 +256,9 @@ export const convertThreadTextToResponseList = (text: string) => {
   };
 };
 
+// Back-reference tracking only; anchors are still linked past this count.
+const MAX_ANCHORS_PER_BODY = 10;
+
 const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
   const refs = [];
   const parts = [];
@@ -280,5 +283,5 @@ const buildAnchorPartedBody = (body: string): [BodyAnchorPart[], number[]] => {
     parts.push({ text: body.slice(lastIndex), isMatch: false });
   }
 
-  return [parts, refs];
+  return [parts, refs.length >= MAX_ANCHORS_PER_BODY ? [] : refs];
 };
