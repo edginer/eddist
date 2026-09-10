@@ -1,40 +1,94 @@
-import { Suspense } from "react";
-import { Link, useParams } from "react-router";
+import { type FormEvent, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import BoardSetting from "~/components/BoardSetting";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
 import ThreadList from "../components/ThreadList";
-import { getArchivedThreads, getBoard, getThreads } from "../hooks/queries";
+import { getBoard, getThreads, useResolveArchivedThread } from "../hooks/queries";
 
-const ArchivedThreadsTabContent = ({
-  boardKey,
-  boardId,
-  boardName,
-}: {
-  boardKey: string;
-  boardId: number;
-  boardName: string;
-}) => {
-  const { data: archivedThreads } = getArchivedThreads({
-    params: {
-      path: { board_key: boardKey },
-    },
-  });
+const ArchivedThreadsTabContent = ({ boardKey }: { boardKey: string }) => {
+  const navigate = useNavigate();
+  const resolveArchivedThread = useResolveArchivedThread();
+  const [threadNumber, setThreadNumber] = useState("");
+  const [inputError, setInputError] = useState<string>();
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const parsedThreadNumber = Number(threadNumber);
+    if (
+      threadNumber.trim() === "" ||
+      !Number.isSafeInteger(parsedThreadNumber) ||
+      parsedThreadNumber < 0
+    ) {
+      resolveArchivedThread.reset();
+      setInputError("Enter a valid thread number.");
+      return;
+    }
+
+    setInputError(undefined);
+    resolveArchivedThread.mutate(
+      {
+        params: {
+          path: {
+            board_key: boardKey,
+            thread_id: parsedThreadNumber,
+          },
+        },
+      },
+      {
+        onSuccess: (result) => {
+          if (!result) {
+            setInputError("Archived thread was not found.");
+            return;
+          }
+
+          const datSuffix = result.source === "dat" ? "/dat" : "";
+          navigate(`/dashboard/boards/${boardKey}/archives/${parsedThreadNumber}${datSuffix}`);
+        },
+      },
+    );
+  };
 
   return (
-    <ThreadList
-      threads={
-        archivedThreads?.map((x) => ({
-          threadNumber: Number(x.thread_number),
-          title: x.title,
-          responseCount: Number(x.response_count),
-          lastModified: x.last_modified,
-          boardId,
-        })) ?? []
-      }
-      board={{ boardKey, boardName }}
-      archives
-    />
+    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+        Search archived threads
+      </h2>
+      <form className="flex max-w-lg items-end gap-3" onSubmit={handleSubmit}>
+        <div className="flex-1">
+          <label
+            className="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+            htmlFor="archived-thread-number"
+          >
+            Thread number
+          </label>
+          <input
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            id="archived-thread-number"
+            inputMode="numeric"
+            min="0"
+            onChange={(event) => setThreadNumber(event.target.value)}
+            placeholder="1234567890"
+            step="1"
+            type="number"
+            value={threadNumber}
+          />
+        </div>
+        <button
+          className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={resolveArchivedThread.isPending}
+          type="submit"
+        >
+          {resolveArchivedThread.isPending ? "Searching..." : "Search"}
+        </button>
+      </form>
+      {(inputError || resolveArchivedThread.isError) && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+          {inputError ?? "Archived thread was not found."}
+        </p>
+      )}
+    </div>
   );
 };
 
@@ -105,13 +159,7 @@ const Page = () => {
             id: "archived-threads-tab",
             children: (
               <div className="p-2 sm:p-4">
-                <Suspense fallback={<div>Loading...</div>}>
-                  <ArchivedThreadsTabContent
-                    boardKey={params.boardKey}
-                    boardId={Number(board?.id)}
-                    boardName={board?.name ?? ""}
-                  />
-                </Suspense>
+                <ArchivedThreadsTabContent boardKey={params.boardKey} />
               </div>
             ),
           },

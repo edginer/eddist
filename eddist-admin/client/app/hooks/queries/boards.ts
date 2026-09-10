@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import client from "~/openapi/client";
+import client, { ApiClientError } from "~/openapi/client";
 import type { paths } from "~/openapi/schema";
 import type { UseQueryOptions } from "./types";
 
@@ -119,6 +119,24 @@ export const getThread = ({
 };
 
 const GET_ARCHIVED_THREAD = "/boards/{board_key}/archives/{thread_id}/";
+
+export const useResolveArchivedThread = () => {
+  return useMutation({
+    mutationFn: async (args: UseQueryOptions<paths[typeof GET_ARCHIVED_THREAD]["get"]>) => {
+      try {
+        await client.GET(GET_ARCHIVED_THREAD, {
+          params: args.params,
+        });
+        return { source: "database" as const };
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          return { source: "dat" as const };
+        }
+        throw error;
+      }
+    },
+  });
+};
 
 export const getArchivedThread = ({
   params,
