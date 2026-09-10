@@ -39,11 +39,11 @@ const ResponseList = ({
 
   return responses.map((response, idx) => (
     <div key={response.id} className="bg-gray-200 p-4 rounded-lg mb-4">
-      <div className="flex items-center mb-2 border-b border-gray-200">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-gray-200 pb-2">
         {selectedResponses && setSelectedResponses && (
           <input
             type="checkbox"
-            className="mr-2"
+            className="shrink-0"
             id={`${response.id}`}
             onClick={() => {
               if (selectedResponses.find((r) => r.id === response.id) != null) {
@@ -62,12 +62,14 @@ const ResponseList = ({
             }}
           />
         )}
-        <span className="font-bold mr-2">{idx + 1}</span>
-        <span className="mr-2">{response.author_name}</span>
-        <span className="text-gray-500 mr-2">{response.mail}</span>
-        <span className="text-gray-500 mr-2">{response.created_at}</span>
-        <span className="text-gray-500 grow">ID:{response.author_id}</span>
-        <div>
+        <span className="font-bold">{idx + 1}</span>
+        <span className="max-w-full break-words">{response.author_name}</span>
+        <span className="max-w-full break-words text-gray-500">{response.mail}</span>
+        <span className="text-gray-500">{response.created_at}</span>
+        <span className="min-w-0 basis-full break-all text-gray-500 sm:flex-1 sm:basis-auto">
+          ID:{response.author_id}
+        </span>
+        <div className="ml-auto shrink-0">
           <Dropdown
             arrowIcon={false}
             label={
@@ -134,8 +136,11 @@ const ResponseList = ({
           </Dropdown>
         </div>
       </div>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body rendered for admin review only */}
-      <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: response.body }} />
+      <div
+        className="break-words whitespace-pre-wrap"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS post body rendered for admin review only
+        dangerouslySetInnerHTML={{ __html: response.body }}
+      />
       <div className="text-gray-500 text-sm mt-2">
         <p>IP: {response.ip_addr}</p>
         <p>

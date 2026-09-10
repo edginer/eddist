@@ -272,8 +272,8 @@ const Page = () => {
   const totalPages = data?.total_pages ?? 0;
 
   return (
-    <div className="p-4">
-      <h1 className="text-3xl font-bold mb-6">Authed Tokens</h1>
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:text-3xl">Authed Tokens</h1>
 
       {/* Token ID Lookup */}
       <div className="mb-4 flex flex-col sm:flex-row gap-3 items-end">
@@ -298,7 +298,7 @@ const Page = () => {
       )}
 
       {/* Filter Bar */}
-      <div className="mb-4 flex flex-wrap gap-3 items-end">
+      <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <div>
           <Label htmlFor="filter-origin-ip" className="mb-1 block text-sm">
             Origin IP
@@ -307,6 +307,7 @@ const Page = () => {
             id="filter-origin-ip"
             placeholder="1.2.3.4"
             sizing="sm"
+            className="w-full"
             value={originIpFilter}
             onChange={(e) => setOriginIpFilter(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -320,6 +321,7 @@ const Page = () => {
             id="filter-writing-ua"
             placeholder="substring..."
             sizing="sm"
+            className="w-full"
             value={writingUaFilter}
             onChange={(e) => setWritingUaFilter(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -333,6 +335,7 @@ const Page = () => {
             id="filter-authed-ua"
             placeholder="substring..."
             sizing="sm"
+            className="w-full"
             value={authedUaFilter}
             onChange={(e) => setAuthedUaFilter(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -347,6 +350,7 @@ const Page = () => {
             placeholder="e.g. 13335"
             sizing="sm"
             type="number"
+            className="w-full"
             value={asnNumFilter}
             onChange={(e) => setAsnNumFilter(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -359,6 +363,7 @@ const Page = () => {
           <Select
             id="filter-validity"
             sizing="sm"
+            className="w-full"
             value={validityFilter}
             onChange={(e) => setValidityFilter(e.target.value)}
           >
@@ -367,7 +372,7 @@ const Page = () => {
             <option value="false">Revoked</option>
           </Select>
         </div>
-        <Button size="sm" onClick={handleSearch}>
+        <Button size="sm" className="w-full sm:w-auto" onClick={handleSearch}>
           Search
         </Button>
       </div>
@@ -466,13 +471,13 @@ const Page = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between mt-4">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-sm text-gray-700">
           {data
             ? `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, data.total)} of ${data.total}`
             : ""}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Button
             size="xs"
             color="gray"

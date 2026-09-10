@@ -27,6 +27,38 @@ type CreateIdpFormData = paths["/idps/"]["post"]["requestBody"]["content"]["appl
 type UpdateIdpFormData =
   paths["/idps/{id}/"]["patch"]["requestBody"]["content"]["application/json"];
 
+const IdpActions = ({
+  idp,
+  onEdit,
+  onDelete,
+}: {
+  idp: Idp;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => (
+  <div className="flex shrink-0 gap-2">
+    <Button
+      size="xs"
+      className="min-h-10 min-w-10 justify-center p-2"
+      onClick={onEdit}
+      aria-label={`Edit ${idp.idp_display_name}`}
+    >
+      <FaEdit aria-hidden="true" />
+      <span className="sr-only">Edit</span>
+    </Button>
+    <Button
+      size="xs"
+      color="alternative"
+      className="min-h-10 min-w-10 justify-center p-2"
+      onClick={onDelete}
+      aria-label={`Delete ${idp.idp_display_name}`}
+    >
+      <FaTrash aria-hidden="true" />
+      <span className="sr-only">Delete</span>
+    </Button>
+  </div>
+);
+
 function decodeBase64Svg(b64: string | null | undefined): string {
   if (!b64) return "";
   try {
@@ -173,52 +205,107 @@ const IdPs = () => {
 
   return (
     <>
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Identity Providers</h1>
-          <Button onClick={() => modal.openCreate()}>
+      <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-5 flex flex-col gap-3 border-b border-gray-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Identity Providers</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage the external identity providers available to users.
+            </p>
+          </div>
+          <Button className="w-full sm:w-auto" onClick={() => modal.openCreate()}>
             <FaPlus className="mr-2" />
             Create IdP
           </Button>
         </div>
 
-        <Table>
-          <TableHead>
-            <TableHeadCell>Name</TableHeadCell>
-            <TableHeadCell>Display Name</TableHeadCell>
-            <TableHeadCell>OIDC Config URL</TableHeadCell>
-            <TableHeadCell>Enabled</TableHeadCell>
-            <TableHeadCell>Actions</TableHeadCell>
-          </TableHead>
-          <TableBody>
-            {idps?.map((idp) => (
-              <TableRow className="border-gray-200" key={idp.id}>
-                <TableCell>
-                  <code className="text-sm text-gray-600">{idp.idp_name}</code>
-                </TableCell>
-                <TableCell>{idp.idp_display_name}</TableCell>
-                <TableCell>
-                  <span className="text-sm truncate max-w-xs block">{idp.oidc_config_url}</span>
-                </TableCell>
-                <TableCell>
-                  <span className={idp.enabled ? "text-green-500" : "text-red-500"}>
-                    {idp.enabled ? "Yes" : "No"}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button size="xs" onClick={() => modal.openEdit(idp)}>
-                      <FaEdit />
-                    </Button>
-                    <Button size="xs" color="alternative" onClick={() => handleDelete(idp.id)}>
-                      <FaTrash />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+          <Table hoverable className="min-w-[700px]">
+            <TableHead>
+              <TableHeadCell>Name</TableHeadCell>
+              <TableHeadCell>Display Name</TableHeadCell>
+              <TableHeadCell>OIDC Config URL</TableHeadCell>
+              <TableHeadCell>Enabled</TableHeadCell>
+              <TableHeadCell>Actions</TableHeadCell>
+            </TableHead>
+            <TableBody>
+              {idps?.map((idp) => (
+                <TableRow className="border-gray-200" key={idp.id}>
+                  <TableCell>
+                    <code className="text-sm text-gray-600">{idp.idp_name}</code>
+                  </TableCell>
+                  <TableCell className="font-medium">{idp.idp_display_name}</TableCell>
+                  <TableCell>
+                    <span className="block max-w-xs truncate text-sm">{idp.oidc_config_url}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={idp.enabled ? "text-green-500" : "text-red-500"}>
+                      {idp.enabled ? "Yes" : "No"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <IdpActions
+                      idp={idp}
+                      onEdit={() => modal.openEdit(idp)}
+                      onDelete={() => handleDelete(idp.id)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="space-y-3 md:hidden">
+          {idps?.map((idp) => (
+            <article
+              key={idp.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm text-gray-500">{idp.idp_name}</p>
+                  <h2 className="mt-1 break-words font-semibold text-gray-900">
+                    {idp.idp_display_name}
+                  </h2>
+                </div>
+                <IdpActions
+                  idp={idp}
+                  onEdit={() => modal.openEdit(idp)}
+                  onDelete={() => handleDelete(idp.id)}
+                />
+              </div>
+
+              <dl className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                <div className="min-w-0">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    OIDC config URL
+                  </dt>
+                  <dd className="mt-1 break-all text-sm text-gray-700">{idp.oidc_config_url}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Status
+                  </dt>
+                  <dd
+                    className={
+                      idp.enabled
+                        ? "mt-1 font-medium text-green-600"
+                        : "mt-1 font-medium text-red-600"
+                    }
+                  >
+                    {idp.enabled ? "Enabled" : "Disabled"}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+          {idps?.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+              No identity providers found.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create Modal */}

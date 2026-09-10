@@ -15,12 +15,13 @@ function Page() {
         setOpen={setOpenCreateBoardModal}
         refetch={refetch}
       />
-      <div className="p-4">
-        <div className="flex">
-          <h1 className="text-3xl font-bold grow">Boards</h1>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center gap-3">
+          <h1 className="grow text-2xl font-bold sm:text-3xl">Boards</h1>
           <button
             type="button"
-            className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
+            className="min-h-11 min-w-11 shrink-0 rounded-xl bg-slate-400 p-3 shadow-lg hover:bg-slate-500"
+            aria-label="Create board"
             onClick={() => setOpenCreateBoardModal(true)}
           >
             <FaPlus />

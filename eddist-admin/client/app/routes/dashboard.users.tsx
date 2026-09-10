@@ -122,12 +122,12 @@ const UserSearchPage = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="flex">
-        <h1 className="text-3xl font-bold grow">User Search</h1>
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">User Search</h1>
       </div>
-      <div className="flex flex-col p-2 sm:p-8 m-4 xl:m-8 h-[calc(100vh-140px)] items-center">
-        <div className="flex w-full flex-col xl:flex-row mb-8 xl:items-end">
+      <div className="mt-6 flex min-w-0 flex-col items-center">
+        <div className="mb-8 flex w-full flex-col xl:flex-row xl:items-end">
           <div className="flex flex-1 flex-col">
             <div className="mb-4">
               <Label htmlFor="user-id-input" className="block mb-2">
@@ -169,7 +169,11 @@ const UserSearchPage = () => {
             </div>
           </div>
 
-          <Button onClick={handleSearch} type="submit" className="mt-2 xl:h-12 px-8 xl:mx-4">
+          <Button
+            onClick={handleSearch}
+            type="submit"
+            className="mt-3 w-full px-8 xl:mx-4 xl:mt-0 xl:h-12 xl:w-auto"
+          >
             Search
           </Button>
         </div>
