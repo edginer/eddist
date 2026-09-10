@@ -21,19 +21,24 @@ interface ThreadListProps {
 
 const ThreadList: React.FC<ThreadListProps> = ({ threads, board, archives: isArchives }) => {
   return (
-    <div className="rounded border border-black divide-y divide-black">
+    <div className="divide-y divide-gray-200 rounded border border-gray-200 bg-white">
       {threads.map((thread) => (
-        <div key={thread.threadNumber} className="flex items-center p-2">
-          <input type="checkbox" className="mr-2" />
+        <div
+          key={thread.threadNumber}
+          className="flex flex-wrap items-start gap-2 p-3 sm:items-center"
+        >
+          <input type="checkbox" className="mt-1 shrink-0 sm:mt-0" />
           <Link
             to={`/dashboard/boards/${board.boardKey}/${
               isArchives ? "archives" : "threads"
             }/${thread.threadNumber}`}
-            className="text-blue-500 hover:underline cursor-pointer"
+            className="min-w-0 flex-1 break-words text-blue-500 hover:underline"
           >
-            <span className="grow">{thread.title}</span>
+            <span>{thread.title}</span>
           </Link>
-          <span className="ml-auto mr-4">{thread.responseCount} responses</span>
+          <span className="basis-full pl-6 text-sm text-gray-500 sm:ml-auto sm:basis-auto sm:pl-0">
+            {thread.responseCount} responses
+          </span>
         </div>
       ))}
     </div>

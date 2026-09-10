@@ -40,7 +40,7 @@ const Tab = <TKey extends string>({ tabItems, onSelectedTabChange }: Props<TKey>
               <li className="mr-2" role="presentation" key={tabItem.tabKey}>
                 <button
                   className={twJoin(
-                    "inline-block p-4 border-b-2 rounded-t-lg",
+                    "inline-block p-3 border-b-2 rounded-t-lg sm:p-4",
                     selectedTabKey === tabItem.tabKey
                       ? "border-blue-600"
                       : "border-gray-200 hover:text-gray-600 hover:border-gray-300",

@@ -30,10 +30,10 @@ const DatArchiveResponseList = ({
         key={`${response.date}:${response.authed_token_id}`}
         className="bg-gray-200 p-4 rounded-lg mb-4"
       >
-        <div className="flex items-center mb-2 border-b border-gray-200">
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-gray-200 pb-2">
           <input
             type="checkbox"
-            className="mr-2"
+            className="shrink-0"
             onClick={() => {
               if (selectedResponsesOrder.find((order) => order === idx) != null) {
                 setSelectedResponsesOrder((s) => s.filter((order) => order !== idx));
@@ -43,18 +43,20 @@ const DatArchiveResponseList = ({
             }}
           />
 
-          <span className="font-bold mr-2">{idx + 1}</span>
-          <span className="mr-2">{response.name}</span>
-          <span className="text-gray-500 mr-2">{response.mail}</span>
-          <span className="text-gray-500 mr-2">{response.date}</span>
-          <span className="text-gray-500 grow">ID:{response.author_id}</span>
+          <span className="font-bold">{idx + 1}</span>
+          <span className="max-w-full break-words">{response.name}</span>
+          <span className="max-w-full break-words text-gray-500">{response.mail}</span>
+          <span className="text-gray-500">{response.date}</span>
+          <span className="min-w-0 basis-full break-all text-gray-500 sm:flex-1 sm:basis-auto">
+            ID:{response.author_id}
+          </span>
           {responses?.[idx]?.is_abone && (
             <div>
               <hr className="mr-2" />
-              <span className="text-gray-500 mr-2">This responses is deleted.</span>
+              <span className="text-gray-500">This responses is deleted.</span>
             </div>
           )}
-          <div>
+          <div className="ml-auto shrink-0">
             <Dropdown
               arrowIcon={false}
               label={
@@ -84,7 +86,7 @@ const DatArchiveResponseList = ({
             </Dropdown>
           </div>
         </div>
-        <div className="p-2">{response.body}</div>
+        <div className="break-words whitespace-pre-wrap p-2">{response.body}</div>
         {responses?.[idx] &&
           !responses[idx].is_abone &&
           (responses[idx].body !== response.body ||
@@ -97,7 +99,7 @@ const DatArchiveResponseList = ({
               <span className="text-gray-500 mr-2">{responses[idx].mail}</span>
               <span className="text-gray-500 mr-2">{responses[idx].date}</span>
               <span className="text-gray-500 grow">ID:{responses[idx].author_id}</span>
-              <div className="p-2">{responses[idx].body}</div>
+              <div className="break-words whitespace-pre-wrap p-2">{responses[idx].body}</div>
             </div>
           )}
         <div className="text-gray-500 text-sm mt-2">

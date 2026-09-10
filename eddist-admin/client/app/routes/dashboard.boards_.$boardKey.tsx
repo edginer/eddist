@@ -61,8 +61,10 @@ const Page = () => {
   });
 
   return (
-    <div className="p-4">
-      <h1 className="text-3xl font-bold">Threads: {params.boardKey}</h1>
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      <h1 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">
+        Threads: {params.boardKey}
+      </h1>
       <Breadcrumb>
         <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
           Boards
@@ -78,7 +80,7 @@ const Page = () => {
             tabLabel: "Threads",
             id: "threads-tab",
             children: (
-              <div className="p-2">
+              <div className="p-2 sm:p-4">
                 <ThreadList
                   threads={
                     threads?.map((x) => ({
@@ -102,7 +104,7 @@ const Page = () => {
             tabLabel: "Archives",
             id: "archived-threads-tab",
             children: (
-              <div className="p-2">
+              <div className="p-2 sm:p-4">
                 <Suspense fallback={<div>Loading...</div>}>
                   <ArchivedThreadsTabContent
                     boardKey={params.boardKey}

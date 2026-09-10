@@ -1,3 +1,17 @@
 @import "tailwindcss";
 @import "flowbite-react/plugin/tailwindcss";
 @source "../.flowbite-react/class-list.json";
+
+@layer components {
+  /* Flowbite's table wrapper is not scrollable by default. Keep wide datasets usable on touch
+     screens without allowing them to expand the dashboard viewport. */
+  [data-testid="table-element"] {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-testid="table-element"] > table {
+    min-width: max-content;
+  }
+}

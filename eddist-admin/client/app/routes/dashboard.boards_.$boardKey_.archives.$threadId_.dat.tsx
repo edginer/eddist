@@ -199,12 +199,17 @@ const Page = () => {
         </ModalFooter>
       </Modal>
 
-      <div className="p-4">
-        <div className="flex items-center gap-4 mb-2">
-          <h1 className="text-3xl font-bold">
+      <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">
             Thread: {thread?.title} ({params.threadId})
           </h1>
-          <Button color="red" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+          <Button
+            color="red"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
             Delete Thread
           </Button>
         </div>

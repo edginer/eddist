@@ -103,64 +103,109 @@ const NgWords = () => {
           </form>
         </ModalBody>
       </Modal>
-      <div className="p-2 lg:p-8">
-        <div className="flex">
-          <h1 className="text-3xl font-bold grow">NG words</h1>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center gap-3">
+          <h1 className="grow text-2xl font-bold sm:text-3xl">NG words</h1>
           <button
             type="button"
-            className="mr-2 bg-slate-400 p-4 rounded-xl shadow-lg hover:bg-slate-500"
+            className="min-h-11 min-w-11 shrink-0 rounded-xl bg-slate-400 p-3 shadow-lg hover:bg-slate-500"
+            aria-label="Create NG word"
             onClick={() => modal.openCreate()}
           >
             <FaPlus />
           </button>
         </div>
-        <Table className="mt-4">
-          <TableHead>
-            <TableHeadCell>Id</TableHeadCell>
-            <TableHeadCell>Name</TableHeadCell>
-            <TableHeadCell>Word</TableHeadCell>
-            <TableHeadCell></TableHeadCell>
-          </TableHead>
-          <TableBody className="divide-y">
-            {ngWords?.map((ngWord) => (
-              <TableRow className="border-gray-200" key={ngWord.id}>
-                <TableCell>{ngWord.id}</TableCell>
-                <TableCell>{ngWord.name}</TableCell>
-                <TableCell>{ngWord.word}</TableCell>
-                <TableCell>
-                  <div className="text-right">
-                    <Dropdown label={<BiDotsHorizontalRounded />}>
-                      <DropdownItem
-                        onClick={() => {
-                          modal.openEdit({
-                            ...ngWord,
-                            boardIds: ngWord.board_ids,
-                          });
-                        }}
-                      >
-                        Edit
-                      </DropdownItem>
-                      <DropdownItem
-                        className="text-red-500"
-                        onClick={() => {
-                          deleteMutation.mutate({
-                            params: {
-                              path: {
-                                ng_word_id: ngWord.id,
+        <div className="mt-4 hidden overflow-x-auto md:block">
+          <Table className="min-w-[560px]">
+            <TableHead>
+              <TableHeadCell>Id</TableHeadCell>
+              <TableHeadCell>Name</TableHeadCell>
+              <TableHeadCell>Word</TableHeadCell>
+              <TableHeadCell></TableHeadCell>
+            </TableHead>
+            <TableBody className="divide-y">
+              {ngWords?.map((ngWord) => (
+                <TableRow className="border-gray-200" key={ngWord.id}>
+                  <TableCell>{ngWord.id}</TableCell>
+                  <TableCell>{ngWord.name}</TableCell>
+                  <TableCell>{ngWord.word}</TableCell>
+                  <TableCell>
+                    <div className="text-right">
+                      <Dropdown label={<BiDotsHorizontalRounded />}>
+                        <DropdownItem
+                          onClick={() => {
+                            modal.openEdit({
+                              ...ngWord,
+                              boardIds: ngWord.board_ids,
+                            });
+                          }}
+                        >
+                          Edit
+                        </DropdownItem>
+                        <DropdownItem
+                          className="text-red-500"
+                          onClick={() => {
+                            deleteMutation.mutate({
+                              params: {
+                                path: {
+                                  ng_word_id: ngWord.id,
+                                },
                               },
-                            },
-                          });
-                        }}
-                      >
-                        Delete
-                      </DropdownItem>
-                    </Dropdown>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                            });
+                          }}
+                        >
+                          Delete
+                        </DropdownItem>
+                      </Dropdown>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="mt-4 space-y-3 md:hidden">
+          {ngWords?.map((ngWord) => (
+            <article
+              key={ngWord.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    NG word #{ngWord.id}
+                  </p>
+                  <h2 className="mt-1 break-words font-semibold text-gray-900">{ngWord.name}</h2>
+                </div>
+                <Dropdown label={<BiDotsHorizontalRounded />}>
+                  <DropdownItem
+                    onClick={() => modal.openEdit({ ...ngWord, boardIds: ngWord.board_ids })}
+                  >
+                    Edit
+                  </DropdownItem>
+                  <DropdownItem
+                    className="text-red-500"
+                    onClick={() =>
+                      deleteMutation.mutate({ params: { path: { ng_word_id: ngWord.id } } })
+                    }
+                  >
+                    Delete
+                  </DropdownItem>
+                </Dropdown>
+              </div>
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Word</p>
+                <p className="mt-1 break-words text-sm text-gray-700">{ngWord.word}</p>
+              </div>
+            </article>
+          ))}
+          {ngWords?.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+              No NG words found.
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

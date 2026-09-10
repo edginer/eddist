@@ -29,11 +29,11 @@ const Page = () => {
   const deleteAuthedTokenMutation = useDeleteAuthedToken();
 
   return (
-    <div className="p-4">
-      <h1 className="text-3xl font-bold">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      <h1 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">
         Thread: {thread?.title} ({thread?.thread_number})
       </h1>
-      <div className="flex justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Breadcrumb>
           <Link to="/dashboard/boards" className="text-gray-500 hover:text-gray-700">
             Boards
@@ -48,7 +48,7 @@ const Page = () => {
             {thread?.title}
           </span>
         </Breadcrumb>
-        <Link className="my-2 mr-4 underline underline-offset-1" to={"./dat"}>
+        <Link className="my-2 underline underline-offset-1 sm:mr-4" to={"./dat"}>
           Go to archive dat page
         </Link>
       </div>
