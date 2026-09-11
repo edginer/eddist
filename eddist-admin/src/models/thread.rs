@@ -23,3 +23,9 @@ pub struct Thread {
 pub struct ThreadCompactionInput {
     pub target_count: u32,
 }
+
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize)]
+pub struct ThreadArchiveInput {
+    /// Thread numbers to archive from the board.
+    pub thread_numbers: Vec<u64>,
+}

@@ -32,6 +32,7 @@ use crate::{
         threads::get_responses,
         threads::update_response,
         threads::threads_compaction,
+        threads::archive_threads,
 
         // Archive routes
         archives::get_archived_threads,
@@ -111,6 +112,7 @@ use crate::{
         EditBoardInput,
         Thread,
         ThreadCompactionInput,
+        ThreadArchiveInput,
         Res,
         ClientInfo,
         Tinker,

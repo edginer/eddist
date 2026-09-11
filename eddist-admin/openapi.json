@@ -983,6 +983,43 @@
         }
       }
     },
+    "/boards/{board_key}/threads/archive/": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "operationId": "archive_threads",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "description": "Board Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThreadArchiveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Selected threads archived successfully"
+          },
+          "400": {
+            "description": "No threads selected"
+          }
+        }
+      }
+    },
     "/boards/{board_key}/threads/{thread_id}/": {
       "get": {
         "tags": [
@@ -3655,6 +3692,23 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "ThreadArchiveInput": {
+        "type": "object",
+        "required": [
+          "thread_numbers"
+        ],
+        "properties": {
+          "thread_numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "description": "Thread numbers to archive from the board."
           }
         }
       },

@@ -1,10 +1,143 @@
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import BoardSetting from "~/components/BoardSetting";
 import Breadcrumb from "../components/Breadcrumb";
 import Tab from "../components/Tab";
 import ThreadList from "../components/ThreadList";
-import { getBoard, getThreads, useResolveArchivedThread } from "../hooks/queries";
+import {
+  getBoard,
+  getThreads,
+  useArchiveThreads,
+  useResolveArchivedThread,
+} from "../hooks/queries";
+
+interface ThreadListItem {
+  threadNumber: number;
+  title: string;
+  responseCount: number;
+}
+
+const ThreadsTabContent = ({
+  boardKey,
+  threads,
+}: {
+  boardKey: string;
+  threads: ThreadListItem[];
+}) => {
+  const archiveThreads = useArchiveThreads();
+  const [selectedThreadNumbers, setSelectedThreadNumbers] = useState<number[]>([]);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+
+  const allThreadNumbers = threads.map((thread) => thread.threadNumber);
+  const allSelected =
+    allThreadNumbers.length > 0 &&
+    allThreadNumbers.every((threadNumber) => selectedThreadNumbers.includes(threadNumber));
+
+  const handleThreadSelection = (threadNumber: number, selected: boolean) => {
+    setSelectedThreadNumbers((current) => {
+      if (selected) {
+        return current.includes(threadNumber) ? current : [...current, threadNumber];
+      }
+      return current.filter((currentThreadNumber) => currentThreadNumber !== threadNumber);
+    });
+  };
+
+  const handleArchive = () => {
+    if (selectedThreadNumbers.length === 0) {
+      return;
+    }
+
+    archiveThreads.mutate(
+      {
+        params: { path: { board_key: boardKey } },
+        body: { thread_numbers: selectedThreadNumbers },
+      },
+      {
+        onSuccess: () => {
+          setSelectedThreadNumbers([]);
+          setShowArchiveConfirm(false);
+        },
+      },
+    );
+  };
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
+        <label
+          className="flex items-center gap-2 text-sm text-gray-700"
+          htmlFor="select-all-threads"
+        >
+          <input
+            id="select-all-threads"
+            type="checkbox"
+            checked={allSelected}
+            disabled={allThreadNumbers.length === 0}
+            onChange={(event) =>
+              setSelectedThreadNumbers(event.target.checked ? allThreadNumbers : [])
+            }
+          />
+          Select all
+        </label>
+        {selectedThreadNumbers.length > 0 && (
+          <span className="text-sm text-gray-500">{selectedThreadNumbers.length} selected</span>
+        )}
+        <Button
+          color="failure"
+          disabled={selectedThreadNumbers.length === 0 || archiveThreads.isPending}
+          onClick={() => setShowArchiveConfirm(true)}
+          className="ml-auto"
+        >
+          Drop selected threads
+        </Button>
+      </div>
+
+      <ThreadList
+        threads={threads}
+        board={{ boardKey, boardName: "" }}
+        selection={{
+          selectedThreadNumbers,
+          onChange: handleThreadSelection,
+        }}
+      />
+
+      <Modal
+        show={showArchiveConfirm}
+        onClose={() => {
+          if (!archiveThreads.isPending) {
+            setShowArchiveConfirm(false);
+          }
+        }}
+        dismissible={!archiveThreads.isPending}
+      >
+        <ModalHeader>Drop selected threads</ModalHeader>
+        <ModalBody>
+          <p className="text-gray-700 dark:text-gray-300">
+            Drop {selectedThreadNumbers.length} selected thread
+            {selectedThreadNumbers.length === 1 ? "" : "s"}?
+          </p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Dropped threads will stop appearing on the public thread list and will be archived by
+            the scheduled archive job.
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            color="gray"
+            disabled={archiveThreads.isPending}
+            onClick={() => setShowArchiveConfirm(false)}
+          >
+            Cancel
+          </Button>
+          <Button color="failure" disabled={archiveThreads.isPending} onClick={handleArchive}>
+            {archiveThreads.isPending ? "Dropping..." : "Drop threads"}
+          </Button>
+        </ModalFooter>
+      </Modal>
+    </>
+  );
+};
 
 const ArchivedThreadsTabContent = ({ boardKey }: { boardKey: string }) => {
   const navigate = useNavigate();
@@ -135,20 +268,17 @@ const Page = () => {
             id: "threads-tab",
             children: (
               <div className="p-2 sm:p-4">
-                <ThreadList
+                <ThreadsTabContent
+                  boardKey={params.boardKey}
                   threads={
-                    threads?.map((x) => ({
-                      threadNumber: Number(x.thread_number),
-                      title: x.title,
-                      responseCount: Number(x.response_count),
-                      lastModified: x.last_modified,
-                      boardId: Number(board?.id),
-                    })) ?? []
+                    threads
+                      ?.filter((thread) => !thread.archived)
+                      .map((x) => ({
+                        threadNumber: Number(x.thread_number),
+                        title: x.title,
+                        responseCount: Number(x.response_count),
+                      })) ?? []
                   }
-                  board={{
-                    boardKey: params.boardKey,
-                    boardName: board?.name ?? "",
-                  }}
                 />
               </div>
             ),

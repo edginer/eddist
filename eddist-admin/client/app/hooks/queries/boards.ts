@@ -393,3 +393,23 @@ export const useCompactThread = () => {
     onError: () => toast.error("Failed to compact thread"),
   });
 };
+
+const ARCHIVE_THREADS = "/boards/{board_key}/threads/archive/";
+
+export const useArchiveThreads = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: UseQueryOptions<paths[typeof ARCHIVE_THREADS]["post"]>) => {
+      const { data } = await client.POST(ARCHIVE_THREADS, {
+        params: args.params,
+        body: args.body,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [GET_THREADS] });
+      toast.success("Successfully archived selected threads");
+    },
+    onError: () => toast.error("Failed to archive selected threads"),
+  });
+};
