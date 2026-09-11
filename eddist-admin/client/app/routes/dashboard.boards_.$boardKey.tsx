@@ -1,5 +1,6 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
 import { type FormEvent, useState } from "react";
+import { FaArchive } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import BoardSetting from "~/components/BoardSetting";
 import Breadcrumb from "../components/Breadcrumb";
@@ -67,33 +68,39 @@ const ThreadsTabContent = ({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
-        <label
-          className="flex items-center gap-2 text-sm text-gray-700"
-          htmlFor="select-all-threads"
-        >
-          <input
-            id="select-all-threads"
-            type="checkbox"
-            checked={allSelected}
-            disabled={selectableThreadNumbers.length === 0}
-            onChange={(event) =>
-              setSelectedThreadNumbers(event.target.checked ? selectableThreadNumbers : [])
-            }
-          />
-          Select all
-        </label>
-        {selectedThreadNumbers.length > 0 && (
-          <span className="text-sm text-gray-500">{selectedThreadNumbers.length} selected</span>
-        )}
-        <Button
-          color="failure"
-          disabled={selectedThreadNumbers.length === 0 || archiveThreads.isPending}
-          onClick={() => setShowArchiveConfirm(true)}
-          className="ml-auto"
-        >
-          Drop selected threads
-        </Button>
+      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <label
+            className="flex items-center gap-2 text-sm font-medium text-gray-700"
+            htmlFor="select-all-threads"
+          >
+            <input
+              id="select-all-threads"
+              type="checkbox"
+              checked={allSelected}
+              disabled={selectableThreadNumbers.length === 0}
+              onChange={(event) =>
+                setSelectedThreadNumbers(event.target.checked ? selectableThreadNumbers : [])
+              }
+            />
+            Select all
+          </label>
+          {selectedThreadNumbers.length > 0 && (
+            <span className="text-sm text-gray-600">{selectedThreadNumbers.length} selected</span>
+          )}
+          <Button
+            color="blue"
+            disabled={selectedThreadNumbers.length === 0 || archiveThreads.isPending}
+            onClick={() => setShowArchiveConfirm(true)}
+            className="ml-auto"
+          >
+            <FaArchive className="mr-2" aria-hidden="true" />
+            Archive selected threads
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-gray-600">
+          Selected threads will be removed from the public list and moved to the archive.
+        </p>
       </div>
 
       <ThreadList
@@ -114,27 +121,27 @@ const ThreadsTabContent = ({
         }}
         dismissible={!archiveThreads.isPending}
       >
-        <ModalHeader>Drop selected threads</ModalHeader>
+        <ModalHeader>Archive selected threads</ModalHeader>
         <ModalBody>
-          <p className="text-gray-700 dark:text-gray-300">
-            Drop {selectedThreadNumbers.length} selected thread
+          <p className="text-gray-700">
+            Archive {selectedThreadNumbers.length} selected thread
             {selectedThreadNumbers.length === 1 ? "" : "s"}?
           </p>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Dropped threads will stop appearing on the public thread list and will be archived by
-            the scheduled archive job.
+          <p className="mt-2 text-sm text-gray-500">
+            Archived threads will stop appearing on the public thread list. Their data will be moved
+            to the archive by the scheduled archive job.
           </p>
         </ModalBody>
         <ModalFooter>
+          <Button color="blue" disabled={archiveThreads.isPending} onClick={handleArchive}>
+            {archiveThreads.isPending ? "Archiving..." : "Confirm archive"}
+          </Button>
           <Button
             color="gray"
             disabled={archiveThreads.isPending}
             onClick={() => setShowArchiveConfirm(false)}
           >
             Cancel
-          </Button>
-          <Button color="failure" disabled={archiveThreads.isPending} onClick={handleArchive}>
-            {archiveThreads.isPending ? "Dropping..." : "Drop threads"}
           </Button>
         </ModalFooter>
       </Modal>
@@ -187,20 +194,18 @@ const ArchivedThreadsTabContent = ({ boardKey }: { boardKey: string }) => {
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        Search archived threads
-      </h2>
+    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">Search archived threads</h2>
       <form className="flex max-w-lg items-end gap-3" onSubmit={handleSubmit}>
         <div className="flex-1">
           <label
-            className="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+            className="mb-2 block text-sm font-medium text-gray-900"
             htmlFor="archived-thread-number"
           >
             Thread number
           </label>
           <input
-            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
             id="archived-thread-number"
             inputMode="numeric"
             min="0"
@@ -212,7 +217,7 @@ const ArchivedThreadsTabContent = ({ boardKey }: { boardKey: string }) => {
           />
         </div>
         <button
-          className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={resolveArchivedThread.isPending}
           type="submit"
         >
@@ -220,7 +225,7 @@ const ArchivedThreadsTabContent = ({ boardKey }: { boardKey: string }) => {
         </button>
       </form>
       {(inputError || resolveArchivedThread.isError) && (
-        <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+        <p className="mt-3 text-sm text-red-600">
           {inputError ?? "Archived thread was not found."}
         </p>
       )}
