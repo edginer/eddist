@@ -31,13 +31,6 @@ const ThreadsTabContent = ({
   const [selectedThreadNumbers, setSelectedThreadNumbers] = useState<number[]>([]);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
-  const selectableThreadNumbers = threads
-    .filter((thread) => !thread.archived)
-    .map((thread) => thread.threadNumber);
-  const allSelected =
-    selectableThreadNumbers.length > 0 &&
-    selectableThreadNumbers.every((threadNumber) => selectedThreadNumbers.includes(threadNumber));
-
   const handleThreadSelection = (threadNumber: number, selected: boolean) => {
     setSelectedThreadNumbers((current) => {
       if (selected) {
@@ -68,39 +61,15 @@ const ThreadsTabContent = ({
 
   return (
     <>
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <label
-            className="flex items-center gap-2 text-sm font-medium text-gray-700"
-            htmlFor="select-all-threads"
-          >
-            <input
-              id="select-all-threads"
-              type="checkbox"
-              checked={allSelected}
-              disabled={selectableThreadNumbers.length === 0}
-              onChange={(event) =>
-                setSelectedThreadNumbers(event.target.checked ? selectableThreadNumbers : [])
-              }
-            />
-            Select all
-          </label>
-          {selectedThreadNumbers.length > 0 && (
-            <span className="text-sm text-gray-600">{selectedThreadNumbers.length} selected</span>
-          )}
-          <Button
-            color="blue"
-            disabled={selectedThreadNumbers.length === 0 || archiveThreads.isPending}
-            onClick={() => setShowArchiveConfirm(true)}
-            className="ml-auto"
-          >
-            <FaArchive className="mr-2" aria-hidden="true" />
-            Archive selected threads
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-gray-600">
-          Selected threads will be removed from the public list and moved to the archive.
-        </p>
+      <div className="mb-4 flex flex-wrap justify-end gap-3">
+        <Button
+          color="blue"
+          disabled={selectedThreadNumbers.length === 0 || archiveThreads.isPending}
+          onClick={() => setShowArchiveConfirm(true)}
+        >
+          <FaArchive className="mr-2" aria-hidden="true" />
+          Archive
+        </Button>
       </div>
 
       <ThreadList
