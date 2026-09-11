@@ -16,6 +16,7 @@ interface ThreadListItem {
   threadNumber: number;
   title: string;
   responseCount: number;
+  archived: boolean;
 }
 
 const ThreadsTabContent = ({
@@ -29,10 +30,12 @@ const ThreadsTabContent = ({
   const [selectedThreadNumbers, setSelectedThreadNumbers] = useState<number[]>([]);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
-  const allThreadNumbers = threads.map((thread) => thread.threadNumber);
+  const selectableThreadNumbers = threads
+    .filter((thread) => !thread.archived)
+    .map((thread) => thread.threadNumber);
   const allSelected =
-    allThreadNumbers.length > 0 &&
-    allThreadNumbers.every((threadNumber) => selectedThreadNumbers.includes(threadNumber));
+    selectableThreadNumbers.length > 0 &&
+    selectableThreadNumbers.every((threadNumber) => selectedThreadNumbers.includes(threadNumber));
 
   const handleThreadSelection = (threadNumber: number, selected: boolean) => {
     setSelectedThreadNumbers((current) => {
@@ -73,9 +76,9 @@ const ThreadsTabContent = ({
             id="select-all-threads"
             type="checkbox"
             checked={allSelected}
-            disabled={allThreadNumbers.length === 0}
+            disabled={selectableThreadNumbers.length === 0}
             onChange={(event) =>
-              setSelectedThreadNumbers(event.target.checked ? allThreadNumbers : [])
+              setSelectedThreadNumbers(event.target.checked ? selectableThreadNumbers : [])
             }
           />
           Select all
@@ -271,13 +274,12 @@ const Page = () => {
                 <ThreadsTabContent
                   boardKey={params.boardKey}
                   threads={
-                    threads
-                      ?.filter((thread) => !thread.archived)
-                      .map((x) => ({
-                        threadNumber: Number(x.thread_number),
-                        title: x.title,
-                        responseCount: Number(x.response_count),
-                      })) ?? []
+                    threads?.map((x) => ({
+                      threadNumber: Number(x.thread_number),
+                      title: x.title,
+                      responseCount: Number(x.response_count),
+                      archived: x.archived,
+                    })) ?? []
                   }
                 />
               </div>

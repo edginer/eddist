@@ -9,6 +9,7 @@ interface Thread {
   threadNumber: number;
   title: string;
   responseCount: number;
+  archived: boolean;
 }
 
 interface ThreadListProps {
@@ -33,14 +34,15 @@ const ThreadList: React.FC<ThreadListProps> = ({
         <p className="p-6 text-center text-sm text-gray-500">No threads found.</p>
       ) : (
         threads.map((thread) => {
+          const isSelectable = selection != null && !thread.archived;
           const isSelected =
-            selection?.selectedThreadNumbers.includes(thread.threadNumber) ?? false;
+            isSelectable && selection.selectedThreadNumbers.includes(thread.threadNumber);
 
           return (
             <div
               key={thread.threadNumber}
               className={`flex flex-wrap items-start gap-2 p-3 sm:items-center ${
-                isSelected ? "bg-blue-50" : ""
+                isSelected ? "bg-blue-50" : thread.archived ? "bg-gray-50" : ""
               }`}
             >
               {selection && (
@@ -49,8 +51,9 @@ const ThreadList: React.FC<ThreadListProps> = ({
                   className="mt-1 shrink-0 sm:mt-0"
                   aria-label={`Select thread ${thread.threadNumber}`}
                   checked={isSelected}
+                  disabled={!isSelectable}
                   onChange={(event) =>
-                    selection.onChange(thread.threadNumber, event.target.checked)
+                    isSelectable && selection.onChange(thread.threadNumber, event.target.checked)
                   }
                 />
               )}
@@ -62,6 +65,11 @@ const ThreadList: React.FC<ThreadListProps> = ({
               >
                 <span>{thread.title}</span>
               </Link>
+              {thread.archived && (
+                <span className="shrink-0 rounded bg-gray-200 px-2 py-1 text-xs font-medium text-gray-600">
+                  Archived
+                </span>
+              )}
               <span
                 className={`basis-full text-sm text-gray-500 sm:ml-auto sm:basis-auto ${
                   selection ? "pl-6 sm:pl-0" : ""
