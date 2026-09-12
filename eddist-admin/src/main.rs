@@ -50,7 +50,6 @@ pub(crate) mod entity;
 pub(crate) mod error;
 mod models;
 mod services;
-pub(crate) mod utils;
 mod repository {
     pub mod admin_archive_repository;
     pub mod admin_board_repository;
@@ -209,24 +208,24 @@ async fn main() {
     let serve_dir = ServeDir::new(serve_dir)
         .not_found_service(ServeFile::new(format!("{serve_dir}/index.html")));
 
-    let pool = sqlx::mysql::MySqlPoolOptions::new()
-        .after_connect(|conn, _| {
-            use sqlx::Executor;
+    let mut connect_options = sea_orm::ConnectOptions::new(std::env::var("DATABASE_URL").unwrap());
+    connect_options
+        .sqlx_logging(false)
+        .map_sqlx_mysql_pool_opts(|pool_options| {
+            pool_options.after_connect(|conn, _| {
+                use sea_orm::sqlx::Executor;
 
-            Box::pin(async move {
-                conn.execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
-                .await
-                .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                Ok(())
+                Box::pin(async move {
+                    conn.execute(
+                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                    )
+                    .await?;
+                    log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
+                    Ok(())
+                })
             })
-        })
-        .connect(&std::env::var("DATABASE_URL").unwrap())
-        .await
-        .unwrap();
-    let orm_db = sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
+        });
+    let orm_db = sea_orm::Database::connect(connect_options).await.unwrap();
 
     let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
     let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
