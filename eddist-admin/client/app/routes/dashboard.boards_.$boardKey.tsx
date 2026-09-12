@@ -1,5 +1,5 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from "flowbite-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, Suspense, useState } from "react";
 import { FaArchive } from "react-icons/fa";
 import { Link, useNavigate, useParams } from "react-router";
 import BoardSetting from "~/components/BoardSetting";
@@ -273,7 +273,17 @@ const Page = () => {
             tabKey: "settings",
             tabLabel: "Settings",
             id: "settings-tab",
-            children: board ? <BoardSetting board={board} refetchBoard={refetch} /> : null,
+            children: board ? (
+              <Suspense
+                fallback={
+                  <div className="flex min-h-64 items-center justify-center text-sm text-gray-500">
+                    Loading settings...
+                  </div>
+                }
+              >
+                <BoardSetting board={board} refetchBoard={refetch} />
+              </Suspense>
+            ) : null,
           },
         ]}
       />
