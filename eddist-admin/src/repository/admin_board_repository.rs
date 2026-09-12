@@ -25,8 +25,9 @@ impl AdminBoardRepositoryImpl {
 }
 
 #[derive(Debug, FromQueryResult)]
-struct ThreadBoardId {
+struct ThreadCountByBoard {
     board_id: Uuid,
+    thread_count: i64,
 }
 
 fn into_board(model: board::Model, thread_count: i64) -> Board {
@@ -90,16 +91,19 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             .all(&self.0)
             .await?;
 
-        let thread_board_ids = thread::Entity::find()
+        let board_ids = models.iter().map(|model| model.id).collect::<Vec<_>>();
+        let thread_counts = thread::Entity::find()
             .select_only()
             .column(thread::Column::BoardId)
-            .into_model::<ThreadBoardId>()
+            .column_as(thread::Column::Id.count(), "thread_count")
+            .filter(thread::Column::BoardId.is_in(board_ids))
+            .group_by(thread::Column::BoardId)
+            .into_model::<ThreadCountByBoard>()
             .all(&self.0)
-            .await?;
-        let mut thread_counts = HashMap::<Uuid, i64>::new();
-        for row in thread_board_ids {
-            *thread_counts.entry(row.board_id).or_default() += 1;
-        }
+            .await?
+            .into_iter()
+            .map(|row| (row.board_id, row.thread_count))
+            .collect::<HashMap<_, _>>();
 
         Ok(models
             .into_iter()

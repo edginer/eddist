@@ -1,7 +1,8 @@
 use crate::entity::{authed_token, idp, user, user_authed_token, user_idp_binding};
+use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, TransactionTrait,
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -137,26 +138,25 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
     async fn update_user_status(&self, user_id: Uuid, enabled: bool) -> anyhow::Result<()> {
         let tx = self.0.begin().await?;
 
-        user::ActiveModel {
-            id: Set(user_id),
-            enabled: Set(enabled),
-            ..Default::default()
-        }
-        .update(&tx)
-        .await?;
+        user::Entity::update_many()
+            .col_expr(user::Column::Enabled, Expr::value(enabled))
+            .filter(user::Column::Id.eq(user_id))
+            .exec(&tx)
+            .await?;
 
-        let token_relations = user_authed_token::Entity::find()
+        let token_ids = user_authed_token::Entity::find()
             .filter(user_authed_token::Column::UserId.eq(user_id))
             .all(&tx)
-            .await?;
-        for relation in token_relations {
-            authed_token::ActiveModel {
-                id: Set(relation.authed_token_id),
-                validity: Set(enabled),
-                ..Default::default()
-            }
-            .update(&tx)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|relation| relation.authed_token_id)
+            .collect::<Vec<_>>();
+        if !token_ids.is_empty() {
+            authed_token::Entity::update_many()
+                .col_expr(authed_token::Column::Validity, Expr::value(enabled))
+                .filter(authed_token::Column::Id.is_in(token_ids))
+                .exec(&tx)
+                .await?;
         }
 
         tx.commit().await?;

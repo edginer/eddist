@@ -2,8 +2,8 @@ use crate::entity::authed_token;
 use crate::models::AuthedToken;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect,
 };
 use uuid::Uuid;
 
@@ -38,6 +38,18 @@ pub struct AuthedTokenRepositoryImpl(DatabaseConnection);
 impl AuthedTokenRepositoryImpl {
     pub fn new(db: DatabaseConnection) -> Self {
         Self(db)
+    }
+
+    async fn update_require_reauth(&self, id: Uuid, require_reauth: bool) -> anyhow::Result<()> {
+        authed_token::Entity::update_many()
+            .col_expr(
+                authed_token::Column::RequireReauth,
+                Expr::value(require_reauth),
+            )
+            .filter(authed_token::Column::Id.eq(id))
+            .exec(&self.0)
+            .await?;
+        Ok(())
     }
 }
 
@@ -74,13 +86,11 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
     }
 
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()> {
-        authed_token::ActiveModel {
-            id: Set(id),
-            validity: Set(false),
-            ..Default::default()
-        }
-        .update(&self.0)
-        .await?;
+        authed_token::Entity::update_many()
+            .col_expr(authed_token::Column::Validity, Expr::value(false))
+            .filter(authed_token::Column::Id.eq(id))
+            .exec(&self.0)
+            .await?;
         Ok(())
     }
 
@@ -175,24 +185,10 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
     }
 
     async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        authed_token::ActiveModel {
-            id: Set(id),
-            require_reauth: Set(true),
-            ..Default::default()
-        }
-        .update(&self.0)
-        .await?;
-        Ok(())
+        self.update_require_reauth(id, true).await
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        authed_token::ActiveModel {
-            id: Set(id),
-            require_reauth: Set(false),
-            ..Default::default()
-        }
-        .update(&self.0)
-        .await?;
-        Ok(())
+        self.update_require_reauth(id, false).await
     }
 }

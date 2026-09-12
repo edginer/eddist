@@ -289,6 +289,22 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         now + Duration::seconds(1),
     )
     .await?;
+    // Boards with no threads must still be returned, with a zero count: the thread counts come
+    // from a GROUP BY that omits them entirely.
+    let all_boards = board_repository.get_boards_by_key(None).await?;
+    let counts = all_boards
+        .iter()
+        .map(|board| (board.board_key.as_str(), board.thread_count))
+        .collect::<HashMap<_, _>>();
+    assert_eq!(counts.get("orm-it").copied(), Some(2));
+    assert_eq!(counts.get("orm-it-2").copied(), Some(0));
+
+    let filtered_boards = board_repository
+        .get_boards_by_key(Some(vec!["orm-it".to_string()]))
+        .await?;
+    assert_eq!(filtered_boards.len(), 1);
+    assert_eq!(filtered_boards[0].thread_count, 2);
+
     let response_id = Uuid::now_v7();
     insert_response(db, response_id, board.id, thread_id, token_id, now).await?;
     let (_, archived_response_id) =
