@@ -10,6 +10,31 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::board::Entity",
+        from = "Column::BoardId",
+        to = "super::board::Column::Id"
+    )]
+    Board,
+    #[sea_orm(
+        belongs_to = "super::ng_word::Entity",
+        from = "Column::NgWordId",
+        to = "super::ng_word::Column::Id"
+    )]
+    NgWord,
+}
+
+impl Related<super::board::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Board.def()
+    }
+}
+
+impl Related<super::ng_word::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::NgWord.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

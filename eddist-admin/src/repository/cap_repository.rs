@@ -3,7 +3,6 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, TransactionTrait,
 };
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::models::Cap;
@@ -69,24 +68,17 @@ impl CapRepositoryImpl {
 #[async_trait::async_trait]
 impl CapRepository for CapRepositoryImpl {
     async fn get_caps(&self) -> anyhow::Result<Vec<Cap>> {
-        let models = cap::Entity::find()
+        Ok(cap::Entity::find()
             .order_by_asc(cap::Column::Name)
+            .find_with_related(board_cap::Entity)
             .all(&self.0)
-            .await?;
-        let relations = board_cap::Entity::find().all(&self.0).await?;
-
-        let mut board_ids_by_cap = HashMap::<Uuid, Vec<Uuid>>::new();
-        for relation in relations {
-            board_ids_by_cap
-                .entry(relation.cap_id)
-                .or_default()
-                .push(relation.board_id);
-        }
-
-        Ok(models
+            .await?
             .into_iter()
-            .map(|model| {
-                let board_ids = board_ids_by_cap.remove(&model.id).unwrap_or_default();
+            .map(|(model, relations)| {
+                let board_ids = relations
+                    .into_iter()
+                    .map(|relation| relation.board_id)
+                    .collect();
                 into_domain(model, board_ids)
             })
             .collect())

@@ -77,35 +77,22 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
         let user_ids = users.iter().map(|model| model.id).collect::<Vec<_>>();
         let bindings = user_idp_binding::Entity::find()
             .filter(user_idp_binding::Column::UserId.is_in(user_ids.clone()))
+            .find_also_related(idp::Entity)
             .all(&self.0)
             .await?;
-        let idp_ids = bindings
-            .iter()
-            .map(|binding| binding.idp_id)
-            .collect::<Vec<_>>();
-        let idps = if idp_ids.is_empty() {
-            Vec::new()
-        } else {
-            idp::Entity::find()
-                .filter(idp::Column::Id.is_in(idp_ids))
-                .all(&self.0)
-                .await?
-        };
-        let idp_names = idps
-            .into_iter()
-            .map(|model| (model.id, model.idp_name))
-            .collect::<HashMap<_, _>>();
 
         let mut idp_bindings_by_user = HashMap::<Uuid, Vec<UserIdpBinding>>::new();
-        for binding in bindings {
-            if let Some(idp_name) = idp_names.get(&binding.idp_id) {
+        for (binding, idp) in bindings {
+            // A binding whose IdP row is gone is skipped, matching the pre-SeaORM
+            // LEFT JOIN, which dropped rows with a NULL idp_name.
+            if let Some(idp) = idp {
                 idp_bindings_by_user
                     .entry(binding.user_id)
                     .or_default()
                     .push(UserIdpBinding {
                         id: binding.id,
                         user_id: binding.user_id,
-                        idp_name: idp_name.clone(),
+                        idp_name: idp.idp_name,
                         idp_sub: binding.idp_sub,
                     });
             }

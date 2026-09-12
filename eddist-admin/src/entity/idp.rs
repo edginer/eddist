@@ -15,6 +15,15 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::user_idp_binding::Entity")]
+    UserIdpBinding,
+}
+
+impl Related<super::user_idp_binding::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserIdpBinding.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

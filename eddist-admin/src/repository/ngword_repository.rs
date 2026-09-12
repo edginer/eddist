@@ -3,7 +3,6 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, TransactionTrait,
 };
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::models::NgWord;
@@ -63,24 +62,17 @@ impl NgWordRepositoryImpl {
 #[async_trait::async_trait]
 impl NgWordRepository for NgWordRepositoryImpl {
     async fn get_ng_words(&self) -> anyhow::Result<Vec<NgWord>> {
-        let models = ng_word::Entity::find()
+        Ok(ng_word::Entity::find()
             .order_by_asc(ng_word::Column::Name)
+            .find_with_related(board_ng_word::Entity)
             .all(&self.0)
-            .await?;
-        let relations = board_ng_word::Entity::find().all(&self.0).await?;
-
-        let mut board_ids_by_ng_word = HashMap::<Uuid, Vec<Uuid>>::new();
-        for relation in relations {
-            board_ids_by_ng_word
-                .entry(relation.ng_word_id)
-                .or_default()
-                .push(relation.board_id);
-        }
-
-        Ok(models
+            .await?
             .into_iter()
-            .map(|model| {
-                let board_ids = board_ids_by_ng_word.remove(&model.id).unwrap_or_default();
+            .map(|(model, relations)| {
+                let board_ids = relations
+                    .into_iter()
+                    .map(|relation| relation.board_id)
+                    .collect();
                 into_domain(model, board_ids)
             })
             .collect())

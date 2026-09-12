@@ -779,3 +779,116 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Pins the relational read paths to the semantics of the pre-SeaORM queries:
+/// `find_with_related` must behave exactly like the original LEFT OUTER JOIN,
+/// including rows with no relations at all and duplicate junction rows (the
+/// junction tables carry no UNIQUE constraint).
+#[tokio::test]
+async fn relational_reads_match_left_outer_join() -> anyhow::Result<()> {
+    use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+
+    let test_db = setup_database().await?;
+    let db = &test_db.db;
+
+    let board_repository = AdminBoardRepositoryImpl::new(db.clone());
+    let b1 = board_repository
+        .create_board(create_board_input("rel-1", "B1"))
+        .await?;
+    let b2 = board_repository
+        .create_board(create_board_input("rel-2", "B2"))
+        .await?;
+
+    async fn left_join_map(
+        db: &DatabaseConnection,
+        sql: &str,
+    ) -> anyhow::Result<HashMap<Uuid, Vec<Uuid>>> {
+        let mut map = HashMap::<Uuid, Vec<Uuid>>::new();
+        for row in db
+            .query_all_raw(Statement::from_string(DatabaseBackend::MySql, sql))
+            .await?
+        {
+            let id: Uuid = row.try_get("", "id")?;
+            let board_id: Option<Uuid> = row.try_get("", "board_id")?;
+            let entry = map.entry(id).or_default();
+            if let Some(board_id) = board_id {
+                entry.push(board_id);
+            }
+        }
+        for ids in map.values_mut() {
+            ids.sort();
+        }
+        Ok(map)
+    }
+
+    // NG words: multi-board, zero-board, duplicated-board
+    let ng_repository = NgWordRepositoryImpl::new(db.clone());
+    let ng_multi = ng_repository.create_ng_word("A-multi", "wa").await?;
+    ng_repository.create_ng_word("B-zero", "wb").await?;
+    let ng_dup = ng_repository.create_ng_word("C-dup", "wc").await?;
+    ng_repository
+        .update_ng_word(ng_multi.id, None, None, Some(vec![b1.id, b2.id]))
+        .await?;
+    ng_repository
+        .update_ng_word(ng_dup.id, None, None, Some(vec![b1.id, b1.id]))
+        .await?;
+
+    let ng_words = ng_repository.get_ng_words().await?;
+    let mut ng_new = HashMap::<Uuid, Vec<Uuid>>::new();
+    for row in &ng_words {
+        let mut ids = row.board_ids.clone();
+        ids.sort();
+        ng_new.insert(row.id, ids);
+    }
+    let ng_old = left_join_map(
+        db,
+        r#"SELECT ng.id AS id, bng.board_id AS board_id
+           FROM ng_words AS ng
+           LEFT OUTER JOIN boards_ng_words AS bng ON ng.id = bng.ng_word_id"#,
+    )
+    .await?;
+    assert_eq!(ng_new, ng_old, "get_ng_words diverged from LEFT OUTER JOIN");
+    assert_eq!(ng_new.get(&ng_multi.id).map(Vec::len), Some(2));
+    assert_eq!(
+        ng_new.get(&ng_dup.id).map(Vec::len),
+        Some(2),
+        "duplicate junction rows must be preserved"
+    );
+    assert!(ng_words.iter().any(|w| w.board_ids.is_empty()));
+    let names = ng_words.iter().map(|w| w.name.clone()).collect::<Vec<_>>();
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(names, sorted, "find_with_related must keep the ORDER BY");
+
+    // Caps: same three shapes
+    let cap_repository = CapRepositoryImpl::new(db.clone());
+    let cap_multi = cap_repository.create_cap("A-multi", "d", "h").await?;
+    cap_repository.create_cap("B-zero", "d", "h").await?;
+    let cap_dup = cap_repository.create_cap("C-dup", "d", "h").await?;
+    cap_repository
+        .update_cap(cap_multi.id, None, None, None, Some(vec![b1.id, b2.id]))
+        .await?;
+    cap_repository
+        .update_cap(cap_dup.id, None, None, None, Some(vec![b1.id, b1.id]))
+        .await?;
+
+    let caps = cap_repository.get_caps().await?;
+    let mut cap_new = HashMap::<Uuid, Vec<Uuid>>::new();
+    for row in &caps {
+        let mut ids = row.board_ids.clone();
+        ids.sort();
+        cap_new.insert(row.id, ids);
+    }
+    let cap_old = left_join_map(
+        db,
+        r#"SELECT c.id AS id, bc.board_id AS board_id
+           FROM caps AS c
+           LEFT OUTER JOIN boards_caps AS bc ON c.id = bc.cap_id"#,
+    )
+    .await?;
+    assert_eq!(cap_new, cap_old, "get_caps diverged from LEFT OUTER JOIN");
+    assert_eq!(cap_new.get(&cap_dup.id).map(Vec::len), Some(2));
+    assert!(caps.iter().any(|c| c.board_ids.is_empty()));
+
+    Ok(())
+}

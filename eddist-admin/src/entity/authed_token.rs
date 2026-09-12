@@ -24,6 +24,35 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::user::Entity",
+        from = "Column::RegisteredUserId",
+        to = "super::user::Column::Id"
+    )]
+    RegisteredUser,
+    #[sea_orm(has_many = "super::thread::Entity")]
+    Thread,
+    #[sea_orm(has_many = "super::user_authed_token::Entity")]
+    UserAuthedToken,
+}
+
+impl Related<super::user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RegisteredUser.def()
+    }
+}
+
+impl Related<super::thread::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Thread.def()
+    }
+}
+
+impl Related<super::user_authed_token::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserAuthedToken.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

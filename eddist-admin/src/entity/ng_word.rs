@@ -12,6 +12,25 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::board_ng_word::Entity")]
+    BoardNgWord,
+}
+
+impl Related<super::board_ng_word::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::BoardNgWord.def()
+    }
+}
+
+impl Related<super::board::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::board_ng_word::Relation::Board.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::board_ng_word::Relation::NgWord.def().rev())
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}
