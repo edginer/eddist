@@ -1,6 +1,9 @@
-use crate::transaction_repository;
+use crate::entity::{authed_token, idp, user, user_authed_token, user_idp_binding};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
+    QueryFilter, QueryOrder, TransactionTrait,
+};
 use std::collections::HashMap;
-
 use uuid::Uuid;
 
 use crate::models::{User, UserIdpBinding};
@@ -17,11 +20,11 @@ pub trait AdminUserRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct AdminUserRepositoryImpl(pub sqlx::MySqlPool);
+pub struct AdminUserRepositoryImpl(DatabaseConnection);
 
 impl AdminUserRepositoryImpl {
-    pub fn new(pool: sqlx::MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
     }
 }
 
@@ -37,190 +40,126 @@ impl AdminUserRepository for AdminUserRepositoryImpl {
             return Ok(vec![]);
         }
 
-        let mut sets = Vec::new();
-        let mut values = Vec::new();
+        // Resolve the token filter first so the final user query can remain a typed Entity query.
+        let token_user_ids = if let Some(authed_token_id) = authed_token_id {
+            user_authed_token::Entity::find()
+                .filter(user_authed_token::Column::AuthedTokenId.eq(authed_token_id))
+                .all(&self.0)
+                .await?
+                .into_iter()
+                .map(|relation| relation.user_id)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
 
+        let mut condition = Condition::any();
         if let Some(user_id) = user_id {
-            sets.push("u.id = UUID_TO_BIN(?)");
-            values.push(user_id.to_string());
+            condition = condition.add(user::Column::Id.eq(user_id));
         }
         if let Some(user_name) = user_name {
-            sets.push("u.user_name = ?");
-            values.push(user_name);
+            condition = condition.add(user::Column::UserName.eq(user_name));
         }
-        if let Some(authed_token_id) = authed_token_id {
-            sets.push(
-                "u.id IN (SELECT user_id FROM user_authed_tokens WHERE authed_token_id = UUID_TO_BIN(?))",
-            );
-            values.push(authed_token_id.to_string());
+        if authed_token_id.is_some() {
+            condition = condition.add(user::Column::Id.is_in(token_user_ids));
         }
-        let query = format!(
-            r#"
-        SELECT
-            u.id AS user_id,
-            u.user_name AS user_name,
-            u.enabled AS enabled,
-            ub.id AS idp_binding_id,
-            ub.idp_sub AS idp_sub,
-            i.idp_name AS idp_name
-        FROM
-            users AS u
-        LEFT JOIN
-            user_idp_bindings AS ub
-        ON
-            u.id = ub.user_id
-        LEFT JOIN
-            idps AS i
-        ON
-            ub.idp_id = i.id
-        WHERE {}
-        "#,
-            sets.join(" OR ")
-        );
 
-        // Dynamic part is only fixed clause fragments; values are bound below.
-        let mut query = sqlx::query_as::<_, UserIdpsSelection>(sqlx::AssertSqlSafe(query));
-        for value in values {
-            query = query.bind(value);
-        }
-        let users = query.fetch_all(&self.0).await?;
-
+        let users = user::Entity::find()
+            .filter(condition)
+            .order_by_asc(user::Column::UserName)
+            .all(&self.0)
+            .await?;
         if users.is_empty() {
             return Ok(vec![]);
         }
 
-        // Collect unique user IDs to fetch authed tokens for each user
-        let unique_user_ids: Vec<Uuid> = users
+        let user_ids = users.iter().map(|model| model.id).collect::<Vec<_>>();
+        let bindings = user_idp_binding::Entity::find()
+            .filter(user_idp_binding::Column::UserId.is_in(user_ids.clone()))
+            .all(&self.0)
+            .await?;
+        let idp_ids = bindings
             .iter()
-            .map(|x| x.user_id)
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-
-        let mut authed_token_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-        for uid in &unique_user_ids {
-            let tokens = sqlx::query!(
-                r#"
-                SELECT
-                    authed_token_id AS "token_id!: Uuid"
-                FROM
-                    user_authed_tokens
-                WHERE
-                    user_id = ?
-            "#,
-                uid
-            )
-            .fetch_all(&self.0)
-            .await?
-            .into_iter()
-            .map(|x| x.token_id)
+            .map(|binding| binding.idp_id)
             .collect::<Vec<_>>();
-            authed_token_map.insert(*uid, tokens);
+        let idps = if idp_ids.is_empty() {
+            Vec::new()
+        } else {
+            idp::Entity::find()
+                .filter(idp::Column::Id.is_in(idp_ids))
+                .all(&self.0)
+                .await?
+        };
+        let idp_names = idps
+            .into_iter()
+            .map(|model| (model.id, model.idp_name))
+            .collect::<HashMap<_, _>>();
+
+        let mut idp_bindings_by_user = HashMap::<Uuid, Vec<UserIdpBinding>>::new();
+        for binding in bindings {
+            if let Some(idp_name) = idp_names.get(&binding.idp_id) {
+                idp_bindings_by_user
+                    .entry(binding.user_id)
+                    .or_default()
+                    .push(UserIdpBinding {
+                        id: binding.id,
+                        user_id: binding.user_id,
+                        idp_name: idp_name.clone(),
+                        idp_sub: binding.idp_sub,
+                    });
+            }
+        }
+
+        let token_relations = user_authed_token::Entity::find()
+            .filter(user_authed_token::Column::UserId.is_in(user_ids))
+            .all(&self.0)
+            .await?;
+        let mut token_ids_by_user = HashMap::<Uuid, Vec<Uuid>>::new();
+        for relation in token_relations {
+            token_ids_by_user
+                .entry(relation.user_id)
+                .or_default()
+                .push(relation.authed_token_id);
         }
 
         Ok(users
             .into_iter()
-            .fold(HashMap::new(), |mut acc: HashMap<Uuid, User>, user| {
-                let user_id = user.user_id;
-                if let Some(existing_user) = acc.get_mut(&user_id) {
-                    if let (Some(idp_binding_id), Some(idp_sub), Some(idp_name)) =
-                        (user.idp_binding_id, user.idp_sub, user.idp_name)
-                    {
-                        existing_user.idp_bindings.push(UserIdpBinding {
-                            id: idp_binding_id,
-                            user_id,
-                            idp_name,
-                            idp_sub,
-                        });
-                    }
-                } else {
-                    let idp_bindings =
-                        if let (Some(idp_binding_id), Some(idp_sub), Some(idp_name)) =
-                            (user.idp_binding_id, user.idp_sub, user.idp_name)
-                        {
-                            vec![UserIdpBinding {
-                                id: idp_binding_id,
-                                user_id,
-                                idp_name,
-                                idp_sub,
-                            }]
-                        } else {
-                            vec![]
-                        };
-                    acc.insert(
-                        user_id,
-                        User {
-                            id: user_id,
-                            user_name: user.user_name,
-                            enabled: user.enabled,
-                            idp_bindings,
-                            authed_token_ids: authed_token_map
-                                .get(&user_id)
-                                .cloned()
-                                .unwrap_or_default(),
-                        },
-                    );
-                }
-                acc
+            .map(|model| User {
+                id: model.id,
+                user_name: model.user_name,
+                enabled: model.enabled,
+                idp_bindings: idp_bindings_by_user.remove(&model.id).unwrap_or_default(),
+                authed_token_ids: token_ids_by_user.remove(&model.id).unwrap_or_default(),
             })
-            .into_values()
             .collect())
     }
 
     async fn update_user_status(&self, user_id: Uuid, enabled: bool) -> anyhow::Result<()> {
-        let mut tx = self.0.begin().await?;
+        let tx = self.0.begin().await?;
 
-        let query = sqlx::query!(
-            r#"
-            UPDATE
-                users
-            SET
-                enabled = ?
-            WHERE
-                id = ?
-        "#,
-            enabled,
-            user_id
-        );
+        user::ActiveModel {
+            id: Set(user_id),
+            enabled: Set(enabled),
+            ..Default::default()
+        }
+        .update(&tx)
+        .await?;
 
-        query.execute(&mut *tx).await?;
-
-        let query = sqlx::query!(
-            r#"
-            UPDATE
-                authed_tokens
-            SET
-                validity = ?
-            WHERE
-                id IN (
-                    SELECT
-                        authed_token_id
-                    FROM
-                        user_authed_tokens
-                    WHERE
-                        user_id = ?
-                )
-        "#,
-            enabled,
-            user_id
-        );
-
-        query.execute(&mut *tx).await?;
+        let token_relations = user_authed_token::Entity::find()
+            .filter(user_authed_token::Column::UserId.eq(user_id))
+            .all(&tx)
+            .await?;
+        for relation in token_relations {
+            authed_token::ActiveModel {
+                id: Set(relation.authed_token_id),
+                validity: Set(enabled),
+                ..Default::default()
+            }
+            .update(&tx)
+            .await?;
+        }
 
         tx.commit().await?;
-
         Ok(())
     }
-}
-
-transaction_repository!(AdminUserRepositoryImpl, 0, MySql);
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct UserIdpsSelection {
-    pub user_id: Uuid,
-    pub user_name: String,
-    pub enabled: bool,
-    pub idp_name: Option<String>,
-    pub idp_sub: Option<String>,
-    pub idp_binding_id: Option<Uuid>,
 }

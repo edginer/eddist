@@ -2,36 +2,6 @@ use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
 use sqlx::{FromRow, types::Json};
 
-/// Shared selection types used by admin_board_repository, admin_thread_repository,
-/// and admin_response_repository.
-
-#[derive(Debug, FromRow)]
-pub struct SelectionBoardWithThreadCount {
-    pub id: Vec<u8>,
-    pub name: String,
-    pub board_key: String,
-    pub default_name: String,
-    pub thread_count: i64,
-}
-
-#[derive(Debug, FromRow)]
-pub struct SelectionBoardInfo {
-    pub local_rules: String,
-    pub base_thread_creation_span_sec: i32,
-    pub base_response_creation_span_sec: i32,
-    pub max_thread_name_byte_length: i32,
-    pub max_author_name_byte_length: i32,
-    pub max_email_byte_length: i32,
-    pub max_response_body_byte_length: i32,
-    pub max_response_body_lines: i32,
-    pub threads_archive_trigger_thread_count: Option<i32>,
-    pub threads_archive_cron: Option<String>,
-    pub read_only: bool,
-    pub force_metadent_type: Option<String>,
-    pub enable_1001_message: bool,
-    pub custom_1001_message: Option<String>,
-}
-
 #[derive(Debug, FromRow)]
 pub struct SelectionThread {
     pub id: Vec<u8>,

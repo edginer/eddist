@@ -264,7 +264,7 @@ async fn main() {
 
     let service_container = services::AppServiceContainer::new(
         ContentRepos {
-            board: Arc::new(AdminBoardRepositoryImpl::new(pool.clone())),
+            board: Arc::new(AdminBoardRepositoryImpl::new(orm_db.clone())),
             thread: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
             response: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
             archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
@@ -276,7 +276,7 @@ async fn main() {
             authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
         },
         AdminRepos {
-            user: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
+            user: Arc::new(AdminUserRepositoryImpl::new(orm_db.clone())),
             idp: Arc::new(IdpAdminRepositoryImpl::new(orm_db.clone())),
             notice: Arc::new(NoticeRepositoryImpl::new(orm_db.clone())),
             terms: Arc::new(TermsRepositoryImpl::new(orm_db.clone())),
