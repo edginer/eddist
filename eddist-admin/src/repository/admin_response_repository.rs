@@ -1,12 +1,11 @@
-use crate::transaction_repository;
-use chrono::{TimeZone, Utc};
-use eddist_core::domain::client_info::ClientInfo;
-use sqlx::{MySqlPool, query_as, types::Json};
-use uuid::Uuid;
-
+use crate::entity::{archived_response, archived_thread, board, response, thread};
 use crate::models::Res;
-
-use super::admin_bbs_repository::SelectionRes;
+use eddist_core::domain::client_info::ClientInfo as CoreClientInfo;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder,
+};
+use uuid::Uuid;
 
 #[async_trait::async_trait]
 pub trait AdminResponseRepository: Send + Sync {
@@ -36,31 +35,64 @@ pub trait AdminResponseRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct AdminResponseRepositoryImpl(pub(crate) MySqlPool);
+pub struct AdminResponseRepositoryImpl(pub(crate) DatabaseConnection);
 
 impl AdminResponseRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
+    }
+
+    async fn board_id_by_key(&self, board_key: &str) -> anyhow::Result<Option<Uuid>> {
+        Ok(board::Entity::find()
+            .filter(board::Column::BoardKey.eq(board_key))
+            .one(&self.0)
+            .await?
+            .map(|model| model.id))
     }
 }
 
-fn selection_res_to_res(res: SelectionRes) -> Res {
-    Res {
-        id: Uuid::from_slice(&res.id).unwrap(),
-        author_name: Some(res.author_name),
-        mail: Some(res.mail),
-        body: res.body,
-        created_at: Utc.from_utc_datetime(&res.created_at),
-        author_id: res.author_id,
-        ip_addr: res.ip_addr,
-        authed_token_id: Uuid::from_slice(&res.authed_token_id).unwrap(),
-        board_id: Uuid::from_slice(&res.board_id).unwrap(),
-        thread_id: Uuid::from_slice(&res.thread_id).unwrap(),
-        is_abone: res.is_abone != 0,
-        is_abone_keep_id: res.is_abone_keep_id != 0,
-        client_info: res.client_info.0.into(),
-        res_order: res.res_order,
-    }
+fn into_response(model: response::Model) -> anyhow::Result<Res> {
+    let client_info = serde_json::from_value::<CoreClientInfo>(model.client_info)?;
+    Ok(Res {
+        id: model.id,
+        author_name: Some(model.author_name),
+        mail: Some(model.mail),
+        body: model.body,
+        created_at: model.created_at.and_utc(),
+        author_id: model.author_id,
+        ip_addr: model.ip_addr,
+        authed_token_id: model.authed_token_id,
+        board_id: model.board_id,
+        thread_id: model.thread_id,
+        is_abone: model.is_abone,
+        is_abone_keep_id: model.is_abone_keep_id,
+        client_info: client_info.into(),
+        res_order: model.res_order,
+    })
+}
+
+fn into_archived_response(model: archived_response::Model) -> anyhow::Result<Res> {
+    let client_info = serde_json::from_value::<CoreClientInfo>(model.client_info)?;
+    Ok(Res {
+        id: model.id,
+        author_name: Some(model.author_name),
+        mail: Some(model.mail),
+        body: model.body,
+        created_at: model.created_at.and_utc(),
+        author_id: model.author_id,
+        ip_addr: model.ip_addr,
+        authed_token_id: model.authed_token_id,
+        board_id: model.board_id,
+        thread_id: model.thread_id,
+        is_abone: model.is_abone,
+        is_abone_keep_id: false,
+        client_info: client_info.into(),
+        res_order: model.res_order,
+    })
+}
+
+fn as_thread_number(value: u64) -> anyhow::Result<i64> {
+    i64::try_from(value).map_err(|_| anyhow::anyhow!("thread number is too large: {value}"))
 }
 
 #[async_trait::async_trait]
@@ -70,58 +102,27 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<Vec<Res>> {
-        let pool = &self.0;
+        let Some(board_id) = self.board_id_by_key(board_key).await? else {
+            return Ok(Vec::new());
+        };
+        let Some(thread) = thread::Entity::find()
+            .filter(thread::Column::BoardId.eq(board_id))
+            .filter(thread::Column::ThreadNumber.eq(as_thread_number(thread_number)?))
+            .one(&self.0)
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
 
-        let query = query_as!(
-            SelectionRes,
-            r#"
-            SELECT
-                id,
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                ip_addr,
-                authed_token_id,
-                board_id,
-                thread_id,
-                is_abone,
-                is_abone_keep_id,
-                client_info AS "client_info!: Json<ClientInfo>",
-                res_order
-            FROM
-                responses
-            WHERE
-                thread_id = (
-                    SELECT
-                        id
-                    FROM
-                        threads
-                    WHERE
-                        board_id = (
-                        SELECT
-                            id
-                        FROM
-                            boards
-                        WHERE
-                            board_key = ?
-                        )
-                    AND
-                        thread_number = ?
-                )
-            ORDER BY
-                res_order ASC, id ASC
-            "#,
-            board_key,
-            thread_number
-        );
-
-        let selected_reses = query.fetch_all(pool).await?;
-        Ok(selected_reses
+        response::Entity::find()
+            .filter(response::Column::ThreadId.eq(thread.id))
+            .order_by_asc(response::Column::ResOrder)
+            .order_by_asc(response::Column::Id)
+            .all(&self.0)
+            .await?
             .into_iter()
-            .map(selection_res_to_res)
-            .collect())
+            .map(into_response)
+            .collect()
     }
 
     async fn get_archived_reses_by_thread_id(
@@ -129,131 +130,56 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<Vec<Res>> {
-        let pool = &self.0;
+        let Some(board_id) = self.board_id_by_key(board_key).await? else {
+            return Ok(Vec::new());
+        };
+        let Some(thread) = archived_thread::Entity::find()
+            .filter(archived_thread::Column::BoardId.eq(board_id))
+            .filter(archived_thread::Column::ThreadNumber.eq(as_thread_number(thread_number)?))
+            .one(&self.0)
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
 
-        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant
-        // 0 here. Whether an archived response kept its author_id is encoded in the dat text in
-        // S3 (see admin_archive_repository), which is the source of truth for archived threads.
-        let query = query_as!(
-            SelectionRes,
-            r#"
-            SELECT
-                id,
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                ip_addr,
-                authed_token_id,
-                board_id,
-                thread_id,
-                is_abone,
-                0 AS "is_abone_keep_id: i8",
-                client_info AS "client_info!: Json<ClientInfo>",
-                res_order
-            FROM
-                archived_responses
-            WHERE
-                thread_id = (
-                    SELECT
-                        id
-                    FROM
-                        archived_threads
-                    WHERE
-                        board_id = (
-                        SELECT
-                            id
-                        FROM
-                            boards
-                        WHERE
-                            board_key = ?
-                        )
-                    AND
-                        thread_number = ?
-                )
-            ORDER BY
-                res_order ASC, id ASC
-            "#,
-            board_key,
-            thread_number
-        );
-
-        let selected_reses = query.fetch_all(pool).await?;
-        Ok(selected_reses
+        archived_response::Entity::find()
+            .filter(archived_response::Column::ThreadId.eq(thread.id))
+            .order_by_asc(archived_response::Column::ResOrder)
+            .order_by_asc(archived_response::Column::Id)
+            .all(&self.0)
+            .await?
             .into_iter()
-            .map(selection_res_to_res)
-            .collect())
+            .map(into_archived_response)
+            .collect()
     }
 
     async fn get_res(
         &self,
         res_id: Uuid,
     ) -> anyhow::Result<(Res, String, String, u64, Option<String>)> {
-        let pool = &self.0;
+        let model = response::Entity::find_by_id(res_id)
+            .one(&self.0)
+            .await?
+            .ok_or_else(|| crate::error::ServiceError::NotFound("Response not found".into()))?;
+        let res = into_response(model)?;
 
-        let res = query_as!(
-            SelectionRes,
-            r#"
-            SELECT
-                id,
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                ip_addr,
-                authed_token_id,
-                board_id,
-                thread_id,
-                is_abone,
-                is_abone_keep_id,
-                client_info AS "client_info!: Json<ClientInfo>",
-                res_order
-            FROM
-                responses
-            WHERE
-                id = ?
-            "#,
-            res_id.as_bytes().to_vec()
-        )
-        .fetch_one(pool)
-        .await?;
-
-        let res = selection_res_to_res(res);
-
-        struct BoardKeyThreadNumber {
-            board_key: String,
-            thread_number: u64,
-            default_name: String,
-            thread_title: Option<String>,
-        }
-
-        let board_key = query_as!(
-            BoardKeyThreadNumber,
-            r#"
-            SELECT
-                boards.board_key AS "board_key!: String",
-                threads.thread_number AS "thread_number!: u64",
-                boards.default_name AS "default_name!: String",
-                threads.title AS "thread_title: String"
-            FROM
-                boards
-            JOIN threads ON boards.id = threads.board_id
-            WHERE
-                threads.id = ?
-            "#,
-            res.thread_id,
-        )
-        .fetch_one(pool)
-        .await?;
+        let thread = thread::Entity::find_by_id(res.thread_id)
+            .one(&self.0)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Thread not found: {}", res.thread_id))?;
+        let board = board::Entity::find_by_id(thread.board_id)
+            .one(&self.0)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Board not found: {}", thread.board_id))?;
+        let thread_number = u64::try_from(thread.thread_number)
+            .map_err(|_| anyhow::anyhow!("negative thread number: {}", thread.thread_number))?;
 
         Ok((
             res,
-            board_key.default_name,
-            board_key.board_key,
-            board_key.thread_number,
-            board_key.thread_title,
+            board.default_name,
+            board.board_key,
+            thread_number,
+            Some(thread.title),
         ))
     }
 
@@ -266,87 +192,47 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         is_abone: Option<bool>,
         is_abone_keep_id: Option<bool>,
     ) -> anyhow::Result<Res> {
-        let pool = &self.0;
+        if response::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .is_none()
+        {
+            return Err(crate::error::ServiceError::NotFound("Response not found".into()).into());
+        }
 
-        let mut sets = Vec::new();
-        let mut values = Vec::new();
-
+        let mut active_model = response::ActiveModel {
+            id: Set(id),
+            ..Default::default()
+        };
+        let mut changed = false;
         if let Some(author_name) = author_name {
-            sets.push("author_name = ?");
-            values.push(author_name);
+            active_model.author_name = Set(author_name);
+            changed = true;
         }
         if let Some(mail) = mail {
-            sets.push("mail = ?");
-            values.push(mail);
+            active_model.mail = Set(mail);
+            changed = true;
         }
         if let Some(body) = body {
-            sets.push("body = ?");
-            values.push(body);
-        }
-        if is_abone.is_some() {
-            sets.push("is_abone = ?");
-        }
-        if is_abone_keep_id.is_some() {
-            sets.push("is_abone_keep_id = ?");
-        }
-
-        let query = format!(
-            r#"
-            UPDATE
-                responses
-            SET
-                {}
-            WHERE
-                id = ?
-            "#,
-            sets.join(", ")
-        );
-
-        // Dynamic part is only fixed column names; values are bound below.
-        let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
-        for v in values {
-            query = query.bind(v);
+            active_model.body = Set(body);
+            changed = true;
         }
         if let Some(is_abone) = is_abone {
-            query = query.bind(is_abone);
+            active_model.is_abone = Set(is_abone);
+            changed = true;
         }
         if let Some(is_abone_keep_id) = is_abone_keep_id {
-            query = query.bind(is_abone_keep_id);
+            active_model.is_abone_keep_id = Set(is_abone_keep_id);
+            changed = true;
         }
-        let query = query.bind(id.as_bytes().to_vec());
+        if changed {
+            active_model.update(&self.0).await?;
+        }
 
-        query.execute(pool).await?;
-
-        let res = query_as!(
-            SelectionRes,
-            r#"
-            SELECT
-                id,
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                ip_addr,
-                authed_token_id,
-                board_id,
-                thread_id,
-                is_abone,
-                is_abone_keep_id,
-                client_info AS "client_info!: Json<ClientInfo>",
-                res_order
-            FROM
-                responses
-            WHERE
-                id = ?
-            "#,
-            id.as_bytes().to_vec()
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(selection_res_to_res(res))
+        response::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Response disappeared after update"))
+            .and_then(into_response)
     }
 }
-
-transaction_repository!(AdminResponseRepositoryImpl, 0, MySql);

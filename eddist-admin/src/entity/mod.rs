@@ -1,3 +1,4 @@
+pub(crate) mod archived_response;
 pub(crate) mod archived_thread;
 pub(crate) mod authed_token;
 pub(crate) mod board;
@@ -9,6 +10,7 @@ pub(crate) mod captcha_config;
 pub(crate) mod idp;
 pub(crate) mod ng_word;
 pub(crate) mod notice;
+pub(crate) mod response;
 pub(crate) mod server_settings;
 pub(crate) mod terms;
 pub(crate) mod thread;

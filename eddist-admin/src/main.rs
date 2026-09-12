@@ -53,7 +53,6 @@ mod services;
 pub(crate) mod utils;
 mod repository {
     pub mod admin_archive_repository;
-    pub mod admin_bbs_repository;
     pub mod admin_board_repository;
     pub mod admin_response_repository;
     pub mod admin_thread_repository;
@@ -266,7 +265,7 @@ async fn main() {
         ContentRepos {
             board: Arc::new(AdminBoardRepositoryImpl::new(orm_db.clone())),
             thread: Arc::new(AdminThreadRepositoryImpl::new(orm_db.clone())),
-            response: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
+            response: Arc::new(AdminResponseRepositoryImpl::new(orm_db.clone())),
             archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
         },
         ModerationRepos {
