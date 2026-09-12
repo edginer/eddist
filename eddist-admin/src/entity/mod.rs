@@ -1,3 +1,4 @@
+pub(crate) mod archived_thread;
 pub(crate) mod authed_token;
 pub(crate) mod board;
 pub(crate) mod board_cap;

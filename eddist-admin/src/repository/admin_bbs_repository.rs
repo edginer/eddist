@@ -1,22 +1,5 @@
-use chrono::Utc;
 use eddist_core::domain::client_info::ClientInfo;
-use sqlx::{FromRow, types::Json};
-
-#[derive(Debug, FromRow)]
-pub struct SelectionThread {
-    pub id: Vec<u8>,
-    pub board_id: Vec<u8>,
-    pub thread_number: i64,
-    pub last_modified_at: chrono::DateTime<Utc>,
-    pub sage_last_modified_at: chrono::DateTime<Utc>,
-    pub title: String,
-    pub authed_token_id: Vec<u8>,
-    pub metadent: String,
-    pub response_count: i32,
-    pub no_pool: bool,
-    pub archived: bool,
-    pub active: bool,
-}
+use sqlx::types::Json;
 
 #[derive(Debug)]
 pub struct SelectionRes {

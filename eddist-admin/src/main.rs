@@ -265,7 +265,7 @@ async fn main() {
     let service_container = services::AppServiceContainer::new(
         ContentRepos {
             board: Arc::new(AdminBoardRepositoryImpl::new(orm_db.clone())),
-            thread: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
+            thread: Arc::new(AdminThreadRepositoryImpl::new(orm_db.clone())),
             response: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
             archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
         },
