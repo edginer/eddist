@@ -1,5 +1,9 @@
+pub(crate) mod board_cap;
+pub(crate) mod board_ng_word;
+pub(crate) mod cap;
 pub(crate) mod captcha_config;
 pub(crate) mod idp;
+pub(crate) mod ng_word;
 pub(crate) mod notice;
 pub(crate) mod server_settings;
 pub(crate) mod terms;

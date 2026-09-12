@@ -270,8 +270,8 @@ async fn main() {
             archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
         },
         ModerationRepos {
-            ng_word: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
-            cap: Arc::new(CapRepositoryImpl::new(pool.clone())),
+            ng_word: Arc::new(NgWordRepositoryImpl::new(orm_db.clone())),
+            cap: Arc::new(CapRepositoryImpl::new(orm_db.clone())),
             user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(orm_db.clone())),
             authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
         },
