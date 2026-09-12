@@ -1,8 +1,8 @@
-use crate::transaction_repository;
-use std::collections::HashMap;
-
-use chrono::Utc;
-use sqlx::{Executor, MySqlPool, query, query_as};
+use crate::entity::{board_ng_word, ng_word};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, TransactionTrait,
+};
 use uuid::Uuid;
 
 use crate::models::NgWord;
@@ -21,138 +21,89 @@ pub trait NgWordRepository: Send + Sync {
     async fn delete_ng_word(&self, ng_word_id: Uuid) -> anyhow::Result<()>;
 }
 
-#[derive(Debug, Clone)]
-pub struct NgWordRepositoryImpl(pub MySqlPool);
+#[derive(Clone)]
+pub struct NgWordRepositoryImpl(DatabaseConnection);
 
 impl NgWordRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
     }
 }
 
-#[derive(Debug)]
-pub struct SelectionNgWord {
-    pub id: Uuid,
-    pub name: String,
-    pub word: String,
-    pub created_at: chrono::DateTime<Utc>,
-    pub updated_at: chrono::DateTime<Utc>,
-    pub board_id: Option<Uuid>,
+fn into_domain(model: ng_word::Model, board_ids: Vec<Uuid>) -> NgWord {
+    NgWord {
+        id: model.id,
+        name: model.name,
+        word: model.word,
+        created_at: model.created_at.and_utc(),
+        updated_at: model.updated_at.and_utc(),
+        board_ids,
+    }
+}
+
+impl NgWordRepositoryImpl {
+    async fn get_ng_word_by_id(&self, id: Uuid) -> anyhow::Result<Option<NgWord>> {
+        let Some(model) = ng_word::Entity::find_by_id(id).one(&self.0).await? else {
+            return Ok(None);
+        };
+        let board_ids = board_ng_word::Entity::find()
+            .filter(board_ng_word::Column::NgWordId.eq(id))
+            .order_by_asc(board_ng_word::Column::BoardId)
+            .all(&self.0)
+            .await?
+            .into_iter()
+            .map(|relation| relation.board_id)
+            .collect();
+
+        Ok(Some(into_domain(model, board_ids)))
+    }
 }
 
 #[async_trait::async_trait]
 impl NgWordRepository for NgWordRepositoryImpl {
     async fn get_ng_words(&self) -> anyhow::Result<Vec<NgWord>> {
-        let selections = query_as!(
-            SelectionNgWord,
-            r#"
-            SELECT
-                ng.id AS "id!: Uuid",
-                name AS "name!: String",
-                word AS "word!: String",
-                created_at AS "created_at!: chrono::DateTime<Utc>",
-                updated_at AS "updated_at!: chrono::DateTime<Utc>",
-                board_id AS "board_id: Uuid"
-            FROM
-                ng_words AS ng
-                LEFT OUTER JOIN boards_ng_words AS bng
-                ON ng.id = bng.ng_word_id
-            "#,
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        let mut ng_words_map = HashMap::<_, NgWord>::new();
-        for selection in selections {
-            ng_words_map
-                .entry(selection.id)
-                .and_modify(|x| {
-                    if let Some(board_id) = selection.board_id {
-                        x.board_ids.push(board_id);
-                    }
-                })
-                .or_insert(NgWord {
-                    id: selection.id,
-                    name: selection.name,
-                    word: selection.word,
-                    created_at: selection.created_at,
-                    updated_at: selection.updated_at,
-                    board_ids: if let Some(board_id) = selection.board_id {
-                        vec![board_id]
-                    } else {
-                        Vec::new()
-                    },
-                });
-        }
-
-        Ok(ng_words_map.into_values().collect())
+        Ok(ng_word::Entity::find()
+            .order_by_asc(ng_word::Column::Name)
+            .find_with_related(board_ng_word::Entity)
+            .all(&self.0)
+            .await?
+            .into_iter()
+            .map(|(model, relations)| {
+                let board_ids = relations
+                    .into_iter()
+                    .map(|relation| relation.board_id)
+                    .collect();
+                into_domain(model, board_ids)
+            })
+            .collect())
     }
 
     async fn create_ng_word(&self, name: &str, word: &str) -> anyhow::Result<NgWord> {
         let id = Uuid::now_v7();
+        let now = crate::db_time::now();
+        let model = ng_word::ActiveModel {
+            id: Set(id),
+            name: Set(name.to_string()),
+            word: Set(word.to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&self.0)
+        .await?;
 
-        let query = query!(
-            r#"
-            INSERT INTO
-                ng_words (id, name, word, created_at, updated_at)
-            VALUES
-                (?, ?, ?, NOW(), NOW())
-        "#,
-            id,
-            name,
-            word
-        );
-        self.0.execute(query).await?;
-
-        let query = query_as!(
-            SelectionNgWord,
-            r#"
-            SELECT
-                ng.id AS "id!: Uuid",
-                name AS "name!: String",
-                word AS "word!: String",
-                created_at AS "created_at!: chrono::DateTime<Utc>",
-                updated_at AS "updated_at!: chrono::DateTime<Utc>",
-                board_id AS "board_id: Uuid"
-            FROM
-                ng_words AS ng
-                LEFT OUTER JOIN boards_ng_words AS bng
-                ON ng.id = bng.ng_word_id
-            WHERE
-                ng.id = ?
-            "#,
-            id,
-        );
-
-        let selection = query.fetch_one(&self.0).await?;
-
-        Ok(NgWord {
-            id: selection.id,
-            name: selection.name,
-            word: selection.word,
-            created_at: selection.created_at,
-            updated_at: selection.updated_at,
-            board_ids: if let Some(board_id) = selection.board_id {
-                vec![board_id]
-            } else {
-                Vec::new()
-            },
-        })
+        Ok(into_domain(model, Vec::new()))
     }
 
     async fn delete_ng_word(&self, ng_word_id: Uuid) -> anyhow::Result<()> {
-        let query = query!(
-            r#"
-            DELETE FROM
-                ng_words
-            WHERE
-                id = ?
-        "#,
-            ng_word_id
-        );
+        let tx = self.0.begin().await?;
 
-        self.0.execute(query).await?;
+        board_ng_word::Entity::delete_many()
+            .filter(board_ng_word::Column::NgWordId.eq(ng_word_id))
+            .exec(&tx)
+            .await?;
+        ng_word::Entity::delete_by_id(ng_word_id).exec(&tx).await?;
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -163,110 +114,51 @@ impl NgWordRepository for NgWordRepositoryImpl {
         word: Option<&str>,
         board_ids: Option<Vec<Uuid>>,
     ) -> anyhow::Result<NgWord> {
-        let mut sets = Vec::new();
-        if name.is_some() {
-            sets.push("name = ?");
+        if ng_word::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .is_none()
+        {
+            anyhow::bail!("ng word not found: {id}");
         }
-        if word.is_some() {
-            sets.push("word = ?");
-        }
-        sets.push("updated_at = ?");
 
-        let query = format!(
-            r#"
-            UPDATE
-                ng_words
-            SET
-                {}
-            WHERE
-                id = ?
-            "#,
-            sets.join(", ")
-        );
-
-        // Dynamic part is only fixed column names; values are bound below.
-        let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
+        let now = crate::db_time::now();
+        let mut active_model = ng_word::ActiveModel {
+            id: Set(id),
+            updated_at: Set(now),
+            ..Default::default()
+        };
         if let Some(name) = name {
-            query = query.bind(name);
+            active_model.name = Set(name.to_string());
         }
         if let Some(word) = word {
-            query = query.bind(word);
+            active_model.word = Set(word.to_string());
         }
-        let query = query.bind(Utc::now()).bind(id);
-        query.execute(&self.0).await?;
+
+        let tx = self.0.begin().await?;
+        active_model.update(&tx).await?;
 
         if let Some(board_ids) = board_ids {
-            let mut tx = self.0.begin().await?;
-
-            let query = query!(
-                r#"
-                DELETE FROM
-                    boards_ng_words
-                WHERE
-                    ng_word_id = ?
-            "#,
-                id
-            );
-            tx.execute(query).await?;
+            board_ng_word::Entity::delete_many()
+                .filter(board_ng_word::Column::NgWordId.eq(id))
+                .exec(&tx)
+                .await?;
 
             for board_id in board_ids {
-                let bnw_id = Uuid::now_v7();
-                let query = query!(
-                    r#"
-                    INSERT INTO
-                        boards_ng_words (id, board_id, ng_word_id)
-                    VALUES
-                        (?, ?, ?)
-                "#,
-                    bnw_id,
-                    board_id,
-                    id
-                );
-                tx.execute(query).await?;
+                board_ng_word::ActiveModel {
+                    id: Set(Uuid::now_v7()),
+                    board_id: Set(board_id),
+                    ng_word_id: Set(id),
+                }
+                .insert(&tx)
+                .await?;
             }
-
-            tx.commit().await?;
         }
 
-        let query = query_as!(
-            SelectionNgWord,
-            r#"
-            SELECT
-                ng.id AS "id!: Uuid",
-                name AS "name!: String",
-                word AS "word!: String",
-                created_at AS "created_at!: chrono::DateTime<Utc>",
-                updated_at AS "updated_at!: chrono::DateTime<Utc>",
-                board_id AS "board_id: Uuid"
-            FROM
-                ng_words AS ng
-                LEFT OUTER JOIN boards_ng_words AS bng
-                ON ng.id = bng.ng_word_id
-            WHERE
-                ng.id = ?
-            "#,
-            id,
-        );
+        tx.commit().await?;
 
-        let selections = query.fetch_all(&self.0).await?;
-        let board_ids = selections
-            .iter()
-            .filter_map(|selection| selection.board_id)
-            .collect::<Vec<_>>();
-        let selection = selections
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("ng word not found: {id}"))?;
-
-        Ok(NgWord {
-            id: selection.id,
-            name: selection.name,
-            word: selection.word,
-            created_at: selection.created_at,
-            updated_at: selection.updated_at,
-            board_ids,
-        })
+        self.get_ng_word_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("ng word disappeared after update"))
     }
 }
-
-transaction_repository!(NgWordRepositoryImpl, 0, MySql);

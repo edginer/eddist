@@ -46,14 +46,15 @@ use tracing::info_span;
 
 mod api_doc;
 mod auth;
+mod db_time;
 pub(crate) mod entity;
 pub(crate) mod error;
+#[cfg(test)]
+mod integration_tests;
 mod models;
 mod services;
-pub(crate) mod utils;
 mod repository {
     pub mod admin_archive_repository;
-    pub mod admin_bbs_repository;
     pub mod admin_board_repository;
     pub mod admin_response_repository;
     pub mod admin_thread_repository;
@@ -210,24 +211,9 @@ async fn main() {
     let serve_dir = ServeDir::new(serve_dir)
         .not_found_service(ServeFile::new(format!("{serve_dir}/index.html")));
 
-    let pool = sqlx::mysql::MySqlPoolOptions::new()
-        .after_connect(|conn, _| {
-            use sqlx::Executor;
-
-            Box::pin(async move {
-                conn.execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
-                .await
-                .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                Ok(())
-            })
-        })
-        .connect(&std::env::var("DATABASE_URL").unwrap())
-        .await
-        .unwrap();
-    let orm_db = sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
+    let mut connect_options = sea_orm::ConnectOptions::new(std::env::var("DATABASE_URL").unwrap());
+    connect_options.sqlx_logging(false);
+    let orm_db = sea_orm::Database::connect(connect_options).await.unwrap();
 
     let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
     let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
@@ -264,23 +250,23 @@ async fn main() {
 
     let service_container = services::AppServiceContainer::new(
         ContentRepos {
-            board: Arc::new(AdminBoardRepositoryImpl::new(pool.clone())),
-            thread: Arc::new(AdminThreadRepositoryImpl::new(pool.clone())),
-            response: Arc::new(AdminResponseRepositoryImpl::new(pool.clone())),
+            board: Arc::new(AdminBoardRepositoryImpl::new(orm_db.clone())),
+            thread: Arc::new(AdminThreadRepositoryImpl::new(orm_db.clone())),
+            response: Arc::new(AdminResponseRepositoryImpl::new(orm_db.clone())),
             archive: Arc::new(AdminArchiveRepositoryImpl::new(s3_client, s3_bucket_name)),
         },
         ModerationRepos {
-            ng_word: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
-            cap: Arc::new(CapRepositoryImpl::new(pool.clone())),
-            user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
-            authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
+            ng_word: Arc::new(NgWordRepositoryImpl::new(orm_db.clone())),
+            cap: Arc::new(CapRepositoryImpl::new(orm_db.clone())),
+            user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(orm_db.clone())),
+            authed_token: Arc::new(AuthedTokenRepositoryImpl::new(orm_db.clone())),
         },
         AdminRepos {
-            user: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
-            idp: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
+            user: Arc::new(AdminUserRepositoryImpl::new(orm_db.clone())),
+            idp: Arc::new(IdpAdminRepositoryImpl::new(orm_db.clone())),
             notice: Arc::new(NoticeRepositoryImpl::new(orm_db.clone())),
             terms: Arc::new(TermsRepositoryImpl::new(orm_db.clone())),
-            captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
+            captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(orm_db.clone())),
             server_settings: Arc::new(ServerSettingsRepositoryImpl::new(orm_db)),
         },
         redis_conn.clone(),

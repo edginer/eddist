@@ -1,10 +1,11 @@
-use crate::transaction_repository;
-use sqlx::{MySqlPool, query, query_as};
-use uuid::Uuid;
-
+use crate::entity::{board, board_info, thread};
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
-
-use super::admin_bbs_repository::{SelectionBoardInfo, SelectionBoardWithThreadCount};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
+    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+};
+use std::collections::HashMap;
+use uuid::Uuid;
 
 #[async_trait::async_trait]
 pub trait AdminBoardRepository: Send + Sync {
@@ -15,392 +16,269 @@ pub trait AdminBoardRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct AdminBoardRepositoryImpl(pub(crate) MySqlPool);
+pub struct AdminBoardRepositoryImpl(DatabaseConnection);
 
 impl AdminBoardRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
+    }
+}
+
+#[derive(Debug, FromQueryResult)]
+struct ThreadCountByBoard {
+    board_id: Uuid,
+    thread_count: i64,
+}
+
+fn into_board(model: board::Model, thread_count: i64) -> Board {
+    Board {
+        id: model.id,
+        name: model.name,
+        board_key: model.board_key,
+        default_name: model.default_name,
+        thread_count,
+    }
+}
+
+fn into_board_info(model: board_info::Model) -> BoardInfo {
+    BoardInfo {
+        local_rules: model.local_rules,
+        base_thread_creation_span_sec: model.base_thread_creation_span_sec as usize,
+        base_response_creation_span_sec: model.base_response_creation_span_sec as usize,
+        max_thread_name_byte_length: model.max_thread_name_byte_length as usize,
+        max_author_name_byte_length: model.max_author_name_byte_length as usize,
+        max_email_byte_length: model.max_email_byte_length as usize,
+        max_response_body_byte_length: model.max_response_body_byte_length as usize,
+        max_response_body_lines: model.max_response_body_lines as usize,
+        threads_archive_cron: model.threads_archive_cron,
+        threads_archive_trigger_thread_count: model
+            .threads_archive_trigger_thread_count
+            .map(|value| value as usize),
+        read_only: model.read_only,
+        force_metadent_type: model.force_metadent_type,
+        enable_1001_message: model.enable_1001_message,
+        custom_1001_message: model.custom_1001_message,
+    }
+}
+
+impl AdminBoardRepositoryImpl {
+    async fn get_board_by_key(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
+        let Some(model) = board::Entity::find()
+            .filter(board::Column::BoardKey.eq(board_key))
+            .one(&self.0)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        let thread_count = thread::Entity::find()
+            .filter(thread::Column::BoardId.eq(model.id))
+            .count(&self.0)
+            .await? as i64;
+        Ok(Some(into_board(model, thread_count)))
     }
 }
 
 #[async_trait::async_trait]
 impl AdminBoardRepository for AdminBoardRepositoryImpl {
     async fn get_boards_by_key(&self, keys: Option<Vec<String>>) -> anyhow::Result<Vec<Board>> {
-        let pool = &self.0;
-        let key_lists = if let Some(keys) = &keys {
-            let mut initial = "WHERE board_key IN (".to_string();
-            initial.push_str(&keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
-            initial.push(')');
-            initial
-        } else {
-            "".to_string()
-        };
-
-        let query = format!(
-            r#"
-            SELECT
-                id,
-                name,
-                board_key,
-                default_name,
-                (
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        threads
-                    WHERE
-                        board_id = boards.id
-                ) AS thread_count
-            FROM
-                boards
-            {key_lists}
-            "#
-        );
-
-        // Dynamic part is only fixed clause fragments / `?` counts; values are bound below.
-        let mut query =
-            sqlx::query_as::<_, SelectionBoardWithThreadCount>(sqlx::AssertSqlSafe(query));
-
+        let mut query = board::Entity::find();
         if let Some(keys) = keys {
-            for key in keys {
-                query = query.bind(key);
-            }
+            query = query.filter(board::Column::BoardKey.is_in(keys));
         }
+        let models = query
+            .order_by_asc(board::Column::BoardKey)
+            .all(&self.0)
+            .await?;
 
-        let selected_boards = query.fetch_all(pool).await?;
-
-        Ok(selected_boards
+        let board_ids = models.iter().map(|model| model.id).collect::<Vec<_>>();
+        let thread_counts = thread::Entity::find()
+            .select_only()
+            .column(thread::Column::BoardId)
+            .column_as(thread::Column::Id.count(), "thread_count")
+            .filter(thread::Column::BoardId.is_in(board_ids))
+            .group_by(thread::Column::BoardId)
+            .into_model::<ThreadCountByBoard>()
+            .all(&self.0)
+            .await?
             .into_iter()
-            .map(|board| Board {
-                id: Uuid::from_slice(&board.id).unwrap(),
-                name: board.name,
-                board_key: board.board_key,
-                default_name: board.default_name,
-                thread_count: board.thread_count,
+            .map(|row| (row.board_id, row.thread_count))
+            .collect::<HashMap<_, _>>();
+
+        Ok(models
+            .into_iter()
+            .map(|model| {
+                let thread_count = thread_counts.get(&model.id).copied().unwrap_or_default();
+                into_board(model, thread_count)
             })
             .collect())
     }
 
     async fn get_board_info(&self, id: Uuid) -> anyhow::Result<BoardInfo> {
-        let pool = &self.0;
-
-        let board = query_as!(
-            SelectionBoardInfo,
-            r#"
-            SELECT
-                local_rules,
-                base_thread_creation_span_sec,
-                base_response_creation_span_sec,
-                max_thread_name_byte_length,
-                max_author_name_byte_length,
-                max_email_byte_length,
-                max_response_body_byte_length,
-                max_response_body_lines,
-                threads_archive_trigger_thread_count,
-                threads_archive_cron,
-                read_only AS "read_only!: bool",
-                force_metadent_type,
-                enable_1001_message AS "enable_1001_message!: bool",
-                custom_1001_message
-            FROM
-                boards_info
-            WHERE
-                id = ?
-            "#,
-            id.as_bytes().to_vec()
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(BoardInfo {
-            local_rules: board.local_rules,
-            base_thread_creation_span_sec: board.base_thread_creation_span_sec as usize,
-            base_response_creation_span_sec: board.base_response_creation_span_sec as usize,
-            max_thread_name_byte_length: board.max_thread_name_byte_length as usize,
-            max_author_name_byte_length: board.max_author_name_byte_length as usize,
-            max_email_byte_length: board.max_email_byte_length as usize,
-            max_response_body_byte_length: board.max_response_body_byte_length as usize,
-            max_response_body_lines: board.max_response_body_lines as usize,
-            threads_archive_trigger_thread_count: board
-                .threads_archive_trigger_thread_count
-                .map(|v| v as usize),
-            threads_archive_cron: board.threads_archive_cron,
-            read_only: board.read_only,
-            force_metadent_type: board.force_metadent_type,
-            enable_1001_message: board.enable_1001_message,
-            custom_1001_message: board.custom_1001_message,
-        })
+        board_info::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .map(into_board_info)
+            .ok_or_else(|| anyhow::anyhow!("Board info not found: {id}"))
     }
 
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board> {
-        let pool = &self.0;
         let board_id = Uuid::now_v7();
+        let board_key = board.board_key.clone();
+        let now = crate::db_time::now();
+        let tx = self.0.begin().await?;
 
-        let mut sets = Vec::new();
-        let mut values = Vec::new();
-
-        if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
-            sets.push("base_thread_creation_span_sec");
-            values.push(base_thread_creation_span_sec);
+        board::ActiveModel {
+            id: Set(board_id),
+            name: Set(board.name),
+            board_key: Set(board.board_key),
+            default_name: Set(board.default_name),
         }
-        if let Some(base_response_creation_span_sec) = board.base_response_creation_span_sec {
-            sets.push("base_response_creation_span_sec");
-            values.push(base_response_creation_span_sec);
-        }
-        if let Some(max_thread_name_byte_length) = board.max_thread_name_byte_length {
-            sets.push("max_thread_name_byte_length");
-            values.push(max_thread_name_byte_length);
-        }
-        if let Some(max_author_name_byte_length) = board.max_author_name_byte_length {
-            sets.push("max_author_name_byte_length");
-            values.push(max_author_name_byte_length);
-        }
-        if let Some(max_email_byte_length) = board.max_email_byte_length {
-            sets.push("max_email_byte_length");
-            values.push(max_email_byte_length);
-        }
-        if let Some(max_response_body_byte_length) = board.max_response_body_byte_length {
-            sets.push("max_response_body_byte_length");
-            values.push(max_response_body_byte_length);
-        }
-        if let Some(max_response_body_lines) = board.max_response_body_lines {
-            sets.push("max_response_body_lines");
-            values.push(max_response_body_lines);
-        }
-        if let Some(threads_archive_trigger_thread_count) =
-            board.threads_archive_trigger_thread_count
-        {
-            sets.push("threads_archive_trigger_thread_count");
-            values.push(threads_archive_trigger_thread_count);
-        }
-        if board.threads_archive_cron.is_some() {
-            sets.push("threads_archive_cron");
-        }
-        if board.force_metadent_type.is_some() {
-            sets.push("force_metadent_type");
-        }
-
-        let mut tx = pool.begin().await?;
-
-        query!(
-            r#"
-            INSERT INTO
-                boards (id, name, board_key, default_name)
-            VALUES
-                (?, ?, ?, ?)
-        "#,
-            board_id,
-            board.name,
-            board.board_key,
-            board.default_name
-        )
-        .execute(&mut *tx)
+        .insert(&tx)
         .await?;
 
-        let query = format!(
-            r#"
-            INSERT INTO
-                boards_info (id, created_at, updated_at, local_rules, {})
-            VALUES
-                (?, NOW(), NOW(), ?, {})
-            "#,
-            sets.join(", "),
-            sets.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
-        );
-        // Dynamic part is only fixed column names / `?` counts; values are bound below.
-        let mut query = sqlx::query(sqlx::AssertSqlSafe(query))
-            .bind(board_id)
-            .bind(board.local_rule);
-
-        for v in values {
-            query = query.bind(v as i32);
+        let mut board_info_model = board_info::ActiveModel {
+            id: Set(board_id),
+            local_rules: Set(board.local_rule),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        if let Some(value) = board.base_thread_creation_span_sec {
+            board_info_model.base_thread_creation_span_sec = Set(value as i32);
         }
-        if let Some(threads_archive_cron) = &board.threads_archive_cron {
-            query = query.bind(threads_archive_cron);
+        if let Some(value) = board.base_response_creation_span_sec {
+            board_info_model.base_response_creation_span_sec = Set(value as i32);
         }
-        if let Some(force_metadent_type) = &board.force_metadent_type {
-            query = query.bind(force_metadent_type);
+        if let Some(value) = board.max_thread_name_byte_length {
+            board_info_model.max_thread_name_byte_length = Set(value as i32);
         }
-
-        query.execute(&mut *tx).await?;
+        if let Some(value) = board.max_author_name_byte_length {
+            board_info_model.max_author_name_byte_length = Set(value as i32);
+        }
+        if let Some(value) = board.max_email_byte_length {
+            board_info_model.max_email_byte_length = Set(value as i32);
+        }
+        if let Some(value) = board.max_response_body_byte_length {
+            board_info_model.max_response_body_byte_length = Set(value as i32);
+        }
+        if let Some(value) = board.max_response_body_lines {
+            board_info_model.max_response_body_lines = Set(value as i32);
+        }
+        if let Some(value) = board.threads_archive_cron {
+            board_info_model.threads_archive_cron = Set(Some(value));
+        }
+        if let Some(value) = board.threads_archive_trigger_thread_count {
+            board_info_model.threads_archive_trigger_thread_count = Set(Some(value as i32));
+        }
+        if let Some(value) = board.force_metadent_type {
+            board_info_model.force_metadent_type = Set(Some(value));
+        }
+        board_info_model.insert(&tx).await?;
 
         tx.commit().await?;
 
-        self.get_boards_by_key(Some(vec![board.board_key.clone()]))
+        self.get_board_by_key(&board_key)
             .await?
-            .into_iter()
-            .next()
             .ok_or_else(|| anyhow::anyhow!("Failed to create board"))
     }
 
-    async fn edit_board(&self, board_key: &str, board: EditBoardInput) -> anyhow::Result<Board> {
-        let pool = &self.0;
+    async fn edit_board(&self, board_key: &str, input: EditBoardInput) -> anyhow::Result<Board> {
+        let board_model = board::Entity::find()
+            .filter(board::Column::BoardKey.eq(board_key))
+            .one(&self.0)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Board not found: {board_key}"))?;
 
-        let mut sets = Vec::new();
-        let mut values = Vec::new();
-        let mut values_str = Vec::new();
+        let tx = self.0.begin().await?;
+        let mut info_model = board_info::ActiveModel {
+            id: Set(board_model.id),
+            ..Default::default()
+        };
+        let mut info_changed = false;
 
-        let mut board_sets = Vec::new();
-        let mut board_values = Vec::new();
-
-        // for boards
-        if let Some(name) = &board.name {
-            board_sets.push("name = ?");
-            board_values.push(name);
+        if let Some(value) = input.local_rule {
+            info_model.local_rules = Set(value);
+            info_changed = true;
         }
-        if let Some(default_name) = &board.default_name {
-            board_sets.push("default_name = ?");
-            board_values.push(default_name);
+        if let Some(value) = input.threads_archive_cron {
+            info_model.threads_archive_cron =
+                Set(if value.is_empty() { None } else { Some(value) });
+            info_changed = true;
         }
-
-        // str first for board_info
-        if let Some(local_rule) = &board.local_rule {
-            sets.push("local_rules = ?");
-            values_str.push(local_rule);
+        if let Some(value) = input.force_metadent_type {
+            info_model.force_metadent_type = Set(if value.is_empty() { None } else { Some(value) });
+            info_changed = true;
         }
-        match &board.threads_archive_cron {
-            Some(v) if v.is_empty() => {
-                sets.push("threads_archive_cron = NULL");
-            }
-            Some(v) => {
-                sets.push("threads_archive_cron = ?");
-                values_str.push(v);
-            }
-            None => {}
+        if let Some(value) = input.custom_1001_message {
+            info_model.custom_1001_message = Set(if value.is_empty() { None } else { Some(value) });
+            info_changed = true;
         }
-        match &board.force_metadent_type {
-            Some(v) if v.is_empty() => {
-                sets.push("force_metadent_type = NULL");
-            }
-            Some(v) => {
-                sets.push("force_metadent_type = ?");
-                values_str.push(v);
-            }
-            None => {}
+        if let Some(value) = input.base_thread_creation_span_sec {
+            info_model.base_thread_creation_span_sec = Set(value as i32);
+            info_changed = true;
         }
-        match &board.custom_1001_message {
-            Some(v) if v.is_empty() => {
-                sets.push("custom_1001_message = NULL");
-            }
-            Some(v) => {
-                sets.push("custom_1001_message = ?");
-                values_str.push(v);
-            }
-            None => {}
+        if let Some(value) = input.base_response_creation_span_sec {
+            info_model.base_response_creation_span_sec = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(base_thread_creation_span_sec) = board.base_thread_creation_span_sec {
-            sets.push("base_thread_creation_span_sec = ?");
-            values.push(base_thread_creation_span_sec);
+        if let Some(value) = input.max_thread_name_byte_length {
+            info_model.max_thread_name_byte_length = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(base_response_creation_span_sec) = board.base_response_creation_span_sec {
-            sets.push("base_response_creation_span_sec = ?");
-            values.push(base_response_creation_span_sec);
+        if let Some(value) = input.max_author_name_byte_length {
+            info_model.max_author_name_byte_length = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(max_thread_name_byte_length) = board.max_thread_name_byte_length {
-            sets.push("max_thread_name_byte_length = ?");
-            values.push(max_thread_name_byte_length);
+        if let Some(value) = input.max_email_byte_length {
+            info_model.max_email_byte_length = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(max_author_name_byte_length) = board.max_author_name_byte_length {
-            sets.push("max_author_name_byte_length = ?");
-            values.push(max_author_name_byte_length);
+        if let Some(value) = input.max_response_body_byte_length {
+            info_model.max_response_body_byte_length = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(max_email_byte_length) = board.max_email_byte_length {
-            sets.push("max_email_byte_length = ?");
-            values.push(max_email_byte_length);
+        if let Some(value) = input.max_response_body_lines {
+            info_model.max_response_body_lines = Set(value as i32);
+            info_changed = true;
         }
-        if let Some(max_response_body_byte_length) = board.max_response_body_byte_length {
-            sets.push("max_response_body_byte_length = ?");
-            values.push(max_response_body_byte_length);
+        if let Some(value) = input.threads_archive_trigger_thread_count {
+            info_model.threads_archive_trigger_thread_count = Set(Some(value as i32));
+            info_changed = true;
         }
-        if let Some(max_response_body_lines) = board.max_response_body_lines {
-            sets.push("max_response_body_lines = ?");
-            values.push(max_response_body_lines);
+        if let Some(value) = input.read_only {
+            info_model.read_only = Set(value);
+            info_changed = true;
         }
-        if let Some(threads_archive_trigger_thread_count) =
-            board.threads_archive_trigger_thread_count
-        {
-            sets.push("threads_archive_trigger_thread_count = ?");
-            values.push(threads_archive_trigger_thread_count);
+        if let Some(value) = input.enable_1001_message {
+            info_model.enable_1001_message = Set(value);
+            info_changed = true;
         }
-        if board.read_only.is_some() {
-            sets.push("read_only = ?");
-        }
-        if board.enable_1001_message.is_some() {
-            sets.push("enable_1001_message = ?");
+        if info_changed {
+            info_model.update(&tx).await?;
         }
 
-        let mut tx = pool.begin().await?;
-
-        if !sets.is_empty() {
-            let query = format!(
-                r#"
-            UPDATE
-                boards_info
-            SET
-                {}
-            WHERE
-                id = (
-                    SELECT
-                        id
-                    FROM
-                        boards
-                    WHERE
-                        board_key = ?
-                )
-            "#,
-                sets.join(", ")
-            );
-            // Dynamic part is only fixed column names; values are bound below.
-            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
-
-            for v in values_str {
-                query = query.bind(v);
-            }
-            for v in values {
-                query = query.bind(v as i32);
-            }
-            if let Some(read_only) = board.read_only {
-                query = query.bind(read_only);
-            }
-            if let Some(enable_1001_message) = board.enable_1001_message {
-                query = query.bind(enable_1001_message);
-            }
-            let query = query.bind(board_key);
-
-            query.execute(&mut *tx).await?;
+        let mut board_update = board::ActiveModel {
+            id: Set(board_model.id),
+            ..Default::default()
+        };
+        let mut board_changed = false;
+        if let Some(value) = input.name {
+            board_update.name = Set(value);
+            board_changed = true;
         }
-
-        if !board_sets.is_empty() {
-            let query = format!(
-                r#"
-            UPDATE
-                boards
-            SET
-                {}
-            WHERE
-                board_key = ?
-            "#,
-                board_sets.join(", ")
-            );
-            // Dynamic part is only fixed column names; values are bound below.
-            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
-
-            for v in board_values {
-                query = query.bind(v);
-            }
-            let query = query.bind(board_key);
-
-            query.execute(&mut *tx).await?;
+        if let Some(value) = input.default_name {
+            board_update.default_name = Set(value);
+            board_changed = true;
+        }
+        if board_changed {
+            board_update.update(&tx).await?;
         }
 
         tx.commit().await?;
 
-        self.get_boards_by_key(Some(vec![board_key.to_string()]))
+        self.get_board_by_key(board_key)
             .await?
-            .first()
-            .cloned()
-            .ok_or(anyhow::anyhow!("Failed to edit board"))
+            .ok_or_else(|| anyhow::anyhow!("Failed to edit board"))
     }
 }
-
-transaction_repository!(AdminBoardRepositoryImpl, 0, MySql);

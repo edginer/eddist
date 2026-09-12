@@ -1,5 +1,4 @@
 use crate::entity::terms;
-use chrono::Utc;
 use eddist_core::domain::terms::Terms;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, QueryOrder};
 
@@ -52,7 +51,7 @@ impl TermsRepository for TermsRepositoryImpl {
         input: UpdateTermsInput,
         updated_by: Option<String>,
     ) -> anyhow::Result<Terms> {
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
         let current = self
             .get_terms()

@@ -1,5 +1,5 @@
 use crate::entity::notice;
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use eddist_core::domain::notice::Notice;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
@@ -107,7 +107,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         }
 
         let id = Uuid::now_v7();
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
         let model = notice::ActiveModel {
             id: Set(id),
@@ -116,7 +116,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             content: Set(input.content),
             created_at: Set(now),
             updated_at: Set(now),
-            published_at: Set(input.published_at),
+            published_at: Set(crate::db_time::truncate_to_millis(input.published_at)),
             author_email: Set(author_email),
             hide_from_list: Set(input.hide_from_list),
         }
@@ -127,7 +127,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
     }
 
     async fn update_notice(&self, id: Uuid, input: UpdateNoticeInput) -> anyhow::Result<Notice> {
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
         let current = self
             .get_notice_by_id(id)
@@ -136,7 +136,8 @@ impl NoticeRepository for NoticeRepositoryImpl {
 
         let title = input.title.clone().unwrap_or_else(|| current.title.clone());
         let content = input.content.unwrap_or(current.content);
-        let published_at = input.published_at.unwrap_or(current.published_at);
+        let published_at =
+            crate::db_time::truncate_to_millis(input.published_at.unwrap_or(current.published_at));
         let hide_from_list = input.hide_from_list.unwrap_or(current.hide_from_list);
 
         let new_slug = if let Some(custom_slug) = input.slug {

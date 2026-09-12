@@ -1,6 +1,8 @@
-use crate::transaction_repository;
-use chrono::Utc;
-use sqlx::{MySqlPool, query, query_as};
+use crate::entity::captcha_config;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder,
+};
 use uuid::Uuid;
 
 use crate::models::{
@@ -13,73 +15,47 @@ fn empty_to_none(s: String) -> Option<String> {
     if s.is_empty() { None } else { Some(s) }
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-struct CaptchaConfigRow {
-    id: Uuid,
-    name: String,
-    provider: String,
-    site_key: String,
-    secret: String,
-    base_url: Option<String>,
-    widget_form_field_name: Option<String>,
-    widget_script_url: Option<String>,
-    widget_html: Option<String>,
-    widget_script_handler: Option<String>,
-    capture_fields: Option<serde_json::Value>,
-    verification: Option<serde_json::Value>,
-    is_active: bool,
-    display_order: i32,
-    endpoint_usage: String,
-    created_at: chrono::NaiveDateTime,
-    updated_at: chrono::NaiveDateTime,
-    updated_by: Option<String>,
-}
+fn into_domain(model: captcha_config::Model) -> CaptchaConfig {
+    let capture_fields: Vec<String> = model
+        .capture_fields
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
 
-impl From<CaptchaConfigRow> for CaptchaConfig {
-    fn from(row: CaptchaConfigRow) -> Self {
-        let capture_fields: Vec<String> = row
-            .capture_fields
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default();
+    let verification: Option<CaptchaVerificationConfig> = model
+        .verification
+        .and_then(|value| serde_json::from_value(value).ok());
 
-        let verification: Option<CaptchaVerificationConfig> = row
-            .verification
-            .and_then(|v| serde_json::from_value(v).ok());
+    // Widget is only present if all required fields are set.
+    let widget = match (
+        model.widget_form_field_name,
+        model.widget_script_url,
+        model.widget_html,
+    ) {
+        (Some(form_field_name), Some(script_url), Some(widget_html)) => Some(CaptchaWidgetConfig {
+            form_field_name,
+            script_url,
+            widget_html,
+            script_handler: model.widget_script_handler,
+        }),
+        _ => None,
+    };
 
-        // Widget is only present if all required fields are set
-        let widget = match (
-            row.widget_form_field_name,
-            row.widget_script_url,
-            row.widget_html,
-        ) {
-            (Some(form_field_name), Some(script_url), Some(widget_html)) => {
-                Some(CaptchaWidgetConfig {
-                    form_field_name,
-                    script_url,
-                    widget_html,
-                    script_handler: row.widget_script_handler,
-                })
-            }
-            _ => None,
-        };
-
-        CaptchaConfig {
-            id: row.id,
-            name: row.name,
-            provider: row.provider,
-            site_key: row.site_key,
-            secret: row.secret,
-            base_url: row.base_url,
-            widget,
-            capture_fields,
-            verification,
-            is_active: row.is_active,
-            display_order: row.display_order,
-            endpoint_usage: row.endpoint_usage,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            updated_by: row.updated_by,
-        }
+    CaptchaConfig {
+        id: model.id,
+        name: model.name,
+        provider: model.provider,
+        site_key: model.site_key,
+        secret: model.secret,
+        base_url: model.base_url,
+        widget,
+        capture_fields,
+        verification,
+        is_active: model.is_active,
+        display_order: model.display_order,
+        endpoint_usage: model.endpoint_usage,
+        created_at: model.created_at,
+        updated_at: model.updated_at,
+        updated_by: model.updated_by,
     }
 }
 
@@ -103,115 +79,44 @@ pub trait CaptchaConfigRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct CaptchaConfigRepositoryImpl(MySqlPool);
+pub struct CaptchaConfigRepositoryImpl(DatabaseConnection);
 
 impl CaptchaConfigRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
     }
 }
 
 #[async_trait::async_trait]
 impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<CaptchaConfig>> {
-        let rows = query_as!(
-            CaptchaConfigRow,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                name,
-                provider,
-                site_key,
-                secret,
-                base_url,
-                widget_form_field_name,
-                widget_script_url,
-                widget_html,
-                widget_script_handler,
-                capture_fields AS "capture_fields: serde_json::Value",
-                verification AS "verification: serde_json::Value",
-                is_active AS "is_active: bool",
-                display_order,
-                endpoint_usage,
-                created_at,
-                updated_at,
-                updated_by
-            FROM captcha_configs
-            ORDER BY display_order ASC, created_at ASC
-            "#
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        Ok(rows.into_iter().map(CaptchaConfig::from).collect())
+        Ok(captcha_config::Entity::find()
+            .order_by_asc(captcha_config::Column::DisplayOrder)
+            .order_by_asc(captcha_config::Column::CreatedAt)
+            .all(&self.0)
+            .await?
+            .into_iter()
+            .map(into_domain)
+            .collect())
     }
 
     async fn get_active(&self) -> anyhow::Result<Vec<CaptchaConfig>> {
-        let rows = query_as!(
-            CaptchaConfigRow,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                name,
-                provider,
-                site_key,
-                secret,
-                base_url,
-                widget_form_field_name,
-                widget_script_url,
-                widget_html,
-                widget_script_handler,
-                capture_fields AS "capture_fields: serde_json::Value",
-                verification AS "verification: serde_json::Value",
-                is_active AS "is_active: bool",
-                display_order,
-                endpoint_usage,
-                created_at,
-                updated_at,
-                updated_by
-            FROM captcha_configs
-            WHERE is_active = 1
-            ORDER BY display_order ASC, created_at ASC
-            "#
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        Ok(rows.into_iter().map(CaptchaConfig::from).collect())
+        Ok(captcha_config::Entity::find()
+            .filter(captcha_config::Column::IsActive.eq(true))
+            .order_by_asc(captcha_config::Column::DisplayOrder)
+            .order_by_asc(captcha_config::Column::CreatedAt)
+            .all(&self.0)
+            .await?
+            .into_iter()
+            .map(into_domain)
+            .collect())
     }
 
     async fn get_by_id(&self, id: Uuid) -> anyhow::Result<Option<CaptchaConfig>> {
-        let row = query_as!(
-            CaptchaConfigRow,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                name,
-                provider,
-                site_key,
-                secret,
-                base_url,
-                widget_form_field_name,
-                widget_script_url,
-                widget_html,
-                widget_script_handler,
-                capture_fields AS "capture_fields: serde_json::Value",
-                verification AS "verification: serde_json::Value",
-                is_active AS "is_active: bool",
-                display_order,
-                endpoint_usage,
-                created_at,
-                updated_at,
-                updated_by
-            FROM captcha_configs
-            WHERE id = ?
-            "#,
-            id
-        )
-        .fetch_optional(&self.0)
-        .await?;
-
-        Ok(row.map(CaptchaConfig::from))
+        Ok(captcha_config::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .map(into_domain))
     }
 
     async fn create(
@@ -220,75 +125,41 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         updated_by: Option<String>,
     ) -> anyhow::Result<CaptchaConfig> {
         let id = Uuid::now_v7();
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
-        let capture_fields_json = serde_json::to_value(&input.capture_fields)?;
-        let verification_json = input
+        let capture_fields = serde_json::to_value(&input.capture_fields)?;
+        let verification = input
             .verification
             .as_ref()
             .map(serde_json::to_value)
             .transpose()?;
+        let (widget_form_field_name, widget_script_url, widget_html, widget_script_handler) =
+            widget_columns(input.widget.as_ref());
 
-        let (form_field_name, script_url, widget_html, script_handler) = match input.widget.as_ref()
-        {
-            Some(w) => (
-                empty_to_none(w.form_field_name.clone()),
-                empty_to_none(w.script_url.clone()),
-                empty_to_none(w.widget_html.clone()),
-                w.script_handler.clone().and_then(empty_to_none),
-            ),
-            None => (None, None, None, None),
-        };
-
-        query!(
-            r#"
-            INSERT INTO captcha_configs (
-                id, name, provider, site_key, secret, base_url,
-                widget_form_field_name, widget_script_url, widget_html, widget_script_handler,
-                capture_fields, verification,
-                is_active, display_order, endpoint_usage, created_at, updated_at, updated_by
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-            id,
-            input.name,
-            input.provider,
-            input.site_key,
-            input.secret,
-            input.base_url,
-            form_field_name,
-            script_url,
-            widget_html,
-            script_handler,
-            capture_fields_json,
-            verification_json,
-            input.is_active,
-            input.display_order,
-            input.endpoint_usage,
-            now,
-            now,
-            updated_by
-        )
-        .execute(&self.0)
+        let model = captcha_config::ActiveModel {
+            id: Set(id),
+            name: Set(input.name),
+            provider: Set(input.provider),
+            site_key: Set(input.site_key),
+            secret: Set(input.secret),
+            base_url: Set(input.base_url),
+            widget_form_field_name: Set(widget_form_field_name),
+            widget_script_url: Set(widget_script_url),
+            widget_html: Set(widget_html),
+            widget_script_handler: Set(widget_script_handler),
+            capture_fields: Set(Some(capture_fields)),
+            verification: Set(verification),
+            is_active: Set(input.is_active),
+            display_order: Set(input.display_order),
+            endpoint_usage: Set(input.endpoint_usage),
+            created_at: Set(now),
+            updated_at: Set(now),
+            updated_by: Set(updated_by),
+        }
+        .insert(&self.0)
         .await?;
 
-        Ok(CaptchaConfig {
-            id,
-            name: input.name,
-            provider: input.provider,
-            site_key: input.site_key,
-            secret: input.secret,
-            base_url: input.base_url,
-            widget: input.widget,
-            capture_fields: input.capture_fields,
-            verification: input.verification,
-            is_active: input.is_active,
-            display_order: input.display_order,
-            endpoint_usage: input.endpoint_usage,
-            created_at: now,
-            updated_at: now,
-            updated_by,
-        })
+        Ok(into_domain(model))
     }
 
     async fn update(
@@ -297,8 +168,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         input: UpdateCaptchaConfigInput,
         updated_by: Option<String>,
     ) -> anyhow::Result<CaptchaConfig> {
-        let now = Utc::now().naive_utc();
-
+        let now = crate::db_time::now();
         let current = self.get_by_id(id).await?.ok_or_else(|| {
             crate::error::ServiceError::NotFound("Captcha config not found".into())
         })?;
@@ -308,7 +178,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         let site_key = input.site_key.unwrap_or(current.site_key);
         let secret = input
             .secret
-            .filter(|s| !s.is_empty())
+            .filter(|value| !value.is_empty())
             .unwrap_or(current.secret);
         let base_url = input.base_url.or(current.base_url);
         let widget = input.widget.or(current.widget);
@@ -323,79 +193,58 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
             .as_ref()
             .map(serde_json::to_value)
             .transpose()?;
+        let (widget_form_field_name, widget_script_url, widget_html, widget_script_handler) =
+            widget_columns(widget.as_ref());
 
-        let (form_field_name, script_url, widget_html_val, script_handler) = match widget.as_ref() {
-            Some(w) => (
-                empty_to_none(w.form_field_name.clone()),
-                empty_to_none(w.script_url.clone()),
-                empty_to_none(w.widget_html.clone()),
-                w.script_handler.clone().and_then(empty_to_none),
-            ),
-            None => (None, None, None, None),
-        };
-
-        query!(
-            r#"
-            UPDATE captcha_configs
-            SET name = ?, provider = ?, site_key = ?, secret = ?, base_url = ?,
-                widget_form_field_name = ?, widget_script_url = ?, widget_html = ?, widget_script_handler = ?,
-                capture_fields = ?, verification = ?,
-                is_active = ?, display_order = ?, endpoint_usage = ?, updated_at = ?, updated_by = ?
-            WHERE id = ?
-            "#,
-            name,
-            provider,
-            site_key,
-            secret,
-            base_url,
-            form_field_name,
-            script_url,
-            widget_html_val,
-            script_handler,
-            capture_fields_json,
-            verification_json,
-            is_active,
-            display_order,
-            endpoint_usage,
-            now,
-            updated_by,
-            id
-        )
-        .execute(&self.0)
+        let model = captcha_config::ActiveModel {
+            id: Set(id),
+            name: Set(name),
+            provider: Set(provider),
+            site_key: Set(site_key),
+            secret: Set(secret),
+            base_url: Set(base_url),
+            widget_form_field_name: Set(widget_form_field_name),
+            widget_script_url: Set(widget_script_url),
+            widget_html: Set(widget_html),
+            widget_script_handler: Set(widget_script_handler),
+            capture_fields: Set(Some(capture_fields_json)),
+            verification: Set(verification_json),
+            is_active: Set(is_active),
+            display_order: Set(display_order),
+            endpoint_usage: Set(endpoint_usage),
+            updated_at: Set(now),
+            updated_by: Set(updated_by),
+            ..Default::default()
+        }
+        .update(&self.0)
         .await?;
 
-        Ok(CaptchaConfig {
-            id,
-            name,
-            provider,
-            site_key,
-            secret,
-            base_url,
-            widget,
-            capture_fields,
-            verification,
-            is_active,
-            display_order,
-            endpoint_usage,
-            created_at: current.created_at,
-            updated_at: now,
-            updated_by,
-        })
+        Ok(into_domain(model))
     }
 
     async fn delete(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            r#"
-            DELETE FROM captcha_configs
-            WHERE id = ?
-            "#,
-            id
-        )
-        .execute(&self.0)
-        .await?;
-
+        captcha_config::Entity::delete_by_id(id)
+            .exec(&self.0)
+            .await?;
         Ok(())
     }
 }
 
-transaction_repository!(CaptchaConfigRepositoryImpl, 0, MySql);
+fn widget_columns(
+    widget: Option<&CaptchaWidgetConfig>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    match widget {
+        Some(widget) => (
+            empty_to_none(widget.form_field_name.clone()),
+            empty_to_none(widget.script_url.clone()),
+            empty_to_none(widget.widget_html.clone()),
+            widget.script_handler.clone().and_then(empty_to_none),
+        ),
+        None => (None, None, None, None),
+    }
+}
