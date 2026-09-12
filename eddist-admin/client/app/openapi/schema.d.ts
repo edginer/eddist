@@ -277,6 +277,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/{board_key}/threads/archive/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archive_threads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/boards/{board_key}/threads/{thread_id}/": {
         parameters: {
             query?: never;
@@ -957,6 +973,10 @@ export interface components {
             /** Format: int64 */
             thread_number: number;
             title: string;
+        };
+        ThreadArchiveInput: {
+            /** Thread numbers to archive from the board. */
+            thread_numbers: number[];
         };
         ThreadCompactionInput: {
             /** Format: int32 */
@@ -1688,6 +1708,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Thread"][];
                 };
+            };
+        };
+    };
+    archive_threads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Board Key */
+                board_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadArchiveInput"];
+            };
+        };
+        responses: {
+            /** @description Selected threads archived successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No threads selected */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

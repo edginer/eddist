@@ -28,6 +28,7 @@ pub trait AdminThreadRepository: Send + Sync {
         limit: u64,
     ) -> anyhow::Result<Vec<Thread>>;
     async fn compact_threads(&self, board_key: &str, target_count: u32) -> anyhow::Result<()>;
+    async fn archive_threads(&self, board_key: &str, thread_numbers: &[u64]) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]
@@ -250,6 +251,40 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
         )
         .execute(&self.0)
         .await?;
+
+        Ok(())
+    }
+
+    async fn archive_threads(&self, board_key: &str, thread_numbers: &[u64]) -> anyhow::Result<()> {
+        if thread_numbers.is_empty() {
+            return Ok(());
+        }
+
+        let placeholders = thread_numbers
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            r#"
+            UPDATE threads
+            SET archived = 1, active = 0
+            WHERE board_id = (
+                SELECT id
+                FROM boards
+                WHERE board_key = ?
+            )
+            AND archived = 0
+            AND thread_number IN ({placeholders})
+            "#
+        );
+
+        // Dynamic part is only the fixed number of parameter placeholders; values are bound below.
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(query)).bind(board_key);
+        for thread_number in thread_numbers {
+            query = query.bind(thread_number);
+        }
+        query.execute(&self.0).await?;
 
         Ok(())
     }

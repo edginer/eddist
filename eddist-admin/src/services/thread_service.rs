@@ -30,6 +30,12 @@ pub trait ThreadService: Send + Sync {
         board_key: &str,
         target_count: u32,
     ) -> anyhow::Result<()>;
+    async fn archive_threads(
+        &self,
+        actor: &AdminIdentity,
+        board_key: &str,
+        thread_numbers: &[u64],
+    ) -> anyhow::Result<()>;
 }
 
 pub struct ThreadServiceImpl {
@@ -146,6 +152,23 @@ impl ThreadService for ThreadServiceImpl {
     ) -> anyhow::Result<()> {
         self.thread_repo
             .compact_threads(board_key, target_count)
+            .await
+    }
+
+    async fn archive_threads(
+        &self,
+        _actor: &AdminIdentity,
+        board_key: &str,
+        thread_numbers: &[u64],
+    ) -> anyhow::Result<()> {
+        if thread_numbers.is_empty() {
+            return Err(anyhow::Error::new(crate::error::ServiceError::BadRequest(
+                "At least one thread must be selected".to_string(),
+            )));
+        }
+
+        self.thread_repo
+            .archive_threads(board_key, thread_numbers)
             .await
     }
 }

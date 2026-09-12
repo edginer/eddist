@@ -10,7 +10,7 @@ use crate::{
     AppState,
     auth::AdminIdentity,
     error::ApiError,
-    models::{Res, Thread, ThreadCompactionInput, UpdateResInput},
+    models::{Res, Thread, ThreadArchiveInput, ThreadCompactionInput, UpdateResInput},
 };
 
 pub fn routes() -> Router<AppState> {
@@ -29,6 +29,7 @@ pub fn routes() -> Router<AppState> {
             "/boards/{boardKey}/threads-compaction",
             post(threads_compaction),
         )
+        .route("/boards/{boardKey}/threads/archive", post(archive_threads))
 }
 
 #[utoipa::path(
@@ -142,6 +143,32 @@ pub async fn threads_compaction(
         .services
         .thread
         .compact_threads(&identity, &board_key, body.target_count)
+        .await?;
+    Ok(StatusCode::OK)
+}
+
+#[utoipa::path(
+    post,
+    path = "/boards/{board_key}/threads/archive/",
+    responses(
+        (status = 200, description = "Selected threads archived successfully"),
+        (status = 400, description = "No threads selected"),
+    ),
+    params(
+        ("board_key" = String, Path, description = "Board Key"),
+    ),
+    request_body = ThreadArchiveInput
+)]
+pub async fn archive_threads(
+    State(state): State<AppState>,
+    identity: AdminIdentity,
+    Path(board_key): Path<String>,
+    Json(body): Json<ThreadArchiveInput>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .services
+        .thread
+        .archive_threads(&identity, &board_key, &body.thread_numbers)
         .await?;
     Ok(StatusCode::OK)
 }
