@@ -1,48 +1,11 @@
-use crate::transaction_repository;
-use chrono::NaiveDateTime;
-use sqlx::{FromRow, MySql, QueryBuilder, Row, query, query_as};
-use uuid::Uuid;
-
+use crate::entity::authed_token;
 use crate::models::AuthedToken;
-
-#[derive(Debug, FromRow)]
-struct AuthedTokenRow {
-    pub id: Vec<u8>,
-    pub token: String,
-    pub origin_ip: String,
-    pub reduced_origin_ip: String,
-    pub asn_num: i32,
-    pub writing_ua: String,
-    pub authed_ua: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub authed_at: Option<NaiveDateTime>,
-    pub validity: bool,
-    pub last_wrote_at: Option<NaiveDateTime>,
-    pub additional_info: Option<serde_json::Value>,
-    pub require_reauth: bool,
-}
-
-impl From<AuthedTokenRow> for AuthedToken {
-    fn from(row: AuthedTokenRow) -> Self {
-        Self {
-            id: Uuid::from_slice(&row.id).unwrap(),
-            token: row.token,
-            origin_ip: row.origin_ip,
-            reduced_origin_ip: row.reduced_origin_ip,
-            asn_num: row.asn_num,
-            writing_ua: row.writing_ua,
-            authed_ua: row.authed_ua,
-            created_at: row.created_at,
-            authed_at: row.authed_at,
-            validity: row.validity,
-            last_wrote_at: row.last_wrote_at,
-            additional_info: row.additional_info,
-            require_reauth: row.require_reauth,
-            // Suspension lives in Redis, not this table; callers fill this in from there.
-            is_suspended: None,
-        }
-    }
-}
+use sea_orm::sea_query::Expr;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+};
+use uuid::Uuid;
 
 pub struct ListAuthedTokensParams<'a> {
     pub offset: u64,
@@ -70,107 +33,76 @@ pub trait AuthedTokenRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct AuthedTokenRepositoryImpl(pub sqlx::MySqlPool);
+pub struct AuthedTokenRepositoryImpl(DatabaseConnection);
 
 impl AuthedTokenRepositoryImpl {
-    pub fn new(pool: sqlx::MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
+    }
+}
+
+fn into_domain(model: authed_token::Model) -> AuthedToken {
+    AuthedToken {
+        id: model.id,
+        token: model.token,
+        origin_ip: model.origin_ip,
+        reduced_origin_ip: model.reduced_origin_ip,
+        asn_num: model.asn_num,
+        writing_ua: model.writing_ua,
+        authed_ua: model.authed_ua,
+        created_at: model.created_at,
+        authed_at: model.authed_at,
+        validity: model.validity,
+        last_wrote_at: model.last_wrote_at,
+        additional_info: model.additional_info,
+        require_reauth: model.require_reauth,
+        // Suspension lives in Redis, not this table; callers fill this in from there.
+        is_suspended: None,
     }
 }
 
 #[async_trait::async_trait]
 impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
     async fn get_authed_token(&self, id: Uuid) -> anyhow::Result<AuthedToken> {
-        let row = query_as!(
-            AuthedTokenRow,
-            r#"
-            SELECT
-                id,
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                created_at,
-                authed_at,
-                validity AS "validity!: bool",
-                last_wrote_at,
-                additional_info AS "additional_info: serde_json::Value",
-                require_reauth AS "require_reauth!: bool"
-            FROM
-                authed_tokens
-            WHERE
-                id = ?
-            "#,
-            id.as_bytes().to_vec(),
-        )
-        .fetch_optional(&self.0)
-        .await?
-        .ok_or_else(|| crate::error::ServiceError::NotFound("Authed token not found".into()))?;
-
-        Ok(AuthedToken::from(row))
+        authed_token::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .map(into_domain)
+            .ok_or_else(|| {
+                crate::error::ServiceError::NotFound("Authed token not found".into()).into()
+            })
     }
 
     async fn delete_authed_token(&self, id: Uuid) -> anyhow::Result<()> {
-        let query = query!(
-            r#"
-            UPDATE
-                authed_tokens
-            SET
-                validity = 0
-            WHERE
-                id = ?
-        "#,
-            id.as_bytes().to_vec(),
-        );
-
-        query.execute(&self.0).await?;
-
+        authed_token::ActiveModel {
+            id: Set(id),
+            validity: Set(false),
+            ..Default::default()
+        }
+        .update(&self.0)
+        .await?;
         Ok(())
     }
 
     async fn delete_authed_token_by_origin_ip(&self, id: Uuid) -> anyhow::Result<Vec<Uuid>> {
-        let affected_ids = query!(
-            r#"
-            SELECT id FROM authed_tokens
-            WHERE validity = 1
-              AND origin_ip IN (
-                SELECT origin_ip FROM (
-                    SELECT origin_ip FROM authed_tokens WHERE id = ?
-                ) tmp
-              )
-            "#,
-            id.as_bytes().to_vec(),
-        )
-        .fetch_all(&self.0)
-        .await?
-        .into_iter()
-        .map(|r| Uuid::from_slice(&r.id).map_err(anyhow::Error::from))
-        .collect::<Result<Vec<_>, _>>()?;
+        let Some(target) = authed_token::Entity::find_by_id(id).one(&self.0).await? else {
+            return Ok(Vec::new());
+        };
 
-        query!(
-            r#"
-            UPDATE
-                authed_tokens
-            SET
-                validity = 0
-            WHERE
-                origin_ip IN (
-                    SELECT origin_ip FROM (
-                        SELECT
-                            origin_ip
-                        FROM
-                            authed_tokens
-                        WHERE
-                            id = ?
-                    ) tmp
-                )
-        "#,
-            id.as_bytes().to_vec(),
-        )
-        .execute(&self.0)
-        .await?;
+        let affected_ids = authed_token::Entity::find()
+            .filter(authed_token::Column::Validity.eq(true))
+            .filter(authed_token::Column::OriginIp.eq(target.origin_ip.clone()))
+            .all(&self.0)
+            .await?
+            .into_iter()
+            .map(|model| model.id)
+            .collect::<Vec<_>>();
+
+        authed_token::Entity::update_many()
+            .col_expr(authed_token::Column::Validity, Expr::value(false))
+            .filter(authed_token::Column::OriginIp.eq(target.origin_ip))
+            .exec(&self.0)
+            .await?;
 
         Ok(affected_ids)
     }
@@ -190,86 +122,77 @@ impl AuthedTokenRepository for AuthedTokenRepositoryImpl {
             sort_column,
             sort_asc,
         } = params;
-        let mut count_builder: QueryBuilder<MySql> =
-            QueryBuilder::new("SELECT COUNT(*) as cnt FROM authed_tokens WHERE 1=1");
-        let mut data_builder: QueryBuilder<MySql> = QueryBuilder::new(
-            "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua, created_at, authed_at, validity, last_wrote_at, additional_info, require_reauth FROM authed_tokens WHERE 1=1",
-        );
 
-        if let Some(ip) = origin_ip {
-            count_builder.push(" AND origin_ip = ");
-            count_builder.push_bind(ip.to_string());
-            data_builder.push(" AND origin_ip = ");
-            data_builder.push_bind(ip.to_string());
+        let mut query = authed_token::Entity::find();
+        if let Some(origin_ip) = origin_ip {
+            query = query.filter(authed_token::Column::OriginIp.eq(origin_ip));
         }
-        if let Some(ua) = writing_ua {
-            count_builder.push(" AND writing_ua LIKE ");
-            count_builder.push_bind(format!("%{ua}%"));
-            data_builder.push(" AND writing_ua LIKE ");
-            data_builder.push_bind(format!("%{ua}%"));
+        if let Some(writing_ua) = writing_ua {
+            query = query.filter(authed_token::Column::WritingUa.contains(writing_ua));
         }
-        if let Some(ua) = authed_ua {
-            count_builder.push(" AND authed_ua LIKE ");
-            count_builder.push_bind(format!("%{ua}%"));
-            data_builder.push(" AND authed_ua LIKE ");
-            data_builder.push_bind(format!("%{ua}%"));
+        if let Some(authed_ua) = authed_ua {
+            query = query.filter(authed_token::Column::AuthedUa.contains(authed_ua));
         }
-        if let Some(asn) = asn_num {
-            count_builder.push(" AND asn_num = ");
-            count_builder.push_bind(asn);
-            data_builder.push(" AND asn_num = ");
-            data_builder.push_bind(asn);
+        if let Some(asn_num) = asn_num {
+            query = query.filter(authed_token::Column::AsnNum.eq(asn_num));
         }
-        if let Some(v) = validity {
-            count_builder.push(" AND validity = ");
-            count_builder.push_bind(v);
-            data_builder.push(" AND validity = ");
-            data_builder.push_bind(v);
+        if let Some(validity) = validity {
+            query = query.filter(authed_token::Column::Validity.eq(validity));
         }
 
-        let direction = if sort_asc { " ASC" } else { " DESC" };
-        let safe_column = match sort_column {
-            "created_at" | "authed_at" | "last_wrote_at" => sort_column,
+        let total = query.clone().count(&self.0).await?;
+        let query = match sort_column {
+            "created_at" => {
+                if sort_asc {
+                    query.order_by_asc(authed_token::Column::CreatedAt)
+                } else {
+                    query.order_by_desc(authed_token::Column::CreatedAt)
+                }
+            }
+            "authed_at" => {
+                if sort_asc {
+                    query.order_by_asc(authed_token::Column::AuthedAt)
+                } else {
+                    query.order_by_desc(authed_token::Column::AuthedAt)
+                }
+            }
+            "last_wrote_at" => {
+                if sort_asc {
+                    query.order_by_asc(authed_token::Column::LastWroteAt)
+                } else {
+                    query.order_by_desc(authed_token::Column::LastWroteAt)
+                }
+            }
             _ => anyhow::bail!("invalid sort column: {sort_column}"),
         };
-        data_builder.push(format!(" ORDER BY {safe_column}{direction}"));
-        data_builder.push(" LIMIT ");
-        data_builder.push_bind(limit as i64);
-        data_builder.push(" OFFSET ");
-        data_builder.push_bind(offset as i64);
 
-        let count_row = count_builder.build().fetch_one(&self.0).await?;
-        let total: i64 = count_row.get("cnt");
-
-        let rows = data_builder
-            .build_query_as::<AuthedTokenRow>()
-            .fetch_all(&self.0)
+        let models = query
+            .limit(u64::from(limit))
+            .offset(offset)
+            .all(&self.0)
             .await?;
-
-        let tokens = rows.into_iter().map(AuthedToken::from).collect();
-
-        Ok((tokens, total as u64))
+        Ok((models.into_iter().map(into_domain).collect(), total))
     }
 
     async fn set_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            r#"UPDATE authed_tokens SET require_reauth = 1 WHERE id = ?"#,
-            id.as_bytes().to_vec(),
-        )
-        .execute(&self.0)
+        authed_token::ActiveModel {
+            id: Set(id),
+            require_reauth: Set(true),
+            ..Default::default()
+        }
+        .update(&self.0)
         .await?;
         Ok(())
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            r#"UPDATE authed_tokens SET require_reauth = 0 WHERE id = ?"#,
-            id.as_bytes().to_vec(),
-        )
-        .execute(&self.0)
+        authed_token::ActiveModel {
+            id: Set(id),
+            require_reauth: Set(false),
+            ..Default::default()
+        }
+        .update(&self.0)
         .await?;
         Ok(())
     }
 }
-
-transaction_repository!(AuthedTokenRepositoryImpl, 0, MySql);

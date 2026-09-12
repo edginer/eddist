@@ -273,7 +273,7 @@ async fn main() {
             ng_word: Arc::new(NgWordRepositoryImpl::new(orm_db.clone())),
             cap: Arc::new(CapRepositoryImpl::new(orm_db.clone())),
             user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(orm_db.clone())),
-            authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
+            authed_token: Arc::new(AuthedTokenRepositoryImpl::new(orm_db.clone())),
         },
         AdminRepos {
             user: Arc::new(AdminUserRepositoryImpl::new(orm_db.clone())),
