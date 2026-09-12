@@ -272,15 +272,15 @@ async fn main() {
         ModerationRepos {
             ng_word: Arc::new(NgWordRepositoryImpl::new(pool.clone())),
             cap: Arc::new(CapRepositoryImpl::new(pool.clone())),
-            user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(pool.clone())),
+            user_restriction: Arc::new(UserRestrictionRepositoryImpl::new(orm_db.clone())),
             authed_token: Arc::new(AuthedTokenRepositoryImpl::new(pool.clone())),
         },
         AdminRepos {
             user: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
-            idp: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
+            idp: Arc::new(IdpAdminRepositoryImpl::new(orm_db.clone())),
             notice: Arc::new(NoticeRepositoryImpl::new(orm_db.clone())),
             terms: Arc::new(TermsRepositoryImpl::new(orm_db.clone())),
-            captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
+            captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(orm_db.clone())),
             server_settings: Arc::new(ServerSettingsRepositoryImpl::new(orm_db)),
         },
         redis_conn.clone(),
