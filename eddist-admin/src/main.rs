@@ -46,6 +46,7 @@ use tracing::info_span;
 
 mod api_doc;
 mod auth;
+mod db_time;
 pub(crate) mod entity;
 pub(crate) mod error;
 #[cfg(test)]
@@ -211,22 +212,7 @@ async fn main() {
         .not_found_service(ServeFile::new(format!("{serve_dir}/index.html")));
 
     let mut connect_options = sea_orm::ConnectOptions::new(std::env::var("DATABASE_URL").unwrap());
-    connect_options
-        .sqlx_logging(false)
-        .map_sqlx_mysql_pool_opts(|pool_options| {
-            pool_options.after_connect(|conn, _| {
-                use sea_orm::sqlx::Executor;
-
-                Box::pin(async move {
-                    conn.execute(
-                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                    )
-                    .await?;
-                    log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                    Ok(())
-                })
-            })
-        });
+    connect_options.sqlx_logging(false);
     let orm_db = sea_orm::Database::connect(connect_options).await.unwrap();
 
     let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();

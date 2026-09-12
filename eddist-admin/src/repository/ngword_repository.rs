@@ -88,7 +88,7 @@ impl NgWordRepository for NgWordRepositoryImpl {
 
     async fn create_ng_word(&self, name: &str, word: &str) -> anyhow::Result<NgWord> {
         let id = Uuid::now_v7();
-        let now = chrono::Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let model = ng_word::ActiveModel {
             id: Set(id),
             name: Set(name.to_string()),
@@ -130,7 +130,7 @@ impl NgWordRepository for NgWordRepositoryImpl {
             anyhow::bail!("ng word not found: {id}");
         }
 
-        let now = chrono::Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let mut active_model = ng_word::ActiveModel {
             id: Set(id),
             updated_at: Set(now),

@@ -1,5 +1,4 @@
 use crate::entity::captcha_config;
-use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder,
@@ -126,7 +125,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         updated_by: Option<String>,
     ) -> anyhow::Result<CaptchaConfig> {
         let id = Uuid::now_v7();
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
         let capture_fields = serde_json::to_value(&input.capture_fields)?;
         let verification = input
@@ -169,7 +168,7 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         input: UpdateCaptchaConfigInput,
         updated_by: Option<String>,
     ) -> anyhow::Result<CaptchaConfig> {
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let current = self.get_by_id(id).await?.ok_or_else(|| {
             crate::error::ServiceError::NotFound("Captcha config not found".into())
         })?;

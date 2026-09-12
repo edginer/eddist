@@ -1,5 +1,4 @@
 use crate::entity::server_settings;
-use chrono::Utc;
 use eddist_core::{server_settings::KEY_AI_OPENAI_API_KEY, symmetric};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
@@ -71,7 +70,7 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
 
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting> {
         let id = Uuid::now_v7();
-        let now = Utc::now().naive_utc();
+        let now = crate::db_time::now();
 
         let should_encrypt = input.setting_key == KEY_AI_OPENAI_API_KEY;
         let value = if should_encrypt {

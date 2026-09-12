@@ -99,7 +99,7 @@ impl CapRepository for CapRepositoryImpl {
         password_hash: &str,
     ) -> anyhow::Result<Cap> {
         let id = Uuid::now_v7();
-        let now = chrono::Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let model = cap::ActiveModel {
             id: Set(id),
             name: Set(name.to_string()),
@@ -139,7 +139,7 @@ impl CapRepository for CapRepositoryImpl {
             anyhow::bail!("cap not found: {id}");
         }
 
-        let now = chrono::Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let mut active_model = cap::ActiveModel {
             id: Set(id),
             updated_at: Set(now),

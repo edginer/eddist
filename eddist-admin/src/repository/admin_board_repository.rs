@@ -121,7 +121,7 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board> {
         let board_id = Uuid::now_v7();
         let board_key = board.board_key.clone();
-        let now = chrono::Utc::now().naive_utc();
+        let now = crate::db_time::now();
         let tx = self.0.begin().await?;
 
         board::ActiveModel {
