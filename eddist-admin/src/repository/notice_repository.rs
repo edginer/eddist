@@ -1,7 +1,10 @@
-use crate::transaction_repository;
+use crate::entity::notice;
 use chrono::{NaiveDateTime, Utc};
 use eddist_core::domain::notice::Notice;
-use sqlx::{MySqlPool, query, query_as};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
@@ -38,92 +41,55 @@ pub trait NoticeRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct NoticeRepositoryImpl(MySqlPool);
+pub struct NoticeRepositoryImpl(DatabaseConnection);
 
 impl NoticeRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
+    }
+}
+
+fn into_domain(model: notice::Model) -> Notice {
+    Notice {
+        id: model.id,
+        slug: model.slug,
+        title: model.title,
+        content: model.content,
+        created_at: model.created_at,
+        updated_at: model.updated_at,
+        published_at: model.published_at,
+        author_email: model.author_email,
+        hide_from_list: model.hide_from_list,
     }
 }
 
 #[async_trait::async_trait]
 impl NoticeRepository for NoticeRepositoryImpl {
     async fn get_notices_paginated(&self, page: u32, limit: u32) -> anyhow::Result<Vec<Notice>> {
-        let offset = page * limit;
-        let notices = query_as!(
-            Notice,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                slug,
-                title,
-                content,
-                created_at,
-                updated_at,
-                published_at,
-                author_email,
-                hide_from_list AS "hide_from_list: bool"
-            FROM notices
-            ORDER BY published_at DESC
-            LIMIT ? OFFSET ?
-            "#,
-            limit,
-            offset
-        )
-        .fetch_all(&self.0)
-        .await?;
+        let offset = u64::from(page) * u64::from(limit);
+        let notices = notice::Entity::find()
+            .order_by_desc(notice::Column::PublishedAt)
+            .limit(u64::from(limit))
+            .offset(offset)
+            .all(&self.0)
+            .await?;
 
-        Ok(notices)
+        Ok(notices.into_iter().map(into_domain).collect())
     }
 
     async fn get_notice_by_id(&self, id: Uuid) -> anyhow::Result<Option<Notice>> {
-        let notice = query_as!(
-            Notice,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                slug,
-                title,
-                content,
-                created_at,
-                updated_at,
-                published_at,
-                author_email,
-                hide_from_list AS "hide_from_list: bool"
-            FROM notices
-            WHERE id = ?
-            "#,
-            id
-        )
-        .fetch_optional(&self.0)
-        .await?;
-
-        Ok(notice)
+        Ok(notice::Entity::find_by_id(id)
+            .one(&self.0)
+            .await?
+            .map(into_domain))
     }
 
     async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>> {
-        let notice = query_as!(
-            Notice,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                slug,
-                title,
-                content,
-                created_at,
-                updated_at,
-                published_at,
-                author_email,
-                hide_from_list AS "hide_from_list: bool"
-            FROM notices
-            WHERE slug = ?
-            "#,
-            slug
-        )
-        .fetch_optional(&self.0)
-        .await?;
-
-        Ok(notice)
+        Ok(notice::Entity::find()
+            .filter(notice::Column::Slug.eq(slug))
+            .one(&self.0)
+            .await?
+            .map(into_domain))
     }
 
     async fn create_notice(
@@ -143,37 +109,21 @@ impl NoticeRepository for NoticeRepositoryImpl {
         let id = Uuid::now_v7();
         let now = Utc::now().naive_utc();
 
-        query!(
-            r#"
-            INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email, hide_from_list)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-            id,
-            input.slug,
-            input.title,
-            input.content,
-            now,
-            now,
-            input.published_at,
-            author_email,
-            input.hide_from_list
-        )
-        .execute(&self.0)
+        let model = notice::ActiveModel {
+            id: Set(id),
+            slug: Set(input.slug),
+            title: Set(input.title),
+            content: Set(input.content),
+            created_at: Set(now),
+            updated_at: Set(now),
+            published_at: Set(input.published_at),
+            author_email: Set(author_email),
+            hide_from_list: Set(input.hide_from_list),
+        }
+        .insert(&self.0)
         .await?;
 
-        let notice = Notice {
-            id,
-            slug: input.slug,
-            title: input.title,
-            content: input.content,
-            created_at: now,
-            updated_at: now,
-            published_at: input.published_at,
-            author_email,
-            hide_from_list: input.hide_from_list,
-        };
-
-        Ok(notice)
+        Ok(into_domain(model))
     }
 
     async fn update_notice(&self, id: Uuid, input: UpdateNoticeInput) -> anyhow::Result<Notice> {
@@ -204,51 +154,27 @@ impl NoticeRepository for NoticeRepositoryImpl {
             current.slug.clone()
         };
 
-        query!(
-            r#"
-            UPDATE notices
-            SET slug = ?, title = ?, content = ?, published_at = ?, updated_at = ?, hide_from_list = ?
-            WHERE id = ?
-            "#,
-            new_slug,
-            title,
-            content,
-            published_at,
-            now,
-            hide_from_list,
-            id
-        )
-        .execute(&self.0)
+        notice::ActiveModel {
+            id: Set(id),
+            slug: Set(new_slug),
+            title: Set(title),
+            content: Set(content),
+            published_at: Set(published_at),
+            updated_at: Set(now),
+            hide_from_list: Set(hide_from_list),
+            ..Default::default()
+        }
+        .update(&self.0)
         .await?;
 
-        let notice = Notice {
-            id,
-            slug: new_slug,
-            title,
-            content,
-            created_at: current.created_at,
-            updated_at: now,
-            published_at,
-            author_email: current.author_email,
-            hide_from_list,
-        };
-
-        Ok(notice)
+        self.get_notice_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Notice disappeared after update"))
     }
 
     async fn delete_notice(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            r#"
-            DELETE FROM notices
-            WHERE id = ?
-            "#,
-            id
-        )
-        .execute(&self.0)
-        .await?;
+        notice::Entity::delete_by_id(id).exec(&self.0).await?;
 
         Ok(())
     }
 }
-
-transaction_repository!(NoticeRepositoryImpl, 0, MySql);

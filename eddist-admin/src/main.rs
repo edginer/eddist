@@ -46,6 +46,7 @@ use tracing::info_span;
 
 mod api_doc;
 mod auth;
+pub(crate) mod entity;
 pub(crate) mod error;
 mod models;
 mod services;
@@ -226,6 +227,7 @@ async fn main() {
         .connect(&std::env::var("DATABASE_URL").unwrap())
         .await
         .unwrap();
+    let orm_db = sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
 
     let r2_account_id = env::var("R2_ACCOUNT_ID").unwrap();
     let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap().trim().to_string();
@@ -276,10 +278,10 @@ async fn main() {
         AdminRepos {
             user: Arc::new(AdminUserRepositoryImpl::new(pool.clone())),
             idp: Arc::new(IdpAdminRepositoryImpl::new(pool.clone())),
-            notice: Arc::new(NoticeRepositoryImpl::new(pool.clone())),
-            terms: Arc::new(TermsRepositoryImpl::new(pool.clone())),
+            notice: Arc::new(NoticeRepositoryImpl::new(orm_db.clone())),
+            terms: Arc::new(TermsRepositoryImpl::new(orm_db.clone())),
             captcha_config: Arc::new(CaptchaConfigRepositoryImpl::new(pool.clone())),
-            server_settings: Arc::new(ServerSettingsRepositoryImpl::new(pool)),
+            server_settings: Arc::new(ServerSettingsRepositoryImpl::new(orm_db)),
         },
         redis_conn.clone(),
     );
