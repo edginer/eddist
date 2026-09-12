@@ -48,6 +48,8 @@ mod api_doc;
 mod auth;
 pub(crate) mod entity;
 pub(crate) mod error;
+#[cfg(test)]
+mod integration_tests;
 mod models;
 mod services;
 mod repository {
