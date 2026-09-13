@@ -1,9 +1,8 @@
 use crate::entity::{board_cap, cap};
 use crate::error::DbResultExt;
-use crate::repository::support::{board_ids_for, replace_board_links};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
-    IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -49,12 +48,23 @@ fn into_domain(model: cap::Model, board_ids: Vec<Uuid>) -> Cap {
     }
 }
 
+async fn board_ids_of_cap<C: ConnectionTrait>(db: &C, cap_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+    Ok(board_cap::Entity::find()
+        .filter(board_cap::Column::CapId.eq(cap_id))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|link| link.board_id)
+        .collect())
+}
+
 #[async_trait::async_trait]
 impl CapRepository for CapRepositoryImpl {
     async fn get_caps(&self) -> anyhow::Result<Vec<Cap>> {
         Ok(cap::Entity::find()
             .order_by_asc(cap::Column::Name)
             .find_with_related(board_cap::Entity)
+            .order_by_asc(board_cap::Column::BoardId)
             .all(&self.0)
             .await?
             .into_iter()
@@ -125,28 +135,25 @@ impl CapRepository for CapRepositoryImpl {
         .await
         .or_not_found("Cap")?;
 
-        if let Some(board_ids) = board_ids {
-            replace_board_links::<board_cap::Entity, _, _>(
-                &tx,
-                board_cap::Column::CapId,
-                id,
-                board_ids,
-                |board_id| board_cap::ActiveModel {
-                    id: Set(Uuid::now_v7()),
-                    board_id: Set(board_id),
-                    cap_id: Set(id),
-                },
-            )
-            .await?;
-        }
-
-        let board_ids = board_ids_for::<board_cap::Entity, _>(
-            &tx,
-            board_cap::Column::CapId,
-            id,
-            board_cap::Column::BoardId,
-        )
-        .await?;
+        let board_ids = match board_ids {
+            Some(board_ids) => {
+                board_cap::Entity::delete_many()
+                    .filter(board_cap::Column::CapId.eq(id))
+                    .exec(&tx)
+                    .await?;
+                board_cap::Entity::insert_many(board_ids.iter().map(|board_id| {
+                    board_cap::ActiveModel {
+                        id: Set(Uuid::now_v7()),
+                        board_id: Set(*board_id),
+                        cap_id: Set(id),
+                    }
+                }))
+                .exec(&tx)
+                .await?;
+                board_ids
+            }
+            None => board_ids_of_cap(&tx, id).await?,
+        };
 
         tx.commit().await?;
 

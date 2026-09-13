@@ -936,8 +936,12 @@ async fn relational_reads_match_left_outer_join() -> anyhow::Result<()> {
     let ng_multi = ng_repository.create_ng_word("A-multi", "wa").await?;
     ng_repository.create_ng_word("B-zero", "wb").await?;
     let ng_dup = ng_repository.create_ng_word("C-dup", "wc").await?;
+    // Fed in descending order so the repositories' ORDER BY is what sorts the result,
+    // not the order the junction rows were written in.
+    let mut descending_board_ids = vec![b1.id, b2.id];
+    descending_board_ids.sort_by(|a, b| b.cmp(a));
     ng_repository
-        .update_ng_word(ng_multi.id, None, None, Some(vec![b1.id, b2.id]))
+        .update_ng_word(ng_multi.id, None, None, Some(descending_board_ids.clone()))
         .await?;
     ng_repository
         .update_ng_word(ng_dup.id, None, None, Some(vec![b1.id, b1.id]))
@@ -965,6 +969,12 @@ async fn relational_reads_match_left_outer_join() -> anyhow::Result<()> {
         "duplicate junction rows must be preserved"
     );
     assert!(ng_words.iter().any(|w| w.board_ids.is_empty()));
+    for row in &ng_words {
+        assert!(
+            row.board_ids.is_sorted(),
+            "get_ng_words must return board_ids in ascending order"
+        );
+    }
     let names = ng_words.iter().map(|w| w.name.clone()).collect::<Vec<_>>();
     let mut sorted = names.clone();
     sorted.sort();
@@ -976,7 +986,13 @@ async fn relational_reads_match_left_outer_join() -> anyhow::Result<()> {
     cap_repository.create_cap("B-zero", "d", "h").await?;
     let cap_dup = cap_repository.create_cap("C-dup", "d", "h").await?;
     cap_repository
-        .update_cap(cap_multi.id, None, None, None, Some(vec![b1.id, b2.id]))
+        .update_cap(
+            cap_multi.id,
+            None,
+            None,
+            None,
+            Some(descending_board_ids.clone()),
+        )
         .await?;
     cap_repository
         .update_cap(cap_dup.id, None, None, None, Some(vec![b1.id, b1.id]))
@@ -997,6 +1013,12 @@ async fn relational_reads_match_left_outer_join() -> anyhow::Result<()> {
     )
     .await?;
     assert_eq!(cap_new, cap_old, "get_caps diverged from LEFT OUTER JOIN");
+    for row in &caps {
+        assert!(
+            row.board_ids.is_sorted(),
+            "get_caps must return board_ids in ascending order"
+        );
+    }
     assert_eq!(cap_new.get(&cap_dup.id).map(Vec::len), Some(2));
     assert!(caps.iter().any(|c| c.board_ids.is_empty()));
 
