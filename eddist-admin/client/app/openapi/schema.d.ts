@@ -975,7 +975,7 @@ export interface components {
             title: string;
         };
         ThreadArchiveInput: {
-            /** Thread numbers to archive from the board. */
+            /** @description Thread numbers to archive from the board. */
             thread_numbers: number[];
         };
         ThreadCompactionInput: {
@@ -1409,6 +1409,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Board"];
                 };
+            };
+            /** @description Board not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1927,6 +1934,13 @@ export interface operations {
                     "application/json": components["schemas"]["Cap"];
                 };
             };
+            /** @description Cap not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_captcha_configs: {
@@ -2339,6 +2353,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NgWord"];
                 };
+            };
+            /** @description NG word not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

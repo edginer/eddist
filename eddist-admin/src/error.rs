@@ -104,6 +104,9 @@ pub(crate) trait DbResultExt<T> {
 }
 
 impl<T> DbResultExt<T> for Result<T, sea_orm::DbErr> {
+    /// Reading `RecordNotUpdated` as "no such row" relies on sqlx-mysql enabling
+    /// `CLIENT_FOUND_ROWS`; without it MySQL reports 0 affected rows for an UPDATE that
+    /// writes identical values, and unchanged updates would answer 404.
     fn or_not_found(self, entity: &str) -> anyhow::Result<T> {
         match self {
             Err(sea_orm::DbErr::RecordNotUpdated | sea_orm::DbErr::RecordNotFound(_)) => {

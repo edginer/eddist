@@ -171,9 +171,8 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             .filter(thread::Column::Archived.eq(false))
             .order_by_desc(thread::Column::LastModifiedAt)
             .offset(u64::from(target_count))
-            // MySQL rejects OFFSET without LIMIT and PostgreSQL caps LIMIT at i64, so this
-            // stands in for "no upper bound" rather than capping the batch.
-            .limit(i64::MAX as u64)
+            // Caps how many threads one call archives; MySQL also rejects OFFSET without LIMIT.
+            .limit(1000)
             .into_tuple::<Uuid>()
             .all(&self.0)
             .await?;
