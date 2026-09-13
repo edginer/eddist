@@ -107,11 +107,7 @@ impl IdpAdminRepository for IdpAdminRepositoryImpl {
             active_model.client_secret = Set(encrypt_client_secret(&new_secret));
         }
 
-        active_model.update(&self.0).await?;
-
-        self.get_by_id(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("IdP disappeared after update"))
+        Ok(into_domain(active_model.update(&self.0).await?))
     }
 
     async fn delete(&self, id: Uuid) -> anyhow::Result<()> {

@@ -33,6 +33,13 @@ impl ServerSettingsRepositoryImpl {
     }
 }
 
+fn mask_secret(mut setting: ServerSetting) -> ServerSetting {
+    if setting.setting_key == KEY_AI_OPENAI_API_KEY && !setting.value.is_empty() {
+        setting.value = "***".to_string();
+    }
+    setting
+}
+
 fn into_domain(model: server_settings::Model) -> ServerSetting {
     ServerSetting {
         id: model.id,
@@ -47,25 +54,14 @@ fn into_domain(model: server_settings::Model) -> ServerSetting {
 #[async_trait::async_trait]
 impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
     async fn get_all(&self) -> anyhow::Result<Vec<ServerSetting>> {
-        let settings = server_settings::Entity::find()
+        Ok(server_settings::Entity::find()
             .order_by_asc(server_settings::Column::SettingKey)
             .all(&self.0)
             .await?
             .into_iter()
             .map(into_domain)
-            .collect::<Vec<_>>();
-
-        let settings = settings
-            .into_iter()
-            .map(|mut s| {
-                if s.setting_key == KEY_AI_OPENAI_API_KEY && !s.value.is_empty() {
-                    s.value = "***".to_string();
-                }
-                s
-            })
-            .collect();
-
-        Ok(settings)
+            .map(mask_secret)
+            .collect())
     }
 
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting> {
@@ -91,21 +87,14 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
         .exec(&self.0)
         .await?;
 
-        let setting = server_settings::Entity::find()
+        // MySQL upserts return no row, so the stored value has to be read back.
+        server_settings::Entity::find()
             .filter(server_settings::Column::SettingKey.eq(input.setting_key))
             .one(&self.0)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Server setting disappeared after upsert"))
-            .map(into_domain)?;
-
-        if setting.setting_key == KEY_AI_OPENAI_API_KEY && !setting.value.is_empty() {
-            return Ok(ServerSetting {
-                value: "***".to_string(),
-                ..setting
-            });
-        }
-
-        Ok(setting)
+            .map(into_domain)
+            .map(mask_secret)
     }
 }
 

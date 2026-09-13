@@ -64,6 +64,41 @@ async fn setup_database() -> anyhow::Result<MysqlTestDatabase> {
     })
 }
 
+fn empty_edit_board_input() -> EditBoardInput {
+    EditBoardInput {
+        name: None,
+        default_name: None,
+        local_rule: None,
+        base_thread_creation_span_sec: None,
+        base_response_creation_span_sec: None,
+        max_thread_name_byte_length: None,
+        max_author_name_byte_length: None,
+        max_email_byte_length: None,
+        max_response_body_byte_length: None,
+        max_response_body_lines: None,
+        threads_archive_cron: None,
+        threads_archive_trigger_thread_count: None,
+        read_only: None,
+        force_metadent_type: None,
+        enable_1001_message: None,
+        custom_1001_message: None,
+    }
+}
+
+fn assert_not_found(error: anyhow::Error, expected: &str) {
+    let service_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<crate::error::ServiceError>())
+        .unwrap_or_else(|| panic!("expected ServiceError::NotFound, got {error:?}"));
+    assert!(
+        matches!(
+            service_error,
+            crate::error::ServiceError::NotFound(message) if message.contains(expected)
+        ),
+        "expected NotFound containing {expected:?}, got {service_error:?}"
+    );
+}
+
 fn create_board_input(board_key: &str, name: &str) -> CreateBoardInput {
     CreateBoardInput {
         name: name.to_string(),
@@ -342,6 +377,16 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
     assert_eq!(archived_responses.len(), 1);
     assert_eq!(archived_responses[0].id, archived_response_id);
     assert!(!archived_responses[0].is_abone_keep_id);
+    let archived_res = &archived_responses[0];
+    assert_eq!(archived_res.author_name.as_deref(), Some("投稿者"));
+    assert_eq!(archived_res.mail.as_deref(), Some(""));
+    assert_eq!(archived_res.body, "過去の本文");
+    assert_eq!(archived_res.author_id, "author");
+    assert_eq!(archived_res.ip_addr, "127.0.0.1");
+    assert_eq!(archived_res.authed_token_id, token_id);
+    assert_eq!(archived_res.board_id, board.id);
+    assert_eq!(archived_res.res_order, 1);
+    assert!(!archived_res.is_abone);
 
     let thread_repository = AdminThreadRepositoryImpl::new(db.clone());
     let threads = thread_repository
@@ -362,10 +407,22 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         .unwrap();
     assert!(compacted.archived);
     assert!(!compacted.active);
+    // Archived rows are read through the live model shape, so assert every mapped column
+    // survives the substituted `archive_converted`.
     let archived_threads = thread_repository
         .get_archived_threads_by_thread_id("orm-it", Some(vec![9001]))
         .await?;
     assert_eq!(archived_threads.len(), 1);
+    let archived_thread_read = &archived_threads[0];
+    assert_eq!(archived_thread_read.board_id, board.id);
+    assert_eq!(archived_thread_read.thread_number, 9001);
+    assert_eq!(archived_thread_read.title, "archived-thread");
+    assert_eq!(archived_thread_read.authed_token_id, token_id);
+    assert_eq!(archived_thread_read.metadent, "metadent");
+    assert_eq!(archived_thread_read.response_count, 1);
+    assert!(!archived_thread_read.no_pool);
+    assert!(archived_thread_read.archived);
+    assert!(!archived_thread_read.active);
     let filtered_archived_threads = thread_repository
         .get_archived_threads_by_filter(
             "orm-it",
@@ -628,6 +685,11 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         )
         .await?;
     assert_eq!(updated_cap.board_ids.len(), 2);
+    let cleared_cap = cap_repository
+        .update_cap(cap.id, None, None, None, Some(Vec::new()))
+        .await?;
+    assert!(cleared_cap.board_ids.is_empty());
+    assert_eq!(cleared_cap.name, "updated cap");
     cap_repository.delete_cap(cap.id).await?;
     assert!(
         cap_repository
@@ -673,6 +735,54 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
             .await?
             .len(),
         0
+    );
+
+    let untouched_board = board_repository
+        .edit_board("orm-it", empty_edit_board_input())
+        .await?;
+    assert_eq!(untouched_board.name, edited_board.name);
+    assert_eq!(untouched_board.default_name, edited_board.default_name);
+    let untouched_info = board_repository.get_board_info(board.id).await?;
+    assert_eq!(
+        untouched_info.base_thread_creation_span_sec,
+        edited_info.base_thread_creation_span_sec
+    );
+    assert_eq!(untouched_info.custom_1001_message, None);
+
+    assert_not_found(
+        board_repository
+            .edit_board("no-such-board", empty_edit_board_input())
+            .await
+            .expect_err("edit_board on a missing board must fail"),
+        "Board not found",
+    );
+    assert_not_found(
+        response_repository
+            .update_res(
+                Uuid::now_v7(),
+                Some("編集者".to_string()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .expect_err("update_res on a missing response must fail"),
+        "Response not found",
+    );
+    assert_not_found(
+        cap_repository
+            .update_cap(cap.id, Some("gone"), None, None, None)
+            .await
+            .expect_err("update_cap on a deleted cap must fail"),
+        "Cap not found",
+    );
+    assert_not_found(
+        ng_word_repository
+            .update_ng_word(ng_word.id, Some("gone"), None, None)
+            .await
+            .expect_err("update_ng_word on a deleted ng word must fail"),
+        "NG word not found",
     );
 
     let user_id = Uuid::now_v7();
