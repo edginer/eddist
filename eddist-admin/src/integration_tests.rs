@@ -377,6 +377,16 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
     assert_eq!(archived_responses.len(), 1);
     assert_eq!(archived_responses[0].id, archived_response_id);
     assert!(!archived_responses[0].is_abone_keep_id);
+    let archived_res = &archived_responses[0];
+    assert_eq!(archived_res.author_name.as_deref(), Some("投稿者"));
+    assert_eq!(archived_res.mail.as_deref(), Some(""));
+    assert_eq!(archived_res.body, "過去の本文");
+    assert_eq!(archived_res.author_id, "author");
+    assert_eq!(archived_res.ip_addr, "127.0.0.1");
+    assert_eq!(archived_res.authed_token_id, token_id);
+    assert_eq!(archived_res.board_id, board.id);
+    assert_eq!(archived_res.res_order, 1);
+    assert!(!archived_res.is_abone);
 
     let thread_repository = AdminThreadRepositoryImpl::new(db.clone());
     let threads = thread_repository
@@ -397,10 +407,22 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         .unwrap();
     assert!(compacted.archived);
     assert!(!compacted.active);
+    // Archived rows are read through the live model shape, so assert every mapped column
+    // survives the substituted `archive_converted`.
     let archived_threads = thread_repository
         .get_archived_threads_by_thread_id("orm-it", Some(vec![9001]))
         .await?;
     assert_eq!(archived_threads.len(), 1);
+    let archived_thread_read = &archived_threads[0];
+    assert_eq!(archived_thread_read.board_id, board.id);
+    assert_eq!(archived_thread_read.thread_number, 9001);
+    assert_eq!(archived_thread_read.title, "archived-thread");
+    assert_eq!(archived_thread_read.authed_token_id, token_id);
+    assert_eq!(archived_thread_read.metadent, "metadent");
+    assert_eq!(archived_thread_read.response_count, 1);
+    assert!(!archived_thread_read.no_pool);
+    assert!(archived_thread_read.archived);
+    assert!(!archived_thread_read.active);
     let filtered_archived_threads = thread_repository
         .get_archived_threads_by_filter(
             "orm-it",
@@ -663,6 +685,11 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         )
         .await?;
     assert_eq!(updated_cap.board_ids.len(), 2);
+    let cleared_cap = cap_repository
+        .update_cap(cap.id, None, None, None, Some(Vec::new()))
+        .await?;
+    assert!(cleared_cap.board_ids.is_empty());
+    assert_eq!(cleared_cap.name, "updated cap");
     cap_repository.delete_cap(cap.id).await?;
     assert!(
         cap_repository

@@ -1,5 +1,6 @@
 use crate::entity::{board, board_info, thread};
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
+use crate::repository::support::empty_to_none;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
     FromQueryResult, IntoActiveValue, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
@@ -69,10 +70,6 @@ impl AdminBoardRepositoryImpl {
             .count(&self.0)
             .await? as i64)
     }
-}
-
-fn empty_to_none(value: String) -> Option<String> {
-    if value.is_empty() { None } else { Some(value) }
 }
 
 #[async_trait::async_trait]

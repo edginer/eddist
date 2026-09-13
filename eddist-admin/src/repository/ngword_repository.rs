@@ -1,8 +1,9 @@
 use crate::entity::{board_ng_word, ng_word};
 use crate::error::DbResultExt;
+use crate::repository::support::{board_ids_for, replace_board_links};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
+    IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -40,17 +41,6 @@ fn into_domain(model: ng_word::Model, board_ids: Vec<Uuid>) -> NgWord {
         updated_at: model.updated_at.and_utc(),
         board_ids,
     }
-}
-
-async fn board_ids_for_ng_word<C: ConnectionTrait>(db: &C, id: Uuid) -> anyhow::Result<Vec<Uuid>> {
-    Ok(board_ng_word::Entity::find()
-        .filter(board_ng_word::Column::NgWordId.eq(id))
-        .order_by_asc(board_ng_word::Column::BoardId)
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|relation| relation.board_id)
-        .collect())
 }
 
 #[async_trait::async_trait]
@@ -122,23 +112,27 @@ impl NgWordRepository for NgWordRepositoryImpl {
         .or_not_found("NG word")?;
 
         if let Some(board_ids) = board_ids {
-            board_ng_word::Entity::delete_many()
-                .filter(board_ng_word::Column::NgWordId.eq(id))
-                .exec(&tx)
-                .await?;
-
-            for board_id in board_ids {
-                board_ng_word::ActiveModel {
+            replace_board_links::<board_ng_word::Entity, _, _>(
+                &tx,
+                board_ng_word::Column::NgWordId,
+                id,
+                board_ids,
+                |board_id| board_ng_word::ActiveModel {
                     id: Set(Uuid::now_v7()),
                     board_id: Set(board_id),
                     ng_word_id: Set(id),
-                }
-                .insert(&tx)
-                .await?;
-            }
+                },
+            )
+            .await?;
         }
 
-        let board_ids = board_ids_for_ng_word(&tx, id).await?;
+        let board_ids = board_ids_for::<board_ng_word::Entity, _>(
+            &tx,
+            board_ng_word::Column::NgWordId,
+            id,
+            board_ng_word::Column::BoardId,
+        )
+        .await?;
 
         tx.commit().await?;
 
