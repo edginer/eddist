@@ -64,6 +64,41 @@ async fn setup_database() -> anyhow::Result<MysqlTestDatabase> {
     })
 }
 
+fn empty_edit_board_input() -> EditBoardInput {
+    EditBoardInput {
+        name: None,
+        default_name: None,
+        local_rule: None,
+        base_thread_creation_span_sec: None,
+        base_response_creation_span_sec: None,
+        max_thread_name_byte_length: None,
+        max_author_name_byte_length: None,
+        max_email_byte_length: None,
+        max_response_body_byte_length: None,
+        max_response_body_lines: None,
+        threads_archive_cron: None,
+        threads_archive_trigger_thread_count: None,
+        read_only: None,
+        force_metadent_type: None,
+        enable_1001_message: None,
+        custom_1001_message: None,
+    }
+}
+
+fn assert_not_found(error: anyhow::Error, expected: &str) {
+    let service_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<crate::error::ServiceError>())
+        .unwrap_or_else(|| panic!("expected ServiceError::NotFound, got {error:?}"));
+    assert!(
+        matches!(
+            service_error,
+            crate::error::ServiceError::NotFound(message) if message.contains(expected)
+        ),
+        "expected NotFound containing {expected:?}, got {service_error:?}"
+    );
+}
+
 fn create_board_input(board_key: &str, name: &str) -> CreateBoardInput {
     CreateBoardInput {
         name: name.to_string(),
@@ -673,6 +708,54 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
             .await?
             .len(),
         0
+    );
+
+    let untouched_board = board_repository
+        .edit_board("orm-it", empty_edit_board_input())
+        .await?;
+    assert_eq!(untouched_board.name, edited_board.name);
+    assert_eq!(untouched_board.default_name, edited_board.default_name);
+    let untouched_info = board_repository.get_board_info(board.id).await?;
+    assert_eq!(
+        untouched_info.base_thread_creation_span_sec,
+        edited_info.base_thread_creation_span_sec
+    );
+    assert_eq!(untouched_info.custom_1001_message, None);
+
+    assert_not_found(
+        board_repository
+            .edit_board("no-such-board", empty_edit_board_input())
+            .await
+            .expect_err("edit_board on a missing board must fail"),
+        "Board not found",
+    );
+    assert_not_found(
+        response_repository
+            .update_res(
+                Uuid::now_v7(),
+                Some("編集者".to_string()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .expect_err("update_res on a missing response must fail"),
+        "Response not found",
+    );
+    assert_not_found(
+        cap_repository
+            .update_cap(cap.id, Some("gone"), None, None, None)
+            .await
+            .expect_err("update_cap on a deleted cap must fail"),
+        "Cap not found",
+    );
+    assert_not_found(
+        ng_word_repository
+            .update_ng_word(ng_word.id, Some("gone"), None, None)
+            .await
+            .expect_err("update_ng_word on a deleted ng word must fail"),
+        "NG word not found",
     );
 
     let user_id = Uuid::now_v7();

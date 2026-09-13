@@ -98,3 +98,18 @@ impl IntoResponse for ApiError {
         (status, Json(json!({ "error": message }))).into_response()
     }
 }
+
+pub(crate) trait DbResultExt<T> {
+    fn or_not_found(self, entity: &str) -> anyhow::Result<T>;
+}
+
+impl<T> DbResultExt<T> for Result<T, sea_orm::DbErr> {
+    fn or_not_found(self, entity: &str) -> anyhow::Result<T> {
+        match self {
+            Err(sea_orm::DbErr::RecordNotUpdated | sea_orm::DbErr::RecordNotFound(_)) => {
+                Err(ServiceError::NotFound(format!("{entity} not found")).into())
+            }
+            other => Ok(other?),
+        }
+    }
+}

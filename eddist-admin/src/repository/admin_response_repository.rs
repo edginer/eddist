@@ -1,9 +1,10 @@
 use crate::entity::{archived_response, archived_thread, board, response, thread};
+use crate::error::DbResultExt;
 use crate::models::Res;
 use eddist_core::domain::client_info::ClientInfo as CoreClientInfo;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
+    IntoActiveValue, QueryFilter, QueryOrder,
 };
 use uuid::Uuid;
 
@@ -192,47 +193,19 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         is_abone: Option<bool>,
         is_abone_keep_id: Option<bool>,
     ) -> anyhow::Result<Res> {
-        if response::Entity::find_by_id(id)
-            .one(&self.0)
-            .await?
-            .is_none()
-        {
-            return Err(crate::error::ServiceError::NotFound("Response not found".into()).into());
-        }
-
-        let mut active_model = response::ActiveModel {
+        let updated = response::ActiveModel {
             id: Set(id),
+            author_name: author_name.into_active_value(),
+            mail: mail.into_active_value(),
+            body: body.into_active_value(),
+            is_abone: is_abone.into_active_value(),
+            is_abone_keep_id: is_abone_keep_id.into_active_value(),
             ..Default::default()
-        };
-        let mut changed = false;
-        if let Some(author_name) = author_name {
-            active_model.author_name = Set(author_name);
-            changed = true;
         }
-        if let Some(mail) = mail {
-            active_model.mail = Set(mail);
-            changed = true;
-        }
-        if let Some(body) = body {
-            active_model.body = Set(body);
-            changed = true;
-        }
-        if let Some(is_abone) = is_abone {
-            active_model.is_abone = Set(is_abone);
-            changed = true;
-        }
-        if let Some(is_abone_keep_id) = is_abone_keep_id {
-            active_model.is_abone_keep_id = Set(is_abone_keep_id);
-            changed = true;
-        }
-        if changed {
-            active_model.update(&self.0).await?;
-        }
+        .update(&self.0)
+        .await
+        .or_not_found("Response")?;
 
-        response::Entity::find_by_id(id)
-            .one(&self.0)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Response disappeared after update"))
-            .and_then(into_response)
+        into_response(updated)
     }
 }

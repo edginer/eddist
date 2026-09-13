@@ -1,7 +1,8 @@
 use crate::entity::{board_cap, cap};
+use crate::error::DbResultExt;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -47,22 +48,15 @@ fn into_domain(model: cap::Model, board_ids: Vec<Uuid>) -> Cap {
     }
 }
 
-impl CapRepositoryImpl {
-    async fn get_cap_by_id(&self, id: Uuid) -> anyhow::Result<Option<Cap>> {
-        let Some(model) = cap::Entity::find_by_id(id).one(&self.0).await? else {
-            return Ok(None);
-        };
-        let board_ids = board_cap::Entity::find()
-            .filter(board_cap::Column::CapId.eq(id))
-            .order_by_asc(board_cap::Column::BoardId)
-            .all(&self.0)
-            .await?
-            .into_iter()
-            .map(|relation| relation.board_id)
-            .collect();
-
-        Ok(Some(into_domain(model, board_ids)))
-    }
+async fn board_ids_for_cap<C: ConnectionTrait>(db: &C, id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+    Ok(board_cap::Entity::find()
+        .filter(board_cap::Column::CapId.eq(id))
+        .order_by_asc(board_cap::Column::BoardId)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|relation| relation.board_id)
+        .collect())
 }
 
 #[async_trait::async_trait]
@@ -127,28 +121,19 @@ impl CapRepository for CapRepositoryImpl {
         password_hash: Option<&str>,
         board_ids: Option<Vec<Uuid>>,
     ) -> anyhow::Result<Cap> {
-        if cap::Entity::find_by_id(id).one(&self.0).await?.is_none() {
-            anyhow::bail!("cap not found: {id}");
-        }
-
-        let now = crate::db_time::now();
-        let mut active_model = cap::ActiveModel {
-            id: Set(id),
-            updated_at: Set(now),
-            ..Default::default()
-        };
-        if let Some(name) = name {
-            active_model.name = Set(name.to_string());
-        }
-        if let Some(description) = description {
-            active_model.description = Set(description.to_string());
-        }
-        if let Some(password_hash) = password_hash {
-            active_model.password_hash = Set(password_hash.to_string());
-        }
-
         let tx = self.0.begin().await?;
-        active_model.update(&tx).await?;
+
+        let updated = cap::ActiveModel {
+            id: Set(id),
+            updated_at: Set(crate::db_time::now()),
+            name: name.map(str::to_string).into_active_value(),
+            description: description.map(str::to_string).into_active_value(),
+            password_hash: password_hash.map(str::to_string).into_active_value(),
+            ..Default::default()
+        }
+        .update(&tx)
+        .await
+        .or_not_found("Cap")?;
 
         if let Some(board_ids) = board_ids {
             board_cap::Entity::delete_many()
@@ -167,10 +152,10 @@ impl CapRepository for CapRepositoryImpl {
             }
         }
 
+        let board_ids = board_ids_for_cap(&tx, id).await?;
+
         tx.commit().await?;
 
-        self.get_cap_by_id(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("cap disappeared after update"))
+        Ok(into_domain(updated, board_ids))
     }
 }

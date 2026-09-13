@@ -2,7 +2,8 @@ use crate::entity::{board, board_info, thread};
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
-    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    FromQueryResult, IntoActiveValue, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    TransactionTrait,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -62,21 +63,16 @@ fn into_board_info(model: board_info::Model) -> BoardInfo {
 }
 
 impl AdminBoardRepositoryImpl {
-    async fn get_board_by_key(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
-        let Some(model) = board::Entity::find()
-            .filter(board::Column::BoardKey.eq(board_key))
-            .one(&self.0)
-            .await?
-        else {
-            return Ok(None);
-        };
-
-        let thread_count = thread::Entity::find()
-            .filter(thread::Column::BoardId.eq(model.id))
+    async fn thread_count(&self, board_id: Uuid) -> anyhow::Result<i64> {
+        Ok(thread::Entity::find()
+            .filter(thread::Column::BoardId.eq(board_id))
             .count(&self.0)
-            .await? as i64;
-        Ok(Some(into_board(model, thread_count)))
+            .await? as i64)
     }
+}
+
+fn empty_to_none(value: String) -> Option<String> {
+    if value.is_empty() { None } else { Some(value) }
 }
 
 #[async_trait::async_trait]
@@ -124,11 +120,10 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
 
     async fn create_board(&self, board: CreateBoardInput) -> anyhow::Result<Board> {
         let board_id = Uuid::now_v7();
-        let board_key = board.board_key.clone();
         let now = crate::db_time::now();
         let tx = self.0.begin().await?;
 
-        board::ActiveModel {
+        let created = board::ActiveModel {
             id: Set(board_id),
             name: Set(board.name),
             board_key: Set(board.board_key),
@@ -137,50 +132,53 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         .insert(&tx)
         .await?;
 
-        let mut board_info_model = board_info::ActiveModel {
+        board_info::ActiveModel {
             id: Set(board_id),
             local_rules: Set(board.local_rule),
             created_at: Set(now),
             updated_at: Set(now),
+            base_thread_creation_span_sec: board
+                .base_thread_creation_span_sec
+                .map(|value| value as i32)
+                .into_active_value(),
+            base_response_creation_span_sec: board
+                .base_response_creation_span_sec
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_thread_name_byte_length: board
+                .max_thread_name_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_author_name_byte_length: board
+                .max_author_name_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_email_byte_length: board
+                .max_email_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_response_body_byte_length: board
+                .max_response_body_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_response_body_lines: board
+                .max_response_body_lines
+                .map(|value| value as i32)
+                .into_active_value(),
+            threads_archive_cron: board.threads_archive_cron.map(Some).into_active_value(),
+            threads_archive_trigger_thread_count: board
+                .threads_archive_trigger_thread_count
+                .map(|value| Some(value as i32))
+                .into_active_value(),
+            force_metadent_type: board.force_metadent_type.map(Some).into_active_value(),
             ..Default::default()
-        };
-        if let Some(value) = board.base_thread_creation_span_sec {
-            board_info_model.base_thread_creation_span_sec = Set(value as i32);
         }
-        if let Some(value) = board.base_response_creation_span_sec {
-            board_info_model.base_response_creation_span_sec = Set(value as i32);
-        }
-        if let Some(value) = board.max_thread_name_byte_length {
-            board_info_model.max_thread_name_byte_length = Set(value as i32);
-        }
-        if let Some(value) = board.max_author_name_byte_length {
-            board_info_model.max_author_name_byte_length = Set(value as i32);
-        }
-        if let Some(value) = board.max_email_byte_length {
-            board_info_model.max_email_byte_length = Set(value as i32);
-        }
-        if let Some(value) = board.max_response_body_byte_length {
-            board_info_model.max_response_body_byte_length = Set(value as i32);
-        }
-        if let Some(value) = board.max_response_body_lines {
-            board_info_model.max_response_body_lines = Set(value as i32);
-        }
-        if let Some(value) = board.threads_archive_cron {
-            board_info_model.threads_archive_cron = Set(Some(value));
-        }
-        if let Some(value) = board.threads_archive_trigger_thread_count {
-            board_info_model.threads_archive_trigger_thread_count = Set(Some(value as i32));
-        }
-        if let Some(value) = board.force_metadent_type {
-            board_info_model.force_metadent_type = Set(Some(value));
-        }
-        board_info_model.insert(&tx).await?;
+        .insert(&tx)
+        .await?;
 
         tx.commit().await?;
 
-        self.get_board_by_key(&board_key)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Failed to create board"))
+        Ok(into_board(created, 0))
     }
 
     async fn edit_board(&self, board_key: &str, input: EditBoardInput) -> anyhow::Result<Board> {
@@ -188,97 +186,78 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
             .filter(board::Column::BoardKey.eq(board_key))
             .one(&self.0)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Board not found: {board_key}"))?;
+            .ok_or_else(|| {
+                crate::error::ServiceError::NotFound(format!("Board not found: {board_key}"))
+            })?;
 
         let tx = self.0.begin().await?;
-        let mut info_model = board_info::ActiveModel {
-            id: Set(board_model.id),
-            ..Default::default()
-        };
-        let mut info_changed = false;
 
-        if let Some(value) = input.local_rule {
-            info_model.local_rules = Set(value);
-            info_changed = true;
-        }
-        if let Some(value) = input.threads_archive_cron {
-            info_model.threads_archive_cron =
-                Set(if value.is_empty() { None } else { Some(value) });
-            info_changed = true;
-        }
-        if let Some(value) = input.force_metadent_type {
-            info_model.force_metadent_type = Set(if value.is_empty() { None } else { Some(value) });
-            info_changed = true;
-        }
-        if let Some(value) = input.custom_1001_message {
-            info_model.custom_1001_message = Set(if value.is_empty() { None } else { Some(value) });
-            info_changed = true;
-        }
-        if let Some(value) = input.base_thread_creation_span_sec {
-            info_model.base_thread_creation_span_sec = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.base_response_creation_span_sec {
-            info_model.base_response_creation_span_sec = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.max_thread_name_byte_length {
-            info_model.max_thread_name_byte_length = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.max_author_name_byte_length {
-            info_model.max_author_name_byte_length = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.max_email_byte_length {
-            info_model.max_email_byte_length = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.max_response_body_byte_length {
-            info_model.max_response_body_byte_length = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.max_response_body_lines {
-            info_model.max_response_body_lines = Set(value as i32);
-            info_changed = true;
-        }
-        if let Some(value) = input.threads_archive_trigger_thread_count {
-            info_model.threads_archive_trigger_thread_count = Set(Some(value as i32));
-            info_changed = true;
-        }
-        if let Some(value) = input.read_only {
-            info_model.read_only = Set(value);
-            info_changed = true;
-        }
-        if let Some(value) = input.enable_1001_message {
-            info_model.enable_1001_message = Set(value);
-            info_changed = true;
-        }
-        if info_changed {
-            info_model.update(&tx).await?;
-        }
-
-        let mut board_update = board::ActiveModel {
+        board_info::ActiveModel {
             id: Set(board_model.id),
+            local_rules: input.local_rule.into_active_value(),
+            threads_archive_cron: input
+                .threads_archive_cron
+                .map(empty_to_none)
+                .into_active_value(),
+            force_metadent_type: input
+                .force_metadent_type
+                .map(empty_to_none)
+                .into_active_value(),
+            custom_1001_message: input
+                .custom_1001_message
+                .map(empty_to_none)
+                .into_active_value(),
+            base_thread_creation_span_sec: input
+                .base_thread_creation_span_sec
+                .map(|value| value as i32)
+                .into_active_value(),
+            base_response_creation_span_sec: input
+                .base_response_creation_span_sec
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_thread_name_byte_length: input
+                .max_thread_name_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_author_name_byte_length: input
+                .max_author_name_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_email_byte_length: input
+                .max_email_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_response_body_byte_length: input
+                .max_response_body_byte_length
+                .map(|value| value as i32)
+                .into_active_value(),
+            max_response_body_lines: input
+                .max_response_body_lines
+                .map(|value| value as i32)
+                .into_active_value(),
+            threads_archive_trigger_thread_count: input
+                .threads_archive_trigger_thread_count
+                .map(|value| Some(value as i32))
+                .into_active_value(),
+            read_only: input.read_only.into_active_value(),
+            enable_1001_message: input.enable_1001_message.into_active_value(),
             ..Default::default()
-        };
-        let mut board_changed = false;
-        if let Some(value) = input.name {
-            board_update.name = Set(value);
-            board_changed = true;
         }
-        if let Some(value) = input.default_name {
-            board_update.default_name = Set(value);
-            board_changed = true;
+        .update(&tx)
+        .await?;
+
+        let updated = board::ActiveModel {
+            id: Set(board_model.id),
+            name: input.name.into_active_value(),
+            default_name: input.default_name.into_active_value(),
+            ..Default::default()
         }
-        if board_changed {
-            board_update.update(&tx).await?;
-        }
+        .update(&tx)
+        .await?;
 
         tx.commit().await?;
 
-        self.get_board_by_key(board_key)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Failed to edit board"))
+        let thread_count = self.thread_count(updated.id).await?;
+        Ok(into_board(updated, thread_count))
     }
 }
