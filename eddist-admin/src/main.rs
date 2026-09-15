@@ -66,6 +66,7 @@ mod repository {
     pub mod ngword_repository;
     pub mod notice_repository;
     pub mod server_settings_repository;
+    pub mod support;
     pub mod terms_repository;
     pub mod user_restriction_repository;
 }

@@ -20,13 +20,11 @@ pub trait UserRestrictionRepository: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct UserRestrictionRepositoryImpl {
-    db: DatabaseConnection,
-}
+pub struct UserRestrictionRepositoryImpl(DatabaseConnection);
 
 impl UserRestrictionRepositoryImpl {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+        Self(db)
     }
 }
 
@@ -53,7 +51,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
     async fn get_all_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {
         user_restriction::Entity::find()
             .order_by_desc(user_restriction::Column::CreatedAt)
-            .all(&self.db)
+            .all(&self.0)
             .await?
             .into_iter()
             .map(into_domain)
@@ -78,7 +76,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             updated_at: Set(now),
             created_by_email: Set(input.created_by_email),
         }
-        .insert(&self.db)
+        .insert(&self.0)
         .await?;
 
         into_domain(model)
@@ -106,7 +104,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             updated_at: Set(now),
             ..Default::default()
         }
-        .update(&self.db)
+        .update(&self.0)
         .await?;
 
         Ok(())
@@ -114,14 +112,14 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
 
     async fn delete_rule(&self, id: Uuid) -> anyhow::Result<()> {
         user_restriction::Entity::delete_by_id(id)
-            .exec(&self.db)
+            .exec(&self.0)
             .await?;
         Ok(())
     }
 
     async fn get_rule_by_id(&self, id: Uuid) -> anyhow::Result<Option<UserRestrictionRule>> {
         user_restriction::Entity::find_by_id(id)
-            .one(&self.db)
+            .one(&self.0)
             .await?
             .map(into_domain)
             .transpose()

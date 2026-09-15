@@ -1,4 +1,5 @@
 use crate::entity::captcha_config;
+use crate::repository::support::empty_to_none;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder,
@@ -9,11 +10,6 @@ use crate::models::{
     CaptchaConfig, CaptchaVerificationConfig, CaptchaWidgetConfig, CreateCaptchaConfigInput,
     UpdateCaptchaConfigInput,
 };
-
-/// Convert empty strings to None (for storing NULL in database)
-fn empty_to_none(s: String) -> Option<String> {
-    if s.is_empty() { None } else { Some(s) }
-}
 
 fn into_domain(model: captcha_config::Model) -> CaptchaConfig {
     let capture_fields: Vec<String> = model

@@ -1,7 +1,8 @@
 use crate::entity::{board_ng_word, ng_word};
+use crate::error::DbResultExt;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, IntoActiveValue, QueryFilter, QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -41,22 +42,17 @@ fn into_domain(model: ng_word::Model, board_ids: Vec<Uuid>) -> NgWord {
     }
 }
 
-impl NgWordRepositoryImpl {
-    async fn get_ng_word_by_id(&self, id: Uuid) -> anyhow::Result<Option<NgWord>> {
-        let Some(model) = ng_word::Entity::find_by_id(id).one(&self.0).await? else {
-            return Ok(None);
-        };
-        let board_ids = board_ng_word::Entity::find()
-            .filter(board_ng_word::Column::NgWordId.eq(id))
-            .order_by_asc(board_ng_word::Column::BoardId)
-            .all(&self.0)
-            .await?
-            .into_iter()
-            .map(|relation| relation.board_id)
-            .collect();
-
-        Ok(Some(into_domain(model, board_ids)))
-    }
+async fn board_ids_of_ng_word<C: ConnectionTrait>(
+    db: &C,
+    ng_word_id: Uuid,
+) -> anyhow::Result<Vec<Uuid>> {
+    Ok(board_ng_word::Entity::find()
+        .filter(board_ng_word::Column::NgWordId.eq(ng_word_id))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|link| link.board_id)
+        .collect())
 }
 
 #[async_trait::async_trait]
@@ -65,6 +61,7 @@ impl NgWordRepository for NgWordRepositoryImpl {
         Ok(ng_word::Entity::find()
             .order_by_asc(ng_word::Column::Name)
             .find_with_related(board_ng_word::Entity)
+            .order_by_asc(board_ng_word::Column::BoardId)
             .all(&self.0)
             .await?
             .into_iter()
@@ -114,51 +111,41 @@ impl NgWordRepository for NgWordRepositoryImpl {
         word: Option<&str>,
         board_ids: Option<Vec<Uuid>>,
     ) -> anyhow::Result<NgWord> {
-        if ng_word::Entity::find_by_id(id)
-            .one(&self.0)
-            .await?
-            .is_none()
-        {
-            anyhow::bail!("ng word not found: {id}");
-        }
-
-        let now = crate::db_time::now();
-        let mut active_model = ng_word::ActiveModel {
-            id: Set(id),
-            updated_at: Set(now),
-            ..Default::default()
-        };
-        if let Some(name) = name {
-            active_model.name = Set(name.to_string());
-        }
-        if let Some(word) = word {
-            active_model.word = Set(word.to_string());
-        }
-
         let tx = self.0.begin().await?;
-        active_model.update(&tx).await?;
 
-        if let Some(board_ids) = board_ids {
-            board_ng_word::Entity::delete_many()
-                .filter(board_ng_word::Column::NgWordId.eq(id))
+        let updated = ng_word::ActiveModel {
+            id: Set(id),
+            updated_at: Set(crate::db_time::now()),
+            name: name.map(str::to_string).into_active_value(),
+            word: word.map(str::to_string).into_active_value(),
+            ..Default::default()
+        }
+        .update(&tx)
+        .await
+        .or_not_found("NG word")?;
+
+        let board_ids = match board_ids {
+            Some(board_ids) => {
+                board_ng_word::Entity::delete_many()
+                    .filter(board_ng_word::Column::NgWordId.eq(id))
+                    .exec(&tx)
+                    .await?;
+                board_ng_word::Entity::insert_many(board_ids.iter().map(|board_id| {
+                    board_ng_word::ActiveModel {
+                        id: Set(Uuid::now_v7()),
+                        board_id: Set(*board_id),
+                        ng_word_id: Set(id),
+                    }
+                }))
                 .exec(&tx)
                 .await?;
-
-            for board_id in board_ids {
-                board_ng_word::ActiveModel {
-                    id: Set(Uuid::now_v7()),
-                    board_id: Set(board_id),
-                    ng_word_id: Set(id),
-                }
-                .insert(&tx)
-                .await?;
+                board_ids
             }
-        }
+            None => board_ids_of_ng_word(&tx, id).await?,
+        };
 
         tx.commit().await?;
 
-        self.get_ng_word_by_id(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("ng word disappeared after update"))
+        Ok(into_domain(updated, board_ids))
     }
 }

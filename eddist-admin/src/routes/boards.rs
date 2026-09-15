@@ -115,6 +115,7 @@ pub async fn create_board(
     path = "/boards/{board_key}/",
     responses(
         (status = 200, description = "Edit board successfully", body = Board),
+        (status = 404, description = "Board not found"),
     ),
     params(
         ("board_key" = Uuid, Path, description = "Board Key"),

@@ -155,7 +155,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             current.slug.clone()
         };
 
-        notice::ActiveModel {
+        let updated = notice::ActiveModel {
             id: Set(id),
             slug: Set(new_slug),
             title: Set(title),
@@ -168,9 +168,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         .update(&self.0)
         .await?;
 
-        self.get_notice_by_id(id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Notice disappeared after update"))
+        Ok(into_domain(updated))
     }
 
     async fn delete_notice(&self, id: Uuid) -> anyhow::Result<()> {

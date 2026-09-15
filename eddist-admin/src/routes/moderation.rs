@@ -82,6 +82,7 @@ pub async fn create_ng_word(
     path = "/ng_words/{ng_word_id}/",
     responses(
         (status = 200, description = "Update ng word successfully", body = NgWord),
+        (status = 404, description = "NG word not found"),
     ),
     params(
         ("ng_word_id" = Uuid, Path, description = "NG word ID"),
@@ -164,6 +165,7 @@ pub async fn create_cap(
     path = "/caps/{cap_id}/",
     responses(
         (status = 200, description = "Update cap word successfully", body = Cap),
+        (status = 404, description = "Cap not found"),
     ),
     params(
         ("cap_id" = Uuid, Path, description = "Cap ID"),

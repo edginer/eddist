@@ -459,6 +459,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Board not found"
           }
         }
       }
@@ -1286,6 +1289,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Cap not found"
           }
         }
       }
@@ -1733,6 +1739,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "NG word not found"
           }
         }
       }
