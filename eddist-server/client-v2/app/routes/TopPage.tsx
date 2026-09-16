@@ -42,7 +42,16 @@ function TopPage({ loaderData: { eddistData, boards, notices } }: Route.Componen
       <Meta bbsName={eddistData.bbsName} />
       <article className="flex-1">
         <header>
-          <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
+          <div className="flex items-center gap-2">
+            <img
+              src="/eddist-logo-transparent-64.png"
+              alt={`${eddistData.bbsName} ロゴ`}
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0"
+            />
+            <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
+          </div>
         </header>
         <section className="py-4 pt-8">
           <h2 className="text-2xl lg:text-4xl">板一覧</h2>
