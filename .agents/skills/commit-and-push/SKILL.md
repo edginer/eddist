@@ -21,7 +21,6 @@ allowed-tools:
   - Bash(pnpm -F eddist-client-v2 check)
   - Bash(pnpm -F eddist-admin-client typecheck)
   - Bash(pnpm -F eddist-client-v2 typecheck)
-model: Haiku
 ---
 
 # Commit and Push Workflow
@@ -42,6 +41,9 @@ Before doing anything, ask the user for:
   ```
 
 If the user already provided one or both of these in their message, skip asking for them.
+
+Before staging, identify the files associated with the requested change. Preserve unrelated
+existing changes and untracked files; do not include them in the commit.
 
 ## Step 2: Run Rust formatter
 
@@ -88,13 +90,32 @@ Run both; if either reports type errors, report them to the user and stop — do
 
 ```
 git checkout -b <branch-name>
-git add -A
-git commit -m "<commit-message>"
+git add -- <associated-file-1> <associated-file-2> ...
+# Create <commit-message-file> with the file-editing tool, then:
+git commit --file <commit-message-file>
 ```
 
 Use the branch name and commit message gathered in Step 1.
 
-**Important:** Always use `git add -A` to stage ALL changes (including any files that may have been missed) in a single commit. Never create a follow-up commit to add forgotten files — if files were missed, amend the commit instead.
+**Important:** Stage only files associated with the requested change. Do not use `git add -A` when unrelated user changes or untracked files are present. Verify the staged file list with `git diff --cached --name-status` before committing.
+
+### Commit message formatting
+
+Create a temporary commit message file first, using the file-editing tool, and write the
+subject and body with real line breaks. Pass that file to Git with `git commit --file` (or
+`git commit -F`). Remove the temporary file after the commit succeeds.
+
+For example, the temporary file should contain:
+
+```text
+fix: disable pull to refresh while modal is open
+
+- Ignore touch events originating inside marked modals.
+- Mark settings and post-related modals so page-level pull-to-refresh cannot intercept modal scrolling.
+```
+
+Never construct the commit message by embedding the literal characters `\n` in a shell
+command; Git records them as text instead of converting them into line breaks.
 
 **Do not append a `Claude-Session: ...` trailer to the commit message.** This overrides the harness's default git commit instructions for this repo — commit messages here should end after the body, with no session link footer.
 
