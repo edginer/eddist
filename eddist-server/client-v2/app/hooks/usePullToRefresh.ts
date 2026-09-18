@@ -32,6 +32,9 @@ const getScrollPosition = (target: "window" | "element", element?: HTMLElement |
   }
 };
 
+const isModalEvent = (event: Event) =>
+  event.target instanceof Element && event.target.closest("[data-eddist-modal]") !== null;
+
 export const usePullToRefresh = ({
   onRefresh,
   threshold = 80,
@@ -52,6 +55,10 @@ export const usePullToRefresh = ({
     (e: Event) => {
       if (!enabled || state.isRefreshing) return;
       if (!(e instanceof TouchEvent)) return;
+      if (isModalEvent(e)) {
+        touchStartY.current = 0;
+        return;
+      }
 
       const { scrollTop, scrollHeight, clientHeight } = getScrollPosition(
         scrollTarget,
@@ -73,6 +80,10 @@ export const usePullToRefresh = ({
     (e: Event) => {
       if (!enabled || state.isRefreshing || touchStartY.current === 0) return;
       if (!(e instanceof TouchEvent)) return;
+      if (isModalEvent(e)) {
+        touchStartY.current = 0;
+        return;
+      }
 
       const { scrollTop, scrollHeight, clientHeight } = getScrollPosition(
         scrollTarget,
@@ -127,32 +138,40 @@ export const usePullToRefresh = ({
     [enabled, direction, state.isRefreshing, scrollTarget],
   );
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!enabled || state.isRefreshing) {
-      touchStartY.current = 0;
-      setState((prev) => ({ ...prev, isPulling: false, pullDistance: 0 }));
-      return;
-    }
-
-    if (state.pullDistance >= threshold) {
-      setState((prev) => ({
-        ...prev,
-        isPulling: false,
-        pullDistance: 0,
-        isRefreshing: true,
-      }));
-
-      try {
-        await onRefresh();
-      } finally {
-        setState((prev) => ({ ...prev, isRefreshing: false }));
+  const handleTouchEnd = useCallback(
+    async (e: Event) => {
+      if (isModalEvent(e)) {
+        touchStartY.current = 0;
+        return;
       }
-    } else {
-      setState((prev) => ({ ...prev, isPulling: false, pullDistance: 0 }));
-    }
 
-    touchStartY.current = 0;
-  }, [enabled, state.pullDistance, state.isRefreshing, threshold, onRefresh]);
+      if (!enabled || state.isRefreshing) {
+        touchStartY.current = 0;
+        setState((prev) => ({ ...prev, isPulling: false, pullDistance: 0 }));
+        return;
+      }
+
+      if (state.pullDistance >= threshold) {
+        setState((prev) => ({
+          ...prev,
+          isPulling: false,
+          pullDistance: 0,
+          isRefreshing: true,
+        }));
+
+        try {
+          await onRefresh();
+        } finally {
+          setState((prev) => ({ ...prev, isRefreshing: false }));
+        }
+      } else {
+        setState((prev) => ({ ...prev, isPulling: false, pullDistance: 0 }));
+      }
+
+      touchStartY.current = 0;
+    },
+    [enabled, state.pullDistance, state.isRefreshing, threshold, onRefresh],
+  );
 
   useEffect(() => {
     const target = scrollTarget === "window" ? window : scrollableRef.current;

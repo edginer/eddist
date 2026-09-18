@@ -21,7 +21,13 @@ const PostThreadModal = (props: PostThreadModalProps) => {
   const { register, handleSubmit } = useForm();
 
   return (
-    <Modal show={props.open} size="5xl" onClose={() => props.setOpen(false)} dismissible>
+    <Modal
+      data-eddist-modal="true"
+      show={props.open}
+      size="5xl"
+      onClose={() => props.setOpen(false)}
+      dismissible
+    >
       <ErrorModal
         openErrorModal={errorModal}
         setOpenErrorModal={serErrorModal}

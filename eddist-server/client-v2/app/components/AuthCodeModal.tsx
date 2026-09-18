@@ -11,6 +11,7 @@ interface AuthCodeModalProps {
 const AuthCodeModal = (props: AuthCodeModalProps) => {
   return (
     <Modal
+      data-eddist-modal="true"
       show={props.openAuthCodeModal}
       size="md"
       onClose={() => props.setOpenAuthCodeModal(false)}

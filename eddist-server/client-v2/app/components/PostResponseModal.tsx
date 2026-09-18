@@ -24,6 +24,7 @@ const PostResponseModal = (props: PostResponseModalProps) => {
 
   return (
     <Modal
+      data-eddist-modal="true"
       show={props.open}
       size="5xl"
       onClose={() => props.setOpen(false)}
