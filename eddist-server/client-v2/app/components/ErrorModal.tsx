@@ -10,6 +10,7 @@ interface ErrorModalProps {
 const ErrorModal = (props: ErrorModalProps) => {
   return (
     <Modal
+      data-eddist-modal="true"
       show={props.openErrorModal}
       size="md"
       onClose={() => props.setOpenErrorModal(false)}

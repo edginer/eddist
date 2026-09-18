@@ -286,7 +286,13 @@ export const NGWordsSettingsModal = ({
   };
 
   return (
-    <Modal show={open} size="5xl" onClose={() => setOpen(false)} dismissible>
+    <Modal
+      data-eddist-modal="true"
+      show={open}
+      size="5xl"
+      onClose={() => setOpen(false)}
+      dismissible
+    >
       <ModalHeader className="border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <span className="lg:text-2xl">設定</span>
