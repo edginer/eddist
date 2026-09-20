@@ -1,6 +1,8 @@
 import { Link, useSearchParams } from "react-router";
 import { fetchNotices, type NoticeListItem } from "~/api-client/notice";
 import { Footer } from "~/components/Footer";
+import { PageMetadata } from "~/components/PageMetadata";
+import { getCanonicalUrl } from "~/utils/metadata";
 import type { Route } from "./+types/NoticeListPage";
 
 export const headers = () => ({
@@ -13,31 +15,36 @@ export const loader = async ({ context, request }: Route.LoaderArgs) => {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "0", 10);
   const limit = 10;
+  const canonicalSearchParams = page > 0 ? new URLSearchParams({ page: String(page) }) : undefined;
 
   return {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
     },
+    canonicalUrl: getCanonicalUrl(
+      context.PUBLIC_BASE_URL,
+      request,
+      "/notices",
+      canonicalSearchParams,
+    ),
     noticeData: await fetchNotices({ baseUrl, page, limit }),
   };
 };
 
-const Meta = ({ bbsName }: { bbsName: string }) => (
-  <>
-    <title>{`お知らせ一覧 - ${bbsName}`}</title>
-    <meta property="og:title" content={`お知らせ一覧 - ${bbsName}`} />
-  </>
-);
-
 function NoticeListPage({ loaderData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
   const currentPage = parseInt(searchParams.get("page") || "0", 10);
-  const { eddistData, noticeData } = loaderData;
+  const { eddistData, noticeData, canonicalUrl } = loaderData;
   const totalPages = Math.ceil(noticeData.total / noticeData.limit);
 
   return (
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
-      <Meta bbsName={eddistData.bbsName} />
+      <PageMetadata
+        title={`お知らせ一覧 - ${eddistData.bbsName}`}
+        description={`${eddistData.bbsName}からのお知らせ一覧です。`}
+        siteName={eddistData.bbsName}
+        canonicalUrl={canonicalUrl}
+      />
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl mb-3">お知らせ一覧</h1>

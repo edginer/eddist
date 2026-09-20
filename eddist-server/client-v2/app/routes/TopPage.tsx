@@ -3,13 +3,15 @@ import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchLatestNotices, type NoticeListItem } from "~/api-client/notice";
 import { Footer } from "~/components/Footer";
+import { PageMetadata } from "~/components/PageMetadata";
+import { getCanonicalUrl } from "~/utils/metadata";
 import type { Route } from "./+types/TopPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=300",
 });
 
-export const loader = async ({ context }: Route.LoaderArgs) => {
+export const loader = async ({ context, request }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const clientConfig = await fetchClientConfig({ baseUrl }).catch(() => ({
@@ -21,25 +23,22 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: clientConfig.enable_user_registration,
     },
+    canonicalUrl: getCanonicalUrl(context.PUBLIC_BASE_URL, request, "/"),
     boards: await fetchBoards({ baseUrl }),
     notices: await fetchLatestNotices({ baseUrl }).catch(() => []),
   };
 };
 
-const Meta = ({ bbsName }: { bbsName: string }) => (
-  <>
-    <title>{bbsName}</title>
-    <meta property="og:title" content={`${bbsName}`} />
-    <meta property="og:site_name" content={bbsName} />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:title" content={`${bbsName}`} />
-  </>
-);
-
-function TopPage({ loaderData: { eddistData, boards, notices } }: Route.ComponentProps) {
+function TopPage({
+  loaderData: { eddistData, canonicalUrl, boards, notices },
+}: Route.ComponentProps) {
   return (
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
-      <Meta bbsName={eddistData.bbsName} />
+      <PageMetadata
+        title={eddistData.bbsName}
+        siteName={eddistData.bbsName}
+        canonicalUrl={canonicalUrl}
+      />
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
@@ -49,7 +48,7 @@ function TopPage({ loaderData: { eddistData, boards, notices } }: Route.Componen
           <ul className="text-left list-disc list-inside pl-4 py-2 lg:text-lg">
             {boards.map((board: Board) => (
               <li key={board.board_key}>
-                <Link to={`/${board.board_key}/`} className="text-blue-500">
+                <Link to={`/${board.board_key}`} className="text-blue-500">
                   {board.name}
                 </Link>
               </li>
@@ -77,9 +76,9 @@ function TopPage({ loaderData: { eddistData, boards, notices } }: Route.Componen
         <section className="py-4 pt-4">
           <h2 className="text-2xl lg:text-4xl">利用規約</h2>
           <p className="text-left py-2 lg:text-lg">
-            <a href="/terms" className="text-blue-500">
+            <Link to="/terms" className="text-blue-500">
               利用規約・問い合わせ先はこちら
-            </a>
+            </Link>
           </p>
         </section>
         {notices && notices.length > 0 && (

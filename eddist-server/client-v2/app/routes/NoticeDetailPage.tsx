@@ -1,14 +1,16 @@
 import { Link } from "react-router";
 import { fetchNoticeBySlug } from "~/api-client/notice";
 import { Footer } from "~/components/Footer";
+import { PageMetadata } from "~/components/PageMetadata";
 import { parseMarkdown } from "~/utils/markdown";
+import { getCanonicalUrl, toMetaText } from "~/utils/metadata";
 import type { Route } from "./+types/NoticeDetailPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
-export const loader = async ({ context, params }: Route.LoaderArgs) => {
+export const loader = async ({ context, params, request }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const notice = await fetchNoticeBySlug({ baseUrl, slug: params.slug });
@@ -17,23 +19,23 @@ export const loader = async ({ context, params }: Route.LoaderArgs) => {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
     },
+    canonicalUrl: getCanonicalUrl(context.PUBLIC_BASE_URL, request),
     notice,
   };
 };
 
-const Meta = ({ title, bbsName }: { title: string; bbsName: string }) => (
-  <>
-    <title>{`${title} - ${bbsName}`}</title>
-    <meta property="og:title" content={`${title} - ${bbsName}`} />
-  </>
-);
-
 function NoticeDetailPage({ loaderData }: Route.ComponentProps) {
-  const { eddistData, notice } = loaderData;
+  const { eddistData, notice, canonicalUrl } = loaderData;
+  const description = toMetaText(notice.content);
 
   return (
     <div className="min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-4rem)] flex flex-col dark:text-gray-100">
-      <Meta title={notice.title} bbsName={eddistData.bbsName} />
+      <PageMetadata
+        title={`${notice.title} - ${eddistData.bbsName}`}
+        description={description || `${eddistData.bbsName}からのお知らせです。`}
+        siteName={eddistData.bbsName}
+        canonicalUrl={canonicalUrl}
+      />
       <article className="flex-1">
         <header>
           <h1 className="text-3xl lg:text-5xl">{notice.title}</h1>

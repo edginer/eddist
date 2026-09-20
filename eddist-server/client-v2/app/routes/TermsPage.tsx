@@ -1,12 +1,14 @@
 import { fetchTerms } from "~/api-client/terms";
+import { PageMetadata } from "~/components/PageMetadata";
 import { parseMarkdown } from "~/utils/markdown";
+import { getCanonicalUrl } from "~/utils/metadata";
 import type { Route } from "./+types/TermsPage";
 
 export const headers = () => ({
   "Cache-Control": "s-maxage=3600",
 });
 
-export const loader = async ({ context }: Route.LoaderArgs) => {
+export const loader = async ({ context, request }: Route.LoaderArgs) => {
   const baseUrl = context.EDDIST_SERVER_URL ?? import.meta.env.VITE_EDDIST_SERVER_URL;
 
   const terms = await fetchTerms({ baseUrl });
@@ -15,23 +17,22 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
     eddistData: {
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
     },
+    canonicalUrl: getCanonicalUrl(context.PUBLIC_BASE_URL, request, "/terms"),
     terms,
   };
 };
 
-const Meta = ({ bbsName }: { bbsName: string }) => (
-  <>
-    <title>{`利用規約 - ${bbsName}`}</title>
-    <meta property="og:title" content={`利用規約 - ${bbsName}`} />
-  </>
-);
-
 function TermsPage({ loaderData }: Route.ComponentProps) {
-  const { eddistData, terms } = loaderData;
+  const { eddistData, terms, canonicalUrl } = loaderData;
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800">
-      <Meta bbsName={eddistData.bbsName} />
+      <PageMetadata
+        title={`利用規約 - ${eddistData.bbsName}`}
+        description={`${eddistData.bbsName}の利用規約、サービス利用上の注意事項です。`}
+        siteName={eddistData.bbsName}
+        canonicalUrl={canonicalUrl}
+      />
       <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
