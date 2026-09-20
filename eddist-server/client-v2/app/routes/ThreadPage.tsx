@@ -6,6 +6,7 @@ import { twMerge } from "tailwind-merge";
 import { type Board, fetchBoards } from "~/api-client/board";
 import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchSharedNg, type SharedNgList } from "~/api-client/ng_id";
+import { fetchUnsafeThreadIds } from "~/api-client/safe_mode";
 import {
   type BodyAnchorPart,
   convertThreadTextToResponseList,
@@ -16,9 +17,11 @@ import {
 import { useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
+import { getCanonicalUrl, toMetaText } from "~/utils/metadata";
 import { FloatingNGButton } from "../components/FloatingNGButton";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { NGSettingsLauncher } from "../components/NGSettingsLauncher";
+import { PageMetadata } from "../components/PageMetadata";
 import { PostResponseLauncher } from "../components/PostResponseLauncher";
 import type { Route } from "./+types/ThreadPage";
 
@@ -37,7 +40,7 @@ export const headers = ({ loaderHeaders }: Route.HeadersArgs) => {
   };
 };
 
-export const loader = async ({ params, context }: Route.LoaderArgs) => {
+export const loader = async ({ params, context, request }: Route.LoaderArgs) => {
   if (!params.boardKey || !params.threadKey) {
     throw new Error("Invalid parameters");
   }
@@ -59,12 +62,13 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const [threadResult, clientConfig, sharedNg] = await Promise.all([
+  const [threadResult, clientConfig, unsafeThreadIds, sharedNg] = await Promise.all([
     fetchThreadText(params.boardKey ?? "", params.threadKey ?? "", { baseUrl }),
     fetchClientConfig({ baseUrl }).catch(() => ({
       enable_user_registration: false,
       enable_safe_mode: false,
     })),
+    fetchUnsafeThreadIds(params.boardKey, { baseUrl }),
     fetchSharedNg(params.boardKey, { baseUrl }),
   ]);
 
@@ -77,6 +81,7 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
     {
       threadText: initialText,
       threadRedirected: threadResult.redirected,
+      noIndex: unsafeThreadIds.has(Number(params.threadKey)),
       boards,
       enableSafeMode: clientConfig.enable_safe_mode ?? false,
       sharedNg,
@@ -84,9 +89,15 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
         bbsName: context.BBS_NAME ?? "エッヂ掲示板",
         availableUserRegistration: clientConfig.enable_user_registration,
       },
+      canonicalUrl: getCanonicalUrl(
+        context.PUBLIC_BASE_URL,
+        request,
+        `/${params.boardKey}/${params.threadKey}`,
+      ),
     } satisfies {
       threadText: string;
       threadRedirected: boolean;
+      noIndex: boolean;
       boards: Board[];
       enableSafeMode: boolean;
       sharedNg: SharedNgList;
@@ -94,8 +105,12 @@ export const loader = async ({ params, context }: Route.LoaderArgs) => {
         bbsName: string;
         availableUserRegistration: boolean;
       };
+      canonicalUrl: string;
     },
-    { headers: { "X-Response-Count": String(lines.length) } },
+    {
+      status: threadResult.redirected ? 410 : 200,
+      headers: { "X-Response-Count": String(lines.length) },
+    },
   );
 };
 
@@ -129,18 +144,36 @@ const MAX_POPUP_WIDTH_MOBILE = "95vw";
 const MAX_POPUP_HEIGHT_MOBILE = "calc(90vh - 50px)";
 const MOBILE_BREAKPOINT = 768; // Tailwind's default mobile breakpoint
 
-const Meta = ({ bbsName, threadName }: { bbsName: string; threadName: string }) => (
-  <>
-    <title>{`${threadName} - ${bbsName}`}</title>
-    <meta property="og:title" content={`${bbsName} | ${threadName}`} />
-    <meta property="og:site_name" content={bbsName} />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:title" content={`${bbsName} | ${threadName}`} />
-  </>
-);
+const Meta = ({
+  bbsName,
+  threadName,
+  canonicalUrl,
+  noIndex,
+}: {
+  bbsName: string;
+  threadName: string;
+  canonicalUrl: string;
+  noIndex: boolean;
+}) => {
+  const metaThreadName = toMetaText(threadName || "スレッド");
+  const title = `${metaThreadName} - ${bbsName}`;
+
+  return (
+    <PageMetadata title={title} noIndex={noIndex} siteName={bbsName} canonicalUrl={canonicalUrl} />
+  );
+};
 
 const ThreadPage = ({
-  loaderData: { boards, threadText, threadRedirected, enableSafeMode, sharedNg, eddistData },
+  loaderData: {
+    boards,
+    threadText,
+    threadRedirected,
+    enableSafeMode,
+    sharedNg,
+    eddistData,
+    canonicalUrl,
+    noIndex,
+  },
 }: Route.ComponentProps) => {
   const params = useParams();
 
@@ -285,9 +318,6 @@ const ThreadPage = ({
         <p className="text-gray-600 dark:text-gray-400">
           このスレッドはしばらく前にdat落ちしたため、Webブラウザからは閲覧できません。
         </p>
-        <p className="text-gray-600 dark:text-gray-400">
-          専用ブラウザなどを使用して閲覧してください。
-        </p>
         <Link to={`/${params.boardKey}`} className="mt-4 text-blue-500">
           戻る
         </Link>
@@ -326,7 +356,12 @@ const ThreadPage = ({
           <FaArrowLeft className="mr-1 lg:mx-2 lg:mr-4 w-6 h-6" />
         </Link>
 
-        <Meta bbsName={eddistData?.bbsName} threadName={threadName} />
+        <Meta
+          bbsName={eddistData?.bbsName}
+          threadName={threadName}
+          canonicalUrl={canonicalUrl}
+          noIndex={noIndex}
+        />
         {/* Mobile header - Board name above thread name */}
         <div className="grow md:hidden">
           <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{boardName}</p>

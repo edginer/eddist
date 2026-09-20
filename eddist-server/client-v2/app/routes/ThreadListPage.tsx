@@ -14,9 +14,11 @@ import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { useSummarizeEnabled } from "~/hooks/useSummarizeEnabled";
 import { useSummarizerSupported } from "~/hooks/useSummarizer";
 import { parseCookie } from "~/utils/cookie";
+import { getCanonicalUrl } from "~/utils/metadata";
 import { getSelectedTextInElement } from "~/utils/selection";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { NGSettingsLauncher } from "../components/NGSettingsLauncher";
+import { PageMetadata } from "../components/PageMetadata";
 import { PostThreadLauncher } from "../components/PostThreadLauncher";
 import { ThreadSummarizeButton } from "../components/ThreadSummarizeButton";
 import type { Route } from "./+types/ThreadListPage";
@@ -128,6 +130,7 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
       bbsName: context.BBS_NAME ?? "エッヂ掲示板",
       availableUserRegistration: clientConfig.enable_user_registration,
     },
+    canonicalUrl: getCanonicalUrl(context.PUBLIC_BASE_URL, request, `/${params.boardKey}`),
   } satisfies {
     threadList: Thread[];
     boards: Board[];
@@ -140,18 +143,9 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
       bbsName: string;
       availableUserRegistration: boolean;
     };
+    canonicalUrl: string;
   };
 };
-
-const Meta = ({ bbsName, boardName }: { bbsName: string; boardName: string }) => (
-  <>
-    <title>{`${boardName} - ${bbsName}`}</title>
-    <meta property="og:title" content={`${bbsName} | ${boardName}`} />
-    <meta property="og:site_name" content={bbsName} />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:title" content={`${bbsName} | ${boardName}`} />
-  </>
-);
 
 const ThreadListPage = ({
   loaderData: {
@@ -163,9 +157,13 @@ const ThreadListPage = ({
     unsafeThreadIds,
     sharedNg,
     eddistData,
+    canonicalUrl,
   },
 }: Route.ComponentProps) => {
   const params = useParams();
+  const boardName =
+    boards?.find((board: { board_key: string }) => board.board_key === params.boardKey)?.name ??
+    "スレッド一覧";
 
   const { data: threadList, mutate } = useSWR(
     `${params.boardKey}/subject.txt`,
@@ -304,22 +302,16 @@ const ThreadListPage = ({
           "fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 shadow-md transition-transform duration-300 transform flex justify-between items-center p-3 lg:p-4"
         }
       >
-        <Meta
-          bbsName={eddistData.bbsName}
-          boardName={
-            boards?.find((board: { board_key: string }) => board.board_key === params.boardKey)
-              ?.name ?? "スレッド一覧"
-          }
+        <PageMetadata
+          title={`${boardName} - ${eddistData.bbsName}`}
+          description={`「${boardName}」のスレッド一覧です。`}
+          siteName={eddistData.bbsName}
+          canonicalUrl={canonicalUrl}
         />
         <Link to="/">
           <FaArrowLeft className="mx-2 mr-4 w-6 h-6" />
         </Link>
-        <h1 className="text-2xl lg:text-4xl grow truncate">
-          {
-            boards?.find((board: { board_key: string }) => board.board_key === params.boardKey)
-              ?.name
-          }
-        </h1>
+        <h1 className="text-2xl lg:text-4xl grow truncate">{boardName}</h1>
         <button
           type="button"
           onClick={handleRefresh}

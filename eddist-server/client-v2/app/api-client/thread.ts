@@ -64,10 +64,18 @@ export const fetchThreadText = async (
         "manual",
     },
   );
+
+  if (res.status === 404) {
+    throw new Response("Not Found", { status: 404 });
+  }
+  if (!res.ok && (res.status < 300 || res.status >= 400)) {
+    throw new Error(`Failed to fetch thread: ${res.status}`);
+  }
+
   const sjisText = await res.blob();
   const arrayBuffer = await sjisText.arrayBuffer();
   const text = new TextDecoder("shift_jis").decode(arrayBuffer);
-  const redirected = res.redirected;
+  const redirected = res.redirected || (res.status >= 300 && res.status < 400);
 
   if (import.meta.env.SSR) {
     if (!_threadCache) _threadCache = new Map();

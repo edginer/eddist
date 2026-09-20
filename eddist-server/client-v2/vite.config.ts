@@ -1,8 +1,8 @@
 import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
+import flowbiteReact from "flowbite-react/plugin/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-import flowbiteReact from "flowbite-react/plugin/vite";
 
 export default defineConfig(
   ({ isSsrBuild }): UserConfig => ({
@@ -26,26 +26,22 @@ export default defineConfig(
           changeOrigin: true,
         },
         "^/.+/subject.txt": {
-          // target: "https://bbs.eddibb.cc",
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
         "^/.+/dat/.+\\.dat": {
-          // target: "https://bbs.eddibb.cc",
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
         "/auth-code": {
-          // target: "https://bbs.eddibb.cc",
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
         "/test/bbs.cgi": {
-          // target: "https://bbs.eddibb.cc",
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
       },
     },
-  })
+  }),
 );
