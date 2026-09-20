@@ -16,7 +16,8 @@ use crate::{
         },
     },
     repositories::{
-        Db, bbs_repository::{BbsRepository, CreatingAuthedToken},
+        Db,
+        bbs_repository::{BbsRepository, CreatingAuthedToken},
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },

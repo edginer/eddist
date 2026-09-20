@@ -120,6 +120,7 @@ pub async fn remove_token_backup(
         .delete_object()
         .bucket(bucket_name)
         .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{token_id}.json"))
+        .send()
         .await?;
     Ok(())
 }

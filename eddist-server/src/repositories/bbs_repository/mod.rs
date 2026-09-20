@@ -1,17 +1,17 @@
 mod authed_token;
 mod board;
-mod response;
-mod thread;
 #[cfg(feature = "backend-postgres")]
 mod legacy;
+mod response;
+mod thread;
 
 pub use authed_token::{AuthedTokenRepository, CreatingAuthedToken};
 pub use board::BoardRepository;
 pub use eddist_core::domain::pubsub_repository::CreatingThread;
-pub use response::ResponseRepository;
-pub use thread::{ThreadRepository, ThreadStatus};
 #[cfg(feature = "backend-postgres")]
 pub use legacy::BbsRepositoryPgImpl;
+pub use response::ResponseRepository;
+pub use thread::{ThreadRepository, ThreadStatus};
 
 use sqlx::MySqlPool;
 
@@ -100,11 +100,13 @@ impl ThreadRepository for BbsRepositoryPgImpl {
     async fn get_threads_with_metadent(
         &self,
         board_id: uuid::Uuid,
-    ) -> anyhow::Result<Vec<(
-        crate::domain::thread::Thread,
-        eddist_core::domain::client_info::ClientInfo,
-        crate::domain::authed_token::AuthedToken,
-    )>> {
+    ) -> anyhow::Result<
+        Vec<(
+            crate::domain::thread::Thread,
+            eddist_core::domain::client_info::ClientInfo,
+            crate::domain::authed_token::AuthedToken,
+        )>,
+    > {
         LegacyBbsRepository::get_threads_with_metadent(self, board_id).await
     }
 
@@ -196,10 +198,7 @@ impl AuthedTokenRepository for BbsRepositoryPgImpl {
         LegacyBbsRepository::get_unauthed_authed_token_by_auth_code(self, auth_code).await
     }
 
-    async fn create_authed_token(
-        &self,
-        token: CreatingAuthedToken,
-    ) -> anyhow::Result<()> {
+    async fn create_authed_token(&self, token: CreatingAuthedToken) -> anyhow::Result<()> {
         let token = LegacyCreatingAuthedToken {
             id: token.id,
             token: token.token,

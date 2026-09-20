@@ -130,9 +130,7 @@ pub async fn run_persistence_loop(
         {
             use sqlx::Executor;
             db_conn
-                .execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
+                .execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')")
                 .await
                 .unwrap();
         }
