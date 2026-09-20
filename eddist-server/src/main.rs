@@ -6,36 +6,11 @@ use std::{convert::Infallible, env, sync::Arc, time::Duration};
 use axum::{
     ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
 };
-use eddist::{
-    AppState,
-    app::create_app,
-    load_template_engine,
-    middleware::not_found_rate_limit::NotFoundPenaltyCache,
-    repositories::{
-        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-    },
-    services::{
-        AppServiceContainer, PubSubRepos,
-        captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
-        server_settings_cache::{
-            refresh_server_settings_cache, start_server_settings_refresh_task,
-        },
-        stats_counter::{flush_stats_now, start_stats_flush_task},
-    },
-    start_cache_refresh_task,
-};
-use eddist_core::{tracing::init_tracing, utils::is_prod};
-use hyper::{server::conn::http1, service::service_fn};
-use hyper_util::rt::{TokioIo, TokioTimer};
-use metrics::describe_counter;
 #[cfg(not(feature = "backend-postgres"))]
 use eddist::repositories::{
-    bbs_repository::BbsRepositoryImpl,
-    captcha_config_repository::CaptchaConfigRepositoryImpl,
-    idp_repository::IdpRepositoryImpl,
-    notice_repository::NoticeRepositoryImpl,
-    stats_repository::StatsRepositoryImpl,
-    terms_repository::TermsRepositoryImpl,
+    bbs_repository::BbsRepositoryImpl, captcha_config_repository::CaptchaConfigRepositoryImpl,
+    idp_repository::IdpRepositoryImpl, notice_repository::NoticeRepositoryImpl,
+    stats_repository::StatsRepositoryImpl, terms_repository::TermsRepositoryImpl,
     user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
@@ -50,6 +25,26 @@ use eddist::repositories::{
     user_repository::UserRepositoryPgImpl as UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
 };
+use eddist::{
+    AppState,
+    app::create_app,
+    load_template_engine,
+    middleware::not_found_rate_limit::NotFoundPenaltyCache,
+    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
+    services::{
+        AppServiceContainer, PubSubRepos,
+        captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
+        server_settings_cache::{
+            refresh_server_settings_cache, start_server_settings_refresh_task,
+        },
+        stats_counter::{flush_stats_now, start_stats_flush_task},
+    },
+    start_cache_refresh_task,
+};
+use eddist_core::{tracing::init_tracing, utils::is_prod};
+use hyper::{server::conn::http1, service::service_fn};
+use hyper_util::rt::{TokioIo, TokioTimer};
+use metrics::describe_counter;
 use tokio::net::TcpListener;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;

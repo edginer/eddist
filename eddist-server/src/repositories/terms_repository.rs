@@ -1,8 +1,8 @@
 use eddist_core::domain::terms::Terms;
-#[cfg(not(feature = "backend-postgres"))]
-use sqlx::{MySqlPool, query_as};
 #[cfg(feature = "backend-postgres")]
 use sqlx::PgPool;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{MySqlPool, query_as};
 use uuid::Uuid;
 
 #[async_trait::async_trait]

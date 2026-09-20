@@ -17,22 +17,11 @@ use tower_http::{
 };
 use tracing::{Span, info_span};
 
-use crate::{
-    middleware::{
-        ng_id_rate_limit::ng_id_rate_limit_middleware,
-        not_found_rate_limit::{NotFoundPenaltyCache, not_found_rate_limit_middleware},
-        user_restriction::user_restriction_middleware,
-    },
-    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-};
 #[cfg(not(feature = "backend-postgres"))]
 use crate::repositories::{
-    bbs_repository::BbsRepositoryImpl,
-    idp_repository::IdpRepositoryImpl,
-    notice_repository::NoticeRepositoryImpl,
-    stats_repository::StatsRepositoryImpl,
-    terms_repository::TermsRepositoryImpl,
-    user_repository::UserRepositoryImpl,
+    bbs_repository::BbsRepositoryImpl, idp_repository::IdpRepositoryImpl,
+    notice_repository::NoticeRepositoryImpl, stats_repository::StatsRepositoryImpl,
+    terms_repository::TermsRepositoryImpl, user_repository::UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryImpl,
 };
 #[cfg(feature = "backend-postgres")]
@@ -44,6 +33,14 @@ use crate::repositories::{
     terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
     user_repository::UserRepositoryPgImpl as UserRepositoryImpl,
     user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
+};
+use crate::{
+    middleware::{
+        ng_id_rate_limit::ng_id_rate_limit_middleware,
+        not_found_rate_limit::{NotFoundPenaltyCache, not_found_rate_limit_middleware},
+        user_restriction::user_restriction_middleware,
+    },
+    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
 };
 use crate::{
     routes::{
