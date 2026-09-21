@@ -1,3 +1,4 @@
+use crate::entity::authed_token;
 use anyhow::Result;
 use aws_sdk_s3::{
     Client,
@@ -7,8 +8,14 @@ use aws_sdk_s3::{
 use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
+use sea_orm::{
+    ActiveValue::Set, ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait,
+    QueryFilter, QuerySelect, TryInsertResult,
+};
 use std::{collections::HashSet, env};
 use uuid::Uuid;
+
+mod entity;
 
 const CONCURRENCY: usize = 16;
 
@@ -72,30 +79,44 @@ fn make_s3_client() -> Result<(Client, String)> {
     Ok((Client::from_conf(config), bucket_name.trim().to_string()))
 }
 
+async fn connect_database() -> Result<DatabaseConnection> {
+    let mut options = ConnectOptions::new(env::var("DATABASE_URL")?);
+    options.sqlx_logging(false);
+    Ok(Database::connect(options).await?)
+}
+
+impl From<authed_token::Model> for AuthedTokenBackup {
+    fn from(token: authed_token::Model) -> Self {
+        Self {
+            id: token.id,
+            token: token.token,
+            origin_ip: token.origin_ip,
+            reduced_origin_ip: token.reduced_origin_ip,
+            asn_num: token.asn_num,
+            writing_ua: token.writing_ua,
+            authed_ua: token.authed_ua,
+            auth_code: Some(token.auth_code),
+            created_at: token.created_at,
+            authed_at: token.authed_at,
+            last_wrote_at: token.last_wrote_at,
+            additional_info: token.additional_info,
+            author_id_seed: token.author_id_seed,
+        }
+    }
+}
+
 async fn backup() -> Result<()> {
-    let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
 
-    let rows = sqlx::query_as!(
-        AuthedTokenBackup,
-        r#"SELECT
-            id AS "id!: Uuid",
-            token,
-            origin_ip,
-            reduced_origin_ip,
-            asn_num,
-            writing_ua,
-            authed_ua,
-            auth_code,
-            created_at,
-            authed_at,
-            last_wrote_at,
-            additional_info AS "additional_info: serde_json::Value",
-            author_id_seed AS "author_id_seed!: Vec<u8>"
-        FROM authed_tokens WHERE validity = 1"#
-    )
-    .fetch_all(&pool)
-    .await?;
+    let rows = authed_token::Entity::find()
+        .filter(authed_token::Column::Validity.eq(true))
+        .all(&db)
+        .await?;
+    let rows = rows
+        .into_iter()
+        .map(AuthedTokenBackup::from)
+        .collect::<Vec<_>>();
 
     let total = rows.len();
     println!("Backing up {total} valid tokens...");
@@ -129,15 +150,18 @@ async fn backup() -> Result<()> {
 }
 
 async fn validate() -> Result<()> {
-    let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
 
-    let db_ids =
-        sqlx::query_scalar!(r#"SELECT id AS "id!: Uuid" FROM authed_tokens WHERE validity = 1"#)
-            .fetch_all(&pool)
-            .await?
-            .into_iter()
-            .collect::<HashSet<_>>();
+    let db_ids = authed_token::Entity::find()
+        .select_only()
+        .column(authed_token::Column::Id)
+        .filter(authed_token::Column::Validity.eq(true))
+        .into_tuple::<Uuid>()
+        .all(&db)
+        .await?
+        .into_iter()
+        .collect::<HashSet<_>>();
 
     let prefix = format!("{AUTHED_TOKENS_S3_PREFIX}/");
     let mut pages = client
@@ -192,7 +216,7 @@ async fn validate() -> Result<()> {
 }
 
 async fn recover() -> Result<()> {
-    let pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
 
     let mut pages = client
@@ -217,7 +241,7 @@ async fn recover() -> Result<()> {
         .map(|key| {
             let client = client.clone();
             let bucket_name = bucket_name.clone();
-            let pool = pool.clone();
+            let db = db.clone();
             async move {
                 let output = client
                     .get_object()
@@ -230,30 +254,28 @@ async fn recover() -> Result<()> {
 
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
 
-                let result = sqlx::query!(
-                    r#"INSERT IGNORE INTO authed_tokens
-                       (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
-                        auth_code, created_at, authed_at, validity, last_wrote_at,
-                        author_id_seed, additional_info)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)"#,
-                    token.id.as_bytes().as_ref(),
-                    token.token,
-                    token.origin_ip,
-                    token.reduced_origin_ip,
-                    token.asn_num,
-                    token.writing_ua,
-                    token.authed_ua,
-                    auth_code,
-                    token.created_at,
-                    token.authed_at,
-                    token.last_wrote_at,
-                    token.author_id_seed,
-                    token.additional_info,
-                )
-                .execute(&pool)
+                let result = authed_token::Entity::insert(authed_token::ActiveModel {
+                    id: Set(token.id),
+                    token: Set(token.token),
+                    origin_ip: Set(token.origin_ip),
+                    reduced_origin_ip: Set(token.reduced_origin_ip),
+                    writing_ua: Set(token.writing_ua),
+                    authed_ua: Set(token.authed_ua),
+                    auth_code: Set(auth_code.to_string()),
+                    created_at: Set(token.created_at),
+                    authed_at: Set(token.authed_at),
+                    validity: Set(true),
+                    last_wrote_at: Set(token.last_wrote_at),
+                    asn_num: Set(token.asn_num),
+                    additional_info: Set(token.additional_info),
+                    author_id_seed: Set(token.author_id_seed),
+                    ..Default::default()
+                })
+                .on_conflict_do_nothing_on([authed_token::Column::Id])
+                .exec(&db)
                 .await?;
 
-                anyhow::Ok(result.rows_affected() > 0)
+                anyhow::Ok(matches!(result, TryInsertResult::Inserted(_)))
             }
         })
         .buffer_unordered(CONCURRENCY)
