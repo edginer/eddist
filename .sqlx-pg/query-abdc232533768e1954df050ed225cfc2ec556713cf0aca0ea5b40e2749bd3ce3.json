@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE threads SET archive_converted = TRUE WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "abdc232533768e1954df050ed225cfc2ec556713cf0aca0ea5b40e2749bd3ce3"
+}

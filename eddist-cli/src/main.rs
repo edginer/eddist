@@ -1,3 +1,4 @@
+#[cfg(not(feature = "backend-postgres"))]
 use crate::entity::authed_token;
 use anyhow::Result;
 use aws_sdk_s3::{
@@ -8,6 +9,7 @@ use aws_sdk_s3::{
 use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
+#[cfg(not(feature = "backend-postgres"))]
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait,
     QueryFilter, QuerySelect, TryInsertResult,
@@ -15,6 +17,7 @@ use sea_orm::{
 use std::{collections::HashSet, env};
 use uuid::Uuid;
 
+#[cfg(not(feature = "backend-postgres"))]
 mod entity;
 mod migrate;
 
@@ -139,9 +142,10 @@ impl From<AuthedTokenBackupPg> for AuthedTokenBackup {
 #[cfg(feature = "backend-postgres")]
 async fn backup() -> Result<()> {
     let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
-    let rows = sqlx::query_as::<_, AuthedTokenBackupPg>(
+    let rows = sqlx::query_as!(
+        AuthedTokenBackupPg,
         r#"SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                   auth_code, created_at, authed_at, last_wrote_at, additional_info, author_id_seed
            FROM authed_tokens WHERE validity = TRUE"#,
@@ -154,15 +158,17 @@ async fn backup() -> Result<()> {
 
     let results = futures::stream::iter(rows)
         .map(|row| {
-            let bucket = bucket.clone();
+            let client = client.clone();
+            let bucket_name = bucket_name.clone();
             let token = AuthedTokenBackup::from(row);
             async move {
                 let bytes = serde_json::to_vec(&token)?;
-                bucket
-                    .put_object(
-                        format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id),
-                        &bytes,
-                    )
+                client
+                    .put_object()
+                    .bucket(&bucket_name)
+                    .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{}.json", token.id))
+                    .body(ByteStream::from(bytes))
+                    .send()
                     .await?;
                 anyhow::Ok(())
             }
@@ -182,25 +188,34 @@ async fn backup() -> Result<()> {
 #[cfg(feature = "backend-postgres")]
 async fn validate() -> Result<()> {
     let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
-    let db_ids: Vec<Uuid> =
-        sqlx::query_scalar("SELECT id FROM authed_tokens WHERE validity = TRUE")
+    let db_ids =
+        sqlx::query_scalar!(r#"SELECT id AS "id!: Uuid" FROM authed_tokens WHERE validity = TRUE"#)
             .fetch_all(&pool)
             .await?;
     let db_ids = db_ids.into_iter().collect::<HashSet<_>>();
 
     let prefix = format!("{AUTHED_TOKENS_S3_PREFIX}/");
-    let s3_ids = bucket
-        .list(prefix.clone(), None)
-        .await?
-        .into_iter()
-        .flat_map(|page| page.contents)
-        .filter_map(|obj| {
-            let name = obj.key.strip_prefix(&prefix)?.strip_suffix(".json")?;
-            Uuid::parse_str(name).ok()
-        })
-        .collect::<HashSet<_>>();
+    let mut pages = client
+        .list_objects_v2()
+        .bucket(&bucket_name)
+        .prefix(&prefix)
+        .into_paginator()
+        .send();
+    let mut s3_ids = HashSet::new();
+    while let Some(page) = pages.next().await {
+        for obj in page?.contents.unwrap_or_default() {
+            if let Some(key) = obj.key
+                && let Some(name) = key
+                    .strip_prefix(&prefix)
+                    .and_then(|n| n.strip_suffix(".json"))
+                && let Ok(id) = Uuid::parse_str(name)
+            {
+                s3_ids.insert(id);
+            }
+        }
+    }
 
     println!("DB valid tokens: {}", db_ids.len());
     println!("S3 objects:      {}", s3_ids.len());
@@ -236,26 +251,40 @@ async fn validate() -> Result<()> {
 #[cfg(feature = "backend-postgres")]
 async fn recover() -> Result<()> {
     let pool = sqlx::PgPool::connect(&env::var("DATABASE_URL")?).await?;
-    let bucket = make_bucket()?;
+    let (client, bucket_name) = make_s3_client()?;
 
-    let keys = bucket
-        .list(format!("{AUTHED_TOKENS_S3_PREFIX}/"), None)
-        .await?
-        .into_iter()
-        .flat_map(|page| page.contents)
-        .map(|obj| obj.key)
-        .collect::<Vec<_>>();
+    let mut pages = client
+        .list_objects_v2()
+        .bucket(&bucket_name)
+        .prefix(format!("{AUTHED_TOKENS_S3_PREFIX}/"))
+        .into_paginator()
+        .send();
+    let mut keys = Vec::new();
+    while let Some(page) = pages.next().await {
+        for obj in page?.contents.unwrap_or_default() {
+            if let Some(key) = obj.key {
+                keys.push(key);
+            }
+        }
+    }
 
     let total = keys.len();
     println!("Recovering {total} tokens from S3...");
 
     let results = futures::stream::iter(keys)
         .map(|key| {
-            let bucket = bucket.clone();
+            let client = client.clone();
+            let bucket_name = bucket_name.clone();
             let pool = pool.clone();
             async move {
-                let data = bucket.get_object(&key).await?;
-                let token: AuthedTokenBackup = serde_json::from_slice(data.bytes())?;
+                let output = client
+                    .get_object()
+                    .bucket(&bucket_name)
+                    .key(&key)
+                    .send()
+                    .await?;
+                let data = output.body.collect().await?.into_bytes();
+                let token: AuthedTokenBackup = serde_json::from_slice(&data)?;
 
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
                 let created_at = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
@@ -269,27 +298,27 @@ async fn recover() -> Result<()> {
                     chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc)
                 });
 
-                let result = sqlx::query(
+                let result = sqlx::query!(
                     r#"INSERT INTO authed_tokens
                        (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                         auth_code, created_at, authed_at, validity, last_wrote_at,
                         author_id_seed, additional_info)
                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12, $13)
                        ON CONFLICT DO NOTHING"#,
+                    token.id,
+                    &token.token,
+                    &token.origin_ip,
+                    &token.reduced_origin_ip,
+                    token.asn_num,
+                    &token.writing_ua,
+                    token.authed_ua,
+                    auth_code,
+                    created_at,
+                    authed_at,
+                    last_wrote_at,
+                    &token.author_id_seed,
+                    token.additional_info,
                 )
-                .bind(token.id)
-                .bind(&token.token)
-                .bind(&token.origin_ip)
-                .bind(&token.reduced_origin_ip)
-                .bind(token.asn_num)
-                .bind(&token.writing_ua)
-                .bind(&token.authed_ua)
-                .bind(auth_code)
-                .bind(created_at)
-                .bind(authed_at)
-                .bind(last_wrote_at)
-                .bind(&token.author_id_seed)
-                .bind(&token.additional_info)
                 .execute(&pool)
                 .await?;
 

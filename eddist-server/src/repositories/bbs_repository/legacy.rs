@@ -1072,6 +1072,8 @@ struct BoardInfoPg {
     pub updated_at: chrono::DateTime<Utc>,
     pub read_only: bool,
     pub force_metadent_type: Option<String>,
+    pub enable_1001_message: bool,
+    pub custom_1001_message: Option<String>,
 }
 
 #[cfg(feature = "backend-postgres")]
@@ -1132,6 +1134,7 @@ struct ResPg {
     pub created_at: chrono::DateTime<Utc>,
     pub author_id: String,
     pub is_abone: bool,
+    pub is_abone_keep_id: bool,
 }
 
 #[cfg(feature = "backend-postgres")]
@@ -1217,10 +1220,12 @@ impl BbsRepositoryPgImpl {
 #[async_trait::async_trait]
 impl BbsRepository for BbsRepositoryPgImpl {
     async fn get_boards(&self) -> anyhow::Result<Vec<Board>> {
-        let rows =
-            sqlx::query_as::<_, BoardPg>("SELECT id, name, board_key, default_name FROM boards")
-                .fetch_all(&self.pool)
-                .await?;
+        let rows = sqlx::query_as!(
+            BoardPg,
+            r#"SELECT id AS "id: Uuid", name, board_key, default_name FROM boards"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
         Ok(rows
             .into_iter()
@@ -1234,10 +1239,12 @@ impl BbsRepository for BbsRepositoryPgImpl {
     }
 
     async fn get_board(&self, board_key: &str) -> anyhow::Result<Option<Board>> {
-        let row = sqlx::query_as::<_, BoardPg>(
-            "SELECT id, name, board_key, default_name FROM boards WHERE board_key = $1",
+        let row = sqlx::query_as!(
+            BoardPg,
+            r#"SELECT id AS "id: Uuid", name, board_key, default_name
+               FROM boards WHERE board_key = $1"#,
+            board_key,
         )
-        .bind(board_key)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1250,17 +1257,19 @@ impl BbsRepository for BbsRepositoryPgImpl {
     }
 
     async fn get_board_info(&self, board_id: Uuid) -> anyhow::Result<Option<BoardInfo>> {
-        let row = sqlx::query_as::<_, BoardInfoPg>(
+        let row = sqlx::query_as!(
+            BoardInfoPg,
             r#"
-            SELECT id, local_rules, base_thread_creation_span_sec, base_response_creation_span_sec,
+            SELECT id AS "id: Uuid", local_rules, base_thread_creation_span_sec, base_response_creation_span_sec,
                    max_thread_name_byte_length, max_author_name_byte_length, max_email_byte_length,
                    max_response_body_byte_length, max_response_body_lines, threads_archive_cron,
-                   threads_archive_trigger_thread_count, created_at, updated_at, read_only, force_metadent_type
+                   threads_archive_trigger_thread_count, created_at, updated_at, read_only,
+                   force_metadent_type, enable_1001_message, custom_1001_message
             FROM boards_info
             WHERE id = $1
             "#,
+            board_id,
         )
-        .bind(board_id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1280,6 +1289,8 @@ impl BbsRepository for BbsRepositoryPgImpl {
             updated_at: r.updated_at.naive_utc(),
             read_only: r.read_only,
             force_metadent_type: r.force_metadent_type,
+            enable_1001_message: r.enable_1001_message,
+            custom_1001_message: r.custom_1001_message,
         }))
     }
 
@@ -1288,25 +1299,73 @@ impl BbsRepository for BbsRepositoryPgImpl {
         board_id: Uuid,
         status: ThreadStatus,
     ) -> anyhow::Result<Vec<crate::domain::thread::Thread>> {
-        let sql = match status {
+        let rows = match status {
             ThreadStatus::Active => {
-                "SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at, title, authed_token_id, metadent, response_count, no_pool, active, archived FROM threads WHERE board_id = $1 AND active = TRUE"
+                sqlx::query_as!(
+                    ThreadPg,
+                    r#"
+                SELECT id AS "id: Uuid", board_id AS "board_id: Uuid", thread_number,
+                       last_modified_at, sage_last_modified_at, title,
+                       authed_token_id AS "authed_token_id: Uuid", metadent, response_count,
+                       no_pool, active, archived
+                FROM threads
+                WHERE board_id = $1 AND active = TRUE
+                "#,
+                    board_id,
+                )
+                .fetch_all(&self.pool)
+                .await?
             }
             ThreadStatus::Archived => {
-                "SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at, title, authed_token_id, metadent, response_count, no_pool, active, archived FROM threads WHERE board_id = $1 AND archived = TRUE"
+                sqlx::query_as!(
+                    ThreadPg,
+                    r#"
+                SELECT id AS "id: Uuid", board_id AS "board_id: Uuid", thread_number,
+                       last_modified_at, sage_last_modified_at, title,
+                       authed_token_id AS "authed_token_id: Uuid", metadent, response_count,
+                       no_pool, active, archived
+                FROM threads
+                WHERE board_id = $1 AND archived = TRUE
+                "#,
+                    board_id,
+                )
+                .fetch_all(&self.pool)
+                .await?
             }
             ThreadStatus::Inactive => {
-                "SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at, title, authed_token_id, metadent, response_count, no_pool, active, archived FROM threads WHERE board_id = $1 AND active = FALSE AND archived = FALSE"
+                sqlx::query_as!(
+                    ThreadPg,
+                    r#"
+                SELECT id AS "id: Uuid", board_id AS "board_id: Uuid", thread_number,
+                       last_modified_at, sage_last_modified_at, title,
+                       authed_token_id AS "authed_token_id: Uuid", metadent, response_count,
+                       no_pool, active, archived
+                FROM threads
+                WHERE board_id = $1 AND active = FALSE AND archived = FALSE
+                "#,
+                    board_id,
+                )
+                .fetch_all(&self.pool)
+                .await?
             }
             ThreadStatus::Unarchived => {
-                "SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at, title, authed_token_id, metadent, response_count, no_pool, active, archived FROM threads WHERE board_id = $1 AND archived = FALSE ORDER BY sage_last_modified_at DESC"
+                sqlx::query_as!(
+                    ThreadPg,
+                    r#"
+                SELECT id AS "id: Uuid", board_id AS "board_id: Uuid", thread_number,
+                       last_modified_at, sage_last_modified_at, title,
+                       authed_token_id AS "authed_token_id: Uuid", metadent, response_count,
+                       no_pool, active, archived
+                FROM threads
+                WHERE board_id = $1 AND archived = FALSE
+                ORDER BY sage_last_modified_at DESC
+                "#,
+                    board_id,
+                )
+                .fetch_all(&self.pool)
+                .await?
             }
         };
-
-        let rows = sqlx::query_as::<_, ThreadPg>(sql)
-            .bind(board_id)
-            .fetch_all(&self.pool)
-            .await?;
 
         Ok(rows
             .into_iter()
@@ -1331,16 +1390,18 @@ impl BbsRepository for BbsRepositoryPgImpl {
         &self,
         board_id: Uuid,
     ) -> anyhow::Result<Vec<(crate::domain::thread::Thread, ClientInfo, AuthedToken)>> {
-        let rows = sqlx::query_as::<_, ThreadWithMetadentPg>(
+        let rows = sqlx::query_as!(
+            ThreadWithMetadentPg,
             r#"
             SELECT
-                t.id, t.board_id, t.thread_number, t.last_modified_at, t.sage_last_modified_at,
+                t.id AS "id: Uuid", t.board_id AS "board_id: Uuid", t.thread_number,
+                t.last_modified_at, t.sage_last_modified_at,
                 t.title, t.authed_token_id, t.metadent, t.response_count, t.no_pool, t.active, t.archived,
                 (
                     SELECT r.client_info
                     FROM responses r
                     WHERE r.thread_id = t.id AND r.res_order = 1
-                ) AS client_info,
+                ) AS "client_info!: Json<ClientInfo>",
                 at.token, at.origin_ip, at.reduced_origin_ip, at.writing_ua, at.authed_ua, at.auth_code,
                 at.created_at AS at_created_at, at.authed_at, at.validity, at.last_wrote_at,
                 at.author_id_seed, at.require_user_registration, at.registered_user_id, at.require_reauth
@@ -1349,8 +1410,8 @@ impl BbsRepository for BbsRepositoryPgImpl {
             WHERE t.board_id = $1 AND t.archived = FALSE
             ORDER BY t.sage_last_modified_at DESC
             "#,
+            board_id,
         )
-        .bind(board_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1401,17 +1462,20 @@ impl BbsRepository for BbsRepositoryPgImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<Option<crate::domain::thread::Thread>> {
-        let row = sqlx::query_as::<_, ThreadPg>(
+        let row = sqlx::query_as!(
+            ThreadPg,
             r#"
-            SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at,
-                   title, authed_token_id, metadent, response_count, no_pool, active, archived
+            SELECT id AS "id: Uuid", board_id AS "board_id: Uuid", thread_number,
+                   last_modified_at, sage_last_modified_at,
+                   title, authed_token_id AS "authed_token_id: Uuid", metadent, response_count,
+                   no_pool, active, archived
             FROM threads
             WHERE thread_number = $1
               AND board_id = (SELECT id FROM boards WHERE board_key = $2 LIMIT 1)
             "#,
+            thread_number as i64,
+            board_key,
         )
-        .bind(thread_number as i64)
-        .bind(board_key)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1432,15 +1496,17 @@ impl BbsRepository for BbsRepositoryPgImpl {
     }
 
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>> {
-        let rows = sqlx::query_as::<_, ResPg>(
+        let rows = sqlx::query_as!(
+            ResPg,
             r#"
-            SELECT author_name, mail, body, created_at, author_id, is_abone
+            SELECT author_name, mail, body, created_at, author_id, is_abone,
+                   is_abone_keep_id AS "is_abone_keep_id: bool"
             FROM responses
             WHERE thread_id = $1
             ORDER BY res_order, id
             "#,
+            thread_id,
         )
-        .bind(thread_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1453,21 +1519,22 @@ impl BbsRepository for BbsRepositoryPgImpl {
                 created_at: r.created_at,
                 author_id: r.author_id,
                 is_abone: r.is_abone,
-                is_abone_keep_id: false,
+                is_abone_keep_id: r.is_abone_keep_id,
             })
             .collect::<Vec<_>>())
     }
 
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as::<_, AuthedTokenPg>(
+        let row = sqlx::query_as!(
+            AuthedTokenPg,
             r#"
-            SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+            SELECT id AS "id: Uuid", token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                    auth_code, created_at, authed_at, validity, last_wrote_at, author_id_seed,
-                   require_user_registration, registered_user_id, require_reauth
+                   require_user_registration, registered_user_id AS "registered_user_id: Uuid", require_reauth
             FROM authed_tokens WHERE token = $1
             "#,
+            token,
         )
-        .bind(token)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1475,15 +1542,16 @@ impl BbsRepository for BbsRepositoryPgImpl {
     }
 
     async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as::<_, AuthedTokenPg>(
+        let row = sqlx::query_as!(
+            AuthedTokenPg,
             r#"
-            SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+            SELECT id AS "id: Uuid", token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                    auth_code, created_at, authed_at, validity, last_wrote_at, author_id_seed,
-                   require_user_registration, registered_user_id, require_reauth
+                   require_user_registration, registered_user_id AS "registered_user_id: Uuid", require_reauth
             FROM authed_tokens WHERE id = $1
             "#,
+            id,
         )
-        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1495,16 +1563,17 @@ impl BbsRepository for BbsRepositoryPgImpl {
         reduced_ip: &str,
         auth_code: &str,
     ) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as::<_, AuthedTokenPg>(
+        let row = sqlx::query_as!(
+            AuthedTokenPg,
             r#"
-            SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+            SELECT id AS "id: Uuid", token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                    auth_code, created_at, authed_at, validity, last_wrote_at, author_id_seed,
-                   require_user_registration, registered_user_id, require_reauth
+                   require_user_registration, registered_user_id AS "registered_user_id: Uuid", require_reauth
             FROM authed_tokens WHERE reduced_origin_ip = $1 AND auth_code = $2
             "#,
+            reduced_ip,
+            auth_code,
         )
-        .bind(reduced_ip)
-        .bind(auth_code)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -1535,15 +1604,16 @@ impl BbsRepository for BbsRepositoryPgImpl {
         &self,
         auth_code: &str,
     ) -> anyhow::Result<Vec<AuthedToken>> {
-        let rows = sqlx::query_as::<_, AuthedTokenPg>(
+        let rows = sqlx::query_as!(
+            AuthedTokenPg,
             r#"
-            SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
+            SELECT id AS "id: Uuid", token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                    auth_code, created_at, authed_at, validity, last_wrote_at, author_id_seed,
-                   require_user_registration, registered_user_id, require_reauth
+                   require_user_registration, registered_user_id AS "registered_user_id: Uuid", require_reauth
             FROM authed_tokens WHERE auth_code = $1 AND validity = FALSE
             "#,
+            auth_code,
         )
-        .bind(auth_code)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1556,22 +1626,22 @@ impl BbsRepository for BbsRepositoryPgImpl {
 
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO threads
                 (id, board_id, thread_number, last_modified_at, sage_last_modified_at,
                  title, authed_token_id, metadent, response_count)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)
             "#,
+            thread.thread_id,
+            thread.board_id,
+            thread.unix_time as i64,
+            thread.created_at,
+            thread.created_at,
+            &thread.title,
+            thread.authed_token_id,
+            metadent,
         )
-        .bind(thread.thread_id)
-        .bind(thread.board_id)
-        .bind(thread.unix_time as i64)
-        .bind(thread.created_at)
-        .bind(thread.created_at)
-        .bind(&thread.title)
-        .bind(thread.authed_token_id)
-        .bind(metadent)
         .execute(&mut *tx)
         .await
         .map_err(|e| {
@@ -1586,25 +1656,25 @@ impl BbsRepository for BbsRepositoryPgImpl {
             }
         })?;
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO responses
                 (id, author_name, mail, author_id, body, thread_id, board_id,
                  ip_addr, authed_token_id, created_at, client_info, res_order)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
             "#,
+            thread.response_id,
+            &thread.name,
+            &thread.mail,
+            &thread.author_ch5id,
+            &thread.body,
+            thread.thread_id,
+            thread.board_id,
+            &thread.ip_addr,
+            thread.authed_token_id,
+            thread.created_at,
+            client_info_json,
         )
-        .bind(thread.response_id)
-        .bind(&thread.name)
-        .bind(&thread.mail)
-        .bind(&thread.author_ch5id)
-        .bind(&thread.body)
-        .bind(thread.thread_id)
-        .bind(thread.board_id)
-        .bind(&thread.ip_addr)
-        .bind(thread.authed_token_id)
-        .bind(thread.created_at)
-        .bind(client_info_json)
         .execute(&mut *tx)
         .await?;
 
@@ -1617,7 +1687,7 @@ impl BbsRepository for BbsRepositoryPgImpl {
 
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             UPDATE threads SET
                 last_modified_at = $1,
@@ -1626,34 +1696,34 @@ impl BbsRepository for BbsRepositoryPgImpl {
                 active = CASE WHEN response_count >= 1000 THEN FALSE ELSE TRUE END
             WHERE id = $4
             "#,
+            res.created_at,
+            res.is_sage,
+            res.created_at,
+            res.thread_id,
         )
-        .bind(res.created_at)
-        .bind(res.is_sage)
-        .bind(res.created_at)
-        .bind(res.thread_id)
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO responses
                 (id, author_name, mail, author_id, body, thread_id, board_id,
                  ip_addr, authed_token_id, created_at, client_info, res_order)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             "#,
+            res.id,
+            &res.name,
+            &res.mail,
+            &res.author_ch5id,
+            &res.body,
+            res.thread_id,
+            res.board_id,
+            &res.ip_addr,
+            res.authed_token_id,
+            res.created_at,
+            client_info_json,
+            res.res_order,
         )
-        .bind(res.id)
-        .bind(&res.name)
-        .bind(&res.mail)
-        .bind(&res.author_ch5id)
-        .bind(&res.body)
-        .bind(res.thread_id)
-        .bind(res.board_id)
-        .bind(&res.ip_addr)
-        .bind(res.authed_token_id)
-        .bind(res.created_at)
-        .bind(client_info_json)
-        .bind(res.res_order)
         .execute(&mut *tx)
         .await?;
 
@@ -1665,24 +1735,24 @@ impl BbsRepository for BbsRepositoryPgImpl {
         let ip_addr = authed_token.origin_ip.to_string();
         let reduced_ip = ReducedIpAddr::from(authed_token.origin_ip).to_string();
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO authed_tokens
                 (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, auth_code,
                  created_at, validity, author_id_seed, require_user_registration)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, $9, $10)
             "#,
+            authed_token.id,
+            &authed_token.token,
+            &ip_addr,
+            &reduced_ip,
+            authed_token.asn_num,
+            &authed_token.writing_ua,
+            &authed_token.auth_code,
+            authed_token.created_at,
+            &authed_token.author_id_seed,
+            authed_token.require_user_registration,
         )
-        .bind(authed_token.id)
-        .bind(&authed_token.token)
-        .bind(&ip_addr)
-        .bind(&reduced_ip)
-        .bind(authed_token.asn_num)
-        .bind(&authed_token.writing_ua)
-        .bind(&authed_token.auth_code)
-        .bind(authed_token.created_at)
-        .bind(&authed_token.author_id_seed)
-        .bind(authed_token.require_user_registration)
         .execute(&self.pool)
         .await?;
 
@@ -1696,13 +1766,13 @@ impl BbsRepository for BbsRepositoryPgImpl {
         authed_time: DateTime<Utc>,
         additional_info: Option<serde_json::Value>,
     ) -> anyhow::Result<()> {
-        sqlx::query(
+        sqlx::query!(
             "UPDATE authed_tokens SET validity = TRUE, authed_ua = $1, authed_at = $2, additional_info = $3 WHERE token = $4",
+            authed_ua,
+            authed_time,
+            additional_info,
+            token,
         )
-        .bind(authed_ua)
-        .bind(authed_time)
-        .bind(additional_info)
-        .bind(token)
         .execute(&self.pool)
         .await?;
 
@@ -1714,27 +1784,30 @@ impl BbsRepository for BbsRepositoryPgImpl {
         token_id: Uuid,
         last_wrote: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        sqlx::query("UPDATE authed_tokens SET last_wrote_at = $1 WHERE id = $2")
-            .bind(last_wrote)
-            .bind(token_id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "UPDATE authed_tokens SET last_wrote_at = $1 WHERE id = $2",
+            last_wrote,
+            token_id,
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
 
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        sqlx::query("UPDATE authed_tokens SET validity = FALSE WHERE token = $1")
-            .bind(token)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "UPDATE authed_tokens SET validity = FALSE WHERE token = $1",
+            token,
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
 
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        sqlx::query("DELETE FROM authed_tokens WHERE token = $1")
-            .bind(token)
+        sqlx::query!("DELETE FROM authed_tokens WHERE token = $1", token)
             .execute(&self.pool)
             .await?;
 
@@ -1742,10 +1815,12 @@ impl BbsRepository for BbsRepositoryPgImpl {
     }
 
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        sqlx::query("UPDATE authed_tokens SET require_reauth = FALSE WHERE id = $1")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query!(
+            "UPDATE authed_tokens SET require_reauth = FALSE WHERE id = $1",
+            id,
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
@@ -1754,16 +1829,17 @@ impl BbsRepository for BbsRepositoryPgImpl {
         &self,
         board_key: &str,
     ) -> anyhow::Result<Vec<crate::domain::ng_word::NgWord>> {
-        let rows = sqlx::query_as::<_, NgWordPg>(
+        let rows = sqlx::query_as!(
+            NgWordPg,
             r#"
-            SELECT nw.id, nw.name, nw.word, nw.created_at, nw.updated_at
+            SELECT nw.id AS "id: Uuid", nw.name, nw.word, nw.created_at, nw.updated_at
             FROM ng_words AS nw
             JOIN boards_ng_words AS bnw ON nw.id = bnw.ng_word_id
             JOIN boards AS b ON bnw.board_id = b.id
             WHERE b.board_key = $1
             "#,
+            board_key,
         )
-        .bind(board_key)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1784,17 +1860,19 @@ impl BbsRepository for BbsRepositoryPgImpl {
         cap_hash: &str,
         board_key: &str,
     ) -> anyhow::Result<Option<Cap>> {
-        let row = sqlx::query_as::<_, CapPg>(
+        let row = sqlx::query_as!(
+            CapPg,
             r#"
-            SELECT c.id, c.name, c.description, c.password_hash, c.created_at, c.updated_at
+            SELECT c.id AS "id: Uuid", c.name, c.description, c.password_hash,
+                   c.created_at, c.updated_at
             FROM caps AS c
             JOIN boards_caps AS bc ON c.id = bc.cap_id
             JOIN boards AS b ON bc.board_id = b.id
             WHERE c.password_hash = $1 AND b.board_key = $2
             "#,
+            cap_hash,
+            board_key,
         )
-        .bind(cap_hash)
-        .bind(board_key)
         .fetch_optional(&self.pool)
         .await?;
 

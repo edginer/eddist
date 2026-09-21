@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE authed_tokens SET last_wrote_at = $1 WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e3672159624d7fcb3d570ce3a38b1cceb903f5e3f1283841e6a5ac3db3fdb5f"
+}

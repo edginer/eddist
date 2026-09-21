@@ -59,6 +59,8 @@ CREATE TABLE boards_info (
     created_at                           TIMESTAMPTZ NOT NULL,
     updated_at                           TIMESTAMPTZ NOT NULL,
     force_metadent_type                  VARCHAR(10) DEFAULT NULL,
+    enable_1001_message                  BOOLEAN NOT NULL DEFAULT TRUE,
+    custom_1001_message                  TEXT DEFAULT NULL,
     FOREIGN KEY (id) REFERENCES boards (id)
 );
 
@@ -96,6 +98,7 @@ CREATE TABLE responses (
     board_id        UUID NOT NULL,
     thread_id       UUID NOT NULL,
     is_abone        BOOLEAN NOT NULL DEFAULT FALSE,
+    is_abone_keep_id BOOLEAN NOT NULL DEFAULT FALSE,
     res_order       INTEGER NOT NULL,
     client_info     JSONB NOT NULL,
     FOREIGN KEY (board_id) REFERENCES boards (id),
@@ -311,7 +314,8 @@ CREATE TABLE notices (
     created_at   TIMESTAMPTZ NOT NULL,
     updated_at   TIMESTAMPTZ NOT NULL,
     published_at TIMESTAMPTZ NOT NULL,
-    author_email VARCHAR(255)
+    author_email VARCHAR(255),
+    hide_from_list BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX ON notices (slug);
 CREATE INDEX ON notices (published_at);
@@ -362,6 +366,17 @@ CREATE TABLE server_settings (
     updated_at  TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX idx_server_settings_key ON server_settings (setting_key);
+
+-- daily_stats
+CREATE TABLE daily_stats (
+    date            DATE NOT NULL,
+    board_key       VARCHAR(255) NOT NULL,
+    total_responses BIGINT NOT NULL DEFAULT 0,
+    new_threads     BIGINT NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (date, board_key)
+);
+CREATE INDEX idx_daily_stats_board_key ON daily_stats (board_key);
 
 -- Seed data
 INSERT INTO boards (id, name, board_key, default_name)

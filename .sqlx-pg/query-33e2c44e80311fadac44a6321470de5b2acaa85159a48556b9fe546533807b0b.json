@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT setting_key, value FROM server_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "setting_key",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "server_settings",
+            "name": "setting_key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "server_settings",
+            "name": "value"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "33e2c44e80311fadac44a6321470de5b2acaa85159a48556b9fe546533807b0b"
+}

@@ -93,14 +93,6 @@ async fn main() -> anyhow::Result<()> {
         .connect(&env::var("DATABASE_URL")?)
         .await?;
 
-    // PostgreSQL: TIMESTAMP has native sub-millisecond precision; no session mode setup needed.
-    #[cfg(feature = "backend-postgres")]
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(8)
-        .acquire_timeout(Duration::from_secs(5))
-        .connect(&env::var("DATABASE_URL")?)
-        .await?;
-
     let tinker_secret = env::var("TINKER_SECRET").unwrap();
 
     // Load initial captcha configs from database and initialize cache

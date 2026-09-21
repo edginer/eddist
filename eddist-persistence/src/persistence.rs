@@ -2,7 +2,9 @@ use std::env;
 
 use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_CACHE_RES_KEY};
 use redis::AsyncCommands;
-use sqlx::{Connection, Executor, QueryBuilder, query};
+use sqlx::Connection;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{Executor, QueryBuilder, query};
 use tokio::{select, time::sleep};
 use tracing::{error, info};
 
@@ -374,7 +376,7 @@ async fn insert_multiple_res(
         builder.build().execute(&mut *tx).await?;
 
         for (thread_id, created_at) in thread_id_to_created_at.iter() {
-            let _ = sqlx::query(
+            let _ = sqlx::query!(
                 r#"
                 WITH response_count AS (
                     SELECT COUNT(*) AS cnt
@@ -387,10 +389,10 @@ async fn insert_multiple_res(
                     active = (SELECT cnt FROM response_count) <= 1000
                 WHERE id = $3
                 "#,
+                thread_id,
+                created_at,
+                thread_id,
             )
-            .bind(thread_id)
-            .bind(created_at)
-            .bind(thread_id)
             .execute(&mut *tx)
             .await;
         }

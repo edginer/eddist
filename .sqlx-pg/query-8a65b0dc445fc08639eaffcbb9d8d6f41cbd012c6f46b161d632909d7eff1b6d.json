@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO authed_tokens\n                       (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,\n                        auth_code, created_at, authed_at, validity, last_wrote_at,\n                        author_id_seed, additional_info)\n                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12, $13)\n                       ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Text",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Bytea",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8a65b0dc445fc08639eaffcbb9d8d6f41cbd012c6f46b161d632909d7eff1b6d"
+}

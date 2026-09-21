@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM authed_tokens WHERE token = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1b3ef7847a76e893ed5db452dd30ede8001e978ec51f61ae767292e179b4ce10"
+}

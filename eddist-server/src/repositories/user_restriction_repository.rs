@@ -123,9 +123,11 @@ impl UserRestrictionRepositoryPgImpl {
 #[async_trait]
 impl UserRestrictionRepository for UserRestrictionRepositoryPgImpl {
     async fn get_all_active_rules(&self) -> anyhow::Result<Vec<UserRestrictionRule>> {
-        let rows = sqlx::query_as::<_, UserRestrictionRulePg>(
+        let rows = sqlx::query_as!(
+            UserRestrictionRulePg,
             r#"
-            SELECT id, name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email
+            SELECT id AS "id: Uuid", name, rule_type::text AS "rule_type!: String", rule_value,
+                   expires_at, created_at, updated_at, created_by_email
             FROM user_restriction_rules
             WHERE expires_at IS NULL OR expires_at > NOW()
             ORDER BY created_at DESC

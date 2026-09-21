@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT at.author_id_seed AS \"author_id_seed!: Vec<u8>\"\n            FROM authed_tokens at\n            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id\n            WHERE uat.user_id = $1\n            ORDER BY uat.created_at ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_id_seed!: Vec<u8>",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "author_id_seed"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09f4f295642b996baa6ef3c89f52e9b5d4a6cb8d1f88e16dd1635f851a09add9"
+}

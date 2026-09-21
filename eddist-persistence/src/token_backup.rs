@@ -89,12 +89,13 @@ pub async fn backup_token(
     bucket_name: &str,
     token_id: Uuid,
 ) -> anyhow::Result<()> {
-    let row = sqlx::query_as::<_, AuthedTokenBackupPg>(
+    let row = sqlx::query_as!(
+        AuthedTokenBackupPg,
         "SELECT id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, authed_ua,
                 auth_code, created_at, authed_at, last_wrote_at, additional_info, author_id_seed
          FROM authed_tokens WHERE id = $1",
+        token_id,
     )
-    .bind(token_id)
     .fetch_one(pool)
     .await?;
 
