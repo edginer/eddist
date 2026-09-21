@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE threads SET archived = TRUE WHERE active = FALSE\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "a65b6b4caab3e0a51657a28a29a04946cc2970db766a2689f7bf4c52d2e1259c"
+}

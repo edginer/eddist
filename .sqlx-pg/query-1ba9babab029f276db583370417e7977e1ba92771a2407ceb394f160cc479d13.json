@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO archived_threads\n                (id, board_id, thread_number, last_modified_at, sage_last_modified_at,\n                 title, authed_token_id, metadent, response_count, no_pool, active, archived)\n            SELECT id, board_id, thread_number, last_modified_at, sage_last_modified_at,\n                   title, authed_token_id, metadent, response_count, no_pool, active, archived\n            FROM threads\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1ba9babab029f276db583370417e7977e1ba92771a2407ceb394f160cc479d13"
+}

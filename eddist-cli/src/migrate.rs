@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use futures::StreamExt;
 use sqlx::{MySqlPool, PgPool, Postgres, QueryBuilder};
 use uuid::Uuid;
@@ -49,6 +49,7 @@ pub async fn run(mysql_url: &str, pg_url: &str) -> Result<()> {
     migrate_terms(&mysql, &pg).await?;
     migrate_captcha_configs(&mysql, &pg).await?;
     migrate_server_settings(&mysql, &pg).await?;
+    migrate_daily_stats(&mysql, &pg).await?;
 
     println!("\nDone.");
     Ok(())
@@ -229,6 +230,8 @@ struct MysqlBoardInfo {
     created_at: NaiveDateTime,
     updated_at: NaiveDateTime,
     force_metadent_type: Option<String>,
+    enable_1001_message: bool,
+    custom_1001_message: Option<String>,
 }
 
 async fn migrate_boards_info(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
@@ -238,7 +241,8 @@ async fn migrate_boards_info(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
                 max_thread_name_byte_length, max_author_name_byte_length,
                 max_email_byte_length, max_response_body_byte_length, max_response_body_lines,
                 threads_archive_cron, threads_archive_trigger_thread_count,
-                read_only, created_at, updated_at, force_metadent_type
+                read_only, created_at, updated_at, force_metadent_type,
+                enable_1001_message, custom_1001_message
          FROM boards_info",
     )
     .fetch_all(mysql)
@@ -251,14 +255,17 @@ async fn migrate_boards_info(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
              (id, local_rules, base_thread_creation_span_sec, base_response_creation_span_sec,
               max_thread_name_byte_length, max_author_name_byte_length, max_email_byte_length,
               max_response_body_byte_length, max_response_body_lines, threads_archive_cron,
-              threads_archive_trigger_thread_count, read_only, created_at, updated_at, force_metadent_type)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+              threads_archive_trigger_thread_count, read_only, created_at, updated_at,
+              force_metadent_type, enable_1001_message, custom_1001_message)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
              ON CONFLICT (id) DO UPDATE SET
                local_rules=EXCLUDED.local_rules,
                threads_archive_cron=EXCLUDED.threads_archive_cron,
                threads_archive_trigger_thread_count=EXCLUDED.threads_archive_trigger_thread_count,
                read_only=EXCLUDED.read_only, updated_at=EXCLUDED.updated_at,
-               force_metadent_type=EXCLUDED.force_metadent_type",
+               force_metadent_type=EXCLUDED.force_metadent_type,
+               enable_1001_message=EXCLUDED.enable_1001_message,
+               custom_1001_message=EXCLUDED.custom_1001_message",
         )
         .bind(uid(&row.id))
         .bind(&row.local_rules)
@@ -275,6 +282,8 @@ async fn migrate_boards_info(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
         .bind(utc(row.created_at))
         .bind(utc(row.updated_at))
         .bind(&row.force_metadent_type)
+        .bind(row.enable_1001_message)
+        .bind(&row.custom_1001_message)
         .execute(pg)
         .await?;
     }
@@ -606,6 +615,7 @@ struct MysqlResponse {
     board_id: String,
     thread_id: String,
     is_abone: bool,
+    is_abone_keep_id: bool,
     res_order: i32,
     client_info: String,
 }
@@ -616,7 +626,7 @@ async fn migrate_responses(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
                 BIN_TO_UUID(authed_token_id) AS authed_token_id,
                 BIN_TO_UUID(board_id) AS board_id,
                 BIN_TO_UUID(thread_id) AS thread_id,
-                is_abone, res_order, CAST(client_info AS CHAR) AS client_info
+                is_abone, is_abone_keep_id, res_order, CAST(client_info AS CHAR) AS client_info
          FROM responses",
     )
     .fetch(mysql);
@@ -650,7 +660,7 @@ async fn insert_responses_batch(pg: &PgPool, batch: &[MysqlResponse]) -> Result<
     let mut qb = QueryBuilder::<Postgres>::new(
         "INSERT INTO responses \
          (id, author_name, mail, body, created_at, author_id, ip_addr, \
-          authed_token_id, board_id, thread_id, is_abone, res_order, client_info) ",
+          authed_token_id, board_id, thread_id, is_abone, is_abone_keep_id, res_order, client_info) ",
     );
     qb.push_values(batch.iter().zip(client_infos.iter()), |mut b, (row, ci)| {
         b.push_bind(uid(&row.id))
@@ -664,6 +674,7 @@ async fn insert_responses_batch(pg: &PgPool, batch: &[MysqlResponse]) -> Result<
             .push_bind(uid(&row.board_id))
             .push_bind(uid(&row.thread_id))
             .push_bind(row.is_abone)
+            .push_bind(row.is_abone_keep_id)
             .push_bind(row.res_order)
             .push_bind(ci);
     });
@@ -876,12 +887,13 @@ struct MysqlNotice {
     updated_at: NaiveDateTime,
     published_at: NaiveDateTime,
     author_email: Option<String>,
+    hide_from_list: bool,
 }
 
 async fn migrate_notices(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
     let rows = sqlx::query_as::<_, MysqlNotice>(
         "SELECT BIN_TO_UUID(id) AS id, slug, title, content,
-                created_at, updated_at, published_at, author_email
+                created_at, updated_at, published_at, author_email, hide_from_list
          FROM notices",
     )
     .fetch_all(mysql)
@@ -890,8 +902,9 @@ async fn migrate_notices(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
     let count = rows.len();
     for row in &rows {
         sqlx::query(
-            "INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING",
+            "INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at,
+                                  author_email, hide_from_list)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING",
         )
         .bind(uid(&row.id))
         .bind(&row.slug)
@@ -901,6 +914,7 @@ async fn migrate_notices(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
         .bind(utc(row.updated_at))
         .bind(utc(row.published_at))
         .bind(&row.author_email)
+        .bind(row.hide_from_list)
         .execute(pg)
         .await?;
     }
@@ -1063,5 +1077,42 @@ async fn migrate_server_settings(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
         .await?;
     }
     println!("server_settings:        {count}");
+    Ok(())
+}
+
+// ─── daily_stats ─────────────────────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+struct MysqlDailyStat {
+    date: NaiveDate,
+    board_key: String,
+    total_responses: i64,
+    new_threads: i64,
+}
+
+async fn migrate_daily_stats(mysql: &MySqlPool, pg: &PgPool) -> Result<()> {
+    let rows = sqlx::query_as::<_, MysqlDailyStat>(
+        "SELECT date, board_key, total_responses, new_threads FROM daily_stats",
+    )
+    .fetch_all(mysql)
+    .await?;
+
+    let count = rows.len();
+    for row in &rows {
+        sqlx::query(
+            "INSERT INTO daily_stats (date, board_key, total_responses, new_threads)
+             VALUES ($1,$2,$3,$4)
+             ON CONFLICT (date, board_key) DO UPDATE SET
+               total_responses=EXCLUDED.total_responses,
+               new_threads=EXCLUDED.new_threads",
+        )
+        .bind(row.date)
+        .bind(&row.board_key)
+        .bind(row.total_responses)
+        .bind(row.new_threads)
+        .execute(pg)
+        .await?;
+    }
+    println!("daily_stats:            {count}");
     Ok(())
 }

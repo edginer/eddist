@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT board_key, date AS \"date: NaiveDate\", total_responses, new_threads\n            FROM daily_stats\n            WHERE date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "board_key",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "daily_stats",
+            "name": "board_key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "date: NaiveDate",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "daily_stats",
+            "name": "date"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "total_responses",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "daily_stats",
+            "name": "total_responses"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "new_threads",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "daily_stats",
+            "name": "new_threads"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6e1adf9eb1953c004b162a90a0fa1099458d716e02e09b28d7223c53611a19fb"
+}

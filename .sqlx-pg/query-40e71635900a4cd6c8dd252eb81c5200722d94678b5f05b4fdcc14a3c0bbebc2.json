@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO threads\n                (id, board_id, thread_number, last_modified_at, sage_last_modified_at,\n                 title, authed_token_id, metadent, response_count)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40e71635900a4cd6c8dd252eb81c5200722d94678b5f05b4fdcc14a3c0bbebc2"
+}

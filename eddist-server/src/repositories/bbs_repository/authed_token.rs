@@ -1,10 +1,12 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::query;
 use uuid::Uuid;
 
 use crate::domain::authed_token::AuthedToken;
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::BbsRepositoryImpl;
 
 #[async_trait::async_trait]
@@ -39,6 +41,7 @@ pub trait AuthedTokenRepository: Send + Sync + 'static {
 }
 
 #[async_trait::async_trait]
+#[cfg(not(feature = "backend-postgres"))]
 impl AuthedTokenRepository for BbsRepositoryImpl {
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
         let row = sqlx::query_as!(

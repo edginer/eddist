@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                us.id AS \"user_id: Uuid\",\n                us.user_name,\n                us.enabled AS \"user_enabled: bool\",\n                us.created_at AS user_created_at,\n                us.updated_at AS user_updated_at,\n                idps.id AS \"idp_id: Uuid\",\n                idps.idp_name,\n                idps.idp_display_name,\n                uib.idp_sub,\n                uib.created_at AS idp_bind_created_at,\n                uib.updated_at AS idp_bind_updated_at\n            FROM users AS us\n            JOIN user_idp_bindings AS uib ON us.id = uib.user_id\n            JOIN idps AS idps ON uib.idp_id = idps.id\n            WHERE us.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "user_name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "user_enabled: bool",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "user_created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "user_updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "idp_id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "idp_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "idp_name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "idp_display_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "idp_display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "idp_sub",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "user_idp_bindings",
+            "name": "idp_sub"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "idp_bind_created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_idp_bindings",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "idp_bind_updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_idp_bindings",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6cc5402999b2aa4c16e849c1fd83c45f609fdb3bbc4ba602b7a3c801ce31c632"
+}

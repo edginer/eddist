@@ -286,12 +286,15 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
 pub async fn get_active_captcha_configs(
     pool: &PgPool,
 ) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
-    let rows = sqlx::query_as::<_, CaptchaConfigRow>(
+    let rows = sqlx::query_as!(
+        CaptchaConfigRow,
         r#"
         SELECT
-            id, name, provider, site_key, secret,
+            id AS "id: Uuid", name, provider, site_key, secret,
             base_url, widget_form_field_name, widget_script_url, widget_html, widget_script_handler,
-            capture_fields, verification, is_active, display_order, endpoint_usage
+            capture_fields AS "capture_fields: serde_json::Value",
+            verification AS "verification: serde_json::Value",
+            is_active AS "is_active: bool", display_order, endpoint_usage
         FROM captcha_configs
         WHERE is_active = TRUE
         ORDER BY display_order ASC, created_at ASC

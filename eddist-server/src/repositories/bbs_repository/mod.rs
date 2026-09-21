@@ -13,6 +13,7 @@ pub use legacy::BbsRepositoryPgImpl;
 pub use response::ResponseRepository;
 pub use thread::{ThreadRepository, ThreadStatus};
 
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
 
 #[async_trait::async_trait]
@@ -21,17 +22,20 @@ pub trait BbsRepository:
 {
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct BbsRepositoryImpl {
     pub(super) pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl BbsRepositoryImpl {
     pub fn new(pool: MySqlPool) -> BbsRepositoryImpl {
         BbsRepositoryImpl { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl BbsRepository for BbsRepositoryImpl {}
 
 // The PostgreSQL implementation was originally written against the monolithic
@@ -151,11 +155,7 @@ impl ResponseRepository for BbsRepositoryPgImpl {
         &self,
         thread_id: uuid::Uuid,
     ) -> anyhow::Result<Vec<eddist_core::domain::res::ResView>> {
-        let mut responses = LegacyBbsRepository::get_responses(self, thread_id).await?;
-        for response in &mut responses {
-            response.is_abone_keep_id = false;
-        }
-        Ok(responses)
+        LegacyBbsRepository::get_responses(self, thread_id).await
     }
 
     async fn create_response(

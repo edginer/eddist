@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT author_name, mail, body, created_at, author_id, is_abone,\n                   is_abone_keep_id AS \"is_abone_keep_id: bool\"\n            FROM responses\n            WHERE thread_id = $1\n            ORDER BY res_order, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "author_name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "mail",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "mail"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "author_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "author_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "is_abone",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "is_abone"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "is_abone_keep_id: bool",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "responses",
+            "name": "is_abone_keep_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "68380fede1de9fbb7b65865ebaa552591029a4001ae9dc1691cf4e61c0b7facb"
+}

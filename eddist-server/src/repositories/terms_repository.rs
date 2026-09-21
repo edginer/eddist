@@ -88,9 +88,10 @@ impl TermsRepositoryPgImpl {
 #[async_trait::async_trait]
 impl TermsRepository for TermsRepositoryPgImpl {
     async fn get_terms(&self) -> anyhow::Result<Option<Terms>> {
-        let row = sqlx::query_as::<_, TermsPg>(
+        let row = sqlx::query_as!(
+            TermsPg,
             r#"
-            SELECT id, content, created_at, updated_at, updated_by
+            SELECT id AS "id: Uuid", content, created_at, updated_at, updated_by
             FROM terms
             ORDER BY updated_at DESC
             LIMIT 1

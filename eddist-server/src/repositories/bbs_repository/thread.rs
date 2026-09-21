@@ -3,12 +3,16 @@ use eddist_core::domain::{
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
 };
-use sqlx::{query, query_as, types::Json};
+use sqlx::types::Json;
+#[cfg(not(feature = "backend-postgres"))]
+use sqlx::{query, query_as};
 use uuid::Uuid;
 
 use crate::domain::{authed_token::AuthedToken, thread::Thread};
 
-use super::{BbsRepositoryImpl, CreatingThread};
+#[cfg(not(feature = "backend-postgres"))]
+use super::BbsRepositoryImpl;
+use super::CreatingThread;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ThreadStatus {
@@ -42,6 +46,7 @@ pub trait ThreadRepository: Send + Sync + 'static {
 }
 
 #[async_trait::async_trait]
+#[cfg(not(feature = "backend-postgres"))]
 impl ThreadRepository for BbsRepositoryImpl {
     async fn get_threads(
         &self,

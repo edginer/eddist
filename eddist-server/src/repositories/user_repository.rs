@@ -438,15 +438,16 @@ fn fold_user_idp_rows(rows: Vec<UserIdpSelectionPg>) -> Option<crate::domain::us
 #[async_trait::async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<crate::domain::user::User>> {
-        let rows = sqlx::query_as::<_, UserIdpSelectionPg>(
+        let rows = sqlx::query_as!(
+            UserIdpSelectionPg,
             r#"
             SELECT
-                us.id AS user_id,
+                us.id AS "user_id: Uuid",
                 us.user_name,
-                us.enabled AS user_enabled,
+                us.enabled AS "user_enabled: bool",
                 us.created_at AS user_created_at,
                 us.updated_at AS user_updated_at,
-                idps.id AS idp_id,
+                idps.id AS "idp_id: Uuid",
                 idps.idp_name,
                 idps.idp_display_name,
                 uib.idp_sub,
@@ -457,8 +458,8 @@ impl UserRepository for UserRepositoryImpl {
             JOIN idps AS idps ON uib.idp_id = idps.id
             WHERE us.id = $1
             "#,
+            id,
         )
-        .bind(id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -470,15 +471,16 @@ impl UserRepository for UserRepositoryImpl {
         idp_name: &str,
         idp_sub: &str,
     ) -> anyhow::Result<Option<crate::domain::user::User>> {
-        let rows = sqlx::query_as::<_, UserIdpSelectionPg>(
+        let rows = sqlx::query_as!(
+            UserIdpSelectionPg,
             r#"
             SELECT
-                us.id AS user_id,
+                us.id AS "user_id: Uuid",
                 us.user_name,
-                us.enabled AS user_enabled,
+                us.enabled AS "user_enabled: bool",
                 us.created_at AS user_created_at,
                 us.updated_at AS user_updated_at,
-                idps.id AS idp_id,
+                idps.id AS "idp_id: Uuid",
                 idps.idp_name,
                 idps.idp_display_name,
                 uib.idp_sub,
@@ -489,9 +491,9 @@ impl UserRepository for UserRepositoryImpl {
             JOIN idps AS idps ON uib.idp_id = idps.id
             WHERE idps.idp_name = $1 AND uib.idp_sub = $2
             "#,
+            idp_name,
+            idp_sub,
         )
-        .bind(idp_name)
-        .bind(idp_sub)
         .fetch_all(&self.pool)
         .await?;
 
@@ -499,26 +501,26 @@ impl UserRepository for UserRepositoryImpl {
     }
 
     async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
-        let rows: Vec<(Uuid,)> = sqlx::query_as(
+        let rows = sqlx::query_scalar!(
             r#"
-            SELECT authed_token_id
+            SELECT authed_token_id AS "authed_token_id!: Uuid"
             FROM user_authed_tokens
             WHERE user_id = $1
             ORDER BY created_at
             "#,
+            user_id,
         )
-        .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|(id,)| id).collect::<Vec<_>>())
+        Ok(rows)
     }
 
     async fn get_valid_authed_token_by_user_id(
         &self,
         user_id: Uuid,
     ) -> anyhow::Result<Option<String>> {
-        let row: Option<(String,)> = sqlx::query_as(
+        let row = sqlx::query_scalar!(
             r#"
             SELECT at.token
             FROM authed_tokens at
@@ -527,12 +529,12 @@ impl UserRepository for UserRepositoryImpl {
             ORDER BY at.authed_at DESC
             LIMIT 1
             "#,
+            user_id,
         )
-        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|(token,)| token))
+        Ok(row)
     }
 
     async fn create_user_with_idp<'a>(
@@ -540,27 +542,27 @@ impl UserRepository for UserRepositoryImpl {
         user: CreatingUser,
         mut tx: Transaction<'a, Db>,
     ) -> anyhow::Result<Transaction<'a, Db>> {
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO users (id, user_name, created_at, updated_at)
             VALUES ($1, $2, NOW(), NOW())
             "#,
+            user.user_id,
+            &user.user_name,
         )
-        .bind(user.user_id)
-        .bind(&user.user_name)
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO user_idp_bindings (id, user_id, idp_id, idp_sub, created_at, updated_at)
             VALUES ($1, $2, $3, $4, NOW(), NOW())
             "#,
+            Uuid::now_v7(),
+            user.user_id,
+            user.idp_id,
+            &user.idp_sub,
         )
-        .bind(Uuid::now_v7())
-        .bind(user.user_id)
-        .bind(user.idp_id)
-        .bind(&user.idp_sub)
         .execute(&mut *tx)
         .await?;
 
@@ -568,18 +570,18 @@ impl UserRepository for UserRepositoryImpl {
     }
 
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool> {
-        let row: (bool,) = sqlx::query_as(
+        let row = sqlx::query_scalar!(
             r#"
-            SELECT (registered_user_id IS NOT NULL)
+            SELECT (registered_user_id IS NOT NULL) AS "is_binded!: bool"
             FROM authed_tokens
             WHERE id = $1
             "#,
+            authed_token_id,
         )
-        .bind(authed_token_id)
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(row.0)
+        Ok(row)
     }
 
     async fn bind_user_authed_token<'a>(
@@ -595,25 +597,26 @@ impl UserRepository for UserRepositoryImpl {
         );
 
         // Serialize concurrent bindings — PG uses SELECT ... FOR UPDATE
-        let user_exists: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT id FROM users WHERE id = $1 FOR UPDATE"#)
-                .bind(user_id)
-                .fetch_optional(&mut *tx)
-                .await?;
+        let user_exists = sqlx::query_scalar!(
+            r#"SELECT id AS "id!: Uuid" FROM users WHERE id = $1 FOR UPDATE"#,
+            user_id,
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
 
         if user_exists.is_none() {
             anyhow::bail!("user {user_id} not found");
         }
 
-        sqlx::query(
+        sqlx::query!(
             r#"
             INSERT INTO user_authed_tokens (id, user_id, authed_token_id, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
             "#,
+            Uuid::now_v7(),
+            user_id,
+            authed_token_id,
         )
-        .bind(Uuid::now_v7())
-        .bind(user_id)
-        .bind(authed_token_id)
         .execute(&mut *tx)
         .await?;
 
@@ -623,43 +626,43 @@ impl UserRepository for UserRepositoryImpl {
             authed_token_id
         );
 
-        let canonical_seed: Option<(Vec<u8>,)> = sqlx::query_as(
+        let canonical_seed = sqlx::query_scalar!(
             r#"
-            SELECT at.author_id_seed
+            SELECT at.author_id_seed AS "author_id_seed!: Vec<u8>"
             FROM authed_tokens at
             JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
             WHERE uat.user_id = $1
             ORDER BY uat.created_at ASC
             LIMIT 1
             "#,
+            user_id,
         )
-        .bind(user_id)
         .fetch_optional(&mut *tx)
         .await?;
 
-        if let Some((seed,)) = canonical_seed {
-            sqlx::query(
+        if let Some(seed) = canonical_seed {
+            sqlx::query!(
                 r#"
                 UPDATE authed_tokens
                 SET registered_user_id = $1, author_id_seed = $2
                 WHERE id = $3
                 "#,
+                user_id,
+                &seed,
+                authed_token_id,
             )
-            .bind(user_id)
-            .bind(&seed)
-            .bind(authed_token_id)
             .execute(&mut *tx)
             .await?;
         } else {
-            sqlx::query(
+            sqlx::query!(
                 r#"
                 UPDATE authed_tokens
                 SET registered_user_id = $1
                 WHERE id = $2
                 "#,
+                user_id,
+                authed_token_id,
             )
-            .bind(user_id)
-            .bind(authed_token_id)
             .execute(&mut *tx)
             .await?;
         }

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE threads SET\n                last_modified_at = $1,\n                response_count = response_count + 1,\n                sage_last_modified_at = CASE WHEN $2 THEN sage_last_modified_at ELSE $3 END,\n                active = CASE WHEN response_count >= 1000 THEN FALSE ELSE TRUE END\n            WHERE id = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Bool",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7aa49aad1f6291f7cc9edde548cd8b78cb5f37e6966a1acfc032742f139dc52f"
+}

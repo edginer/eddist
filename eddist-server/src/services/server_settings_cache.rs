@@ -51,15 +51,16 @@ pub async fn refresh_server_settings_cache(pool: &MySqlPool) -> anyhow::Result<(
 
 #[cfg(feature = "backend-postgres")]
 pub async fn refresh_server_settings_cache(pool: &PgPool) -> anyhow::Result<()> {
-    let rows =
-        sqlx::query_as::<_, (String, String)>("SELECT setting_key, value FROM server_settings")
-            .fetch_all(pool)
-            .await?;
+    let rows = sqlx::query!("SELECT setting_key, value FROM server_settings")
+        .fetch_all(pool)
+        .await?;
 
     let cache = get_global_cache();
     let mut map = cache.write().await;
     map.clear();
-    for (key, value) in rows {
+    for row in rows {
+        let key = row.setting_key;
+        let value = row.value;
         map.insert(key, value);
     }
 

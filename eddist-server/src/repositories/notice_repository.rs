@@ -111,6 +111,7 @@ struct NoticePg {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub published_at: chrono::DateTime<chrono::Utc>,
     pub author_email: Option<String>,
+    pub hide_from_list: bool,
 }
 
 #[cfg(feature = "backend-postgres")]
@@ -125,6 +126,7 @@ impl From<NoticePg> for Notice {
             updated_at: r.updated_at.naive_utc(),
             published_at: r.published_at.naive_utc(),
             author_email: r.author_email,
+            hide_from_list: r.hide_from_list,
         }
     }
 }
@@ -173,17 +175,18 @@ impl NoticeRepository for NoticeRepositoryPgImpl {
     ) -> anyhow::Result<Vec<NoticeListItem>> {
         let offset = (page * limit) as i64;
         let limit = limit as i64;
-        let rows = sqlx::query_as::<_, NoticeListItemPg>(
+        let rows = sqlx::query_as!(
+            NoticeListItemPg,
             r#"
-            SELECT id, slug, title, published_at
+            SELECT id AS "id: Uuid", slug, title, published_at
             FROM notices
-            WHERE published_at <= NOW()
+            WHERE published_at <= NOW() AND hide_from_list = FALSE
             ORDER BY published_at DESC
             LIMIT $1 OFFSET $2
             "#,
+            limit,
+            offset,
         )
-        .bind(limit)
-        .bind(offset)
         .fetch_all(&self.pool)
         .await?;
 
@@ -194,14 +197,16 @@ impl NoticeRepository for NoticeRepositoryPgImpl {
     }
 
     async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>> {
-        let row = sqlx::query_as::<_, NoticePg>(
+        let row = sqlx::query_as!(
+            NoticePg,
             r#"
-            SELECT id, slug, title, content, created_at, updated_at, published_at, author_email
+            SELECT id AS "id: Uuid", slug, title, content, created_at, updated_at, published_at, author_email,
+                   hide_from_list AS "hide_from_list: bool"
             FROM notices
             WHERE slug = $1 AND published_at <= NOW()
             "#,
+            slug,
         )
-        .bind(slug)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -209,11 +214,11 @@ impl NoticeRepository for NoticeRepositoryPgImpl {
     }
 
     async fn count_notices(&self) -> anyhow::Result<i64> {
-        let count: i64 = sqlx::query_scalar(
+        let count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(*)
+            SELECT COUNT(*) AS "count!: i64"
             FROM notices
-            WHERE published_at <= NOW()
+            WHERE published_at <= NOW() AND hide_from_list = FALSE
             "#,
         )
         .fetch_one(&self.pool)

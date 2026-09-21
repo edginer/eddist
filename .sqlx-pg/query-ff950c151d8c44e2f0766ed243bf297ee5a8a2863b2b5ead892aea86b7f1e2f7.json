@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO authed_tokens\n                (id, token, origin_ip, reduced_origin_ip, asn_num, writing_ua, auth_code,\n                 created_at, validity, author_id_seed, require_user_registration)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, $9, $10)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Bytea",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ff950c151d8c44e2f0766ed243bf297ee5a8a2863b2b5ead892aea86b7f1e2f7"
+}
