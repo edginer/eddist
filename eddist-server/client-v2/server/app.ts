@@ -21,6 +21,7 @@ app.use((req, res, next) => {
 
   if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
     url.pathname = url.pathname.slice(0, -1);
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
     res.redirect(308, `${url.pathname}${url.search}`);
     return;
   }
