@@ -1951,7 +1951,6 @@ dependencies = [
  "futures",
  "sea-orm",
  "serde_json",
- "sqlx",
  "tokio",
  "uuid",
 ]
