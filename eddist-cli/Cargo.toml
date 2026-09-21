@@ -9,14 +9,14 @@ backend-postgres = []
 
 [dependencies]
 anyhow.workspace = true
-sea-orm.workspace = true
+# `sqlx-mysql` comes from the workspace dependency; the CLI migration also
+# connects to PostgreSQL, so add its SeaORM driver here.
+sea-orm = { workspace = true, features = ["sqlx-postgres"] }
 clap.workspace = true
 eddist-core.workspace = true
 futures.workspace = true
-chrono.workspace = true
 dotenvy.workspace = true
 aws-sdk-s3.workspace = true
 serde_json.workspace = true
-sqlx.workspace = true
 tokio.workspace = true
 uuid.workspace = true
