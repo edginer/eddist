@@ -1,3 +1,4 @@
+use crate::entity::support::board_id_by_key;
 use crate::entity::{board, board_info, thread};
 use crate::models::{Board, BoardInfo, CreateBoardInput, EditBoardInput};
 use crate::repository::support::empty_to_none;
@@ -179,18 +180,14 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
     }
 
     async fn edit_board(&self, board_key: &str, input: EditBoardInput) -> anyhow::Result<Board> {
-        let board_model = board::Entity::find()
-            .filter(board::Column::BoardKey.eq(board_key))
-            .one(&self.0)
-            .await?
-            .ok_or_else(|| {
-                crate::error::ServiceError::NotFound(format!("Board not found: {board_key}"))
-            })?;
+        let board_id = board_id_by_key(&self.0, board_key).await?.ok_or_else(|| {
+            crate::error::ServiceError::NotFound(format!("Board not found: {board_key}"))
+        })?;
 
         let tx = self.0.begin().await?;
 
         board_info::ActiveModel {
-            id: Set(board_model.id),
+            id: Set(board_id),
             local_rules: input.local_rule.into_active_value(),
             threads_archive_cron: input
                 .threads_archive_cron
@@ -244,7 +241,7 @@ impl AdminBoardRepository for AdminBoardRepositoryImpl {
         .await?;
 
         let updated = board::ActiveModel {
-            id: Set(board_model.id),
+            id: Set(board_id),
             name: input.name.into_active_value(),
             default_name: input.default_name.into_active_value(),
             ..Default::default()

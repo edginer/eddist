@@ -2004,6 +2004,7 @@ dependencies = [
 name = "eddist-entity"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "sea-orm",
 ]
 

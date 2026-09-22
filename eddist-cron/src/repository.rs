@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
+use eddist_entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
 use eddist_entity::{archived_response, archived_thread, board, board_info, response, thread};
 use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{
@@ -15,25 +16,6 @@ impl Repository {
     pub fn new(db: DatabaseConnection) -> Self {
         Self(db)
     }
-}
-
-async fn board_id_by_key<C: ConnectionTrait>(
-    db: &C,
-    board_key: &str,
-) -> anyhow::Result<Option<Uuid>> {
-    Ok(board::Entity::find()
-        .filter(board::Column::BoardKey.eq(board_key))
-        .one(db)
-        .await?
-        .map(|model| model.id))
-}
-
-fn as_thread_number(value: i64) -> anyhow::Result<u64> {
-    u64::try_from(value).map_err(|_| anyhow::anyhow!("negative thread number: {value}"))
-}
-
-fn as_i64_thread_number(value: u64) -> anyhow::Result<i64> {
-    i64::try_from(value).map_err(|_| anyhow::anyhow!("thread number is too large: {value}"))
 }
 
 fn into_response(model: response::Model) -> anyhow::Result<(ResView, ClientInfo, Uuid)> {
@@ -107,7 +89,7 @@ impl Repository {
             .all(&self.0)
             .await?;
 
-        numbers.into_iter().map(as_thread_number).collect()
+        numbers.into_iter().map(thread_number_from_db).collect()
     }
 
     pub async fn update_threads_to_inactive(
@@ -173,7 +155,7 @@ impl Repository {
             .map(|thread| {
                 Ok((
                     thread.title,
-                    as_thread_number(thread.thread_number)?,
+                    thread_number_from_db(thread.thread_number)?,
                     thread.id,
                     thread.last_modified_at,
                 ))
@@ -190,8 +172,8 @@ impl Repository {
         let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
             return Ok(Vec::new());
         };
-        let start = as_i64_thread_number(start)?;
-        let end = as_i64_thread_number(end)?;
+        let start = thread_number_to_db(start)?;
+        let end = thread_number_to_db(end)?;
 
         let threads = archived_thread::Entity::find()
             .filter(archived_thread::Column::BoardId.eq(board_id))
@@ -204,7 +186,7 @@ impl Repository {
             .map(|thread| {
                 Ok((
                     thread.title,
-                    as_thread_number(thread.thread_number)?,
+                    thread_number_from_db(thread.thread_number)?,
                     thread.id,
                 ))
             })

@@ -1,7 +1,7 @@
+use crate::entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
 use crate::entity::{archived_response, archived_thread, board, response, thread};
 use crate::error::DbResultExt;
 use crate::models::Res;
-use crate::repository::support::{as_thread_number, board_id_by_key};
 use eddist_core::domain::client_info::ClientInfo as CoreClientInfo;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -78,7 +78,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         };
         let Some(thread) = thread::Entity::find()
             .filter(thread::Column::BoardId.eq(board_id))
-            .filter(thread::Column::ThreadNumber.eq(as_thread_number(thread_number)?))
+            .filter(thread::Column::ThreadNumber.eq(thread_number_to_db(thread_number)?))
             .one(&self.0)
             .await?
         else {
@@ -106,7 +106,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
         };
         let Some(thread) = archived_thread::Entity::find()
             .filter(archived_thread::Column::BoardId.eq(board_id))
-            .filter(archived_thread::Column::ThreadNumber.eq(as_thread_number(thread_number)?))
+            .filter(archived_thread::Column::ThreadNumber.eq(thread_number_to_db(thread_number)?))
             .one(&self.0)
             .await?
         else {
@@ -145,8 +145,7 @@ impl AdminResponseRepository for AdminResponseRepositoryImpl {
             .one(&self.0)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Board not found: {}", thread.board_id))?;
-        let thread_number = u64::try_from(thread.thread_number)
-            .map_err(|_| anyhow::anyhow!("negative thread number: {}", thread.thread_number))?;
+        let thread_number = thread_number_from_db(thread.thread_number)?;
 
         Ok((
             res,

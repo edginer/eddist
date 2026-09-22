@@ -12,6 +12,7 @@ pub mod ng_word;
 pub mod notice;
 pub mod response;
 pub mod server_settings;
+pub mod support;
 pub mod terms;
 pub mod thread;
 pub mod user;
