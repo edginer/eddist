@@ -8,8 +8,8 @@ pub struct Model {
     pub board_id: Uuid,
     pub thread_number: i64,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub last_modified_at: DateTime,
-    pub sage_last_modified_at: DateTime,
+    pub last_modified_at: DateTimeUtc,
+    pub sage_last_modified_at: DateTimeUtc,
     pub title: String,
     pub authed_token_id: Uuid,
     pub metadent: String,

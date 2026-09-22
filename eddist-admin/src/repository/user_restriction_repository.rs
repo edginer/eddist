@@ -40,9 +40,9 @@ fn into_domain(model: user_restriction::Model) -> anyhow::Result<UserRestriction
         target: model.target.parse().map_err(anyhow::Error::msg)?,
         rule_type,
         rule_value: model.rule_value,
-        expires_at: model.expires_at.map(|date_time| date_time.and_utc()),
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.and_utc(),
+        expires_at: model.expires_at,
+        created_at: model.created_at,
+        updated_at: model.updated_at,
         created_by_email: model.created_by_email,
     })
 }
@@ -71,9 +71,9 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             rule_type: Set(input.rule_type.as_str().to_string()),
             target: Set(input.target.as_str().to_string()),
             rule_value: Set(input.rule_value),
-            expires_at: Set(input.expires_at.map(|date_time| {
-                crate::entity::db_time::truncate_to_millis(date_time.naive_utc())
-            })),
+            expires_at: Set(input
+                .expires_at
+                .map(|date_time| crate::entity::db_time::truncate_to_millis(date_time))),
             created_at: Set(now),
             updated_at: Set(now),
             created_by_email: Set(input.created_by_email),
@@ -102,9 +102,9 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             rule_type: Set(rule_type.as_str().to_string()),
             target: Set(input.target.unwrap_or(current.target).as_str().to_string()),
             rule_value: Set(rule_value),
-            expires_at: Set(expires_at.map(|date_time| {
-                crate::entity::db_time::truncate_to_millis(date_time.naive_utc())
-            })),
+            expires_at: Set(
+                expires_at.map(|date_time| crate::entity::db_time::truncate_to_millis(date_time))
+            ),
             updated_at: Set(now),
             ..Default::default()
         }

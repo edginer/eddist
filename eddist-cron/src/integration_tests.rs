@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use eddist_entity::{authed_token, board, thread, user, user_authed_token};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, DatabaseConnection, EntityTrait};
 use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners::AsyncRunner};
@@ -36,10 +36,10 @@ async fn setup_database() -> anyhow::Result<MysqlTestDatabase> {
 
 async fn insert_token(
     db: &DatabaseConnection,
-    created_at: NaiveDateTime,
-    authed_at: Option<NaiveDateTime>,
+    created_at: DateTime<Utc>,
+    authed_at: Option<DateTime<Utc>>,
     validity: bool,
-    last_wrote_at: Option<NaiveDateTime>,
+    last_wrote_at: Option<DateTime<Utc>>,
     registered_user_id: Option<Uuid>,
 ) -> anyhow::Result<Uuid> {
     let id = Uuid::now_v7();
@@ -71,7 +71,7 @@ async fn insert_token(
 async fn delete_stale_authed_tokens_keeps_referenced_and_recent_tokens() -> anyhow::Result<()> {
     let test_database = setup_database().await?;
     let db = &test_database.db;
-    let now = Utc::now().naive_utc();
+    let now = Utc::now();
     let days_ago = |days| now - TimeDelta::days(days);
 
     let pending_old = insert_token(db, days_ago(8), None, false, None, None).await?;

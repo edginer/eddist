@@ -53,7 +53,7 @@ fn into_response(model: response::Model) -> anyhow::Result<Res> {
         author_name: Some(model.author_name),
         mail: Some(model.mail),
         body: model.body,
-        created_at: model.created_at.and_utc(),
+        created_at: model.created_at,
         author_id: model.author_id,
         ip_addr: model.ip_addr,
         authed_token_id: model.authed_token_id,

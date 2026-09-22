@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use eddist_core::domain::{client_info::ClientInfo, pubsub_repository::CreatingRes};
 use eddist_entity::{authed_token, board, response, thread};
 use sea_orm::{
@@ -43,8 +43,10 @@ struct Fixture {
     authed_token_id: Uuid,
 }
 
-fn timestamp(s: &str) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f").unwrap()
+fn timestamp(s: &str) -> DateTime<Utc> {
+    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f")
+        .unwrap()
+        .and_utc()
 }
 
 async fn insert_fixture(db: &DatabaseConnection) -> anyhow::Result<Fixture> {
@@ -92,7 +94,7 @@ async fn insert_thread(
     db: &DatabaseConnection,
     fixture: &Fixture,
     thread_number: i64,
-    last_modified_at: NaiveDateTime,
+    last_modified_at: DateTime<Utc>,
     archived: bool,
 ) -> anyhow::Result<Uuid> {
     let id = Uuid::now_v7();
@@ -146,7 +148,7 @@ fn creating_res(
 }
 
 fn utc(s: &str) -> DateTime<Utc> {
-    Utc.from_utc_datetime(&timestamp(s))
+    timestamp(s)
 }
 
 async fn response_count(db: &DatabaseConnection, thread_id: Uuid) -> anyhow::Result<u64> {

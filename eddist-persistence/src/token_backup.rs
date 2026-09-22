@@ -24,9 +24,9 @@ pub async fn backup_token(
         writing_ua: token.writing_ua,
         authed_ua: token.authed_ua,
         auth_code: Some(token.auth_code),
-        created_at: token.created_at,
-        authed_at: token.authed_at,
-        last_wrote_at: token.last_wrote_at,
+        created_at: token.created_at.naive_utc(),
+        authed_at: token.authed_at.map(|dt| dt.naive_utc()),
+        last_wrote_at: token.last_wrote_at.map(|dt| dt.naive_utc()),
         additional_info: token.additional_info,
         author_id_seed: token.author_id_seed,
     };
