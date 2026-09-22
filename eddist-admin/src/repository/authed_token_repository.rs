@@ -62,10 +62,10 @@ fn into_domain(model: authed_token::Model) -> AuthedToken {
         asn_num: model.asn_num,
         writing_ua: model.writing_ua,
         authed_ua: model.authed_ua,
-        created_at: model.created_at,
-        authed_at: model.authed_at,
+        created_at: model.created_at.naive_utc(),
+        authed_at: model.authed_at.map(|value| value.naive_utc()),
         validity: model.validity,
-        last_wrote_at: model.last_wrote_at,
+        last_wrote_at: model.last_wrote_at.map(|value| value.naive_utc()),
         additional_info: model.additional_info,
         require_reauth: model.require_reauth,
         // Suspension lives in Redis, not this table; callers fill this in from there.

@@ -49,8 +49,8 @@ fn into_domain(model: captcha_config::Model) -> CaptchaConfig {
         is_active: model.is_active,
         display_order: model.display_order,
         endpoint_usage: model.endpoint_usage,
-        created_at: model.created_at,
-        updated_at: model.updated_at,
+        created_at: model.created_at.naive_utc(),
+        updated_at: model.updated_at.naive_utc(),
         updated_by: model.updated_by,
     }
 }

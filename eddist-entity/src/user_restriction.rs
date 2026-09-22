@@ -8,9 +8,9 @@ pub struct Model {
     pub name: String,
     pub rule_type: String,
     pub rule_value: String,
-    pub expires_at: Option<DateTime>,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    pub expires_at: Option<DateTimeUtc>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
     pub created_by_email: String,
 }
 

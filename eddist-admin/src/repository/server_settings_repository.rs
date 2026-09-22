@@ -46,8 +46,8 @@ fn into_domain(model: server_settings::Model) -> ServerSetting {
         setting_key: model.setting_key,
         value: model.value,
         description: model.description,
-        created_at: model.created_at,
-        updated_at: model.updated_at,
+        created_at: model.created_at.naive_utc(),
+        updated_at: model.updated_at.naive_utc(),
     }
 }
 
@@ -110,18 +110,18 @@ mod tests {
             setting_key: Set("key".to_string()),
             value: Set("value".to_string()),
             description: Set(None),
-            created_at: Set(chrono::NaiveDateTime::default()),
-            updated_at: Set(chrono::NaiveDateTime::default()),
+            created_at: Set(chrono::DateTime::<chrono::Utc>::default()),
+            updated_at: Set(chrono::DateTime::<chrono::Utc>::default()),
         })
         .on_conflict(upsert_on_conflict());
 
         assert_eq!(
             statement.build(DbBackend::MySql).to_string(),
-            "INSERT INTO `server_settings` (`id`, `setting_key`, `value`, `description`, `created_at`, `updated_at`) VALUES ('00000000-0000-0000-0000-000000000000', 'key', 'value', NULL, '1970-01-01 00:00:00.000000', '1970-01-01 00:00:00.000000') ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `description` = VALUES(`description`), `updated_at` = VALUES(`updated_at`)"
+            "INSERT INTO `server_settings` (`id`, `setting_key`, `value`, `description`, `created_at`, `updated_at`) VALUES ('00000000-0000-0000-0000-000000000000', 'key', 'value', NULL, '1970-01-01 00:00:00.000000 +00:00', '1970-01-01 00:00:00.000000 +00:00') ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `description` = VALUES(`description`), `updated_at` = VALUES(`updated_at`)"
         );
         assert_eq!(
             statement.build(DbBackend::Postgres).to_string(),
-            "INSERT INTO \"server_settings\" (\"id\", \"setting_key\", \"value\", \"description\", \"created_at\", \"updated_at\") VALUES ('00000000-0000-0000-0000-000000000000', 'key', 'value', NULL, '1970-01-01 00:00:00.000000', '1970-01-01 00:00:00.000000') ON CONFLICT (\"setting_key\") DO UPDATE SET \"value\" = \"excluded\".\"value\", \"description\" = \"excluded\".\"description\", \"updated_at\" = \"excluded\".\"updated_at\""
+            "INSERT INTO \"server_settings\" (\"id\", \"setting_key\", \"value\", \"description\", \"created_at\", \"updated_at\") VALUES ('00000000-0000-0000-0000-000000000000', 'key', 'value', NULL, '1970-01-01 00:00:00.000000 +00:00', '1970-01-01 00:00:00.000000 +00:00') ON CONFLICT (\"setting_key\") DO UPDATE SET \"value\" = \"excluded\".\"value\", \"description\" = \"excluded\".\"description\", \"updated_at\" = \"excluded\".\"updated_at\""
         );
     }
 }

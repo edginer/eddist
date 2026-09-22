@@ -30,8 +30,8 @@ fn into_domain(model: terms::Model) -> Terms {
     Terms {
         id: model.id,
         content: model.content,
-        created_at: model.created_at,
-        updated_at: model.updated_at,
+        created_at: model.created_at.naive_utc(),
+        updated_at: model.updated_at.naive_utc(),
         updated_by: model.updated_by,
     }
 }

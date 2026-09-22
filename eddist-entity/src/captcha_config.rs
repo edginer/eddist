@@ -19,8 +19,8 @@ pub struct Model {
     pub is_active: bool,
     pub display_order: i32,
     pub endpoint_usage: String,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
     pub updated_by: Option<String>,
 }
 

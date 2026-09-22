@@ -1,4 +1,4 @@
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
 use eddist_entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
 use eddist_entity::{archived_response, archived_thread, board, board_info, response, thread};
@@ -38,7 +38,7 @@ fn into_response(model: response::Model) -> anyhow::Result<(ResView, ClientInfo,
             author_name,
             mail,
             body,
-            created_at: Utc.from_utc_datetime(&created_at),
+            created_at,
             author_id,
             is_abone,
             is_abone_keep_id,
@@ -137,7 +137,7 @@ impl Repository {
         &self,
         board_key: &str,
         is_archive_converted: bool,
-    ) -> anyhow::Result<Vec<(String, u64, Uuid, chrono::NaiveDateTime)>> {
+    ) -> anyhow::Result<Vec<(String, u64, Uuid, DateTime<Utc>)>> {
         let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
             return Ok(Vec::new());
         };

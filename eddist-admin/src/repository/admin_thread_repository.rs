@@ -46,8 +46,8 @@ fn into_thread(model: thread::Model) -> anyhow::Result<Thread> {
         id: model.id,
         board_id: model.board_id,
         thread_number: thread_number_from_db(model.thread_number)?,
-        last_modified: model.last_modified_at.and_utc(),
-        sage_last_modified: model.sage_last_modified_at.and_utc(),
+        last_modified: model.last_modified_at,
+        sage_last_modified: model.sage_last_modified_at,
         title: model.title,
         authed_token_id: model.authed_token_id,
         metadent: model.metadent,
@@ -140,9 +140,7 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             query = query.filter(archived_thread::Column::Title.contains(keyword));
         }
         if let (Some(start), Some(end)) = range {
-            query = query.filter(
-                archived_thread::Column::LastModifiedAt.between(start.naive_utc(), end.naive_utc()),
-            );
+            query = query.filter(archived_thread::Column::LastModifiedAt.between(start, end));
         }
 
         archived_as_thread_model(
