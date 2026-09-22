@@ -1,6 +1,6 @@
+use crate::entity::support::{board_id_by_key, thread_number_from_db, thread_numbers_to_db};
 use crate::entity::{archived_thread, thread};
 use crate::models::Thread;
-use crate::repository::support::{as_thread_numbers, board_id_by_key};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
@@ -45,8 +45,7 @@ fn into_thread(model: thread::Model) -> anyhow::Result<Thread> {
     Ok(Thread {
         id: model.id,
         board_id: model.board_id,
-        thread_number: u64::try_from(model.thread_number)
-            .map_err(|_| anyhow::anyhow!("negative thread number: {}", model.thread_number))?,
+        thread_number: thread_number_from_db(model.thread_number)?,
         last_modified: model.last_modified_at.and_utc(),
         sage_last_modified: model.sage_last_modified_at.and_utc(),
         title: model.title,
@@ -84,7 +83,7 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
         let mut query = thread::Entity::find().filter(thread::Column::BoardId.eq(board_id));
         if let Some(thread_numbers) = thread_numbers {
             query = query
-                .filter(thread::Column::ThreadNumber.is_in(as_thread_numbers(thread_numbers)?));
+                .filter(thread::Column::ThreadNumber.is_in(thread_numbers_to_db(thread_numbers)?));
         }
 
         query
@@ -108,7 +107,7 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             archived_thread::Entity::find().filter(archived_thread::Column::BoardId.eq(board_id));
         if let Some(thread_numbers) = thread_numbers {
             query = query.filter(
-                archived_thread::Column::ThreadNumber.is_in(as_thread_numbers(thread_numbers)?),
+                archived_thread::Column::ThreadNumber.is_in(thread_numbers_to_db(thread_numbers)?),
             );
         }
 
@@ -206,7 +205,7 @@ impl AdminThreadRepository for AdminThreadRepositoryImpl {
             .filter(thread::Column::Archived.eq(false))
             .filter(
                 thread::Column::ThreadNumber
-                    .is_in(as_thread_numbers(thread_numbers.iter().copied())?),
+                    .is_in(thread_numbers_to_db(thread_numbers.iter().copied())?),
             )
             .exec(&self.0)
             .await?;

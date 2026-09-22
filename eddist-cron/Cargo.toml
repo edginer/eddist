@@ -5,11 +5,13 @@ edition = "2024"
 
 [dependencies]
 tokio.workspace = true
-sqlx.workspace = true
+sea-orm.workspace = true
 anyhow.workspace = true
 cron.workspace = true
 chrono.workspace = true
+serde_json.workspace = true
 eddist-core.workspace = true
+eddist-entity.workspace = true
 aws-sdk-s3.workspace = true
 uuid.workspace = true
 dotenvy.workspace = true

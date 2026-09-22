@@ -24,6 +24,7 @@ serde_json.workspace = true
 jsonwebtoken.workspace = true
 redis = { workspace = true, features = ["connection-manager"] }
 eddist-core.workspace = true
+eddist-entity.workspace = true
 utoipa.workspace = true
 tower-layer.workspace = true
 aws-sdk-s3.workspace = true

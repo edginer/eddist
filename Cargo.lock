@@ -1913,6 +1913,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "eddist-core",
+ "eddist-entity",
  "encoding_rs",
  "jsonwebtoken",
  "log",
@@ -1987,14 +1988,24 @@ dependencies = [
  "cron",
  "dotenvy",
  "eddist-core",
+ "eddist-entity",
  "encoding_rs",
  "futures",
  "log",
  "rand 0.10.2",
  "redis",
- "sqlx",
+ "sea-orm",
+ "serde_json",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "eddist-entity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sea-orm",
 ]
 
 [[package]]

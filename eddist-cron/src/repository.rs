@@ -1,60 +1,95 @@
 use chrono::{TimeZone, Utc};
-use sqlx::{MySqlPool, types::Json};
+use eddist_core::domain::{client_info::ClientInfo, res::ResView};
+use eddist_entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
+use eddist_entity::{archived_response, archived_thread, board, board_info, response, thread};
+use sea_orm::sea_query::{Expr, Query};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, TransactionTrait,
+};
 use uuid::Uuid;
 
-use eddist_core::domain::{client_info::ClientInfo, res::ResView};
-
 #[derive(Clone)]
-pub(crate) struct Repository(MySqlPool);
+pub(crate) struct Repository(DatabaseConnection);
 
 impl Repository {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self(pool)
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self(db)
     }
+}
+
+fn into_response(model: response::Model) -> anyhow::Result<(ResView, ClientInfo, Uuid)> {
+    let response::Model {
+        author_name,
+        mail,
+        body,
+        created_at,
+        author_id,
+        is_abone,
+        is_abone_keep_id,
+        authed_token_id,
+        client_info,
+        ..
+    } = model;
+    let client_info = serde_json::from_value::<ClientInfo>(client_info)?;
+
+    Ok((
+        ResView {
+            author_name,
+            mail,
+            body,
+            created_at: Utc.from_utc_datetime(&created_at),
+            author_id,
+            is_abone,
+            is_abone_keep_id,
+        },
+        client_info,
+        authed_token_id,
+    ))
 }
 
 impl Repository {
     pub async fn get_all_boards_info(&self) -> anyhow::Result<Vec<SelectionBoardInfo>> {
-        let boards = sqlx::query_as!(
-            SelectionBoardInfo,
-            r#"
-            SELECT
-                b.id AS "board_id!: Uuid",
-                b.board_key AS board_key,
-                b.default_name AS default_name,
-                bi.threads_archive_cron AS threads_archive_cron,
-                bi.threads_archive_trigger_thread_count AS threads_archive_trigger_thread_count,
-                bi.enable_1001_message AS "enable_1001_message: bool",
-                bi.custom_1001_message AS custom_1001_message
-            FROM
-                boards AS b
-            JOIN
-                boards_info AS bi
-            ON
-                b.id = bi.id
-            "#,
-        )
-        .fetch_all(&self.0)
-        .await?;
-        Ok(boards)
+        let boards = board::Entity::find()
+            .find_also_related(board_info::Entity)
+            .all(&self.0)
+            .await?;
+
+        Ok(boards
+            .into_iter()
+            .filter_map(|(board, board_info)| {
+                board_info.map(|board_info| SelectionBoardInfo {
+                    board_id: board.id,
+                    board_key: board.board_key,
+                    default_name: board.default_name,
+                    threads_archive_cron: board_info.threads_archive_cron,
+                    threads_archive_trigger_thread_count: board_info
+                        .threads_archive_trigger_thread_count,
+                    enable_1001_message: board_info.enable_1001_message,
+                    custom_1001_message: board_info.custom_1001_message,
+                })
+            })
+            .collect())
     }
 
     pub async fn get_inactive_thread_numbers_for_board(
         &self,
         board_key: &str,
     ) -> anyhow::Result<Vec<u64>> {
-        let numbers = sqlx::query_scalar!(
-            r#"
-            SELECT thread_number
-            FROM threads
-            WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
-            AND active = 0
-            "#,
-            board_key,
-        )
-        .fetch_all(&self.0)
-        .await?;
-        Ok(numbers.into_iter().map(|n| n as u64).collect())
+        let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
+            return Ok(Vec::new());
+        };
+
+        let numbers = thread::Entity::find()
+            .select_only()
+            .column(thread::Column::ThreadNumber)
+            .filter(thread::Column::BoardId.eq(board_id))
+            .filter(thread::Column::Active.eq(false))
+            .into_tuple::<i64>()
+            .all(&self.0)
+            .await?;
+
+        numbers.into_iter().map(thread_number_from_db).collect()
     }
 
     pub async fn update_threads_to_inactive(
@@ -62,32 +97,38 @@ impl Repository {
         board_key: &str,
         max_thread_count: u32,
     ) -> anyhow::Result<()> {
-        sqlx::query!(
-            r#"
-            UPDATE threads SET archived = 1 WHERE active = 0
-            "#,
-        )
-        .execute(&self.0)
-        .await?;
+        thread::Entity::update_many()
+            .col_expr(thread::Column::Archived, Expr::value(true))
+            .filter(thread::Column::Active.eq(false))
+            .exec(&self.0)
+            .await?;
 
-        sqlx::query!(
-            r#"
-            UPDATE threads SET archived = 1, active = 0 WHERE id IN (
-                SELECT id FROM (
-                    SELECT id
-                    FROM threads
-                    WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)
-                    AND archived = 0
-                    ORDER BY last_modified_at DESC
-                    LIMIT 1000000 OFFSET ?
-                ) AS tmp
-            )
-            "#,
-            board_key,
-            max_thread_count,
-        )
-        .execute(&self.0)
-        .await?;
+        let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
+            return Ok(());
+        };
+
+        let ids = thread::Entity::find()
+            .select_only()
+            .column(thread::Column::Id)
+            .filter(thread::Column::BoardId.eq(board_id))
+            .filter(thread::Column::Archived.eq(false))
+            .order_by_desc(thread::Column::LastModifiedAt)
+            .limit(1_000_000)
+            .offset(u64::from(max_thread_count))
+            .into_tuple::<Uuid>()
+            .all(&self.0)
+            .await?;
+
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        thread::Entity::update_many()
+            .col_expr(thread::Column::Archived, Expr::value(true))
+            .col_expr(thread::Column::Active, Expr::value(false))
+            .filter(thread::Column::Id.is_in(ids))
+            .exec(&self.0)
+            .await?;
 
         Ok(())
     }
@@ -97,41 +138,29 @@ impl Repository {
         board_key: &str,
         is_archive_converted: bool,
     ) -> anyhow::Result<Vec<(String, u64, Uuid, chrono::NaiveDateTime)>> {
-        struct Thread {
-            title: String,
-            thread_number: i64,
-            id: Uuid,
-            last_modified_at: chrono::NaiveDateTime,
-        }
+        let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
+            return Ok(Vec::new());
+        };
 
-        let threads = sqlx::query_as!(
-            Thread,
-            r#"
-            SELECT
-                title,
-                thread_number,
-                id AS "id: Uuid",
-                last_modified_at
-            FROM
-                threads
-            WHERE
-                board_id = (SELECT id FROM boards WHERE board_key = ?)
-            AND
-                active = 0
-            AND
-                archived = 1
-            AND
-                archive_converted = ?
-            "#,
-            board_key,
-            is_archive_converted,
-        )
-        .fetch_all(&self.0)
-        .await?;
-        Ok(threads
+        let threads = thread::Entity::find()
+            .filter(thread::Column::BoardId.eq(board_id))
+            .filter(thread::Column::Active.eq(false))
+            .filter(thread::Column::Archived.eq(true))
+            .filter(thread::Column::ArchiveConverted.eq(is_archive_converted))
+            .all(&self.0)
+            .await?;
+
+        threads
             .into_iter()
-            .map(|t| (t.title, t.thread_number as u64, t.id, t.last_modified_at))
-            .collect())
+            .map(|thread| {
+                Ok((
+                    thread.title,
+                    thread_number_from_db(thread.thread_number)?,
+                    thread.id,
+                    thread.last_modified_at,
+                ))
+            })
+            .collect()
     }
 
     pub async fn get_archived_threads(
@@ -140,47 +169,36 @@ impl Repository {
         start: u64,
         end: u64,
     ) -> anyhow::Result<Vec<(String, u64, Uuid)>> {
-        struct Thread {
-            title: String,
-            thread_number: i64,
-            id: Uuid,
-        }
+        let Some(board_id) = board_id_by_key(&self.0, board_key).await? else {
+            return Ok(Vec::new());
+        };
+        let start = thread_number_to_db(start)?;
+        let end = thread_number_to_db(end)?;
 
-        let threads = sqlx::query_as!(
-            Thread,
-            r#"
-            SELECT
-                title,
-                thread_number,
-                id AS "id: Uuid"
-            FROM
-                archived_threads
-            WHERE
-                board_id = (SELECT id FROM boards WHERE board_key = ?)
-            AND
-                thread_number BETWEEN ? AND ?
-            "#,
-            board_key,
-            start as i64,
-            end as i64,
-        )
-        .fetch_all(&self.0)
-        .await?;
-        Ok(threads
+        let threads = archived_thread::Entity::find()
+            .filter(archived_thread::Column::BoardId.eq(board_id))
+            .filter(archived_thread::Column::ThreadNumber.between(start, end))
+            .all(&self.0)
+            .await?;
+
+        threads
             .into_iter()
-            .map(|t| (t.title, t.thread_number as u64, t.id))
-            .collect())
+            .map(|thread| {
+                Ok((
+                    thread.title,
+                    thread_number_from_db(thread.thread_number)?,
+                    thread.id,
+                ))
+            })
+            .collect()
     }
 
     pub async fn update_archive_converted(&self, thread_id: Uuid) -> anyhow::Result<()> {
-        sqlx::query!(
-            r#"
-            UPDATE threads SET archive_converted = 1 WHERE id = ?
-            "#,
-            thread_id,
-        )
-        .execute(&self.0)
-        .await?;
+        thread::Entity::update_many()
+            .col_expr(thread::Column::ArchiveConverted, Expr::value(true))
+            .filter(thread::Column::Id.eq(thread_id))
+            .exec(&self.0)
+            .await?;
         Ok(())
     }
 
@@ -188,214 +206,138 @@ impl Repository {
         &self,
         thread_id: Uuid,
     ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
-        let thread_id = Vec::<u8>::from(thread_id);
-
-        let responses = sqlx::query_as!(
-            Res,
-            r#"
-            SELECT
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                is_abone,
-                is_abone_keep_id,
-                authed_token_id AS "authed_token_id: Uuid",
-                client_info AS "client_info: Json<ClientInfo>"
-            FROM
-                responses
-            WHERE
-                thread_id = ?
-            ORDER BY res_order, id
-            "#,
-            thread_id,
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        Ok(responses
+        response::Entity::find()
+            .filter(response::Column::ThreadId.eq(thread_id))
+            .order_by_asc(response::Column::ResOrder)
+            .order_by_asc(response::Column::Id)
+            .all(&self.0)
+            .await?
             .into_iter()
-            .map(|r| {
-                (
-                    ResView {
-                        author_name: r.author_name,
-                        mail: r.mail,
-                        body: r.body,
-                        created_at: Utc.from_utc_datetime(&r.created_at),
-                        author_id: r.author_id,
-                        is_abone: r.is_abone == 1,
-                        is_abone_keep_id: r.is_abone_keep_id == 1,
-                    },
-                    r.client_info.0,
-                    r.authed_token_id,
-                )
-            })
-            .collect::<Vec<_>>())
+            .map(into_response)
+            .collect()
     }
 
     pub async fn get_archived_thread_responses(
         &self,
         thread_id: Uuid,
     ) -> anyhow::Result<Vec<(ResView, ClientInfo, Uuid)>> {
-        let thread_id = Vec::<u8>::from(thread_id);
-
-        // `archived_responses` has no `is_abone_keep_id` column, so it is selected as a constant 0
-        // here. This only feeds `backfill-convert`, which regenerates a dat solely when the S3
-        // object is missing, so an already-published keep-id line is never overwritten by it.
-        let responses = sqlx::query_as!(
-            Res,
-            r#"
-            SELECT
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                is_abone,
-                0 AS "is_abone_keep_id: i8",
-                authed_token_id AS "authed_token_id: Uuid",
-                client_info AS "client_info: Json<ClientInfo>"
-            FROM
-                archived_responses
-            WHERE
-                thread_id = ?
-            ORDER BY res_order, id
-            "#,
-            thread_id,
-        )
-        .fetch_all(&self.0)
-        .await?;
-
-        Ok(responses
+        // `archived_responses` has no `is_abone_keep_id` column. Reporting false is safe because
+        // this only feeds `backfill-convert`, which regenerates a dat solely when the S3 object is
+        // missing, so an already-published keep-id line is never overwritten.
+        archived_response::Entity::find()
+            .filter(archived_response::Column::ThreadId.eq(thread_id))
+            .column_as(Expr::value(false), "is_abone_keep_id")
+            .order_by_asc(archived_response::Column::ResOrder)
+            .order_by_asc(archived_response::Column::Id)
+            .into_model::<response::Model>()
+            .all(&self.0)
+            .await?
             .into_iter()
-            .map(|r| {
-                (
-                    ResView {
-                        author_name: r.author_name,
-                        mail: r.mail,
-                        body: r.body,
-                        created_at: Utc.from_utc_datetime(&r.created_at),
-                        author_id: r.author_id,
-                        is_abone: r.is_abone == 1,
-                        is_abone_keep_id: r.is_abone_keep_id == 1,
-                    },
-                    r.client_info.0,
-                    r.authed_token_id,
-                )
-            })
-            .collect::<Vec<_>>())
+            .map(into_response)
+            .collect()
     }
 
     pub async fn archive_thread_and_responses(&self, thread_id: Uuid) -> anyhow::Result<()> {
-        let thread_id = Vec::<u8>::from(thread_id);
-        let mut tx = self.0.begin().await?;
+        let tx = self.0.begin().await?;
 
-        sqlx::query!(
-            r#"
-            INSERT INTO archived_threads 
-                (
-                    id,
-                    board_id,
-                    thread_number,
-                    last_modified_at,
-                    sage_last_modified_at,
-                    title,
-                    authed_token_id,
-                    metadent,
-                    response_count,
-                    no_pool,
-                    active,
-                    archived
-                ) SELECT
-                    id,
-                    board_id,
-                    thread_number,
-                    last_modified_at,
-                    sage_last_modified_at,
-                    title,
-                    authed_token_id,
-                    metadent,
-                    response_count,
-                    no_pool,
-                    active,
-                    archived
-                FROM
-                    threads
-                WHERE
-                    id = ?
-            "#,
-            thread_id,
-        )
-        .execute(&mut *tx)
-        .await?;
+        // Blocks a late response insert (FK check on the thread row) so it cannot be cascaded
+        // away by the delete below without being archived.
+        let locked = thread::Entity::find_by_id(thread_id)
+            .select_only()
+            .column(thread::Column::Id)
+            .lock_exclusive()
+            .into_tuple::<Uuid>()
+            .one(&tx)
+            .await?;
+        if locked.is_none() {
+            return Ok(());
+        }
 
-        sqlx::query!(
-            r#"
-            INSERT INTO archived_responses 
-                (
-                    id,
-                    author_name,
-                    mail,
-                    body,
-                    created_at,
-                    author_id,
-                    ip_addr,
-                    authed_token_id,
-                    board_id,
-                    thread_id,
-                    is_abone,
-                    res_order,
-                    client_info
-                ) SELECT
-                    id,
-                    author_name,
-                    mail,
-                    body,
-                    created_at,
-                    author_id,
-                    ip_addr,
-                    authed_token_id,
-                    board_id,
-                    thread_id,
-                    is_abone,
-                    res_order,
-                    client_info
-                FROM
-                    responses
-                WHERE
-                    thread_id = ?
-            "#,
-            thread_id,
-        )
-        .execute(&mut *tx)
-        .await?;
+        let mut insert_thread = Query::insert();
+        insert_thread
+            .into_table(archived_thread::Entity)
+            .columns([
+                archived_thread::Column::Id,
+                archived_thread::Column::BoardId,
+                archived_thread::Column::ThreadNumber,
+                archived_thread::Column::LastModifiedAt,
+                archived_thread::Column::SageLastModifiedAt,
+                archived_thread::Column::Title,
+                archived_thread::Column::AuthedTokenId,
+                archived_thread::Column::Metadent,
+                archived_thread::Column::ResponseCount,
+                archived_thread::Column::NoPool,
+                archived_thread::Column::Active,
+                archived_thread::Column::Archived,
+            ])
+            .select_from(
+                thread::Entity::find()
+                    .select_only()
+                    .columns([
+                        thread::Column::Id,
+                        thread::Column::BoardId,
+                        thread::Column::ThreadNumber,
+                        thread::Column::LastModifiedAt,
+                        thread::Column::SageLastModifiedAt,
+                        thread::Column::Title,
+                        thread::Column::AuthedTokenId,
+                        thread::Column::Metadent,
+                        thread::Column::ResponseCount,
+                        thread::Column::NoPool,
+                        thread::Column::Active,
+                        thread::Column::Archived,
+                    ])
+                    .filter(thread::Column::Id.eq(thread_id))
+                    .into_query(),
+            )?;
+        tx.execute(&insert_thread).await?;
 
-        sqlx::query!(
-            r#"
-            DELETE FROM threads WHERE id = ?
-            "#,
-            thread_id,
-        )
-        .execute(&mut *tx)
-        .await?;
+        let mut insert_responses = Query::insert();
+        insert_responses
+            .into_table(archived_response::Entity)
+            .columns([
+                archived_response::Column::Id,
+                archived_response::Column::AuthorName,
+                archived_response::Column::Mail,
+                archived_response::Column::Body,
+                archived_response::Column::CreatedAt,
+                archived_response::Column::AuthorId,
+                archived_response::Column::IpAddr,
+                archived_response::Column::AuthedTokenId,
+                archived_response::Column::BoardId,
+                archived_response::Column::ThreadId,
+                archived_response::Column::IsAbone,
+                archived_response::Column::ResOrder,
+                archived_response::Column::ClientInfo,
+            ])
+            .select_from(
+                response::Entity::find()
+                    .select_only()
+                    .columns([
+                        response::Column::Id,
+                        response::Column::AuthorName,
+                        response::Column::Mail,
+                        response::Column::Body,
+                        response::Column::CreatedAt,
+                        response::Column::AuthorId,
+                        response::Column::IpAddr,
+                        response::Column::AuthedTokenId,
+                        response::Column::BoardId,
+                        response::Column::ThreadId,
+                        response::Column::IsAbone,
+                        response::Column::ResOrder,
+                        response::Column::ClientInfo,
+                    ])
+                    .filter(response::Column::ThreadId.eq(thread_id))
+                    .into_query(),
+            )?;
+        tx.execute(&insert_responses).await?;
 
+        thread::Entity::delete_by_id(thread_id).exec(&tx).await?;
         tx.commit().await?;
 
         Ok(())
     }
-}
-
-struct Res {
-    author_name: String,
-    mail: String,
-    body: String,
-    created_at: chrono::NaiveDateTime,
-    author_id: String,
-    is_abone: i8,
-    is_abone_keep_id: i8,
-    authed_token_id: Uuid,
-    client_info: Json<ClientInfo>,
 }
 
 #[derive(Debug, Clone)]
