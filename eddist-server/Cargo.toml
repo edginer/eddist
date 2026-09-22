@@ -17,7 +17,6 @@ base64.workspace = true
 chrono.workspace = true
 dotenvy.workspace = true
 encoding_rs = { workspace = true, features = ["fast-kanji-encode"] }
-env_logger.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 jsonwebtoken.workspace = true
@@ -33,13 +32,9 @@ sqlx = { workspace = true, features = ["migrate"] }
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true
-tokio-util.workspace = true
 tower-http = { workspace = true, features = [
-    "compression-br",
-    "compression-gzip",
     "trace",
     "timeout",
-    "fs",
     "normalize-path",
     "catch-panic",
 ] }
@@ -54,7 +49,6 @@ futures.workspace = true
 handlebars.workspace = true
 jsonpath-rust.workspace = true
 metrics.workspace = true
-metrics-exporter-prometheus.workspace = true
 axum-prometheus.workspace = true
 sha1.workspace = true
 aws-sdk-s3.workspace = true
@@ -62,7 +56,6 @@ http.workspace = true
 tower.workspace = true
 openidconnect.workspace = true
 url.workspace = true
-chacha20poly1305.workspace = true
 p256.workspace = true
 aes-gcm.workspace = true
 toml.workspace = true
