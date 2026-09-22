@@ -103,7 +103,6 @@ aws-sdk-s3 = { version = "1", default-features = false, features = [
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 metrics = "0.24.3"
-metrics-exporter-prometheus = "0.18.1"
 axum-prometheus = "0.10.0"
 
 # CLI
@@ -137,14 +136,9 @@ axum-test = "21.0.0"
 # Admin specific
 utoipa = { version = "5.4.0", features = ["uuid", "axum_extras", "chrono"] }
 tower-sessions = "0.15.0"
-env_logger = "0.11.10"
-tokio-util = "0.7.18"
 
 # Allocator
 mimalloc = { version = "0.1", default-features = false }
-
-# Hashing
-twox-hash = "2"
 
 # Internal
 eddist-core = { path = "eddist-core" }
