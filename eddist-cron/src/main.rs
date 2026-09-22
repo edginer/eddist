@@ -14,7 +14,7 @@ use eddist_core::{
     utils::is_prod,
 };
 use redis::AsyncCommands;
-use sqlx::mysql::MySqlPoolOptions;
+use sea_orm::{ConnectOptions, Database};
 use tokio::time::sleep;
 
 mod repository;
@@ -39,26 +39,13 @@ async fn main() {
     }
 
     let executed_time = Utc::now();
-    let pool = MySqlPoolOptions::new()
-        .after_connect(|conn, _| {
-            use sqlx::Executor;
-
-            Box::pin(async move {
-                conn.execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
-                .await
-                .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                Ok(())
-            })
-        })
+    let mut connect_options = ConnectOptions::new(env::var("DATABASE_URL").unwrap());
+    connect_options
+        .sqlx_logging(false)
         .max_connections(4)
-        .acquire_timeout(Duration::from_secs(25))
-        .connect(&env::var("DATABASE_URL").unwrap())
-        .await
-        .unwrap();
-    let repo = repository::Repository::new(pool);
+        .acquire_timeout(Duration::from_secs(25));
+    let db = Database::connect(connect_options).await.unwrap();
+    let repo = repository::Repository::new(db);
 
     log::info!("Application started with args: {args:?}");
 

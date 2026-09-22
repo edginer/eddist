@@ -8,6 +8,7 @@ members = [
     "eddist-admin",
     "eddist-core",
     "eddist-cron",
+    "eddist-entity",
     "eddist-persistence",
     "eddist-cli",
     "eddist-server",
@@ -146,3 +147,4 @@ mimalloc = { version = "0.1", default-features = false }
 
 # Internal
 eddist-core = { path = "eddist-core" }
+eddist-entity = { path = "eddist-entity" }
