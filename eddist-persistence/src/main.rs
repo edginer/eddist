@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
                     )
                     .await
                     .unwrap();
-                    log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
+                    tracing::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
                     Ok(())
                 })
             })
