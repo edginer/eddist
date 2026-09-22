@@ -54,7 +54,7 @@ jobs:
             -p eddist-cron \
             -p eddist-persistence \
             -p eddist-cli \
-            --features eddist/backend-postgres,eddist-cron/backend-postgres,eddist-persistence/backend-postgres,eddist-cli/backend-postgres
+            --features eddist/backend-postgres,eddist-persistence/backend-postgres,eddist-cli/backend-postgres
       - name: rm .dockerignore
         run: rm .dockerignore
       - name: Login to Docker registry
