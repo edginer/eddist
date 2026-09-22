@@ -17,6 +17,8 @@ use redis::AsyncCommands;
 use sea_orm::{ConnectOptions, Database};
 use tokio::time::sleep;
 
+#[cfg(test)]
+mod integration_tests;
 mod repository;
 
 #[tokio::main]
