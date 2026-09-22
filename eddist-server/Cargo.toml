@@ -33,11 +33,8 @@ thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true
 tower-http = { workspace = true, features = [
-    "compression-br",
-    "compression-gzip",
     "trace",
     "timeout",
-    "fs",
     "normalize-path",
     "catch-panic",
 ] }
