@@ -1,11 +1,14 @@
-use chrono::{TimeZone, Utc};
+use chrono::{NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
 use eddist_entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
-use eddist_entity::{archived_response, archived_thread, board, board_info, response, thread};
-use sea_orm::sea_query::{Expr, Query};
+use eddist_entity::{
+    archived_response, archived_thread, authed_token, board, board_info, response, thread,
+    user_authed_token,
+};
+use sea_orm::sea_query::{Expr, Func, LockType, Query};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait, ExprTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -337,6 +340,109 @@ impl Repository {
         tx.commit().await?;
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StaleAuthedTokenKind {
+    /// Initiated but never authenticated; revoked tokens also have `validity = false`
+    /// but keep `authed_at`, so they are not matched.
+    Pending,
+    Idle,
+}
+
+fn stale_authed_token_condition(kind: StaleAuthedTokenKind, cutoff: NaiveDateTime) -> Condition {
+    let condition = match kind {
+        StaleAuthedTokenKind::Pending => Condition::all()
+            .add(authed_token::Column::Validity.eq(false))
+            .add(authed_token::Column::AuthedAt.is_null())
+            .add(authed_token::Column::CreatedAt.lt(cutoff)),
+        StaleAuthedTokenKind::Idle => Condition::all()
+            .add(authed_token::Column::Validity.eq(true))
+            .add(authed_token::Column::RegisteredUserId.is_null())
+            .add(
+                Expr::expr(Func::coalesce([
+                    Expr::col(authed_token::Column::LastWroteAt),
+                    Expr::col(authed_token::Column::AuthedAt),
+                ]))
+                .lt(cutoff),
+            ),
+    };
+
+    // threads.authed_token_id has no ON DELETE, and a user's first linked token carries
+    // the author_id_seed that later linked tokens inherit.
+    condition
+        .add(
+            authed_token::Column::Id.not_in_subquery(
+                Query::select()
+                    .column(thread::Column::AuthedTokenId)
+                    .from(thread::Entity)
+                    .to_owned(),
+            ),
+        )
+        .add(
+            authed_token::Column::Id.not_in_subquery(
+                Query::select()
+                    .column(user_authed_token::Column::AuthedTokenId)
+                    .from(user_authed_token::Entity)
+                    .to_owned(),
+            ),
+        )
+}
+
+impl Repository {
+    pub async fn delete_stale_authed_tokens(
+        &self,
+        kind: StaleAuthedTokenKind,
+        cutoff: NaiveDateTime,
+        batch_size: u64,
+    ) -> anyhow::Result<Vec<Uuid>> {
+        let mut deleted = Vec::new();
+        let mut cursor = Uuid::nil();
+
+        loop {
+            let candidates = authed_token::Entity::find()
+                .select_only()
+                .column(authed_token::Column::Id)
+                .filter(authed_token::Column::Id.gt(cursor))
+                .filter(stale_authed_token_condition(kind, cutoff))
+                .order_by_asc(authed_token::Column::Id)
+                .limit(batch_size)
+                .into_tuple::<Uuid>()
+                .all(&self.0)
+                .await?;
+            let Some(&last) = candidates.last() else {
+                break;
+            };
+            cursor = last;
+            let is_last_batch = (candidates.len() as u64) < batch_size;
+
+            // Re-check under lock: the token may have written since the unlocked scan.
+            let tx = self.0.begin().await?;
+            let mut locking = authed_token::Entity::find()
+                .select_only()
+                .column(authed_token::Column::Id)
+                .filter(authed_token::Column::Id.is_in(candidates))
+                .filter(stale_authed_token_condition(kind, cutoff));
+            QueryTrait::query(&mut locking)
+                .lock_with_tables(LockType::Update, [authed_token::Entity]);
+            let ids = locking.into_tuple::<Uuid>().all(&tx).await?;
+
+            if !ids.is_empty() {
+                authed_token::Entity::delete_many()
+                    .filter(authed_token::Column::Id.is_in(ids.clone()))
+                    .exec(&tx)
+                    .await?;
+            }
+            tx.commit().await?;
+            deleted.extend(ids);
+
+            if is_last_batch {
+                break;
+            }
+        }
+
+        Ok(deleted)
     }
 }
 

@@ -101,7 +101,7 @@ pub async fn post_bbs_cgi(
             );
             resp.headers_mut().append(
                 "Set-Cookie",
-                "tinker = ; Max-Age = 0; Path = /; "
+                "tinker-token = ; Max-Age = 0; Path = /; "
                     .to_string()
                     .parse()
                     .unwrap(),

@@ -20,3 +20,8 @@ log.workspace = true
 encoding_rs = { workspace = true, features = ["fast-kanji-encode"] }
 rand.workspace = true
 futures.workspace = true
+
+[dev-dependencies]
+sqlx = { workspace = true, features = ["migrate"] }
+testcontainers.workspace = true
+testcontainers-modules.workspace = true
