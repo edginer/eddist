@@ -2,11 +2,13 @@ use eddist_core::domain::{
     board::{Board, BoardInfo},
     cap::Cap,
 };
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::query_as;
 use uuid::Uuid;
 
 use crate::domain::ng_word::NgWord;
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::BbsRepositoryImpl;
 
 #[async_trait::async_trait]
@@ -23,6 +25,7 @@ pub trait BoardRepository: Send + Sync + 'static {
 }
 
 #[async_trait::async_trait]
+#[cfg(not(feature = "backend-postgres"))]
 impl BoardRepository for BbsRepositoryImpl {
     async fn get_boards(&self) -> anyhow::Result<Vec<Board>> {
         let boards = query_as!(

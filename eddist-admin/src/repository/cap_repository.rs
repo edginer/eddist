@@ -42,8 +42,8 @@ fn into_domain(model: cap::Model, board_ids: Vec<Uuid>) -> Cap {
         id: model.id,
         name: model.name,
         description: model.description,
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.and_utc(),
+        created_at: model.created_at,
+        updated_at: model.updated_at,
         board_ids,
     }
 }

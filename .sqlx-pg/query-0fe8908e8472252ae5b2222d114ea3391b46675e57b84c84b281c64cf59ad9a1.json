@@ -1,0 +1,194 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id AS \"id: Uuid\", name, provider, site_key, secret,\n            base_url, widget_form_field_name, widget_script_url, widget_html, widget_script_handler,\n            capture_fields AS \"capture_fields: serde_json::Value\",\n            verification AS \"verification: serde_json::Value\",\n            is_active AS \"is_active: bool\", display_order, endpoint_usage\n        FROM captcha_configs\n        WHERE is_active = TRUE\n        ORDER BY display_order ASC, created_at ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "provider",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "site_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "site_key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "secret",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "secret"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "base_url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "base_url"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "widget_form_field_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "widget_form_field_name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "widget_script_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "widget_script_url"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "widget_html",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "widget_html"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "widget_script_handler",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "widget_script_handler"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "capture_fields: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "capture_fields"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "verification: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "verification"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "is_active: bool",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "is_active"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "display_order",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "display_order"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "endpoint_usage",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "captcha_configs",
+            "name": "endpoint_usage"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0fe8908e8472252ae5b2222d114ea3391b46675e57b84c84b281c64cf59ad9a1"
+}

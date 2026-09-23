@@ -3,6 +3,10 @@ name = "eddist-persistence"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+backend-postgres = []
+
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true

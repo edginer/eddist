@@ -3,9 +3,15 @@ name = "eddist-cli"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+backend-postgres = []
+
 [dependencies]
 anyhow.workspace = true
-sea-orm.workspace = true
+# `sqlx-mysql` comes from the workspace dependency; the CLI migration also
+# connects to PostgreSQL, so add its SeaORM driver here.
+sea-orm = { workspace = true, features = ["sqlx-postgres"] }
 clap.workspace = true
 eddist-core.workspace = true
 futures.workspace = true

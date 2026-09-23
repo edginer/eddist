@@ -15,7 +15,8 @@ use sea_orm::{
 use std::{collections::HashSet, env};
 use uuid::Uuid;
 
-mod entity;
+pub(crate) mod entity;
+mod migrate;
 
 const CONCURRENCY: usize = 16;
 
@@ -33,15 +34,24 @@ enum Commands {
         #[command(subcommand)]
         command: AuthedTokensCommand,
     },
+    /// Migrate data from MySQL to PostgreSQL (excludes archived_responses and archived_threads)
+    Migrate {
+        /// MySQL connection URL (defaults to DATABASE_URL env var)
+        #[arg(long)]
+        mysql_url: Option<String>,
+        /// PostgreSQL connection URL (defaults to PG_DATABASE_URL env var)
+        #[arg(long)]
+        pg_url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
 enum AuthedTokensCommand {
-    /// Backup valid tokens from MySQL to S3
+    /// Backup valid tokens from the database to S3
     Backup,
-    /// Restore tokens from S3 into MySQL
+    /// Restore tokens from S3 into the database
     Recover,
-    /// Show differences between DB and S3
+    /// Show differences between the database and S3
     Validate,
 }
 
@@ -56,6 +66,15 @@ async fn main() -> Result<()> {
             AuthedTokensCommand::Recover => recover().await,
             AuthedTokensCommand::Validate => validate().await,
         },
+        Commands::Migrate { mysql_url, pg_url } => {
+            let mysql_url = mysql_url
+                .or_else(|| env::var("DATABASE_URL").ok())
+                .expect("provide --mysql-url or set DATABASE_URL / MYSQL_URL");
+            let pg_url = pg_url
+                .or_else(|| env::var("PG_DATABASE_URL").ok())
+                .expect("provide --pg-url or set PG_DATABASE_URL");
+            migrate::run(&mysql_url, &pg_url).await
+        }
     }
 }
 
@@ -80,8 +99,7 @@ fn make_s3_client() -> Result<(Client, String)> {
 }
 
 async fn connect_database() -> Result<DatabaseConnection> {
-    let mut options = ConnectOptions::new(env::var("DATABASE_URL")?);
-    options.sqlx_logging(false);
+    let options = ConnectOptions::new(env::var("DATABASE_URL")?);
     Ok(Database::connect(options).await?)
 }
 
@@ -96,9 +114,9 @@ impl From<authed_token::Model> for AuthedTokenBackup {
             writing_ua: token.writing_ua,
             authed_ua: token.authed_ua,
             auth_code: Some(token.auth_code),
-            created_at: token.created_at,
-            authed_at: token.authed_at,
-            last_wrote_at: token.last_wrote_at,
+            created_at: token.created_at.naive_utc(),
+            authed_at: token.authed_at.map(|dt| dt.naive_utc()),
+            last_wrote_at: token.last_wrote_at.map(|dt| dt.naive_utc()),
             additional_info: token.additional_info,
             author_id_seed: token.author_id_seed,
         }
@@ -253,7 +271,6 @@ async fn recover() -> Result<()> {
                 let token: AuthedTokenBackup = serde_json::from_slice(&data)?;
 
                 let auth_code = token.auth_code.as_deref().unwrap_or("000000");
-
                 let result = authed_token::Entity::insert(authed_token::ActiveModel {
                     id: Set(token.id),
                     token: Set(token.token),
@@ -262,10 +279,10 @@ async fn recover() -> Result<()> {
                     writing_ua: Set(token.writing_ua),
                     authed_ua: Set(token.authed_ua),
                     auth_code: Set(auth_code.to_string()),
-                    created_at: Set(token.created_at),
-                    authed_at: Set(token.authed_at),
+                    created_at: Set(token.created_at.and_utc()),
+                    authed_at: Set(token.authed_at.map(|dt| dt.and_utc())),
                     validity: Set(true),
-                    last_wrote_at: Set(token.last_wrote_at),
+                    last_wrote_at: Set(token.last_wrote_at.map(|dt| dt.and_utc())),
                     asn_num: Set(token.asn_num),
                     additional_info: Set(token.additional_info),
                     author_id_seed: Set(token.author_id_seed),

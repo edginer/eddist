@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id AS \"id: Uuid\", idp_name, oidc_config_url, idp_display_name, idp_logo_svg,\n                   client_id, client_secret, enabled AS \"enabled: bool\"\n            FROM idps\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "idp_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "idp_name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "oidc_config_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "oidc_config_url"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "idp_display_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "idp_display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "idp_logo_svg",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "idp_logo_svg"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "client_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "client_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "client_secret",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "client_secret"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "enabled: bool",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "idps",
+            "name": "enabled"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "23c3cce1d4f438018e4179081fcfc05e97f1667fe24215302cff118321555ebe"
+}

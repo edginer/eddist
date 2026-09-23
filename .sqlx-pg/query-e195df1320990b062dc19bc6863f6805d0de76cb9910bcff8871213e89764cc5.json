@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE authed_tokens SET validity = TRUE, authed_ua = $1, authed_at = $2, additional_info = $3 WHERE token = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e195df1320990b062dc19bc6863f6805d0de76cb9910bcff8871213e89764cc5"
+}

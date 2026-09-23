@@ -1996,6 +1996,9 @@ dependencies = [
  "redis",
  "sea-orm",
  "serde_json",
+ "sqlx",
+ "testcontainers",
+ "testcontainers-modules",
  "tokio",
  "uuid",
 ]

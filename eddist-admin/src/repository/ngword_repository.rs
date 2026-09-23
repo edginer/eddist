@@ -36,8 +36,8 @@ fn into_domain(model: ng_word::Model, board_ids: Vec<Uuid>) -> NgWord {
         id: model.id,
         name: model.name,
         word: model.word,
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.and_utc(),
+        created_at: model.created_at,
+        updated_at: model.updated_at,
         board_ids,
     }
 }

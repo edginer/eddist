@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use eddist_core::utils::slugify;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::MySqlPool;
+#[cfg(feature = "backend-postgres")]
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::captcha_like::{
@@ -9,6 +12,7 @@ use crate::domain::captcha_like::{
     HttpMethod, RequestFormat,
 };
 
+#[cfg_attr(feature = "backend-postgres", derive(sqlx::FromRow))]
 #[derive(Debug, Clone)]
 struct CaptchaConfigRow {
     id: Uuid,
@@ -229,17 +233,20 @@ pub trait CaptchaConfigRepository: Send + Sync + 'static {
     async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>>;
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[derive(Debug, Clone)]
 pub struct CaptchaConfigRepositoryImpl {
     pool: MySqlPool,
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 impl CaptchaConfigRepositoryImpl {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
 }
 
+#[cfg(not(feature = "backend-postgres"))]
 #[async_trait::async_trait]
 impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
@@ -271,5 +278,51 @@ impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
         .await?;
 
         Ok(rows.into_iter().map(CaptchaProviderConfig::from).collect())
+    }
+}
+
+/// Load all active captcha configs from the database (PostgreSQL)
+#[cfg(feature = "backend-postgres")]
+pub async fn get_active_captcha_configs(
+    pool: &PgPool,
+) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
+    let rows = sqlx::query_as!(
+        CaptchaConfigRow,
+        r#"
+        SELECT
+            id AS "id: Uuid", name, provider, site_key, secret,
+            base_url, widget_form_field_name, widget_script_url, widget_html, widget_script_handler,
+            capture_fields AS "capture_fields: serde_json::Value",
+            verification AS "verification: serde_json::Value",
+            is_active AS "is_active: bool", display_order, endpoint_usage
+        FROM captcha_configs
+        WHERE is_active = TRUE
+        ORDER BY display_order ASC, created_at ASC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(CaptchaProviderConfig::from).collect())
+}
+
+#[cfg(feature = "backend-postgres")]
+#[derive(Debug, Clone)]
+pub struct CaptchaConfigRepositoryPgImpl {
+    pool: PgPool,
+}
+
+#[cfg(feature = "backend-postgres")]
+impl CaptchaConfigRepositoryPgImpl {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[cfg(feature = "backend-postgres")]
+#[async_trait::async_trait]
+impl CaptchaConfigRepository for CaptchaConfigRepositoryPgImpl {
+    async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
+        get_active_captcha_configs(&self.pool).await
     }
 }

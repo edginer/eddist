@@ -1,0 +1,122 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id AS \"id: Uuid\", name, rule_type, rule_value, expires_at, created_at, updated_at, created_by_email\n            FROM user_restriction_rules\n            WHERE expires_at IS NULL OR expires_at > NOW()\n            ORDER BY created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "rule_type",
+        "type_info": {
+          "Custom": {
+            "name": "restriction_rule_type",
+            "kind": {
+              "Enum": [
+                "ASN",
+                "IP",
+                "IP_CIDR",
+                "USER_AGENT"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "rule_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "rule_value",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "rule_value"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_by_email",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "created_by_email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8dbab77394528f851745c3671841a753817e5e8f77e8b3f2ea7327b82bd254f3"
+}

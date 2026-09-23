@@ -1,9 +1,11 @@
 use chrono::{NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::pubsub_repository::CreatingRes;
 use eddist_core::domain::res::ResView;
+#[cfg(not(feature = "backend-postgres"))]
 use sqlx::query;
 use uuid::Uuid;
 
+#[cfg(not(feature = "backend-postgres"))]
 use super::BbsRepositoryImpl;
 
 #[async_trait::async_trait]
@@ -13,6 +15,7 @@ pub trait ResponseRepository: Send + Sync + 'static {
 }
 
 #[async_trait::async_trait]
+#[cfg(not(feature = "backend-postgres"))]
 impl ResponseRepository for BbsRepositoryImpl {
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>> {
         let responses = sqlx::query_as!(

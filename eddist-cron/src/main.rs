@@ -7,7 +7,7 @@ use aws_sdk_s3::{
     operation::head_object::HeadObjectError,
     primitives::ByteStream,
 };
-use chrono::{TimeDelta, TimeZone, Timelike, Utc};
+use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{
     domain::res::get_1001_sjis_bytes, redis_keys::unsafe_threads_key, tracing::init_tracing,
@@ -17,6 +17,8 @@ use redis::AsyncCommands;
 use sea_orm::{ConnectOptions, Database};
 use tokio::time::sleep;
 
+#[cfg(test)]
+mod integration_tests;
 mod repository;
 
 #[tokio::main]
@@ -237,10 +239,9 @@ async fn main() {
                     }
 
                     if board.enable_1001_message && responses.len() >= 1000 {
-                        let last_modified_utc = Utc.from_utc_datetime(&last_modified_at);
                         let bytes_1001 = get_1001_sjis_bytes(
                             thread_number as i64,
-                            last_modified_utc,
+                            last_modified_at,
                             board.custom_1001_message.as_deref(),
                         )
                         .get_inner();

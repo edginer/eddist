@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                WITH response_count AS (\n                    SELECT COUNT(*) AS cnt\n                    FROM responses\n                    WHERE thread_id = $1\n                )\n                UPDATE threads\n                SET response_count = (SELECT cnt FROM response_count),\n                    last_modified_at = $2,\n                    active = (SELECT cnt FROM response_count) <= 1000\n                WHERE id = $3\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55255181bf97eca253f4f6d190102dab5682655a6f9c94b0062ecd5efec1883d"
+}

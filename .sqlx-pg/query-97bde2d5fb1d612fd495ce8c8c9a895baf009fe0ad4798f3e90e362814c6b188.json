@@ -1,0 +1,335 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                t.id AS \"id: Uuid\", t.board_id AS \"board_id: Uuid\", t.thread_number,\n                t.last_modified_at, t.sage_last_modified_at,\n                t.title, t.authed_token_id, t.metadent, t.response_count, t.no_pool, t.active, t.archived,\n                (\n                    SELECT r.client_info\n                    FROM responses r\n                    WHERE r.thread_id = t.id AND r.res_order = 1\n                ) AS \"client_info!: Json<ClientInfo>\",\n                at.token, at.origin_ip, at.reduced_origin_ip, at.writing_ua, at.authed_ua, at.auth_code,\n                at.created_at AS at_created_at, at.authed_at, at.validity, at.last_wrote_at,\n                at.author_id_seed, at.require_user_registration, at.registered_user_id, at.require_reauth\n            FROM threads AS t\n            INNER JOIN authed_tokens AS at ON t.authed_token_id = at.id\n            WHERE t.board_id = $1 AND t.archived = FALSE\n            ORDER BY t.sage_last_modified_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "board_id: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "board_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "thread_number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_modified_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "last_modified_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "sage_last_modified_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "sage_last_modified_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "authed_token_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "authed_token_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "metadent",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "metadent"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "response_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "response_count"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "no_pool",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "no_pool"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "archived",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "archived"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "client_info!: Json<ClientInfo>",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 13,
+        "name": "token",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "token"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "origin_ip",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "origin_ip"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "reduced_origin_ip",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "reduced_origin_ip"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "writing_ua",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "writing_ua"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "authed_ua",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "authed_ua"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "auth_code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "auth_code"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "at_created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "authed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "authed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "validity",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "validity"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "last_wrote_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "last_wrote_at"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "author_id_seed",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "author_id_seed"
+          }
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "require_user_registration",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "require_user_registration"
+          }
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "registered_user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "registered_user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 26,
+        "name": "require_reauth",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "require_reauth"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "97bde2d5fb1d612fd495ce8c8c9a895baf009fe0ad4798f3e90e362814c6b188"
+}
