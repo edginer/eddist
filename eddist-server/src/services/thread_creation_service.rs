@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use chrono::Utc;
 use eddist_core::{
@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
+        captcha_like::CaptchaProviderConfig,
         ng_word::NgWordRestrictable,
         res::Res,
         res_core::ResCore,
@@ -36,6 +37,7 @@ use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
     BbsCgiService, openai_moderation_service,
+    post_captcha_verification::verify_post_captchas,
     server_settings_cache::{ServerSettingKey, get_server_setting_bool},
     validation::{check_userreg, resolve_cap_name},
 };
@@ -136,6 +138,17 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 input.require_user_registration,
             )
             .await?;
+
+        if !input.captcha_like_configs.is_empty() {
+            verify_post_captchas(
+                &input.captcha_like_configs,
+                &input.captcha_responses,
+                &input.ip_addr,
+                redis_conn.clone(),
+            )
+            .await
+            .map_err(BbsCgiError::CaptchaError)?;
+        }
 
         let email_auth_service = EmailAuthRestrictionService::new(self.2.clone());
         email_auth_service
@@ -297,6 +310,8 @@ pub struct ThreadCreationServiceInput {
     pub user_agent: String,
     pub asn_num: u32,
     pub require_user_registration: bool,
+    pub captcha_like_configs: Vec<CaptchaProviderConfig>,
+    pub captcha_responses: HashMap<String, String>,
 }
 
 pub struct ThreadCreationServiceOutput {

@@ -36,6 +36,7 @@ use crate::{
     routes::{
         auth_code::{get_auth_code, post_auth_code},
         bbs_cgi::post_bbs_cgi,
+        captcha_config_api::get_api_captcha_configs,
         dat_routing::{get_dat_txt, get_kako_dat_txt},
         ng_id::{
             delete_ng_ids, delete_thread_metadents, get_shared_ng, post_ng_id, post_thread_metadent,
@@ -281,6 +282,7 @@ pub fn create_app(app_state: AppState, conn_mgr: redis::aio::ConnectionManager) 
         .route("/api/notices", get(get_notices_paginated))
         .route("/api/notices/{slug}", get(get_notice_by_slug))
         .route("/api/client-config", get(get_api_client_config))
+        .route("/api/captcha-configs", get(get_api_captcha_configs))
         .route("/api/stats", get(get_stats))
         .route(
             "/api/{boardKey}/unsafe-thread-ids",

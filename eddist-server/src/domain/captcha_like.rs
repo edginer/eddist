@@ -110,6 +110,10 @@ pub enum CaptchaEndpointUsage {
     #[default]
     AuthCode,
     ReAuth,
+    AllAuth,
+    ThreadCreation,
+    ResponseCreation,
+    AllPosting,
     All,
 }
 
@@ -117,17 +121,116 @@ impl CaptchaEndpointUsage {
     pub fn from_str(s: &str) -> Self {
         match s {
             "re_auth" => Self::ReAuth,
+            "all_auth" => Self::AllAuth,
+            "thread_creation" => Self::ThreadCreation,
+            "res_creation" => Self::ResponseCreation,
+            "all_posting" => Self::AllPosting,
             "all" => Self::All,
             _ => Self::AuthCode,
         }
     }
 
     pub fn matches_auth_code(&self) -> bool {
-        matches!(self, Self::AuthCode | Self::All)
+        matches!(self, Self::AuthCode | Self::AllAuth | Self::All)
     }
 
     pub fn matches_reauth(&self) -> bool {
-        matches!(self, Self::ReAuth | Self::All)
+        matches!(self, Self::ReAuth | Self::AllAuth | Self::All)
+    }
+
+    pub fn matches_thread_creation(&self) -> bool {
+        matches!(self, Self::ThreadCreation | Self::AllPosting | Self::All)
+    }
+
+    pub fn matches_response_creation(&self) -> bool {
+        matches!(self, Self::ResponseCreation | Self::AllPosting | Self::All)
+    }
+}
+
+#[cfg(test)]
+mod captcha_endpoint_usage_tests {
+    use super::*;
+
+    #[test]
+    fn from_str_maps_wire_strings_to_variants() {
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("auth_code"),
+            CaptchaEndpointUsage::AuthCode
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("re_auth"),
+            CaptchaEndpointUsage::ReAuth
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("all_auth"),
+            CaptchaEndpointUsage::AllAuth
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("thread_creation"),
+            CaptchaEndpointUsage::ThreadCreation
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("res_creation"),
+            CaptchaEndpointUsage::ResponseCreation
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("all_posting"),
+            CaptchaEndpointUsage::AllPosting
+        );
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("all"),
+            CaptchaEndpointUsage::All
+        );
+        // Unknown values fall back to the default (AuthCode)
+        assert_eq!(
+            CaptchaEndpointUsage::from_str("garbage"),
+            CaptchaEndpointUsage::AuthCode
+        );
+    }
+
+    #[test]
+    fn individual_variants_match_only_their_own_endpoint() {
+        assert!(CaptchaEndpointUsage::AuthCode.matches_auth_code());
+        assert!(!CaptchaEndpointUsage::AuthCode.matches_reauth());
+        assert!(!CaptchaEndpointUsage::AuthCode.matches_thread_creation());
+        assert!(!CaptchaEndpointUsage::AuthCode.matches_response_creation());
+
+        assert!(CaptchaEndpointUsage::ReAuth.matches_reauth());
+        assert!(!CaptchaEndpointUsage::ReAuth.matches_auth_code());
+
+        assert!(CaptchaEndpointUsage::ThreadCreation.matches_thread_creation());
+        assert!(!CaptchaEndpointUsage::ThreadCreation.matches_response_creation());
+        assert!(!CaptchaEndpointUsage::ThreadCreation.matches_auth_code());
+        assert!(!CaptchaEndpointUsage::ThreadCreation.matches_reauth());
+
+        assert!(CaptchaEndpointUsage::ResponseCreation.matches_response_creation());
+        assert!(!CaptchaEndpointUsage::ResponseCreation.matches_thread_creation());
+        assert!(!CaptchaEndpointUsage::ResponseCreation.matches_auth_code());
+        assert!(!CaptchaEndpointUsage::ResponseCreation.matches_reauth());
+    }
+
+    #[test]
+    fn all_auth_groups_only_auth_related_endpoints() {
+        assert!(CaptchaEndpointUsage::AllAuth.matches_auth_code());
+        assert!(CaptchaEndpointUsage::AllAuth.matches_reauth());
+        assert!(!CaptchaEndpointUsage::AllAuth.matches_thread_creation());
+        assert!(!CaptchaEndpointUsage::AllAuth.matches_response_creation());
+    }
+
+    #[test]
+    fn all_posting_groups_only_posting_related_endpoints() {
+        assert!(CaptchaEndpointUsage::AllPosting.matches_thread_creation());
+        assert!(CaptchaEndpointUsage::AllPosting.matches_response_creation());
+        assert!(!CaptchaEndpointUsage::AllPosting.matches_auth_code());
+        assert!(!CaptchaEndpointUsage::AllPosting.matches_reauth());
+    }
+
+    #[test]
+    fn all_matches_every_endpoint_usage() {
+        assert!(CaptchaEndpointUsage::All.matches_auth_code());
+        assert!(CaptchaEndpointUsage::All.matches_reauth());
+        assert!(CaptchaEndpointUsage::All.matches_thread_creation());
+        assert!(CaptchaEndpointUsage::All.matches_response_creation());
     }
 }
 
