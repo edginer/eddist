@@ -15,3 +15,14 @@
     @apply flex flex-wrap items-center gap-x-2 gap-y-1;
   }
 }
+
+/* See SKELETON_ATTR in routes/ThreadListPage.tsx */
+.thread-list-skeleton {
+  display: none;
+}
+html[data-thread-list-skeleton] .thread-list-skeleton {
+  display: flex;
+}
+html[data-thread-list-skeleton] .thread-list {
+  display: none;
+}

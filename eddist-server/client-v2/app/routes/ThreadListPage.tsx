@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FaArrowLeft, FaCog, FaPen, FaSort, FaSortDown, FaSortUp, FaSync } from "react-icons/fa";
 import { Link, useParams } from "react-router";
 import useSWR from "swr";
@@ -8,7 +8,7 @@ import { fetchClientConfig } from "~/api-client/client-config";
 import { fetchSharedNg, type SharedNgList } from "~/api-client/ng_id";
 import { fetchUnsafeThreadIds } from "~/api-client/safe_mode";
 import { fetchThreadList, type Thread } from "~/api-client/thread_list";
-import { useNGWords } from "~/contexts/NGWordsContext";
+import { NG_CONFIG_STORAGE_KEY, useNGWords } from "~/contexts/NGWordsContext";
 import { useContextMenu } from "~/hooks/useContextMenu";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 import { useSummarizeEnabled } from "~/hooks/useSummarizeEnabled";
@@ -16,6 +16,10 @@ import { useSummarizerSupported } from "~/hooks/useSummarizer";
 import { parseCookie } from "~/utils/cookie";
 import { getCanonicalUrl } from "~/utils/metadata";
 import { getSelectedTextInElement } from "~/utils/selection";
+import {
+  buildThreadListSkeletonScript,
+  THREAD_LIST_SKELETON_ATTR,
+} from "~/utils/threadListSkeleton";
 import { NGContextMenu } from "../components/NGContextMenu";
 import { NGSettingsLauncher } from "../components/NGSettingsLauncher";
 import { PageMetadata } from "../components/PageMetadata";
@@ -29,6 +33,14 @@ type SortOrder = "asc" | "desc";
 // Rows SSR'd before hydration; the rest are rendered client-side on mount to cut
 // single-threaded SSR render cost. 40 covers the fold up to a 4K portrait display.
 const SSR_INITIAL_ROWS = 40;
+
+// Placeholder rows shown while the SSR'd list is hidden; see utils/threadListSkeleton.ts.
+const SKELETON_ROWS = 20;
+
+const isSafeModeOptedOut = () => parseCookie(document.cookie, "safe_mode") === "off";
+
+// Mounts after the initial hydration are client-side navigations with no SSR markup to match.
+let hasHydrated = false;
 
 // In-memory store: survives SPA navigation, resets on hard reload. Never mutated server-side.
 let memorySortKey: SortKey | null = null;
@@ -99,10 +111,12 @@ export const loader = async ({ params, request, context }: Route.LoaderArgs) => 
     throw new Response("Not Found", { status: 404 });
   }
 
+  // The response is shared via the CDN cache (s-maxage), which does not key on cookies, so
+  // the loader must not depend on the safe_mode cookie. The per-user opt-out is applied on
+  // the client.
   const url = new URL(request.url);
   const isFull = url.searchParams.get("_v") === "full";
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const safeMode = !isFull && parseCookie(cookieHeader, "safe_mode") !== "off";
+  const safeMode = !isFull;
 
   const [threadList, clientConfig, unsafeThreadIds, sharedNg] = await Promise.all([
     fetchThreadList(params.boardKey, { baseUrl }),
@@ -182,11 +196,34 @@ const ThreadListPage = ({
   const [showSortControls, setShowSortControls] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { shouldFilterThread, setSharedNgList } = useNGWords();
+  const { config: ngConfig, shouldFilterThread, setSharedNgList } = useNGWords();
+  const sharedNgEnabled = ngConfig.sharedNg.enabled;
   useEffect(() => {
     setSharedNgList(sharedNg);
   }, [sharedNg, setSharedNgList]);
   const unsafeSet = useMemo(() => new Set(unsafeThreadIds), [unsafeThreadIds]);
+  const [safeModeOptedOut, setSafeModeOptedOut] = useState(
+    () => hasHydrated && isSafeModeOptedOut(),
+  );
+  // Re-read on every loader result so a toggle followed by revalidate() takes effect.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the loader revalidates
+  useEffect(() => {
+    setSafeModeOptedOut(isSafeModeOptedOut());
+  }, [unsafeThreadIds]);
+  const clientSafeMode = safeMode && !safeModeOptedOut;
+  // Read from the loader rather than the NG context, which is only updated in an effect.
+  const sharedMetadentSet = useMemo(
+    () => new Set(sharedNg.threadMetadents),
+    [sharedNg.threadMetadents],
+  );
+  const isUnsafe = useCallback(
+    (thread: Thread) => safeMode && unsafeSet.has(thread.id),
+    [safeMode, unsafeSet],
+  );
+  const isSharedNg = useCallback(
+    (thread: Thread) => thread.authorId !== undefined && sharedMetadentSet.has(thread.authorId),
+    [sharedMetadentSet],
+  );
   const summarizerSupported = useSummarizerSupported();
   const { enabled: summarizeEnabled, setEnabled: setSummarizeEnabled } = useSummarizeEnabled();
   const { menuState, closeMenu, contextMenuHandlers } = useContextMenu();
@@ -255,21 +292,48 @@ const ThreadListPage = ({
 
   const filteredThreadList = useMemo(() => {
     return sortedThreadList.filter(
-      (thread) => !shouldFilterThread(thread) && !(safeMode && unsafeSet.has(thread.id)),
+      (thread) =>
+        !shouldFilterThread(thread) &&
+        !(clientSafeMode && unsafeSet.has(thread.id)) &&
+        !(sharedNgEnabled && isSharedNg(thread)),
     );
-  }, [sortedThreadList, shouldFilterThread, safeMode, unsafeSet]);
+  }, [
+    sortedThreadList,
+    shouldFilterThread,
+    clientSafeMode,
+    unsafeSet,
+    sharedNgEnabled,
+    isSharedNg,
+  ]);
 
-  // Collapsed phase excludes NG (localStorage-only) so SSR and the hydration render match
-  // for every user; safeMode comes from the loader so it is consistent across both.
+  // Collapsed phase is rendered for the default reader (safe mode and shared NG on, no
+  // personal NG rules) so SSR and the hydration render match and the cached HTML is shared.
   const ssrBaseList = useMemo(
-    () => sortedThreadList.filter((thread) => !(safeMode && unsafeSet.has(thread.id))),
-    [sortedThreadList, safeMode, unsafeSet],
+    () => sortedThreadList.filter((thread) => !isUnsafe(thread) && !isSharedNg(thread)),
+    [sortedThreadList, isUnsafe, isSharedNg],
   );
+  const ssrRows = ssrBaseList.slice(0, SSR_INITIAL_ROWS);
 
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(true), []);
+  const [expanded, setExpanded] = useState(() => hasHydrated);
+  useEffect(() => {
+    hasHydrated = true;
+    setExpanded(true);
+  }, []);
+  // Reveal the list in the same frame the expanded render (with the opt-out applied) commits.
+  useLayoutEffect(() => {
+    if (expanded) document.documentElement.removeAttribute(THREAD_LIST_SKELETON_ATTR);
+  }, [expanded]);
 
-  const visibleThreadList = expanded ? filteredThreadList : ssrBaseList.slice(0, SSR_INITIAL_ROWS);
+  const visibleThreadList = expanded ? filteredThreadList : ssrRows;
+  const skeletonScript = expanded
+    ? null
+    : buildThreadListSkeletonScript({
+        attr: THREAD_LIST_SKELETON_ATTR,
+        storageKey: NG_CONFIG_STORAGE_KEY,
+        hasUnsafe: sortedThreadList.some(isUnsafe),
+        hasShared: sortedThreadList.some(isSharedNg),
+        rows: ssrRows.map((thread) => [thread.title, thread.authorId ?? null]),
+      });
 
   return (
     <div className="relative pt-16 min-h-screen dark:bg-gray-900 dark:text-gray-100">
@@ -441,7 +505,32 @@ const ThreadListPage = ({
         </div>
       )}
 
-      <div className="flex flex-col lg:grow">
+      {skeletonScript && (
+        <>
+          <script
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: must run before first paint
+            dangerouslySetInnerHTML={{ __html: skeletonScript }}
+          />
+          <div className="thread-list-skeleton flex-col lg:grow" aria-hidden="true">
+            {Array.from({ length: SKELETON_ROWS }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows
+              <div key={i} className="block">
+                {i !== 0 && (
+                  <div className="border-b border-gray-400 dark:border-gray-600 lg:border-none lg:pt-2"></div>
+                )}
+                <div className="thread-row">
+                  <div className="thread-row-link animate-pulse">
+                    <div className="h-5 my-0.5 w-3/4 rounded bg-gray-300 dark:bg-gray-600" />
+                    <div className="h-4 my-1 w-1/2 rounded bg-gray-300 dark:bg-gray-600" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="thread-list flex flex-col lg:grow">
         {visibleThreadList.map((thread, i) => (
           <div key={thread.id} className="block">
             {i !== 0 && (
