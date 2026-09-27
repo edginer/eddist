@@ -306,6 +306,55 @@ async fn test_auth_code_with_create_response() {
     .expect("Failed to get correct DAT response");
 }
 
+#[tokio::test]
+async fn test_missing_edge_token_row_issues_auth_code_immediately() {
+    let ctx = TestContext::new().await;
+    let board_id = create_test_board(&ctx.pool, "missingtoken", "テスト板").await;
+    let (owner_id, _) = create_test_authed_token(&ctx.pool, "10.0.0.1", "owner-code").await;
+    create_test_thread(&ctx.pool, board_id, 2222222223, "認証テスト", owner_id).await;
+
+    let form_data = encode_sjis_form(&[
+        ("bbs", "missingtoken"),
+        ("submit", "書き込む"),
+        ("key", "2222222223"),
+        ("FROM", "認証ユーザー"),
+        ("mail", ""),
+        ("MESSAGE", "テストレスポンス"),
+    ]);
+    let missing_token = "00000000000000000000000000000000";
+    let response = ctx
+        .server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={missing_token}")).unwrap(),
+        )
+        .bytes(Bytes::from(form_data.into_bytes()))
+        .await;
+
+    assert_eq!(response.status_code(), 200);
+    let set_cookie = response.header("set-cookie");
+    let cookie = set_cookie.to_str().unwrap();
+    let new_token = cookie
+        .strip_prefix("edge-token=")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap();
+    assert_ne!(new_token, missing_token);
+
+    let auth_code: (String,) = sqlx::query_as(
+        "SELECT auth_code FROM authed_tokens WHERE token = ? AND validity = false AND authed_at IS NULL",
+    )
+    .bind(new_token)
+    .fetch_one(&ctx.pool)
+    .await
+    .unwrap();
+    let body = decode_sjis(response.as_bytes());
+    assert!(body.contains(&format!("認証コード'{}'", auth_code.0)));
+}
+
 /// Test 6: Cache and DB return identical dat bytes
 #[tokio::test]
 async fn test_dat_cache_and_db_parity() {
