@@ -77,7 +77,7 @@ impl ServerSettingKey {
                 "Check each new thread (title + body) with an LLM in batches in eddist-persistence and publish verdicts on bbs:event:thread_moderation_verdict (true/false)"
             }
             Self::AiLlmModerationUnsafeThreads => {
-                "Use LLM verdicts instead of the OpenAI moderation API's flagged result to decide which threads safe mode hides (true/false)"
+                "Use LLM verdicts (violations and NSFW threads) instead of the OpenAI moderation API's flagged result to decide which threads safe mode hides (true/false)"
             }
             Self::AiLlmModerationModel => "Model for LLM thread moderation (default: gpt-5.6-luna)",
             Self::AiLlmModerationInstructions => {

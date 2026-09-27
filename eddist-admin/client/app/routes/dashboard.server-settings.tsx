@@ -80,7 +80,7 @@ const KNOWN_SETTINGS: SettingDefinition[] = [
     key: "ai.llm_moderation_unsafe_threads",
     label: "Use LLM Verdicts for Safe Mode",
     description:
-      'Decide which threads safe mode hides from LLM verdicts instead of the OpenAI moderation API. Requires LLM moderation to be enabled; turn off "Enable Moderation for Threads" once this is on.',
+      'Decide which threads safe mode hides from LLM verdicts (violations and NSFW threads) instead of the OpenAI moderation API. Requires LLM moderation to be enabled; turn off "Enable Moderation for Threads" once this is on.',
     type: "boolean",
   },
   {
