@@ -103,4 +103,5 @@ pub struct ThreadModerationVerdict {
     pub clauses: Vec<String>,
     pub reason: String,
     pub model: String,
+    pub nsfw: bool,
 }

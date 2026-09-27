@@ -117,8 +117,8 @@ message AuthTokenRevoked {
 }
 
 // ThreadModerationVerdict is published on bbs:event:thread_moderation_verdict by
-// eddist-persistence for each thread the LLM moderation check flags. Threads that
-// pass produce no message.
+// eddist-persistence for each thread the LLM moderation check flags as a
+// violation, as NSFW, or both. Threads that pass produce no message.
 // thread_id, board_id, authed_token_id are 16-byte UUID values (RFC 4122).
 message ThreadModerationVerdict {
   bytes thread_id = 1;
@@ -128,6 +128,9 @@ message ThreadModerationVerdict {
   // Clause keys from the fixed set in eddist-persistence (defamation, spam, ...).
   repeated string clauses = 5;
   // Short model-written explanation; instructed not to quote the post.
+  // Empty clauses and reason mean the thread is NSFW but not a violation.
   string reason = 6;
   string model = 7;
+  // Not a terms violation, but hidden from safe mode (sexual or graphic content).
+  bool nsfw = 8;
 }

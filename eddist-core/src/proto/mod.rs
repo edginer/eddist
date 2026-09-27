@@ -345,6 +345,7 @@ impl From<&ThreadModerationVerdict> for events::ThreadModerationVerdict {
             clauses: v.clauses.clone(),
             reason: v.reason.clone(),
             model: v.model.clone(),
+            nsfw: v.nsfw,
         }
     }
 }
@@ -359,6 +360,7 @@ impl From<events::ThreadModerationVerdict> for ThreadModerationVerdict {
             clauses: p.clauses,
             reason: p.reason,
             model: p.model,
+            nsfw: p.nsfw,
         }
     }
 }
@@ -437,6 +439,7 @@ mod tests {
             clauses: vec!["spam".into(), "illegal".into()],
             reason: "宣伝".into(),
             model: "gpt-5.6-luna".into(),
+            nsfw: true,
         };
         let decoded =
             decode_thread_moderation_verdict(&encode_thread_moderation_verdict(&verdict)).unwrap();
