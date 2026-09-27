@@ -40,8 +40,8 @@ pub async fn get_unsafe_thread_ids(
         .execute(BoardInfoServiceInput { board_key })
         .await;
 
-    let board_id = match board_info {
-        Ok(info) => info.board_id,
+    let board_key = match board_info {
+        Ok(info) => info.board_key,
         Err(e) => {
             if e.to_string().contains("board not found") {
                 return Response::builder().status(404).body(Body::empty()).unwrap();
@@ -51,7 +51,7 @@ pub async fn get_unsafe_thread_ids(
         }
     };
 
-    let key = unsafe_threads_key(board_id);
+    let key = unsafe_threads_key(&board_key);
     let mut redis_conn = state.redis_conn.clone();
     let thread_ids: Vec<u64> = match redis_conn.smembers(&key).await {
         Ok(ids) => ids,

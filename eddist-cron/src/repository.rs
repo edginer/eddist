@@ -59,7 +59,6 @@ impl Repository {
             .into_iter()
             .filter_map(|(board, board_info)| {
                 board_info.map(|board_info| SelectionBoardInfo {
-                    board_id: board.id,
                     board_key: board.board_key,
                     default_name: board.default_name,
                     threads_archive_cron: board_info.threads_archive_cron,
@@ -342,7 +341,6 @@ impl Repository {
 
 #[derive(Debug, Clone)]
 pub struct SelectionBoardInfo {
-    pub board_id: Uuid,
     pub board_key: String,
     pub default_name: String,
     pub threads_archive_cron: Option<String>,

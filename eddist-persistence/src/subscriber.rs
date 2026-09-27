@@ -1,4 +1,4 @@
-use std::env;
+use std::{collections::HashMap, env};
 
 use eddist_core::{
     domain::pubsub_repository::{
@@ -11,6 +11,7 @@ use futures::StreamExt;
 use redis::AsyncCommands;
 use tokio::{select, time::sleep};
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 use crate::token_backup::{backup_token, remove_token_backup};
 
@@ -19,7 +20,9 @@ pub struct RedisSubRepository {
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
     s3_bucket: Option<(aws_sdk_s3::Client, String)>,
-    db_pool: Option<sqlx::MySqlPool>,
+    db_pool: sqlx::MySqlPool,
+    // board_key is immutable, so entries never need invalidation.
+    board_key_cache: HashMap<Uuid, String>,
 }
 
 impl RedisSubRepository {
@@ -29,7 +32,7 @@ impl RedisSubRepository {
         cancel: tokio::sync::broadcast::Receiver<()>,
         s3_client: Option<aws_sdk_s3::Client>,
         s3_bucket_name: Option<String>,
-        db_pool: Option<sqlx::MySqlPool>,
+        db_pool: sqlx::MySqlPool,
     ) -> Self {
         Self {
             pubsub_conn,
@@ -37,8 +40,28 @@ impl RedisSubRepository {
             cancel,
             s3_bucket: s3_client.zip(s3_bucket_name),
             db_pool,
+            board_key_cache: HashMap::new(),
         }
     }
+}
+
+async fn board_key_by_id(
+    cache: &mut HashMap<Uuid, String>,
+    pool: &sqlx::MySqlPool,
+    board_id: Uuid,
+) -> anyhow::Result<String> {
+    if let Some(board_key) = cache.get(&board_id) {
+        return Ok(board_key.clone());
+    }
+
+    let board_key =
+        sqlx::query_scalar::<_, String>("SELECT board_key FROM boards WHERE id = UUID_TO_BIN(?)")
+            .bind(board_id.to_string())
+            .fetch_one(pool)
+            .await?;
+
+    cache.insert(board_id, board_key.clone());
+    Ok(board_key)
 }
 
 pub trait SubRepository {
@@ -225,7 +248,7 @@ impl RedisSubRepository {
                     };
                     let token_id = event.authed_token_id;
                     if let (Some(pool), Some((client, bucket_name))) =
-                        (self.db_pool.as_ref(), self.s3_bucket.as_ref())
+                        (Some(&self.db_pool), self.s3_bucket.as_ref())
                     {
                         let pool = pool.clone();
                         let client = client.clone();
@@ -263,7 +286,24 @@ impl RedisSubRepository {
                     };
 
                     if event.moderation_result.map(|m| m.flagged).unwrap_or(false) {
-                        let key = unsafe_threads_key(event.board_id);
+                        let board_key = match board_key_by_id(
+                            &mut self.board_key_cache,
+                            &self.db_pool,
+                            event.board_id,
+                        )
+                        .await
+                        {
+                            Ok(board_key) => board_key,
+                            Err(e) => {
+                                error!(
+                                    error = e.to_string().as_str(),
+                                    board_id = event.board_id.to_string().as_str(),
+                                    "Failed to resolve board_key for unsafe thread"
+                                );
+                                continue;
+                            }
+                        };
+                        let key = unsafe_threads_key(&board_key);
                         let mut conn = self.conn.clone();
                         if let Err(e) = conn.sadd::<_, _, ()>(&key, event.unix_time).await {
                             error!(
@@ -272,7 +312,7 @@ impl RedisSubRepository {
                             );
                         } else {
                             info!(
-                                board_id = event.board_id.to_string().as_str(),
+                                board_key = board_key.as_str(),
                                 unix_time = event.unix_time,
                                 "Flagged thread stored in safe mode set"
                             );

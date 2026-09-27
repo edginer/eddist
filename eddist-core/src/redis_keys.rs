@@ -70,8 +70,8 @@ pub fn reauth_lock_key(token_id: &str) -> String {
     format!("reauth:lock:{token_id}")
 }
 
-pub fn unsafe_threads_key(board_id: impl std::fmt::Display) -> String {
-    format!("bbs:safe_mode:unsafe_threads:{board_id}")
+pub fn unsafe_threads_key(board_key: &str) -> String {
+    format!("bbs:safe_mode:unsafe_threads:{board_key}")
 }
 
 pub fn not_found_access_count_key(ip: &str) -> String {
