@@ -1,4 +1,4 @@
-use std::{env, str::FromStr, time::Duration};
+use std::{collections::HashSet, env, str::FromStr, time::Duration};
 
 use aws_sdk_s3::{
     Client,
@@ -6,18 +6,31 @@ use aws_sdk_s3::{
     error::SdkError,
     operation::head_object::HeadObjectError,
     primitives::ByteStream,
+    types::{Delete, ObjectIdentifier},
 };
 use chrono::{TimeDelta, TimeZone, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{
-    domain::res::get_1001_sjis_bytes, redis_keys::unsafe_threads_key, tracing::init_tracing,
-    utils::is_prod,
+    domain::{authed_token_backup::AUTHED_TOKENS_S3_PREFIX, res::get_1001_sjis_bytes},
+    redis_keys::unsafe_threads_key,
+    tracing::init_tracing,
+    utils::{is_authed_token_backup_enabled, is_prod},
 };
 use redis::AsyncCommands;
+use repository::StaleAuthedTokenKind;
 use sea_orm::{ConnectOptions, Database};
 use tokio::time::sleep;
+use uuid::Uuid;
 
+#[cfg(test)]
+mod integration_tests;
 mod repository;
+
+const PENDING_AUTHED_TOKEN_RETENTION: TimeDelta = TimeDelta::days(7);
+// Margin over the 365-day edge-token cookie refreshed on every write.
+const IDLE_AUTHED_TOKEN_RETENTION: TimeDelta = TimeDelta::days(400);
+const CLEANUP_BATCH_SIZE: u64 = 1000;
+const BACKUP_DELETE_ATTEMPTS: usize = 3;
 
 #[tokio::main]
 async fn main() {
@@ -495,11 +508,121 @@ async fn main() {
             }
         }
 
+        "cleanup-authed-tokens" => {
+            let now = Utc::now().naive_utc();
+
+            let pending = repo
+                .delete_stale_authed_tokens(
+                    StaleAuthedTokenKind::Pending,
+                    now - PENDING_AUTHED_TOKEN_RETENTION,
+                    CLEANUP_BATCH_SIZE,
+                )
+                .await
+                .unwrap();
+            log::info!("Deleted {} pending authed tokens", pending.len());
+
+            let idle = repo
+                .delete_stale_authed_tokens(
+                    StaleAuthedTokenKind::Idle,
+                    now - IDLE_AUTHED_TOKEN_RETENTION,
+                    CLEANUP_BATCH_SIZE,
+                )
+                .await
+                .unwrap();
+            log::info!("Deleted {} idle authed tokens", idle.len());
+
+            // Otherwise `eddist-cli authed-tokens recover` would resurrect them as valid.
+            if is_authed_token_backup_enabled() && !idle.is_empty() {
+                let (s3_client, s3_bucket_name) = make_s3_client();
+                delete_authed_token_backups(&s3_client, &s3_bucket_name, &idle)
+                    .await
+                    .unwrap();
+            }
+        }
         job => {
             log::error!("Unknown job: {job}");
             std::process::exit(1);
         }
     }
+}
+
+async fn delete_authed_token_backups(
+    s3_client: &Client,
+    bucket_name: &str,
+    ids: &[Uuid],
+) -> anyhow::Result<()> {
+    let mut failed_count = 0;
+    for chunk in ids.chunks(1000) {
+        let mut remaining = chunk.to_vec();
+
+        for attempt in 1..=BACKUP_DELETE_ATTEMPTS {
+            let objects = remaining
+                .iter()
+                .map(|id| {
+                    ObjectIdentifier::builder()
+                        .key(format!("{AUTHED_TOKENS_S3_PREFIX}/{id}.json"))
+                        .build()
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            let delete = Delete::builder()
+                .set_objects(Some(objects))
+                .quiet(true)
+                .build()
+                .unwrap();
+
+            match s3_client
+                .delete_objects()
+                .bucket(bucket_name)
+                .delete(delete)
+                .send()
+                .await
+            {
+                Ok(output) => {
+                    let mut failed_keys = HashSet::new();
+                    let mut has_unidentified_error = false;
+                    for e in output.errors() {
+                        log::warn!(
+                            "Failed to delete authed token backup {} on attempt {attempt}: {:?}",
+                            e.key().unwrap_or_default(),
+                            e.message()
+                        );
+                        if let Some(key) = e.key() {
+                            failed_keys.insert(key.to_string());
+                        } else {
+                            has_unidentified_error = true;
+                        }
+                    }
+                    if !has_unidentified_error {
+                        remaining.retain(|id| {
+                            failed_keys.contains(&format!("{AUTHED_TOKENS_S3_PREFIX}/{id}.json"))
+                        });
+                    }
+                }
+                Err(e) => log::warn!(
+                    "Failed to delete authed token backups {:?} on attempt {attempt}: {e:?}",
+                    remaining
+                ),
+            }
+
+            if remaining.is_empty() {
+                break;
+            }
+            if attempt < BACKUP_DELETE_ATTEMPTS {
+                sleep(Duration::from_secs(1 << (attempt - 1))).await;
+            }
+        }
+
+        if !remaining.is_empty() {
+            failed_count += remaining.len();
+            log::error!("Authed token backups still present after retries: {remaining:?}");
+        }
+    }
+
+    if failed_count > 0 {
+        anyhow::bail!("Failed to delete {failed_count} authed token backups after retries");
+    }
+    Ok(())
 }
 
 fn make_s3_client() -> (Client, String) {

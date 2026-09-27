@@ -1943,6 +1943,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
+ "chrono",
  "clap",
  "dotenvy",
  "eddist-core",
@@ -1996,6 +1997,9 @@ dependencies = [
  "redis",
  "sea-orm",
  "serde_json",
+ "sqlx",
+ "testcontainers",
+ "testcontainers-modules",
  "tokio",
  "uuid",
 ]

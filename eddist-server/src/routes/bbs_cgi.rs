@@ -94,14 +94,14 @@ pub async fn post_bbs_cgi(
         if is_cookie_reset {
             resp.headers_mut().append(
                 "Set-Cookie",
-                "edge-token = ; Max-Age = 0; Path = /; "
+                "edge-token=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/"
                     .to_string()
                     .parse()
                     .unwrap(),
             );
             resp.headers_mut().append(
                 "Set-Cookie",
-                "tinker = ; Max-Age = 0; Path = /; "
+                "tinker-token=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/"
                     .to_string()
                     .parse()
                     .unwrap(),
