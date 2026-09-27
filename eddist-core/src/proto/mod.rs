@@ -13,7 +13,7 @@ use crate::domain::{
     metadent::MetadentType,
     pubsub_repository::{
         AuthTokenInitiated, AuthTokenRequested, AuthTokenRevoked, AuthTokenSucceeded, CreatingRes,
-        CreatingThread, ModerationResult,
+        CreatingThread, ModerationResult, ThreadModerationVerdict,
     },
     tinker::Tinker,
 };
@@ -333,6 +333,36 @@ impl From<events::AuthTokenRevoked> for AuthTokenRevoked {
     }
 }
 
+// ── ThreadModerationVerdict ───────────────────────────────────────────────────
+
+impl From<&ThreadModerationVerdict> for events::ThreadModerationVerdict {
+    fn from(v: &ThreadModerationVerdict) -> Self {
+        Self {
+            thread_id: uuid_to_bytes(v.thread_id),
+            board_id: uuid_to_bytes(v.board_id),
+            unix_time: v.unix_time,
+            authed_token_id: uuid_to_bytes(v.authed_token_id),
+            clauses: v.clauses.clone(),
+            reason: v.reason.clone(),
+            model: v.model.clone(),
+        }
+    }
+}
+
+impl From<events::ThreadModerationVerdict> for ThreadModerationVerdict {
+    fn from(p: events::ThreadModerationVerdict) -> Self {
+        Self {
+            thread_id: bytes_to_uuid(&p.thread_id),
+            board_id: bytes_to_uuid(&p.board_id),
+            unix_time: p.unix_time,
+            authed_token_id: bytes_to_uuid(&p.authed_token_id),
+            clauses: p.clauses,
+            reason: p.reason,
+            model: p.model,
+        }
+    }
+}
+
 // ── Public encode/decode helpers ──────────────────────────────────────────────
 
 pub fn encode_creating_thread(e: &CreatingThread) -> Vec<u8> {
@@ -379,6 +409,37 @@ pub fn encode_auth_token_revoked(e: &AuthTokenRevoked) -> Vec<u8> {
     events::AuthTokenRevoked::from(e).encode_to_vec()
 }
 
+pub fn encode_thread_moderation_verdict(v: &ThreadModerationVerdict) -> Vec<u8> {
+    events::ThreadModerationVerdict::from(v).encode_to_vec()
+}
+
+pub fn decode_thread_moderation_verdict(
+    bytes: &[u8],
+) -> Result<ThreadModerationVerdict, prost::DecodeError> {
+    Ok(events::ThreadModerationVerdict::decode(bytes)?.into())
+}
+
 pub fn decode_auth_token_revoked(bytes: &[u8]) -> Result<AuthTokenRevoked, prost::DecodeError> {
     events::AuthTokenRevoked::decode(bytes).map(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thread_moderation_verdict_roundtrips() {
+        let verdict = ThreadModerationVerdict {
+            thread_id: Uuid::new_v4(),
+            board_id: Uuid::new_v4(),
+            unix_time: 1_785_510_001,
+            authed_token_id: Uuid::new_v4(),
+            clauses: vec!["spam".into(), "illegal".into()],
+            reason: "宣伝".into(),
+            model: "gpt-5.6-luna".into(),
+        };
+        let decoded =
+            decode_thread_moderation_verdict(&encode_thread_moderation_verdict(&verdict)).unwrap();
+        assert_eq!(decoded, verdict);
+    }
 }

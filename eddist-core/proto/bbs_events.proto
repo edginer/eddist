@@ -115,3 +115,19 @@ message AuthTokenSucceeded {
 message AuthTokenRevoked {
   bytes authed_token_id = 1;
 }
+
+// ThreadModerationVerdict is published on bbs:event:thread_moderation_verdict by
+// eddist-persistence for each thread the LLM moderation check flags. Threads that
+// pass produce no message.
+// thread_id, board_id, authed_token_id are 16-byte UUID values (RFC 4122).
+message ThreadModerationVerdict {
+  bytes thread_id = 1;
+  bytes board_id = 2;
+  uint64 unix_time = 3;
+  bytes authed_token_id = 4;
+  // Clause keys from the fixed set in eddist-persistence (defamation, spam, ...).
+  repeated string clauses = 5;
+  // Short model-written explanation; instructed not to quote the post.
+  string reason = 6;
+  string model = 7;
+}

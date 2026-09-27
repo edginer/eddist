@@ -106,6 +106,7 @@ pub const DB_FAILED_CACHE_RES_KEY: &str = "bbs:db_failed_cache:res";
 
 pub const CHANNEL_RES_CREATED: &str = "bbs:event:res_created";
 pub const CHANNEL_THREAD_CREATED: &str = "bbs:event:thread_created";
+pub const CHANNEL_THREAD_MODERATION_VERDICT: &str = "bbs:event:thread_moderation_verdict";
 pub use crate::domain::pubsub_repository::{
     CHANNEL_AUTH_TOKEN_INITIATED, CHANNEL_AUTH_TOKEN_REQUESTED, CHANNEL_AUTH_TOKEN_REVOKED,
     CHANNEL_AUTH_TOKEN_SUCCEEDED, CHANNEL_PUBSUB_ITEM,

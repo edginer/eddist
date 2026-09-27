@@ -1,3 +1,4 @@
+mod llm_moderation;
 mod persistence;
 mod shutdown;
 mod subscriber;
@@ -58,6 +59,16 @@ async fn main() -> anyhow::Result<()> {
     let pubsub_conn = client.get_async_pubsub().await?;
     let conn = client.get_connection_manager().await?;
 
+    let llm_moderation = llm_moderation::LlmModeration::default();
+    // Loaded before subscribing so the first thread_created events already see
+    // whether LLM moderation owns the unsafe set.
+    llm_moderation.refresh_settings(&db_pool).await;
+    tokio::spawn(llm_moderation::run_loop(
+        llm_moderation.clone(),
+        db_pool.clone(),
+        conn.clone(),
+    ));
+
     let mut sub_repo = subscriber::RedisSubRepository::new(
         pubsub_conn,
         conn.clone(),
@@ -65,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
         s3_client,
         s3_bucket_name,
         db_pool,
+        llm_moderation,
     );
 
     let subscribe_handle = tokio::spawn(async move { sub_repo.subscribe().await });

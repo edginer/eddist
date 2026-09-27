@@ -13,7 +13,10 @@ use tokio::{select, time::sleep};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::token_backup::{backup_token, remove_token_backup};
+use crate::{
+    llm_moderation::{LlmModeration, PendingThread},
+    token_backup::{backup_token, remove_token_backup},
+};
 
 pub struct RedisSubRepository {
     pubsub_conn: redis::aio::PubSub,
@@ -23,6 +26,7 @@ pub struct RedisSubRepository {
     db_pool: sqlx::MySqlPool,
     // board_key is immutable, so entries never need invalidation.
     board_key_cache: HashMap<Uuid, String>,
+    llm_moderation: LlmModeration,
 }
 
 impl RedisSubRepository {
@@ -33,6 +37,7 @@ impl RedisSubRepository {
         s3_client: Option<aws_sdk_s3::Client>,
         s3_bucket_name: Option<String>,
         db_pool: sqlx::MySqlPool,
+        llm_moderation: LlmModeration,
     ) -> Self {
         Self {
             pubsub_conn,
@@ -41,6 +46,7 @@ impl RedisSubRepository {
             s3_bucket: s3_client.zip(s3_bucket_name),
             db_pool,
             board_key_cache: HashMap::new(),
+            llm_moderation,
         }
     }
 }
@@ -285,24 +291,34 @@ impl RedisSubRepository {
                         }
                     };
 
-                    if event.moderation_result.map(|m| m.flagged).unwrap_or(false) {
-                        let board_key = match board_key_by_id(
-                            &mut self.board_key_cache,
-                            &self.db_pool,
-                            event.board_id,
-                        )
-                        .await
-                        {
-                            Ok(board_key) => board_key,
-                            Err(e) => {
-                                error!(
-                                    error = e.to_string().as_str(),
-                                    board_id = event.board_id.to_string().as_str(),
-                                    "Failed to resolve board_key for unsafe thread"
-                                );
-                                continue;
-                            }
-                        };
+                    // Once LLM verdicts decide the unsafe set, the moderation API's
+                    // `flagged` is ignored so the two can't both add a thread.
+                    let flagged = !self.llm_moderation.decides_unsafe_threads()
+                        && event.moderation_result.as_ref().is_some_and(|m| m.flagged);
+                    let queue_for_llm = self.llm_moderation.is_enabled();
+                    if !flagged && !queue_for_llm {
+                        continue;
+                    }
+
+                    let board_key = match board_key_by_id(
+                        &mut self.board_key_cache,
+                        &self.db_pool,
+                        event.board_id,
+                    )
+                    .await
+                    {
+                        Ok(board_key) => board_key,
+                        Err(e) => {
+                            error!(
+                                error = e.to_string().as_str(),
+                                board_id = event.board_id.to_string().as_str(),
+                                "Failed to resolve board_key for thread moderation"
+                            );
+                            continue;
+                        }
+                    };
+
+                    if flagged {
                         let key = unsafe_threads_key(&board_key);
                         let mut conn = self.conn.clone();
                         if let Err(e) = conn.sadd::<_, _, ()>(&key, event.unix_time).await {
@@ -317,6 +333,18 @@ impl RedisSubRepository {
                                 "Flagged thread stored in safe mode set"
                             );
                         }
+                    }
+
+                    if queue_for_llm {
+                        self.llm_moderation.push(PendingThread {
+                            thread_id: event.thread_id,
+                            board_id: event.board_id,
+                            board_key,
+                            unix_time: event.unix_time,
+                            authed_token_id: event.authed_token_id,
+                            title: event.title,
+                            body: event.body,
+                        });
                     }
                 }
                 ch if ch == CHANNEL_AUTH_TOKEN_REVOKED => {

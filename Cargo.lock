@@ -2021,6 +2021,7 @@ dependencies = [
  "hyper 1.11.0",
  "hyper-util",
  "redis",
+ "reqwest",
  "serde",
  "serde_json",
  "sqlx",
