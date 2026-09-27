@@ -19,3 +19,4 @@ hyper = { workspace = true, features = ["server", "http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
 aws-sdk-s3.workspace = true
 uuid.workspace = true
+reqwest.workspace = true

@@ -93,3 +93,14 @@ pub struct CreatingThread {
     pub client_info: ClientInfo,
     pub moderation_result: Option<ModerationResult>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadModerationVerdict {
+    pub thread_id: Uuid,
+    pub board_id: Uuid,
+    pub unix_time: u64,
+    pub authed_token_id: Uuid,
+    pub clauses: Vec<String>,
+    pub reason: String,
+    pub model: String,
+}
