@@ -110,7 +110,6 @@ async fn main() {
                     let repo_clone = repo.clone();
                     let mut redis_conn = redis_conn.clone();
                     let board_key = b.board_key.clone();
-                    let board_id = b.board_id;
 
                     let task = tokio::spawn(async move {
                         // Randomize thread archive timing (0-59 seconds)
@@ -133,7 +132,7 @@ async fn main() {
                             .await
                         {
                             Ok(thread_numbers) if !thread_numbers.is_empty() => {
-                                let key = unsafe_threads_key(board_id);
+                                let key = unsafe_threads_key(&board_key);
                                 if let Err(e) =
                                     redis_conn.srem::<_, _, ()>(&key, thread_numbers).await
                                 {

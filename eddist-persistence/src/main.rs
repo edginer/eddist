@@ -52,12 +52,7 @@ async fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
-    let db_pool = if is_authed_token_backup_enabled() {
-        let database_url = env::var("DATABASE_URL")?;
-        Some(sqlx::MySqlPool::connect(&database_url).await?)
-    } else {
-        None
-    };
+    let db_pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let pubsub_conn = client.get_async_pubsub().await?;
