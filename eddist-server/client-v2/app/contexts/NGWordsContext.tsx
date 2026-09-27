@@ -11,8 +11,9 @@ import {
 import { EMPTY_SHARED_NG_LIST, type SharedNgList } from "~/api-client/ng_id";
 import type { Response } from "~/api-client/thread";
 import type { Thread } from "~/api-client/thread_list";
+import { matchesNgRule } from "~/utils/threadListSkeleton";
 
-const STORAGE_KEY = "eddist:ng-words:config";
+export const NG_CONFIG_STORAGE_KEY = "eddist:ng-words:config";
 const DEBOUNCE_DELAY = 300;
 
 export interface NGRule {
@@ -130,7 +131,7 @@ const loadConfig = (): NGWordsConfig => {
   if (!isBrowser) return getDefaultConfig();
 
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(NG_CONFIG_STORAGE_KEY);
     if (!stored) return getDefaultConfig();
 
     const parsed = JSON.parse(stored);
@@ -152,7 +153,7 @@ const saveConfig = (config: NGWordsConfig): void => {
 
   try {
     const configString = JSON.stringify(config);
-    localStorage.setItem(STORAGE_KEY, configString);
+    localStorage.setItem(NG_CONFIG_STORAGE_KEY, configString);
   } catch (error) {
     if (error instanceof Error && error.name === "QuotaExceededError") {
       console.error("localStorage quota exceeded");
@@ -174,7 +175,7 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
   // Listen for storage changes from other tabs/windows
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
+      if (e.key === NG_CONFIG_STORAGE_KEY && e.newValue) {
         try {
           const newConfig = JSON.parse(e.newValue);
           isExternalUpdateRef.current = true;
@@ -308,29 +309,18 @@ export const NGWordsProvider = ({ children }: { children: ReactNode }) => {
 
   // matchesRule with regex caching for performance
   const matchesRule = useCallback((text: string, rule: NGRule): boolean => {
-    if (!rule.enabled || !text) return false;
-
-    if (rule.matchType === "regex") {
-      // Check cache first
-      let regex = regexCache.current.get(rule.pattern);
-
+    return matchesNgRule(text, rule, (pattern) => {
+      let regex = regexCache.current.get(pattern);
       if (regex === undefined) {
         try {
-          regex = new RegExp(rule.pattern, "i");
+          regex = new RegExp(pattern, "i");
         } catch {
           regex = null; // Mark as invalid
         }
-        regexCache.current.set(rule.pattern, regex);
+        regexCache.current.set(pattern, regex);
       }
-
-      if (!regex) return false;
-      return regex.test(text);
-    } else {
-      // Partial match optimization: use toLowerCase() once
-      const lowerText = text.toLowerCase();
-      const lowerPattern = rule.pattern.toLowerCase();
-      return lowerText.includes(lowerPattern);
-    }
+      return regex;
+    });
   }, []);
 
   const shouldFilterThread = useCallback(
