@@ -5,6 +5,7 @@ use aws_sdk_s3::{
     config::{Credentials, Region},
     primitives::ByteStream,
 };
+use chrono::Utc;
 use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
 use futures::StreamExt;
@@ -236,6 +237,7 @@ async fn recover() -> Result<()> {
 
     let total = keys.len();
     println!("Recovering {total} tokens from S3...");
+    let recovered_at = Utc::now().naive_utc();
 
     let results = futures::stream::iter(keys)
         .map(|key| {
@@ -265,7 +267,9 @@ async fn recover() -> Result<()> {
                     created_at: Set(token.created_at),
                     authed_at: Set(token.authed_at),
                     validity: Set(true),
-                    last_wrote_at: Set(token.last_wrote_at),
+                    // The backup only records writes up to its snapshot time. Give restored
+                    // tokens a fresh idle-retention window before the cleanup job runs.
+                    last_wrote_at: Set(Some(recovered_at)),
                     asn_num: Set(token.asn_num),
                     additional_info: Set(token.additional_info),
                     author_id_seed: Set(token.author_id_seed),
