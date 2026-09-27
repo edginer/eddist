@@ -65,6 +65,38 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         }
     }
 
+    async fn issue_auth_code(
+        &self,
+        ip_addr: String,
+        user_agent: String,
+        asn_num: i32,
+        created_at: chrono::DateTime<chrono::Utc>,
+        require_user_registration: bool,
+    ) -> Result<AuthedToken, BbsCgiError> {
+        let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
+        self.repo
+            .create_authed_token(CreatingAuthedToken {
+                token: authed_token.token.clone(),
+                writing_ua: authed_token.writing_ua,
+                origin_ip: authed_token.origin_ip,
+                asn_num: authed_token.asn_num,
+                created_at,
+                author_id_seed: authed_token.author_id_seed,
+                auth_code: authed_token.auth_code.clone(),
+                id: authed_token.id,
+                require_user_registration,
+            })
+            .await?;
+        counter!("token_request", "state" => "created").increment(1);
+        self.publish_initiated(authed_token.id, ip_addr, user_agent, asn_num as u32);
+
+        Err(BbsCgiError::Unauthenticated {
+            auth_code: authed_token.auth_code,
+            base_url: env::var("BASE_URL").unwrap(),
+            auth_token: authed_token.token,
+        })
+    }
+
     pub async fn check_validity(
         &self,
         token: Option<&str>,
@@ -74,71 +106,46 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         created_at: chrono::DateTime<chrono::Utc>,
         require_user_registration: bool,
     ) -> Result<AuthedToken, BbsCgiError> {
-        let Some(authed_token) = token else {
-            let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
-            self.repo
-                .create_authed_token(CreatingAuthedToken {
-                    token: authed_token.token.clone(),
-                    writing_ua: authed_token.writing_ua,
-                    origin_ip: authed_token.origin_ip,
-                    asn_num: authed_token.asn_num,
+        let authed_token = match token {
+            Some(token) => self
+                .repo
+                .get_authed_token(token)
+                .await
+                .map_err(BbsCgiError::Other)?,
+            None => None,
+        };
+        let Some(authed_token) = authed_token else {
+            return self
+                .issue_auth_code(
+                    ip_addr,
+                    user_agent,
+                    asn_num,
                     created_at,
-                    author_id_seed: authed_token.author_id_seed,
-                    auth_code: authed_token.auth_code.clone(),
-                    id: authed_token.id,
                     require_user_registration,
-                })
-                .await?;
-            counter!("token_request", "state" => "created").increment(1);
-            self.publish_initiated(authed_token.id, ip_addr, user_agent, asn_num as u32);
+                )
+                .await;
+        };
 
+        if !authed_token.validity {
+            if authed_token.authed_at.is_some() {
+                return Err(BbsCgiError::RevokedAuthedToken);
+            }
+            if authed_token.is_activation_expired(Utc::now()) {
+                return self
+                    .issue_auth_code(
+                        ip_addr,
+                        user_agent,
+                        asn_num,
+                        created_at,
+                        require_user_registration,
+                    )
+                    .await;
+            }
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
                 base_url: env::var("BASE_URL").unwrap(),
                 auth_token: authed_token.token,
             });
-        };
-
-        let authed_token = self
-            .repo
-            .get_authed_token(authed_token)
-            .await
-            .map_err(BbsCgiError::Other)?
-            .ok_or_else(|| BbsCgiError::InvalidAuthedToken)?;
-
-        if !authed_token.validity {
-            return if authed_token.authed_at.is_some() {
-                Err(BbsCgiError::RevokedAuthedToken)
-            } else if authed_token.is_activation_expired(Utc::now()) {
-                let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
-                self.repo
-                    .create_authed_token(CreatingAuthedToken {
-                        token: authed_token.token.clone(),
-                        writing_ua: authed_token.writing_ua,
-                        origin_ip: authed_token.origin_ip,
-                        asn_num: authed_token.asn_num,
-                        created_at,
-                        author_id_seed: authed_token.author_id_seed,
-                        auth_code: authed_token.auth_code.clone(),
-                        id: authed_token.id,
-                        require_user_registration,
-                    })
-                    .await?;
-                counter!("token_request", "state" => "created").increment(1);
-                self.publish_initiated(authed_token.id, ip_addr, user_agent, asn_num as u32);
-
-                return Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: env::var("BASE_URL").unwrap(),
-                    auth_token: authed_token.token,
-                });
-            } else {
-                Err(BbsCgiError::Unauthenticated {
-                    auth_code: authed_token.auth_code,
-                    base_url: env::var("BASE_URL").unwrap(),
-                    auth_token: authed_token.token,
-                })
-            };
         }
 
         // Check temporary suspension flag in Redis
