@@ -100,12 +100,7 @@ pub async fn revoke_authed_token(
     State(state): State<AppState>,
     Json(input): Json<RevokeAuthedTokenInput>,
 ) -> Result<StatusCode, ApiError> {
-    // Internal routes don't have a session-based actor; use a system placeholder.
-    let system_actor = crate::auth::AdminIdentity {
-        sub: "system".to_string(),
-        email: "system@internal".to_string(),
-        username: "system".to_string(),
-    };
+    let system_actor = crate::auth::AdminIdentity::system();
     state
         .services
         .authed_token

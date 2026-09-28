@@ -16,7 +16,8 @@ pub mod threads;
 pub mod users;
 
 pub fn create_internal_routes() -> Router<AppState> {
-    internal::create_internal_routes()
+    // Keep the session and internal API route sets in sync.
+    create_api_routes().merge(internal::create_internal_routes())
 }
 
 pub fn create_api_routes() -> Router<AppState> {
@@ -32,4 +33,12 @@ pub fn create_api_routes() -> Router<AppState> {
         .merge(server_settings::routes())
         .merge(terms::routes())
         .merge(users::routes())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn internal_routes_merge_without_conflicts() {
+        let _ = super::create_internal_routes();
+    }
 }

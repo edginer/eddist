@@ -455,10 +455,67 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct AdminIdentity {
     pub sub: String,
     pub email: String,
     pub username: String,
+    is_system: bool,
+}
+
+#[cfg(test)]
+mod internal_identity_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn system_identity_requires_an_authenticated_extension() {
+        let (mut unauthenticated, _) = http::Request::new(()).into_parts();
+        assert!(
+            AdminIdentity::from_request_parts(&mut unauthenticated, &())
+                .await
+                .is_err()
+        );
+
+        let (mut authenticated, _) = http::Request::new(()).into_parts();
+        authenticated.extensions.insert(AdminIdentity::system());
+        let identity = AdminIdentity::from_request_parts(&mut authenticated, &())
+            .await
+            .unwrap();
+        assert!(identity.is_system());
+        assert_eq!(identity.email, "system@internal");
+    }
+
+    #[tokio::test]
+    async fn admin_claims_never_get_system_privileges() {
+        let (mut request, _) = http::Request::new(()).into_parts();
+        request.extensions.insert(Auth0Claims {
+            exp: i64::MAX,
+            sub: "system".to_string(),
+            email_verified: true,
+            preferred_username: "system".to_string(),
+            email: "system@internal".to_string(),
+        });
+
+        let identity = AdminIdentity::from_request_parts(&mut request, &())
+            .await
+            .unwrap();
+        assert!(!identity.is_system());
+    }
+}
+
+impl AdminIdentity {
+    pub fn system() -> Self {
+        Self {
+            sub: "system".to_string(),
+            email: "system@internal".to_string(),
+            username: "system".to_string(),
+            is_system: true,
+        }
+    }
+
+    pub fn is_system(&self) -> bool {
+        self.is_system
+    }
 }
 
 impl<S> FromRequestParts<S> for AdminIdentity
@@ -468,12 +525,17 @@ where
     type Rejection = (http::StatusCode, &'static str);
 
     async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        if let Some(identity) = req.extensions.get::<AdminIdentity>() {
+            return Ok(identity.clone());
+        }
+
         req.extensions
             .get::<Auth0Claims>()
             .map(|token| AdminIdentity {
                 sub: token.sub.clone(),
                 email: token.email.clone(),
                 username: token.preferred_username.clone(),
+                is_system: false,
             })
             .ok_or((StatusCode::UNAUTHORIZED, "No user information available"))
     }

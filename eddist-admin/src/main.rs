@@ -115,7 +115,7 @@ async fn ok() -> impl IntoResponse {
 
 async fn internal_secret_auth(
     State(state): State<AppState>,
-    req: Request<Body>,
+    mut req: Request<Body>,
     next: Next,
 ) -> Response {
     let Some(ref expected) = state.internal_secret else {
@@ -131,6 +131,7 @@ async fn internal_secret_auth(
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
+    req.extensions_mut().insert(auth::AdminIdentity::system());
     next.run(req).await
 }
 
@@ -276,7 +277,9 @@ async fn main() {
     let state = AppState {
         oauth2_client: client,
         services: service_container,
-        internal_secret: std::env::var("EDDIST_INTERNAL_SECRET").ok(),
+        internal_secret: std::env::var("EDDIST_INTERNAL_SECRET")
+            .ok()
+            .filter(|secret| !secret.is_empty()),
     };
 
     let app = Router::new()
