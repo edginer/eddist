@@ -40,7 +40,13 @@ function TopPage({
         canonicalUrl={canonicalUrl}
       />
       <article className="flex-1">
-        <header>
+        <header className="flex items-center gap-3">
+          <img
+            src="/eddist-logo-transparent.png"
+            alt=""
+            aria-hidden="true"
+            className="size-10 shrink-0 object-contain lg:size-14"
+          />
           <h1 className="text-3xl lg:text-5xl">{eddistData?.bbsName}</h1>
         </header>
         <section className="py-4 pt-8">
