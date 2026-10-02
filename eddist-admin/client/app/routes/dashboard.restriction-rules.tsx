@@ -28,11 +28,18 @@ interface RestrictionRule {
   name: string;
   rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
+  target: "Authentication" | "Posting" | "Both";
   expires_at?: string | null;
   created_at: string;
   updated_at: string;
   created_by_email: string;
 }
+
+const TARGET_LABELS = {
+  Authentication: "New Authentication",
+  Posting: "Posting",
+  Both: "New Authentication and Posting",
+};
 
 const RestrictionRules = () => {
   const { data: restrictionRules } = getRestrictionRules({});
@@ -101,6 +108,7 @@ const RestrictionRules = () => {
             <TableHead>
               <TableHeadCell>Name</TableHeadCell>
               <TableHeadCell>Type</TableHeadCell>
+              <TableHeadCell>Applies To</TableHeadCell>
               <TableHeadCell>Value</TableHeadCell>
               <TableHeadCell>Expires</TableHeadCell>
               <TableHeadCell>Created By</TableHeadCell>
@@ -116,6 +124,7 @@ const RestrictionRules = () => {
                       {rule.rule_type}
                     </span>
                   </TableCell>
+                  <TableCell>{TARGET_LABELS[rule.target]}</TableCell>
                   <TableCell className="font-mono text-sm">{rule.rule_value}</TableCell>
                   <TableCell>
                     <span
@@ -185,6 +194,12 @@ const RestrictionRules = () => {
                 </Dropdown>
               </div>
               <dl className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Applies To
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-700">{TARGET_LABELS[rule.target]}</dd>
+                </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     Value

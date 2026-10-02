@@ -6,6 +6,7 @@ interface RestrictionRuleFormData {
   name: string;
   rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
+  target: "Authentication" | "Posting" | "Both";
   expires_at?: string;
 }
 
@@ -13,6 +14,7 @@ interface DefaultValues {
   name: string;
   rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
+  target: "Authentication" | "Posting" | "Both";
   expires_at?: string | null;
 }
 
@@ -20,6 +22,7 @@ interface SubmitData {
   name: string;
   rule_type: "Asn" | "IP" | "IPCidr" | "UserAgent";
   rule_value: string;
+  target: "Authentication" | "Posting" | "Both";
   expires_at?: string;
 }
 
@@ -54,6 +57,7 @@ const RestrictionRuleForm = (props: Props) => {
           name: data.name,
           rule_type: data.rule_type,
           rule_value: data.rule_value,
+          target: data.target,
           expires_at:
             neverExpires || !data.expires_at ? undefined : new Date(data.expires_at).toISOString(),
         });
@@ -89,6 +93,18 @@ const RestrictionRuleForm = (props: Props) => {
               </Select>
             )}
           />
+        </div>
+        <div>
+          <Label htmlFor="restriction-target">Applies To</Label>
+          <Select
+            id="restriction-target"
+            defaultValue={defaults?.target ?? "Both"}
+            {...register("target", { required: true })}
+          >
+            <option value="Authentication">New Authentication</option>
+            <option value="Posting">Posting (Threads and Responses)</option>
+            <option value="Both">New Authentication and Posting</option>
+          </Select>
         </div>
         <div>
           <Label>Rule Value</Label>

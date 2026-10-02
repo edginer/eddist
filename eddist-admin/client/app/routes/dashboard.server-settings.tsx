@@ -27,6 +27,13 @@ type SettingDefinition =
 
 const KNOWN_SETTINGS: SettingDefinition[] = [
   {
+    key: "bbs.close_new_authentication",
+    label: "Close New Authentication",
+    description:
+      "Stop accepting new authentication. Existing users can continue posting and re-authenticating. Changes can take up to 5 minutes to apply.",
+    type: "boolean",
+  },
+  {
     key: "user.enable_idp_linking",
     label: "Enable IdP Linking",
     description: "Enable the IdP account linking feature.",

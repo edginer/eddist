@@ -623,6 +623,7 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
     let restriction = restriction_repository
         .create_rule(CreateUserRestrictionRuleInput {
             name: "integration restriction".to_string(),
+            target: eddist_core::domain::user_restriction::RestrictionTarget::Authentication,
             rule_type: RestrictionRuleType::IP,
             rule_value: "192.0.2.1".to_string(),
             expires_at: Some(Utc::now() + Duration::hours(1)),
@@ -633,6 +634,7 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
         .update_rule(UpdateUserRestrictionRuleInput {
             id: restriction.id,
             name: Some("updated restriction".to_string()),
+            target: Some(eddist_core::domain::user_restriction::RestrictionTarget::Posting),
             rule_type: Some(RestrictionRuleType::IPCidr),
             rule_value: Some("192.0.2.0/24".to_string()),
             expires_at: Some(None),
@@ -645,6 +647,10 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
     assert_eq!(updated_restriction.name, "updated restriction");
     assert_eq!(updated_restriction.rule_type, RestrictionRuleType::IPCidr);
     assert_eq!(updated_restriction.expires_at, None);
+    assert_eq!(
+        updated_restriction.target,
+        eddist_core::domain::user_restriction::RestrictionTarget::Posting
+    );
     restriction_repository.delete_rule(restriction.id).await?;
     assert!(
         restriction_repository

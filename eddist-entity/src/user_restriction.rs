@@ -7,6 +7,7 @@ pub struct Model {
     pub id: Uuid,
     pub name: String,
     pub rule_type: String,
+    pub target: String,
     pub rule_value: String,
     pub expires_at: Option<DateTime>,
     pub created_at: DateTime,

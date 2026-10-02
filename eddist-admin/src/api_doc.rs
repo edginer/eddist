@@ -145,6 +145,7 @@ use crate::{
         UpdateRestrictionRuleRequest,
         UserRestrictionRuleSchema,
         RestrictionRuleTypeSchema,
+        RestrictionTargetSchema,
 
         // User models
         User,

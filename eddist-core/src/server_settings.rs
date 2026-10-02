@@ -1,3 +1,4 @@
+pub const KEY_CLOSE_NEW_AUTHENTICATION: &str = "bbs.close_new_authentication";
 pub const KEY_ENABLE_IDP_LINKING: &str = "user.enable_idp_linking";
 pub const KEY_REQUIRE_IDP_LINKING: &str = "user.require_idp_linking";
 pub const KEY_AI_OPENAI_API_KEY: &str = "ai.openai_api_key";
@@ -11,6 +12,7 @@ pub const KEY_AI_LLM_MODERATION_INSTRUCTIONS: &str = "ai.llm_moderation_instruct
 pub const KEY_AI_LLM_MODERATION_INTERVAL_SECONDS: &str = "ai.llm_moderation_interval_seconds";
 
 pub enum ServerSettingKey {
+    CloseNewAuthentication,
     EnableIdpLinking,
     RequireIdpLinking,
     AiOpenAiApiKey,
@@ -27,6 +29,7 @@ pub enum ServerSettingKey {
 impl ServerSettingKey {
     pub const fn as_str(&self) -> &'static str {
         match self {
+            Self::CloseNewAuthentication => KEY_CLOSE_NEW_AUTHENTICATION,
             Self::EnableIdpLinking => KEY_ENABLE_IDP_LINKING,
             Self::RequireIdpLinking => KEY_REQUIRE_IDP_LINKING,
             Self::AiOpenAiApiKey => KEY_AI_OPENAI_API_KEY,
@@ -42,6 +45,7 @@ impl ServerSettingKey {
     }
 
     pub const ALL: &[ServerSettingKey] = &[
+        ServerSettingKey::CloseNewAuthentication,
         ServerSettingKey::EnableIdpLinking,
         ServerSettingKey::RequireIdpLinking,
         ServerSettingKey::AiOpenAiApiKey,
@@ -57,6 +61,9 @@ impl ServerSettingKey {
 
     pub const fn description(&self) -> &'static str {
         match self {
+            Self::CloseNewAuthentication => {
+                "Close new authentication while allowing existing users to post and re-authenticate (true/false)"
+            }
             Self::EnableIdpLinking => "Enable the IdP account linking feature (true/false)",
             Self::RequireIdpLinking => {
                 "Require users to link an external IdP account before posting. Only applies to auth tokens issued after enabling this setting. (true/false)"
