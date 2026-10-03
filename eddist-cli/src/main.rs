@@ -1,4 +1,3 @@
-use crate::entity::authed_token;
 use anyhow::Result;
 use aws_sdk_s3::{
     Client,
@@ -8,6 +7,7 @@ use aws_sdk_s3::{
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
+use eddist_entity::authed_token;
 use futures::StreamExt;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait,
@@ -15,8 +15,6 @@ use sea_orm::{
 };
 use std::{collections::HashSet, env};
 use uuid::Uuid;
-
-mod entity;
 
 const CONCURRENCY: usize = 16;
 
@@ -86,23 +84,21 @@ async fn connect_database() -> Result<DatabaseConnection> {
     Ok(Database::connect(options).await?)
 }
 
-impl From<authed_token::Model> for AuthedTokenBackup {
-    fn from(token: authed_token::Model) -> Self {
-        Self {
-            id: token.id,
-            token: token.token,
-            origin_ip: token.origin_ip,
-            reduced_origin_ip: token.reduced_origin_ip,
-            asn_num: token.asn_num,
-            writing_ua: token.writing_ua,
-            authed_ua: token.authed_ua,
-            auth_code: Some(token.auth_code),
-            created_at: token.created_at,
-            authed_at: token.authed_at,
-            last_wrote_at: token.last_wrote_at,
-            additional_info: token.additional_info,
-            author_id_seed: token.author_id_seed,
-        }
+fn into_backup(token: authed_token::Model) -> AuthedTokenBackup {
+    AuthedTokenBackup {
+        id: token.id,
+        token: token.token,
+        origin_ip: token.origin_ip,
+        reduced_origin_ip: token.reduced_origin_ip,
+        asn_num: token.asn_num,
+        writing_ua: token.writing_ua,
+        authed_ua: token.authed_ua,
+        auth_code: Some(token.auth_code),
+        created_at: token.created_at,
+        authed_at: token.authed_at,
+        last_wrote_at: token.last_wrote_at,
+        additional_info: token.additional_info,
+        author_id_seed: token.author_id_seed,
     }
 }
 
@@ -114,10 +110,7 @@ async fn backup() -> Result<()> {
         .filter(authed_token::Column::Validity.eq(true))
         .all(&db)
         .await?;
-    let rows = rows
-        .into_iter()
-        .map(AuthedTokenBackup::from)
-        .collect::<Vec<_>>();
+    let rows = rows.into_iter().map(into_backup).collect::<Vec<_>>();
 
     let total = rows.len();
     println!("Backing up {total} valid tokens...");
