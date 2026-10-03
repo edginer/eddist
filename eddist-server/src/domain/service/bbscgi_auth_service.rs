@@ -18,6 +18,7 @@ use crate::{
         bbs_pubsub_repository::CreationEventRepository,
         bbs_repository::{BbsRepository, CreatingAuthedToken},
     },
+    services::server_settings_cache::{ServerSettingKey, get_server_setting_bool},
 };
 use eddist_core::{
     domain::pubsub_repository::AuthTokenInitiated,
@@ -73,6 +74,10 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         created_at: chrono::DateTime<chrono::Utc>,
         require_user_registration: bool,
     ) -> Result<AuthedToken, BbsCgiError> {
+        if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+            return Err(BbsCgiError::NewAuthenticationClosed);
+        }
+
         let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
         self.repo
             .create_authed_token(CreatingAuthedToken {
@@ -140,6 +145,10 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                         require_user_registration,
                     )
                     .await;
+            }
+            // /auth-code is closed too, so a pending code could not be redeemed anyway.
+            if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+                return Err(BbsCgiError::NewAuthenticationClosed);
             }
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
