@@ -85,7 +85,7 @@ impl CapRepository for CapRepositoryImpl {
         password_hash: &str,
     ) -> anyhow::Result<Cap> {
         let id = Uuid::now_v7();
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
         let model = cap::ActiveModel {
             id: Set(id),
             name: Set(name.to_string()),
@@ -125,7 +125,7 @@ impl CapRepository for CapRepositoryImpl {
 
         let updated = cap::ActiveModel {
             id: Set(id),
-            updated_at: Set(crate::db_time::now()),
+            updated_at: Set(crate::entity::db_time::now()),
             name: name.map(str::to_string).into_active_value(),
             description: description.map(str::to_string).into_active_value(),
             password_hash: password_hash.map(str::to_string).into_active_value(),

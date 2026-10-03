@@ -1,17 +1,26 @@
-use std::env;
+use std::{collections::HashMap, env, ops::Deref};
 
+use chrono::NaiveDateTime;
 use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_CACHE_RES_KEY};
+use eddist_entity::{db_time::truncate_to_millis, response, thread};
 use redis::AsyncCommands;
-use sqlx::{Connection, Executor, QueryBuilder, query};
+use sea_orm::{
+    ActiveValue::Set,
+    ColumnTrait, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait, QueryFilter,
+    RuntimeErr, SqlErr, TransactionTrait,
+    sea_query::{Expr, ExprTrait, Func, OnConflict, Query},
+};
 use tokio::{select, time::sleep};
-use tracing::{error, info};
+use tracing::{error, info, warn};
+
+const MAX_ACTIVE_RESPONSE_COUNT: i64 = 1000;
 
 pub async fn run_persistence_loop(
     mut conn: redis::aio::ConnectionManager,
+    db: DatabaseConnection,
     mut ctrl_c_rx: tokio::sync::broadcast::Receiver<()>,
 ) {
     let redis_url = env::var("REDIS_URL").unwrap();
-    let database_url = env::var("DATABASE_URL").unwrap();
     let mut redis_error_count = 0u32;
     let mut is_redis_connected = true;
 
@@ -83,39 +92,6 @@ pub async fn run_persistence_loop(
             continue;
         }
 
-        let db_conn = sqlx::MySqlConnection::connect(&database_url).await;
-        let db_conn = match db_conn {
-            Ok(mut db_conn) => {
-                // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono truncation behavior
-                if let Err(e) = db_conn
-                    .execute(
-                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                    )
-                    .await
-                {
-                    error!(
-                        error = e.to_string().as_str(),
-                        "failed to set TIME_TRUNCATE_FRACTIONAL mode"
-                    );
-                }
-                Some(db_conn)
-            }
-            Err(sqlx::Error::Io(e)) => {
-                error!(error = e.to_string().as_str(), "failed to connect to db");
-                None
-            }
-            Err(sqlx::Error::Tls(e)) => {
-                error!(error = e.to_string().as_str(), "failed to connect to db");
-                None
-            }
-            Err(_) => panic!(),
-        };
-
-        let mut db_conn = match db_conn {
-            Some(db_conn) => db_conn,
-            None => continue,
-        };
-
         let res_count = res_list.len();
         let res_list = res_list
             .iter()
@@ -131,7 +107,7 @@ pub async fn run_persistence_loop(
             })
             .collect::<Vec<_>>();
 
-        if let Err(e) = insert_multiple_res(&mut db_conn, &res_list).await {
+        if let Err(e) = insert_multiple_res(&db, &res_list).await {
             error!(
                 error = e.to_string().as_str(),
                 "Failed to insert responses to DB"
@@ -151,159 +127,177 @@ pub async fn run_persistence_loop(
     }
 }
 
-async fn insert_multiple_res(
-    conn: &mut sqlx::MySqlConnection,
+pub(crate) async fn insert_multiple_res(
+    db: &DatabaseConnection,
     res_list: &[CreatingRes],
-) -> Result<(), sqlx::Error> {
-    let mut tx = conn.begin().await?;
-    // bulk insert (max 1000)
+) -> Result<(), DbErr> {
+    let tx = db.begin().await?;
     for chunk in res_list.chunks(1000) {
-        // HashMap<thread_id, most recent created_at in same thread_id>
-        let mut thread_id_to_created_at = std::collections::HashMap::new();
+        let mut thread_id_to_created_at = HashMap::new();
         for res in chunk {
-            let created_at = thread_id_to_created_at
+            let created_at = truncate_to_millis(res.created_at.naive_utc());
+            let latest = thread_id_to_created_at
                 .entry(res.thread_id)
-                .or_insert(res.created_at);
-            if res.created_at > *created_at {
-                *created_at = res.created_at;
+                .or_insert(created_at);
+            if created_at > *latest {
+                *latest = created_at;
             }
         }
 
-        let mut builder = QueryBuilder::new(
-            "INSERT IGNORE INTO responses (
-                    id,
-                    author_name,
-                    mail,
-                    author_id,
-                    body,
-                    thread_id,
-                    board_id,
-                    ip_addr,
-                    authed_token_id,
-                    created_at,
-                    client_info,
-                    res_order
-                )",
-        );
-
-        builder.push_values(chunk, |mut b, res| {
-            let client_info = serde_json::to_string(&res.client_info).unwrap();
-
-            b.push_bind(res.id)
-                .push_bind(&res.name)
-                .push_bind(&res.mail)
-                .push_bind(&res.author_ch5id)
-                .push_bind(&res.body)
-                .push_bind(res.thread_id)
-                .push_bind(res.board_id)
-                .push_bind(&res.ip_addr)
-                .push_bind(res.authed_token_id)
-                .push_bind(res.created_at)
-                .push_bind(client_info)
-                .push_bind(res.res_order);
-        });
-
-        let query = builder.build();
-
-        if let Err(e) = query.execute(&mut *tx).await {
-            if matches!(&e, sqlx::Error::Database(de) if de.kind() == sqlx::error::ErrorKind::ForeignKeyViolation)
-            {
-                // One row in the chunk references a thread/board that no longer exists
-                // (e.g. the thread was archive-deleted before this response could be
-                // replayed). A multi-row INSERT is atomic, so that single poisoned row
-                // would otherwise abort the whole chunk and retry forever. Fall back to
-                // inserting rows one at a time, dropping only the poisoned ones.
-                for res in chunk {
-                    if let Err(e) = insert_single_res(&mut tx, res).await {
-                        if matches!(&e, sqlx::Error::Database(de) if de.kind() == sqlx::error::ErrorKind::ForeignKeyViolation)
-                        {
-                            error!(
-                                response_id = ?res.id,
-                                thread_id = ?res.thread_id,
-                                "Dropping cached response referencing a deleted thread/board"
-                            );
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            } else {
+        if let Err(e) = insert_res_in_savepoint(&tx, chunk).await {
+            if !is_row_error(&e) {
                 return Err(e);
             }
+            // A multi-row INSERT is atomic, so one rejected row would otherwise
+            // fail the whole chunk on every retry.
+            for res in chunk {
+                let Err(e) = insert_res_in_savepoint(&tx, std::slice::from_ref(res)).await else {
+                    continue;
+                };
+                if !is_row_error(&e) {
+                    return Err(e);
+                }
+                if matches!(e.sql_err(), Some(SqlErr::ForeignKeyConstraintViolation(_))) {
+                    error!(
+                        response_id = ?res.id,
+                        thread_id = ?res.thread_id,
+                        "Dropping cached response referencing a deleted thread/board"
+                    );
+                } else {
+                    error!(
+                        error = e.to_string().as_str(),
+                        response_id = ?res.id,
+                        thread_id = ?res.thread_id,
+                        "Dropping cached response rejected by the database"
+                    );
+                }
+            }
         }
 
-        for (thread_id, created_at) in thread_id_to_created_at.iter() {
-            // query which is updating to responses_count, last_modified_at and active
-            // response_count is calculated by select count(*) from responses where thread_id = ?
-            // active is calculated response_count <= 1000, unless the thread was already
-            // archived (in which case it must stay inactive). last_modified_at only moves
-            // forward, so it can't be rewound by replaying older cached responses.
-            // NOTE: this query is not crusial, so we can ignore the error
-            let query = query!(
-                r#"
-            WITH response_count AS (
-                SELECT COUNT(*) AS cnt
-                FROM responses
-                WHERE thread_id = ?
-            ) UPDATE threads
-            SET response_count = (SELECT cnt FROM response_count),
-                last_modified_at = GREATEST(last_modified_at, ?),
-                active = CASE
-                    WHEN archived = 1 THEN 0
-                    ELSE (SELECT cnt FROM response_count) <= 1000
-                END
-            WHERE id = ?;
-        "#,
-                thread_id,
-                created_at,
-                thread_id
-            );
-            let _ = query.execute(&mut *tx).await;
+        // Not crucial, so failures are only logged.
+        for (thread_id, created_at) in thread_id_to_created_at {
+            if let Err(e) = update_thread_stats_in_savepoint(&tx, thread_id, created_at).await {
+                warn!(
+                    error = e.to_string().as_str(),
+                    thread_id = ?thread_id,
+                    "Failed to update thread stats"
+                );
+            }
         }
     }
 
-    tx.commit().await?;
+    tx.commit().await
+}
+
+// PostgreSQL aborts the whole transaction on any failed statement, so every
+// statement whose failure is tolerated must run in its own savepoint.
+async fn insert_res_in_savepoint(
+    tx: &DatabaseTransaction,
+    res_list: &[CreatingRes],
+) -> Result<(), DbErr> {
+    let savepoint = tx.begin().await?;
+    let result = response::Entity::insert_many(res_list.iter().map(to_active_model))
+        .on_conflict(
+            OnConflict::column(response::Column::Id)
+                .do_nothing_on([response::Column::Id])
+                .to_owned(),
+        )
+        .exec_without_returning(&savepoint)
+        .await;
+    match result {
+        Ok(_) => savepoint.commit().await,
+        Err(e) => {
+            savepoint.rollback().await?;
+            Err(e)
+        }
+    }
+}
+
+async fn update_thread_stats_in_savepoint(
+    tx: &DatabaseTransaction,
+    thread_id: uuid::Uuid,
+    created_at: NaiveDateTime,
+) -> Result<(), DbErr> {
+    let savepoint = tx.begin().await?;
+    let result = update_thread_stats(&savepoint, thread_id, created_at).await;
+    match result {
+        Ok(()) => savepoint.commit().await,
+        Err(e) => {
+            savepoint.rollback().await?;
+            Err(e)
+        }
+    }
+}
+
+// The count subquery is repeated instead of reading `response_count` back:
+// MySQL evaluates SET left to right with updated values, PostgreSQL does not.
+// `last_modified_at` only moves forward so replaying older responses can't
+// rewind it, and archived threads must stay inactive.
+async fn update_thread_stats(
+    db: &DatabaseTransaction,
+    thread_id: uuid::Uuid,
+    created_at: NaiveDateTime,
+) -> Result<(), DbErr> {
+    let response_count = || {
+        Query::select()
+            .expr(Expr::col(response::Column::Id).count())
+            .from(response::Entity)
+            .and_where(response::Column::ThreadId.eq(thread_id))
+            .to_owned()
+    };
+
+    thread::Entity::update_many()
+        .col_expr(thread::Column::ResponseCount, response_count().into())
+        .col_expr(
+            thread::Column::LastModifiedAt,
+            Func::greatest([
+                Expr::col(thread::Column::LastModifiedAt),
+                Expr::value(created_at),
+            ])
+            .into(),
+        )
+        .col_expr(
+            thread::Column::Active,
+            Expr::case(Expr::col(thread::Column::Archived), false)
+                .finally(Expr::expr(response_count()).lte(MAX_ACTIVE_RESPONSE_COUNT))
+                .into(),
+        )
+        .filter(thread::Column::Id.eq(thread_id))
+        .exec(db)
+        .await?;
     Ok(())
 }
 
-async fn insert_single_res(
-    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
-    res: &CreatingRes,
-) -> Result<(), sqlx::Error> {
-    let client_info = serde_json::to_string(&res.client_info).unwrap();
+fn to_active_model(res: &CreatingRes) -> response::ActiveModel {
+    response::ActiveModel {
+        id: Set(res.id),
+        author_name: Set(res.name.clone()),
+        mail: Set(res.mail.clone()),
+        body: Set(res.body.clone()),
+        created_at: Set(truncate_to_millis(res.created_at.naive_utc())),
+        author_id: Set(res.author_ch5id.clone()),
+        ip_addr: Set(res.ip_addr.clone()),
+        authed_token_id: Set(res.authed_token_id),
+        board_id: Set(res.board_id),
+        thread_id: Set(res.thread_id),
+        res_order: Set(res.res_order),
+        client_info: Set(serde_json::to_value(&res.client_info).unwrap()),
+        ..Default::default()
+    }
+}
 
-    query!(
-        r#"
-        INSERT IGNORE INTO responses (
-            id,
-            author_name,
-            mail,
-            author_id,
-            body,
-            thread_id,
-            board_id,
-            ip_addr,
-            authed_token_id,
-            created_at,
-            client_info,
-            res_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        "#,
-        res.id,
-        res.name,
-        res.mail,
-        res.author_ch5id,
-        res.body,
-        res.thread_id,
-        res.board_id,
-        res.ip_addr,
-        res.authed_token_id,
-        res.created_at,
-        client_info,
-        res.res_order,
-    )
-    .execute(&mut **tx)
-    .await?;
-
-    Ok(())
+// SQLSTATE class 22 (data exception) and 23 (integrity constraint violation)
+// mean the row itself is bad on both MySQL and PostgreSQL; anything else
+// (connection loss, a broken statement) must not drop data.
+fn is_row_error(e: &DbErr) -> bool {
+    let (DbErr::Exec(RuntimeErr::SqlxError(err)) | DbErr::Query(RuntimeErr::SqlxError(err))) = e
+    else {
+        return false;
+    };
+    let sea_orm::sqlx::Error::Database(db_err) = err.deref() else {
+        return false;
+    };
+    db_err
+        .code()
+        .is_some_and(|code| code.starts_with("22") || code.starts_with("23"))
 }

@@ -46,7 +46,6 @@ use tracing::info_span;
 
 mod api_doc;
 mod auth;
-mod db_time;
 pub(crate) use eddist_entity as entity;
 pub(crate) mod error;
 #[cfg(test)]

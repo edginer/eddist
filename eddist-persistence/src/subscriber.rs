@@ -7,8 +7,10 @@ use eddist_core::{
     proto::{decode_auth_token_revoked, decode_auth_token_succeeded, decode_creating_thread},
     redis_keys::{CHANNEL_THREAD_CREATED, DB_FAILED_CACHE_RES_KEY, unsafe_threads_key},
 };
+use eddist_entity::board;
 use futures::StreamExt;
 use redis::AsyncCommands;
+use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
 use tokio::{select, time::sleep};
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -23,7 +25,7 @@ pub struct RedisSubRepository {
     conn: redis::aio::ConnectionManager,
     cancel: tokio::sync::broadcast::Receiver<()>,
     s3_bucket: Option<(aws_sdk_s3::Client, String)>,
-    db_pool: sqlx::MySqlPool,
+    db: DatabaseConnection,
     // board_key is immutable, so entries never need invalidation.
     board_key_cache: HashMap<Uuid, String>,
     llm_moderation: LlmModeration,
@@ -36,7 +38,7 @@ impl RedisSubRepository {
         cancel: tokio::sync::broadcast::Receiver<()>,
         s3_client: Option<aws_sdk_s3::Client>,
         s3_bucket_name: Option<String>,
-        db_pool: sqlx::MySqlPool,
+        db: DatabaseConnection,
         llm_moderation: LlmModeration,
     ) -> Self {
         Self {
@@ -44,7 +46,7 @@ impl RedisSubRepository {
             conn,
             cancel,
             s3_bucket: s3_client.zip(s3_bucket_name),
-            db_pool,
+            db,
             board_key_cache: HashMap::new(),
             llm_moderation,
         }
@@ -53,18 +55,20 @@ impl RedisSubRepository {
 
 async fn board_key_by_id(
     cache: &mut HashMap<Uuid, String>,
-    pool: &sqlx::MySqlPool,
+    db: &DatabaseConnection,
     board_id: Uuid,
 ) -> anyhow::Result<String> {
     if let Some(board_key) = cache.get(&board_id) {
         return Ok(board_key.clone());
     }
 
-    let board_key =
-        sqlx::query_scalar::<_, String>("SELECT board_key FROM boards WHERE id = UUID_TO_BIN(?)")
-            .bind(board_id.to_string())
-            .fetch_one(pool)
-            .await?;
+    let board_key = board::Entity::find_by_id(board_id)
+        .select_only()
+        .column(board::Column::BoardKey)
+        .into_tuple::<String>()
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("board not found"))?;
 
     cache.insert(board_id, board_key.clone());
     Ok(board_key)
@@ -253,15 +257,12 @@ impl RedisSubRepository {
                         }
                     };
                     let token_id = event.authed_token_id;
-                    if let (Some(pool), Some((client, bucket_name))) =
-                        (Some(&self.db_pool), self.s3_bucket.as_ref())
-                    {
-                        let pool = pool.clone();
+                    if let Some((client, bucket_name)) = self.s3_bucket.as_ref() {
+                        let db = self.db.clone();
                         let client = client.clone();
                         let bucket_name = bucket_name.clone();
                         tokio::spawn(async move {
-                            if let Err(e) =
-                                backup_token(&pool, &client, &bucket_name, token_id).await
+                            if let Err(e) = backup_token(&db, &client, &bucket_name, token_id).await
                             {
                                 warn!("Failed to backup token {token_id}: {e}");
                             }
@@ -300,23 +301,20 @@ impl RedisSubRepository {
                         continue;
                     }
 
-                    let board_key = match board_key_by_id(
-                        &mut self.board_key_cache,
-                        &self.db_pool,
-                        event.board_id,
-                    )
-                    .await
-                    {
-                        Ok(board_key) => board_key,
-                        Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                board_id = event.board_id.to_string().as_str(),
-                                "Failed to resolve board_key for thread moderation"
-                            );
-                            continue;
-                        }
-                    };
+                    let board_key =
+                        match board_key_by_id(&mut self.board_key_cache, &self.db, event.board_id)
+                            .await
+                        {
+                            Ok(board_key) => board_key,
+                            Err(e) => {
+                                error!(
+                                    error = e.to_string().as_str(),
+                                    board_id = event.board_id.to_string().as_str(),
+                                    "Failed to resolve board_key for thread moderation"
+                                );
+                                continue;
+                            }
+                        };
 
                     if flagged {
                         let key = unsafe_threads_key(&board_key);

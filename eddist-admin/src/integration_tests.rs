@@ -119,7 +119,7 @@ fn create_board_input(board_key: &str, name: &str) -> CreateBoardInput {
 }
 
 async fn insert_authed_token(db: &DatabaseConnection, id: Uuid) -> anyhow::Result<()> {
-    let now = crate::db_time::now();
+    let now = crate::entity::db_time::now();
     authed_token::ActiveModel {
         id: Set(id),
         token: Set(format!("integration-token-{id}")),
@@ -209,7 +209,7 @@ async fn insert_archived_thread_and_response(
 ) -> anyhow::Result<(Uuid, Uuid)> {
     let thread_id = Uuid::now_v7();
     let response_id = Uuid::now_v7();
-    let timestamp = crate::db_time::now();
+    let timestamp = crate::entity::db_time::now();
 
     archived_thread::Entity::insert(archived_thread::ActiveModel {
         id: Set(thread_id),
@@ -313,7 +313,7 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
     insert_authed_token(db, token_id).await?;
     let thread_id = Uuid::now_v7();
     let second_thread_id = Uuid::now_v7();
-    let now = crate::db_time::now();
+    let now = crate::entity::db_time::now();
     insert_thread(db, thread_id, board.id, token_id, 1001, now).await?;
     insert_thread(
         db,

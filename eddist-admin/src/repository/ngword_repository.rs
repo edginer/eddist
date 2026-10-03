@@ -77,7 +77,7 @@ impl NgWordRepository for NgWordRepositoryImpl {
 
     async fn create_ng_word(&self, name: &str, word: &str) -> anyhow::Result<NgWord> {
         let id = Uuid::now_v7();
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
         let model = ng_word::ActiveModel {
             id: Set(id),
             name: Set(name.to_string()),
@@ -115,7 +115,7 @@ impl NgWordRepository for NgWordRepositoryImpl {
 
         let updated = ng_word::ActiveModel {
             id: Set(id),
-            updated_at: Set(crate::db_time::now()),
+            updated_at: Set(crate::entity::db_time::now()),
             name: name.map(str::to_string).into_active_value(),
             word: word.map(str::to_string).into_active_value(),
             ..Default::default()

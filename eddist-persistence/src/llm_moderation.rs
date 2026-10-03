@@ -31,7 +31,9 @@ use eddist_core::{
     },
     symmetric,
 };
+use eddist_entity::server_settings;
 use redis::AsyncCommands;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info, warn};
@@ -134,18 +136,24 @@ impl Settings {
         )
     }
 
-    async fn load(pool: &sqlx::MySqlPool) -> anyhow::Result<Self> {
-        let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT setting_key, value FROM server_settings WHERE setting_key IN (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(KEY_AI_LLM_MODERATION_ON_THREAD)
-        .bind(KEY_AI_LLM_MODERATION_UNSAFE_THREADS)
-        .bind(KEY_AI_LLM_MODERATION_MODEL)
-        .bind(KEY_AI_LLM_MODERATION_INSTRUCTIONS)
-        .bind(KEY_AI_LLM_MODERATION_INTERVAL_SECONDS)
-        .bind(KEY_AI_OPENAI_API_KEY)
-        .fetch_all(pool)
-        .await?;
+    async fn load(db: &DatabaseConnection) -> anyhow::Result<Self> {
+        let rows = server_settings::Entity::find()
+            .select_only()
+            .columns([
+                server_settings::Column::SettingKey,
+                server_settings::Column::Value,
+            ])
+            .filter(server_settings::Column::SettingKey.is_in([
+                KEY_AI_LLM_MODERATION_ON_THREAD,
+                KEY_AI_LLM_MODERATION_UNSAFE_THREADS,
+                KEY_AI_LLM_MODERATION_MODEL,
+                KEY_AI_LLM_MODERATION_INSTRUCTIONS,
+                KEY_AI_LLM_MODERATION_INTERVAL_SECONDS,
+                KEY_AI_OPENAI_API_KEY,
+            ]))
+            .into_tuple::<(String, String)>()
+            .all(db)
+            .await?;
         Ok(Self::from_rows(rows))
     }
 }
@@ -217,8 +225,8 @@ impl LlmModeration {
         self.queue.lock().unwrap().drain(..).collect()
     }
 
-    pub async fn refresh_settings(&self, pool: &sqlx::MySqlPool) {
-        match Settings::load(pool).await {
+    pub async fn refresh_settings(&self, db: &DatabaseConnection) {
+        match Settings::load(db).await {
             Ok(settings) => *self.settings.write().unwrap() = settings,
             Err(e) => error!(
                 error = e.to_string().as_str(),
@@ -237,7 +245,7 @@ impl LlmModeration {
 /// restarting persistence.
 pub async fn run_loop(
     moderation: LlmModeration,
-    pool: sqlx::MySqlPool,
+    db: DatabaseConnection,
     conn: redis::aio::ConnectionManager,
 ) {
     let client = match reqwest::Client::builder()
@@ -259,7 +267,7 @@ pub async fn run_loop(
 
     loop {
         tokio::time::sleep(moderation.settings().interval()).await;
-        moderation.refresh_settings(&pool).await;
+        moderation.refresh_settings(&db).await;
 
         let pending = moderation.drain();
         let settings = moderation.settings();
