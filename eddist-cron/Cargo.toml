@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 tokio.workspace = true
+# Backend is chosen at runtime from DATABASE_URL.
 sea-orm.workspace = true
 anyhow.workspace = true
 cron.workspace = true
@@ -24,4 +25,4 @@ futures.workspace = true
 [dev-dependencies]
 sqlx = { workspace = true, features = ["migrate"] }
 testcontainers.workspace = true
-testcontainers-modules.workspace = true
+testcontainers-modules = { workspace = true, features = ["postgres"] }

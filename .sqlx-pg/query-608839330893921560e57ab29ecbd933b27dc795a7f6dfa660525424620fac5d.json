@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO daily_stats (date, board_key, total_responses, new_threads)\n                VALUES ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date, $1, $2, $3)\n                ON CONFLICT (date, board_key) DO UPDATE SET\n                    total_responses = daily_stats.total_responses + EXCLUDED.total_responses,\n                    new_threads = daily_stats.new_threads + EXCLUDED.new_threads\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "608839330893921560e57ab29ecbd933b27dc795a7f6dfa660525424620fac5d"
+}

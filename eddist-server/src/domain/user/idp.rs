@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[cfg_attr(feature = "backend-postgres", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Idp {
     pub id: Uuid,

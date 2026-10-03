@@ -1,6 +1,5 @@
 use redis::{AsyncCommands, aio::ConnectionManager};
 use serde::Serialize;
-use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
         user::user_reg_state::{TempUrlRegistrationRecord, UserRegState},
     },
     repositories::{
-        bbs_repository::BbsRepository, idp_repository::IdpRepository,
+        Db, bbs_repository::BbsRepository, idp_repository::IdpRepository,
         user_repository::UserRepository,
     },
     utils::TransactionRepository,
@@ -44,7 +43,7 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
 #[async_trait::async_trait]
 impl<
     I: IdpRepository + Clone,
-    U: UserRepository + Clone + TransactionRepository<MySql>,
+    U: UserRepository + Clone + TransactionRepository<Db>,
     B: BbsRepository + Clone,
 > AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
     for UserRegTempUrlService<I, U, B>

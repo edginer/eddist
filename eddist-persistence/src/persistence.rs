@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, ops::Deref};
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use eddist_core::{domain::pubsub_repository::CreatingRes, redis_keys::DB_FAILED_CACHE_RES_KEY};
 use eddist_entity::{db_time::truncate_to_millis, response, thread};
 use redis::AsyncCommands;
@@ -135,7 +135,7 @@ pub(crate) async fn insert_multiple_res(
     for chunk in res_list.chunks(1000) {
         let mut thread_id_to_created_at = HashMap::new();
         for res in chunk {
-            let created_at = truncate_to_millis(res.created_at.naive_utc());
+            let created_at = truncate_to_millis(res.created_at);
             let latest = thread_id_to_created_at
                 .entry(res.thread_id)
                 .or_insert(created_at);
@@ -216,7 +216,7 @@ async fn insert_res_in_savepoint(
 async fn update_thread_stats_in_savepoint(
     tx: &DatabaseTransaction,
     thread_id: uuid::Uuid,
-    created_at: NaiveDateTime,
+    created_at: DateTime<Utc>,
 ) -> Result<(), DbErr> {
     let savepoint = tx.begin().await?;
     let result = update_thread_stats(&savepoint, thread_id, created_at).await;
@@ -236,7 +236,7 @@ async fn update_thread_stats_in_savepoint(
 async fn update_thread_stats(
     db: &DatabaseTransaction,
     thread_id: uuid::Uuid,
-    created_at: NaiveDateTime,
+    created_at: DateTime<Utc>,
 ) -> Result<(), DbErr> {
     let response_count = || {
         Query::select()
@@ -274,7 +274,7 @@ fn to_active_model(res: &CreatingRes) -> response::ActiveModel {
         author_name: Set(res.name.clone()),
         mail: Set(res.mail.clone()),
         body: Set(res.body.clone()),
-        created_at: Set(truncate_to_millis(res.created_at.naive_utc())),
+        created_at: Set(truncate_to_millis(res.created_at)),
         author_id: Set(res.author_ch5id.clone()),
         ip_addr: Set(res.ip_addr.clone()),
         authed_token_id: Set(res.authed_token_id),

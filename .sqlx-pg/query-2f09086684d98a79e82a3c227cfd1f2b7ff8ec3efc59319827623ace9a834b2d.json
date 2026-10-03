@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT at.token\n            FROM authed_tokens at\n            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id\n            WHERE uat.user_id = $1 AND at.validity = TRUE\n            ORDER BY at.authed_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "authed_tokens",
+            "name": "token"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2f09086684d98a79e82a3c227cfd1f2b7ff8ec3efc59319827623ace9a834b2d"
+}

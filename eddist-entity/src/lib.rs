@@ -1,3 +1,6 @@
+pub mod admin_role;
+pub mod admin_role_scope;
+pub mod admin_user;
 pub mod archived_response;
 pub mod archived_thread;
 pub mod authed_token;
@@ -7,6 +10,7 @@ pub mod board_info;
 pub mod board_ng_word;
 pub mod cap;
 pub mod captcha_config;
+pub mod daily_stat;
 pub mod db_time;
 pub mod idp;
 pub mod ng_word;

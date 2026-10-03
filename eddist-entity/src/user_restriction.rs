@@ -6,12 +6,16 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub name: String,
+    #[sea_orm(column_type = r#"Enum {
+        name: "restriction_rule_type".into(),
+        variants: ["ASN", "IP", "IP_CIDR", "USER_AGENT"].map(Into::into).to_vec(),
+    }"#)]
     pub rule_type: String,
     pub target: String,
     pub rule_value: String,
-    pub expires_at: Option<DateTime>,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    pub expires_at: Option<DateTimeUtc>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
     pub created_by_email: String,
 }
 

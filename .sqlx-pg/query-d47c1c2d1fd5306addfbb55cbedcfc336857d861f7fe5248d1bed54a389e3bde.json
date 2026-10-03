@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT (registered_user_id IS NOT NULL) AS \"is_binded!: bool\"\n            FROM authed_tokens\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_binded!: bool",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d47c1c2d1fd5306addfbb55cbedcfc336857d861f7fe5248d1bed54a389e3bde"
+}

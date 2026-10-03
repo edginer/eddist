@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE authed_tokens SET require_reauth = FALSE WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e9f4d672b4968baeb946035df80461e9a46a00c05986a6c69d29037727ef036d"
+}

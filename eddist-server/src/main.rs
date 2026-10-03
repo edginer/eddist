@@ -6,22 +6,31 @@ use std::{convert::Infallible, env, sync::Arc, time::Duration};
 use axum::{
     ServiceExt as AxumServiceExt, body::Body, extract::Request as AxumRequest, response::Response,
 };
+#[cfg(not(feature = "backend-postgres"))]
+use eddist::repositories::{
+    bbs_repository::BbsRepositoryImpl, captcha_config_repository::CaptchaConfigRepositoryImpl,
+    idp_repository::IdpRepositoryImpl, notice_repository::NoticeRepositoryImpl,
+    stats_repository::StatsRepositoryImpl, terms_repository::TermsRepositoryImpl,
+    user_repository::UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryImpl,
+};
+#[cfg(feature = "backend-postgres")]
+use eddist::repositories::{
+    bbs_repository::BbsRepositoryPgImpl as BbsRepositoryImpl,
+    captcha_config_repository::CaptchaConfigRepositoryPgImpl as CaptchaConfigRepositoryImpl,
+    idp_repository::IdpRepositoryPgImpl as IdpRepositoryImpl,
+    notice_repository::NoticeRepositoryPgImpl as NoticeRepositoryImpl,
+    stats_repository::StatsRepositoryPgImpl as StatsRepositoryImpl,
+    terms_repository::TermsRepositoryPgImpl as TermsRepositoryImpl,
+    user_repository::UserRepositoryPgImpl as UserRepositoryImpl,
+    user_restriction_repository::UserRestrictionRepositoryPgImpl as UserRestrictionRepositoryImpl,
+};
 use eddist::{
     AppState,
     app::create_app,
     load_template_engine,
     middleware::not_found_rate_limit::NotFoundPenaltyCache,
-    repositories::{
-        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-        bbs_repository::BbsRepositoryImpl,
-        captcha_config_repository::CaptchaConfigRepositoryImpl,
-        idp_repository::IdpRepositoryImpl,
-        notice_repository::NoticeRepositoryImpl,
-        stats_repository::StatsRepositoryImpl,
-        terms_repository::TermsRepositoryImpl,
-        user_repository::UserRepositoryImpl,
-        user_restriction_repository::UserRestrictionRepositoryImpl,
-    },
+    repositories::bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
     services::{
         AppServiceContainer, PubSubRepos,
         captcha_config_cache::{refresh_captcha_config_cache, start_captcha_config_refresh_task},
@@ -36,11 +45,9 @@ use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
-use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if !is_prod() {
@@ -54,7 +61,8 @@ async fn main() -> anyhow::Result<()> {
     let pub_repo = RedisPubRepository::new(conn_mgr.clone());
     let event_repo = RedisCreationEventRepository::new(conn_mgr.clone());
 
-    let pool = MySqlPoolOptions::new()
+    #[cfg(not(feature = "backend-postgres"))]
+    let pool = sqlx::mysql::MySqlPoolOptions::new()
         .after_connect(|conn, _| {
             use sqlx::Executor;
             Box::pin(async move {
@@ -63,8 +71,6 @@ async fn main() -> anyhow::Result<()> {
                     .await
                     .unwrap();
                 log::info!("Set transaction isolation level to `READ-COMMITTED`");
-
-                // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono's %3f truncation behavior
                 conn.execute(
                     "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
                 )
@@ -74,6 +80,14 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             })
         })
+        .max_connections(8)
+        .acquire_timeout(Duration::from_secs(5))
+        .connect(&env::var("DATABASE_URL")?)
+        .await?;
+
+    // PostgreSQL: TIMESTAMP has native sub-millisecond precision; no session mode setup needed.
+    #[cfg(feature = "backend-postgres")]
+    let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(8)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&env::var("DATABASE_URL")?)
@@ -141,7 +155,10 @@ async fn main() -> anyhow::Result<()> {
     start_cache_refresh_task(user_restriction_repo, Duration::from_secs(300));
 
     // Start background task for captcha config cache refresh (every 5 minutes)
-    start_captcha_config_refresh_task(pool.clone(), Duration::from_secs(300));
+    start_captcha_config_refresh_task(
+        CaptchaConfigRepositoryImpl::new(pool.clone()),
+        Duration::from_secs(300),
+    );
 
     // Start background task for server settings cache refresh (every 5 minutes)
     start_server_settings_refresh_task(pool.clone(), Duration::from_secs(300));

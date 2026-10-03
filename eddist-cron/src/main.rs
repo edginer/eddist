@@ -8,7 +8,7 @@ use aws_sdk_s3::{
     primitives::ByteStream,
     types::{Delete, ObjectIdentifier},
 };
-use chrono::{TimeDelta, TimeZone, Timelike, Utc};
+use chrono::{TimeDelta, Timelike, Utc};
 use cron::Schedule;
 use eddist_core::{
     domain::{authed_token_backup::AUTHED_TOKENS_S3_PREFIX, res::get_1001_sjis_bytes},
@@ -249,10 +249,9 @@ async fn main() {
                     }
 
                     if board.enable_1001_message && responses.len() >= 1000 {
-                        let last_modified_utc = Utc.from_utc_datetime(&last_modified_at);
                         let bytes_1001 = get_1001_sjis_bytes(
                             thread_number as i64,
-                            last_modified_utc,
+                            last_modified_at,
                             board.custom_1001_message.as_deref(),
                         )
                         .get_inner();
@@ -509,7 +508,7 @@ async fn main() {
         }
 
         "cleanup-authed-tokens" => {
-            let now = Utc::now().naive_utc();
+            let now = Utc::now();
 
             let pending = repo
                 .delete_stale_authed_tokens(

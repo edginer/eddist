@@ -55,9 +55,9 @@ fn into_domain(model: notice::Model) -> Notice {
         slug: model.slug,
         title: model.title,
         content: model.content,
-        created_at: model.created_at,
-        updated_at: model.updated_at,
-        published_at: model.published_at,
+        created_at: model.created_at.naive_utc(),
+        updated_at: model.updated_at.naive_utc(),
+        published_at: model.published_at.naive_utc(),
         author_email: model.author_email,
         hide_from_list: model.hide_from_list,
     }
@@ -117,7 +117,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
             created_at: Set(now),
             updated_at: Set(now),
             published_at: Set(crate::entity::db_time::truncate_to_millis(
-                input.published_at,
+                input.published_at.and_utc(),
             )),
             author_email: Set(author_email),
             hide_from_list: Set(input.hide_from_list),
@@ -139,7 +139,7 @@ impl NoticeRepository for NoticeRepositoryImpl {
         let title = input.title.clone().unwrap_or_else(|| current.title.clone());
         let content = input.content.unwrap_or(current.content);
         let published_at = crate::entity::db_time::truncate_to_millis(
-            input.published_at.unwrap_or(current.published_at),
+            input.published_at.unwrap_or(current.published_at).and_utc(),
         );
         let hide_from_list = input.hide_from_list.unwrap_or(current.hide_from_list);
 

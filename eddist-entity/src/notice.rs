@@ -8,9 +8,9 @@ pub struct Model {
     pub slug: String,
     pub title: String,
     pub content: String,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
-    pub published_at: DateTime,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    pub published_at: DateTimeUtc,
     pub author_email: Option<String>,
     pub hide_from_list: bool,
 }

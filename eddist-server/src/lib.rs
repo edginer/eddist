@@ -7,6 +7,12 @@ pub use uuid;
 
 mod shiftjis;
 pub mod repositories {
+    /// Database backend type alias. Controlled by the `backend-postgres` feature flag.
+    #[cfg(feature = "backend-postgres")]
+    pub(crate) type Db = sqlx::Postgres;
+    #[cfg(not(feature = "backend-postgres"))]
+    pub(crate) type Db = sqlx::MySql;
+
     pub mod bbs_pubsub_repository;
     pub mod bbs_repository;
     pub mod captcha_config_repository;
@@ -67,7 +73,6 @@ pub mod app;
 pub use app::AppState;
 use uuid::Uuid;
 
-use crate::repositories::notice_repository::NoticeRepositoryImpl;
 use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
 use crate::services::server_settings_cache::{
     refresh_server_settings_cache, start_server_settings_refresh_task,
@@ -75,7 +80,8 @@ use crate::services::server_settings_cache::{
 pub use crate::services::user_restriction_service::start_cache_refresh_task;
 pub use crate::template::load_template_engine;
 
-// Test app factory for integration tests
+// Test app factory for integration tests (MySQL only)
+#[cfg(not(feature = "backend-postgres"))]
 pub fn create_test_app(
     pool: sqlx::MySqlPool,
     redis_conn: redis::aio::ConnectionManager,
@@ -84,7 +90,9 @@ pub fn create_test_app(
     use crate::repositories::{
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
+        captcha_config_repository::CaptchaConfigRepositoryImpl,
         idp_repository::IdpRepositoryImpl,
+        notice_repository::NoticeRepositoryImpl,
         user_repository::UserRepositoryImpl,
         user_restriction_repository::UserRestrictionRepositoryImpl,
     };
@@ -107,7 +115,10 @@ pub fn create_test_app(
     let stats_repo = crate::repositories::stats_repository::StatsRepositoryImpl::new(pool.clone());
 
     drop(refresh_server_settings_cache(&pool));
-    start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
+    start_captcha_config_refresh_task(
+        CaptchaConfigRepositoryImpl::new(pool.clone()),
+        std::time::Duration::from_secs(300),
+    );
     start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
 
     let app_state = AppState {
@@ -139,7 +150,8 @@ pub fn create_test_app(
     app::create_app(app_state, redis_conn)
 }
 
-// Simple test helper that doesn't require exposing private types
+// Simple test helper that doesn't require exposing private types (MySQL only)
+#[cfg(not(feature = "backend-postgres"))]
 pub mod test_helpers {
     use chrono::Utc;
     use sqlx::{MySqlPool, Row};

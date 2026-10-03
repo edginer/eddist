@@ -1,3 +1,5 @@
+#![cfg(not(feature = "backend-postgres"))]
+
 mod common;
 
 use axum::body::Bytes;

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT authed_token_id AS \"authed_token_id!: Uuid\"\n            FROM user_authed_tokens\n            WHERE user_id = $1\n            ORDER BY created_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "authed_token_id!: Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_authed_tokens",
+            "name": "authed_token_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4346874545d3617be9e8e26b4e73246b39f002cbf0e0fd08ec7c7af11d770061"
+}

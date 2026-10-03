@@ -146,7 +146,7 @@ async fn insert_thread(
     board_id: Uuid,
     token_id: Uuid,
     thread_number: i64,
-    last_modified_at: chrono::NaiveDateTime,
+    last_modified_at: chrono::DateTime<chrono::Utc>,
 ) -> anyhow::Result<()> {
     thread::ActiveModel {
         id: Set(id),
@@ -174,7 +174,7 @@ async fn insert_response(
     board_id: Uuid,
     thread_id: Uuid,
     token_id: Uuid,
-    created_at: chrono::NaiveDateTime,
+    created_at: chrono::DateTime<chrono::Utc>,
 ) -> anyhow::Result<()> {
     response::ActiveModel {
         id: Set(id),
@@ -444,7 +444,7 @@ async fn seaorm_admin_crud_round_trips_against_mysql() -> anyhow::Result<()> {
                 title: "お知らせ".to_string(),
                 slug: "orm-it-notice".to_string(),
                 content: "内容".to_string(),
-                published_at: now,
+                published_at: now.naive_utc(),
                 hide_from_list: false,
             },
             Some("admin@example.test".to_string()),
