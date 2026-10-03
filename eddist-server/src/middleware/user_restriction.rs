@@ -10,7 +10,6 @@ use crate::{
     AppState,
     services::{
         AppService,
-        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
         user_restriction_service::{UserRestrictionCheckInput, UserRestrictionCheckOutput},
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
@@ -23,18 +22,8 @@ pub async fn user_restriction_middleware(
 ) -> Response {
     // Check if this is a route we want to restrict
     let path = request.uri().path();
-    let authentication_closed = path == "/auth-code"
-        && get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await;
-    let target = match restriction_action(request.method(), path, authentication_closed) {
-        RestrictionAction::CloseAuthentication => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "現在、新規認証の受付を停止しています。認証済みの方は引き続き書き込みできます。",
-            )
-                .into_response();
-        }
-        RestrictionAction::Check(target) => target,
-        RestrictionAction::Skip => return next.run(request).await,
+    let Some(target) = restriction_target(request.method(), path) else {
+        return next.run(request).await;
     };
 
     let headers = request.headers();
@@ -76,27 +65,11 @@ pub async fn user_restriction_middleware(
     next.run(request).await
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum RestrictionAction {
-    Skip,
-    CloseAuthentication,
-    Check(RestrictionTarget),
-}
-
-fn restriction_action(
-    method: &Method,
-    path: &str,
-    authentication_closed: bool,
-) -> RestrictionAction {
+fn restriction_target(method: &Method, path: &str) -> Option<RestrictionTarget> {
     match (method, path) {
-        (&Method::GET | &Method::POST, "/auth-code") if authentication_closed => {
-            RestrictionAction::CloseAuthentication
-        }
-        (&Method::POST, "/auth-code") => {
-            RestrictionAction::Check(RestrictionTarget::Authentication)
-        }
-        (&Method::POST, "/test/bbs.cgi") => RestrictionAction::Check(RestrictionTarget::Posting),
-        _ => RestrictionAction::Skip,
+        (&Method::POST, "/auth-code") => Some(RestrictionTarget::Authentication),
+        (&Method::POST, "/test/bbs.cgi") => Some(RestrictionTarget::Posting),
+        _ => None,
     }
 }
 
@@ -105,36 +78,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn closing_new_authentication_preserves_posting_and_reauthentication() {
-        for closed in [false, true] {
-            assert_eq!(
-                restriction_action(&Method::POST, "/test/bbs.cgi", closed),
-                RestrictionAction::Check(RestrictionTarget::Posting)
-            );
-            for path in ["/re-auth", "/user/login", "/user/auth/callback"] {
-                assert_eq!(
-                    restriction_action(&Method::POST, path, closed),
-                    RestrictionAction::Skip
-                );
-                assert_eq!(
-                    restriction_action(&Method::GET, path, closed),
-                    RestrictionAction::Skip
-                );
-            }
-        }
+    fn restriction_targets_only_authentication_and_posting() {
         assert_eq!(
-            restriction_action(&Method::GET, "/auth-code", false),
-            RestrictionAction::Skip
+            restriction_target(&Method::POST, "/auth-code"),
+            Some(RestrictionTarget::Authentication)
         );
         assert_eq!(
-            restriction_action(&Method::POST, "/auth-code", false),
-            RestrictionAction::Check(RestrictionTarget::Authentication)
+            restriction_target(&Method::POST, "/test/bbs.cgi"),
+            Some(RestrictionTarget::Posting)
         );
-        for method in [Method::GET, Method::POST] {
-            assert_eq!(
-                restriction_action(&method, "/auth-code", true),
-                RestrictionAction::CloseAuthentication
-            );
+        assert_eq!(restriction_target(&Method::GET, "/auth-code"), None);
+        for path in ["/re-auth", "/user/login", "/user/auth/callback"] {
+            assert_eq!(restriction_target(&Method::POST, path), None);
+            assert_eq!(restriction_target(&Method::GET, path), None);
         }
     }
 }

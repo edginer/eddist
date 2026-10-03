@@ -10,6 +10,9 @@ use crate::{
     shiftjis::{SJisResponseBuilder, SjisContentType},
 };
 
+pub const NEW_AUTHENTICATION_CLOSED_MESSAGE: &str =
+    "現在、新規認証の受付を停止しています。認証済みの方は引き続き書き込みできます。";
+
 #[derive(thiserror::Error, Debug)]
 pub enum BbsCgiError {
     // this error occurs mainly when the client is developing the client
@@ -36,6 +39,9 @@ pub enum BbsCgiError {
         base_url: String,
         auth_token: String,
     },
+
+    #[error("{NEW_AUTHENTICATION_CLOSED_MESSAGE}")]
+    NewAuthenticationClosed,
 
     // cause on failed to find authed token by given token (not found)
     #[error("与えられた認証トークンが不正です")]
@@ -116,6 +122,7 @@ impl BbsCgiError {
             BbsCgiError::InactiveThread => StatusCode::OK,
             BbsCgiError::SameTimeThreadCration => StatusCode::OK,
             BbsCgiError::Unauthenticated { .. } => StatusCode::OK,
+            BbsCgiError::NewAuthenticationClosed => StatusCode::OK,
             BbsCgiError::InvalidAuthedToken => StatusCode::BAD_REQUEST,
             BbsCgiError::RevokedAuthedToken => StatusCode::FORBIDDEN,
             BbsCgiError::NgWordDetected => StatusCode::OK,
@@ -147,6 +154,7 @@ impl BbsCgiError {
             BbsCgiError::InactiveThread => "InactiveThread",
             BbsCgiError::SameTimeThreadCration => "SameTimeThreadCration",
             BbsCgiError::Unauthenticated { .. } => "Unauthenticated",
+            BbsCgiError::NewAuthenticationClosed => "NewAuthenticationClosed",
             BbsCgiError::InvalidAuthedToken => "InvalidAuthedToken",
             BbsCgiError::RevokedAuthedToken => "RevokedAuthedToken",
             BbsCgiError::NgWordDetected => "NgWordDetected",

@@ -4,7 +4,7 @@ use axum::{
     Form,
     extract::State,
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::HeaderMap;
@@ -15,12 +15,13 @@ use time;
 use crate::{
     AppState,
     domain::captcha_like::CaptchaProviderConfig,
-    error::BbsPostAuthWithCodeError,
+    error::{BbsPostAuthWithCodeError, NEW_AUTHENTICATION_CLOSED_MESSAGE},
     services::{
         AppService,
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         bind_token_to_user_service::BindTokenToUserServiceInput,
         captcha_config_cache::get_cached_captcha_configs_for_auth_code,
+        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
 };
@@ -92,8 +93,19 @@ pub fn build_template_variables(configs: &[CaptchaProviderConfig]) -> serde_json
     })
 }
 
+fn new_authentication_closed_response() -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        NEW_AUTHENTICATION_CLOSED_MESSAGE,
+    )
+        .into_response()
+}
+
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
+    if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+        return new_authentication_closed_response();
+    }
     let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
     let template_vars = build_template_variables(&captcha_configs);
 
@@ -115,6 +127,9 @@ pub async fn post_auth_code(
     State(state): State<AppState>,
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
+    if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+        return new_authentication_closed_response();
+    }
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
