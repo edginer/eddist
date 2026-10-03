@@ -80,6 +80,7 @@ struct UserRestrictionRulePg {
     pub id: Uuid,
     pub name: String,
     pub rule_type: String,
+    pub target: String,
     pub rule_value: String,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -99,6 +100,7 @@ impl TryFrom<UserRestrictionRulePg> for UserRestrictionRule {
             id: r.id,
             name: r.name,
             rule_type,
+            target: r.target.parse().map_err(anyhow::Error::msg)?,
             rule_value: r.rule_value,
             expires_at: r.expires_at,
             created_at: r.created_at,
@@ -128,7 +130,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryPgImpl {
         let rows = sqlx::query_as!(
             UserRestrictionRulePg,
             r#"
-            SELECT id AS "id: Uuid", name, rule_type::text AS "rule_type!: String", rule_value,
+            SELECT id AS "id: Uuid", name, rule_type::text AS "rule_type!: String", target, rule_value,
                    expires_at, created_at, updated_at, created_by_email
             FROM user_restriction_rules
             WHERE expires_at IS NULL OR expires_at > NOW()

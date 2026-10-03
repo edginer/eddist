@@ -5,7 +5,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
     PaginatorTrait, QueryFilter,
 };
-use testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner};
+use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners::AsyncRunner};
 use testcontainers_modules::mysql::Mysql;
 use uuid::Uuid;
 
@@ -18,7 +18,7 @@ struct MysqlTestDatabase {
 
 async fn setup_database() -> anyhow::Result<MysqlTestDatabase> {
     let container = Mysql::default().with_tag("8.0").start().await?;
-    let port = container.get_host_port_ipv4(3306).await?;
+    let port = container.get_host_port_ipv4(3306.tcp()).await?;
     let database_url = format!("mysql://root@127.0.0.1:{port}/test");
 
     let migration_pool = sqlx::mysql::MySqlPoolOptions::new()

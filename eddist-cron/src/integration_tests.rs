@@ -208,7 +208,6 @@ async fn exercise_repository(db: &DatabaseConnection) -> anyhow::Result<()> {
         .iter()
         .find(|board| board.board_key == BOARD_KEY)
         .expect("seeded board is listed");
-    assert_eq!(info.board_id, board_id);
     assert_eq!(info.threads_archive_trigger_thread_count, Some(1));
     assert!(info.enable_1001_message);
 

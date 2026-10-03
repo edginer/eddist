@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id AS \"id: Uuid\", name, rule_type::text AS rule_type, rule_value,\n                   expires_at, created_at, updated_at, created_by_email\n            FROM user_restriction_rules\n            WHERE expires_at IS NULL OR expires_at > NOW()\n            ORDER BY created_at DESC\n            ",
+  "query": "\n            SELECT id AS \"id: Uuid\", name, rule_type::text AS \"rule_type!: String\", target, rule_value,\n                   expires_at, created_at, updated_at, created_by_email\n            FROM user_restriction_rules\n            WHERE expires_at IS NULL OR expires_at > NOW()\n            ORDER BY created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -27,12 +27,23 @@
       },
       {
         "ordinal": 2,
-        "name": "rule_type",
+        "name": "rule_type!: String",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 3,
+        "name": "target",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "user_restriction_rules",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "rule_value",
         "type_info": "Text",
         "origin": {
@@ -43,7 +54,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "expires_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -54,7 +65,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -65,7 +76,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -76,7 +87,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "created_by_email",
         "type_info": "Varchar",
         "origin": {
@@ -95,11 +106,12 @@
       false,
       null,
       false,
+      false,
       true,
       false,
       false,
       false
     ]
   },
-  "hash": "8a212304dce7cc4f31637d491d0810e78733d010f9f24ba6cb8508920900db81"
+  "hash": "df876e826d03bd19f3fde337e891227cb62790f93446a66606d477f927dfb3b9"
 }

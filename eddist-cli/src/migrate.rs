@@ -473,6 +473,7 @@ async fn migrate_user_restriction_rules(
             id: Set(row.id),
             name: Set(row.name),
             rule_type: Set(row.rule_type),
+            target: Set(row.target),
             rule_value: Set(row.rule_value),
             expires_at: Set(row.expires_at),
             created_at: Set(row.created_at),
