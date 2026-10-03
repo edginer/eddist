@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT \n                BIN_TO_UUID(id) as id,\n                name,\n                rule_type,\n                rule_value,\n                expires_at,\n                created_at,\n                updated_at,\n                created_by_email\n            FROM user_restriction_rules\n            WHERE expires_at IS NULL OR expires_at > NOW()\n            ORDER BY created_at DESC\n            ",
+  "query": "\n            SELECT \n                BIN_TO_UUID(id) as id,\n                name,\n                rule_type,\n                target,\n                rule_value,\n                expires_at,\n                created_at,\n                updated_at,\n                created_by_email\n            FROM user_restriction_rules\n            WHERE expires_at IS NULL OR expires_at > NOW()\n            ORDER BY created_at DESC\n            ",
   "describe": {
     "columns": [
       {
@@ -48,6 +48,22 @@
       },
       {
         "ordinal": 3,
+        "name": "target",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL",
+          "collation": 255,
+          "max_size": 128
+        },
+        "origin": {
+          "Table": {
+            "table": "eddist.user_restriction_rules",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "rule_value",
         "type_info": {
           "type": "Blob",
@@ -63,7 +79,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "expires_at",
         "type_info": {
           "type": "Datetime",
@@ -79,7 +95,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "created_at",
         "type_info": {
           "type": "Datetime",
@@ -95,7 +111,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "updated_at",
         "type_info": {
           "type": "Datetime",
@@ -111,7 +127,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "created_by_email",
         "type_info": {
           "type": "VarString",
@@ -135,11 +151,12 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
       false
     ]
   },
-  "hash": "01da262d52a8c57a194a713d9b4bbbfe85a0d9761432ad22d3968433728a1c10"
+  "hash": "c9bb10986e428671fddd2ac1bc48e6fb27fab119e2386656d1c598dee872eb23"
 }

@@ -59,6 +59,8 @@ pub struct UpdateCapInput {
 pub struct CreateRestrictionRuleRequest {
     pub name: String,
     pub rule_type: RestrictionRuleTypeSchema,
+    #[serde(default)]
+    pub target: RestrictionTargetSchema,
     pub rule_value: String,
     pub expires_at: Option<DateTime<Utc>>,
 }
@@ -67,6 +69,7 @@ pub struct CreateRestrictionRuleRequest {
 pub struct UpdateRestrictionRuleRequest {
     pub name: Option<String>,
     pub rule_type: Option<RestrictionRuleTypeSchema>,
+    pub target: Option<RestrictionTargetSchema>,
     pub rule_value: Option<String>,
     pub expires_at: Option<Option<DateTime<Utc>>>,
 }
@@ -76,6 +79,7 @@ pub struct UserRestrictionRuleSchema {
     pub id: String,
     pub name: String,
     pub rule_type: RestrictionRuleTypeSchema,
+    pub target: RestrictionTargetSchema,
     pub rule_value: String,
     pub expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -98,6 +102,24 @@ impl From<RestrictionRuleTypeSchema> for RestrictionRuleType {
             RestrictionRuleTypeSchema::IP => RestrictionRuleType::IP,
             RestrictionRuleTypeSchema::IPCidr => RestrictionRuleType::IPCidr,
             RestrictionRuleTypeSchema::UserAgent => RestrictionRuleType::UserAgent,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub enum RestrictionTargetSchema {
+    Authentication,
+    Posting,
+    #[default]
+    Both,
+}
+
+impl From<RestrictionTargetSchema> for eddist_core::domain::user_restriction::RestrictionTarget {
+    fn from(value: RestrictionTargetSchema) -> Self {
+        match value {
+            RestrictionTargetSchema::Authentication => Self::Authentication,
+            RestrictionTargetSchema::Posting => Self::Posting,
+            RestrictionTargetSchema::Both => Self::Both,
         }
     }
 }

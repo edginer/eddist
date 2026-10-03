@@ -798,6 +798,7 @@ export interface components {
             name: string;
             rule_type: components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value: string;
+            target?: components["schemas"]["RestrictionTargetSchema"];
         };
         CreationCapInput: {
             description: string;
@@ -927,6 +928,8 @@ export interface components {
         };
         /** @enum {string} */
         RestrictionRuleTypeSchema: "Asn" | "IP" | "IPCidr" | "UserAgent";
+        /** @enum {string} */
+        RestrictionTargetSchema: "Authentication" | "Posting" | "Both";
         ServerSetting: {
             /** Format: date-time */
             created_at: string;
@@ -1059,6 +1062,7 @@ export interface components {
             name?: string | null;
             rule_type?: null | components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value?: string | null;
+            target?: null | components["schemas"]["RestrictionTargetSchema"];
         };
         UpdateTermsInput: {
             content: string;
@@ -1094,6 +1098,7 @@ export interface components {
             name: string;
             rule_type: components["schemas"]["RestrictionRuleTypeSchema"];
             rule_value: string;
+            target: components["schemas"]["RestrictionTargetSchema"];
             /** Format: date-time */
             updated_at: string;
         };

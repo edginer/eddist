@@ -55,6 +55,7 @@ pub trait ModerationService: Send + Sync {
         actor: &AdminIdentity,
         name: String,
         rule_type: eddist_core::domain::user_restriction::RestrictionRuleType,
+        target: eddist_core::domain::user_restriction::RestrictionTarget,
         rule_value: String,
         expires_at: Option<DateTime<Utc>>,
     ) -> anyhow::Result<UserRestrictionRule>;
@@ -185,12 +186,14 @@ impl ModerationService for ModerationServiceImpl {
         actor: &AdminIdentity,
         name: String,
         rule_type: eddist_core::domain::user_restriction::RestrictionRuleType,
+        target: eddist_core::domain::user_restriction::RestrictionTarget,
         rule_value: String,
         expires_at: Option<DateTime<Utc>>,
     ) -> anyhow::Result<UserRestrictionRule> {
         let input = CreateUserRestrictionRuleInput {
             name,
             rule_type,
+            target,
             rule_value,
             expires_at,
             created_by_email: actor.email.clone(),

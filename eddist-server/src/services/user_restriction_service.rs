@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use eddist_core::domain::user_restriction::UserRestrictionRule;
+use eddist_core::domain::user_restriction::{RestrictionTarget, UserRestrictionRule};
 use tokio::sync::RwLock;
 
 use crate::repositories::user_restriction_repository::UserRestrictionRepository;
@@ -35,6 +35,19 @@ impl RestrictionCache {
         }
     }
 
+    fn matching_rule(
+        &self,
+        ip: &str,
+        asn: u32,
+        user_agent: &str,
+        target: RestrictionTarget,
+    ) -> Option<UserRestrictionRule> {
+        self.rules
+            .iter()
+            .find(|rule| rule.target.applies_to(target) && rule.matches(ip, asn, user_agent))
+            .cloned()
+    }
+
     fn update_rules(&mut self, rules: Vec<UserRestrictionRule>) {
         self.rules = rules;
         self.last_updated = Instant::now();
@@ -64,16 +77,11 @@ impl<T: UserRestrictionRepository + Clone> UserRestrictionService<T> {
         ip: &str,
         asn: u32,
         user_agent: &str,
+        target: RestrictionTarget,
     ) -> anyhow::Result<Option<UserRestrictionRule>> {
         let global_cache = get_global_cache();
         let cache = global_cache.read().await;
-        for rule in &cache.rules {
-            if rule.matches(ip, asn, user_agent) {
-                return Ok(Some(rule.clone()));
-            }
-        }
-
-        Ok(None)
+        Ok(cache.matching_rule(ip, asn, user_agent, target))
     }
 }
 
@@ -87,7 +95,7 @@ impl<T: UserRestrictionRepository + Clone>
         input: UserRestrictionCheckInput,
     ) -> anyhow::Result<UserRestrictionCheckOutput> {
         let matching_rule = self
-            .is_restricted(&input.ip, input.asn, &input.user_agent)
+            .is_restricted(&input.ip, input.asn, &input.user_agent, input.target)
             .await?;
 
         Ok(UserRestrictionCheckOutput { matching_rule })
@@ -99,6 +107,7 @@ pub struct UserRestrictionCheckInput {
     pub ip: String,
     pub asn: u32,
     pub user_agent: String,
+    pub target: RestrictionTarget,
 }
 
 #[derive(Debug, Clone)]
@@ -126,4 +135,59 @@ pub fn start_cache_refresh_task<T: UserRestrictionRepository + Clone + Send + Sy
     tracing::info!(
         "Started user restriction cache refresh task with interval: {refresh_interval:?}",
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eddist_core::domain::user_restriction::RestrictionRuleType;
+
+    #[test]
+    fn cache_skips_rules_for_other_operations_and_expired_rules() {
+        let now = chrono::Utc::now();
+        let auth = UserRestrictionRule {
+            id: uuid::Uuid::new_v4(),
+            name: "auth".into(),
+            rule_type: RestrictionRuleType::IP,
+            rule_value: "192.0.2.1".into(),
+            target: RestrictionTarget::Authentication,
+            expires_at: None,
+            created_at: now,
+            updated_at: now,
+            created_by_email: "admin@example.com".into(),
+        };
+        let mut posting = auth.clone();
+        posting.id = uuid::Uuid::new_v4();
+        posting.target = RestrictionTarget::Posting;
+        let mut expired = posting.clone();
+        expired.target = RestrictionTarget::Both;
+        expired.expires_at = Some(now - chrono::Duration::seconds(1));
+        let mut cache = RestrictionCache::new();
+        cache.update_rules(vec![expired, auth.clone(), posting.clone()]);
+        assert_eq!(
+            cache
+                .matching_rule("192.0.2.1", 1, "ua", RestrictionTarget::Authentication)
+                .unwrap()
+                .id,
+            auth.id
+        );
+        assert_eq!(
+            cache
+                .matching_rule("192.0.2.1", 1, "ua", RestrictionTarget::Posting)
+                .unwrap()
+                .id,
+            posting.id
+        );
+        cache.update_rules(vec![auth]);
+        assert!(
+            cache
+                .matching_rule("192.0.2.1", 1, "ua", RestrictionTarget::Posting)
+                .is_none()
+        );
+        assert!(
+            cache
+                .matching_rule("192.0.2.2", 1, "ua", RestrictionTarget::Authentication)
+                .is_none()
+        );
+    }
 }

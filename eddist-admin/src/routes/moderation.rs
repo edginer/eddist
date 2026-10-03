@@ -248,6 +248,7 @@ pub async fn create_restriction_rule(
             &identity,
             req.name,
             req.rule_type.into(),
+            req.target.into(),
             req.rule_value,
             req.expires_at,
         )
@@ -276,6 +277,7 @@ pub async fn update_restriction_rule(
         id: rule_id,
         name: req.name,
         rule_type: req.rule_type.map(|rt| rt.into()),
+        target: req.target.map(Into::into),
         rule_value: req.rule_value,
         expires_at: req.expires_at,
     };

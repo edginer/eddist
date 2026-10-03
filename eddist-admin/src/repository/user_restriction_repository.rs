@@ -37,6 +37,7 @@ fn into_domain(model: user_restriction::Model) -> anyhow::Result<UserRestriction
     Ok(UserRestrictionRule {
         id: model.id,
         name: model.name,
+        target: model.target.parse().map_err(anyhow::Error::msg)?,
         rule_type,
         rule_value: model.rule_value,
         expires_at: model.expires_at.map(|date_time| date_time.and_utc()),
@@ -68,6 +69,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             id: Set(id),
             name: Set(input.name),
             rule_type: Set(input.rule_type.as_str().to_string()),
+            target: Set(input.target.as_str().to_string()),
             rule_value: Set(input.rule_value),
             expires_at: Set(input
                 .expires_at
@@ -98,6 +100,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             id: Set(input.id),
             name: Set(name),
             rule_type: Set(rule_type.as_str().to_string()),
+            target: Set(input.target.unwrap_or(current.target).as_str().to_string()),
             rule_value: Set(rule_value),
             expires_at: Set(expires_at
                 .map(|date_time| crate::db_time::truncate_to_millis(date_time.naive_utc()))),
