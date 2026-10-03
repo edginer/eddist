@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod integration_tests;
 mod llm_moderation;
 mod persistence;
 mod shutdown;
@@ -14,6 +16,7 @@ use eddist_core::{
     tracing::init_tracing,
     utils::{is_authed_token_backup_enabled, is_prod},
 };
+use sea_orm::{ConnectOptions, Database};
 use tokio::join;
 
 use subscriber::SubRepository;
@@ -53,7 +56,9 @@ async fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
-    let db_pool = sqlx::MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let mut connect_options = ConnectOptions::new(env::var("DATABASE_URL")?);
+    connect_options.sqlx_logging(false);
+    let db = Database::connect(connect_options).await?;
 
     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let pubsub_conn = client.get_async_pubsub().await?;
@@ -62,10 +67,10 @@ async fn main() -> anyhow::Result<()> {
     let llm_moderation = llm_moderation::LlmModeration::default();
     // Loaded before subscribing so the first thread_created events already see
     // whether LLM moderation owns the unsafe set.
-    llm_moderation.refresh_settings(&db_pool).await;
+    llm_moderation.refresh_settings(&db).await;
     tokio::spawn(llm_moderation::run_loop(
         llm_moderation.clone(),
-        db_pool.clone(),
+        db.clone(),
         conn.clone(),
     ));
 
@@ -75,13 +80,14 @@ async fn main() -> anyhow::Result<()> {
         ctrl_c_sub_sub,
         s3_client,
         s3_bucket_name,
-        db_pool,
+        db.clone(),
         llm_moderation,
     );
 
     let subscribe_handle = tokio::spawn(async move { sub_repo.subscribe().await });
     let persistence_handle = tokio::spawn(persistence::run_persistence_loop(
         conn,
+        db,
         ctrl_c_sub_persitence,
     ));
 

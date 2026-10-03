@@ -51,7 +51,7 @@ impl TermsRepository for TermsRepositoryImpl {
         input: UpdateTermsInput,
         updated_by: Option<String>,
     ) -> anyhow::Result<Terms> {
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
 
         let current = self
             .get_terms()

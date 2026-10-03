@@ -2009,6 +2009,7 @@ name = "eddist-entity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "sea-orm",
 ]
 
@@ -2021,14 +2022,18 @@ dependencies = [
  "chrono",
  "dotenvy",
  "eddist-core",
+ "eddist-entity",
  "futures",
  "hyper 1.11.0",
  "hyper-util",
  "redis",
  "reqwest",
+ "sea-orm",
  "serde",
  "serde_json",
  "sqlx",
+ "testcontainers",
+ "testcontainers-modules",
  "tokio",
  "tracing",
  "uuid",

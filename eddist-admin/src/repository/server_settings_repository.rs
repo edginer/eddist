@@ -66,7 +66,7 @@ impl ServerSettingsRepository for ServerSettingsRepositoryImpl {
 
     async fn upsert(&self, input: UpsertServerSettingInput) -> anyhow::Result<ServerSetting> {
         let id = Uuid::now_v7();
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
 
         let should_encrypt = input.setting_key == KEY_AI_OPENAI_API_KEY;
         let value = if should_encrypt {

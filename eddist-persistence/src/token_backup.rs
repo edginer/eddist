@@ -1,34 +1,35 @@
+use anyhow::Context;
 use aws_sdk_s3::{Client, primitives::ByteStream};
 use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
+use eddist_entity::authed_token;
+use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
 pub async fn backup_token(
-    pool: &sqlx::MySqlPool,
+    db: &DatabaseConnection,
     client: &Client,
     bucket_name: &str,
     token_id: Uuid,
 ) -> anyhow::Result<()> {
-    let backup = sqlx::query_as!(
-        AuthedTokenBackup,
-        r#"SELECT
-            id AS "id!: Uuid",
-            token,
-            origin_ip,
-            reduced_origin_ip,
-            asn_num,
-            writing_ua,
-            authed_ua,
-            auth_code,
-            created_at,
-            authed_at,
-            last_wrote_at,
-            additional_info AS "additional_info: serde_json::Value",
-            author_id_seed AS "author_id_seed!: Vec<u8>"
-        FROM authed_tokens WHERE id = ?"#,
-        token_id.as_bytes().to_vec()
-    )
-    .fetch_one(pool)
-    .await?;
+    let token = authed_token::Entity::find_by_id(token_id)
+        .one(db)
+        .await?
+        .context("authed token not found")?;
+    let backup = AuthedTokenBackup {
+        id: token.id,
+        token: token.token,
+        origin_ip: token.origin_ip,
+        reduced_origin_ip: token.reduced_origin_ip,
+        asn_num: token.asn_num,
+        writing_ua: token.writing_ua,
+        authed_ua: token.authed_ua,
+        auth_code: Some(token.auth_code),
+        created_at: token.created_at,
+        authed_at: token.authed_at,
+        last_wrote_at: token.last_wrote_at,
+        additional_info: token.additional_info,
+        author_id_seed: token.author_id_seed,
+    };
 
     let bytes = serde_json::to_vec(&backup)?;
     client

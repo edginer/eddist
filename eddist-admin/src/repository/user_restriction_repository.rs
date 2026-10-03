@@ -64,16 +64,16 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
         input: CreateUserRestrictionRuleInput,
     ) -> anyhow::Result<UserRestrictionRule> {
         let id = Uuid::now_v7();
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
         let model = user_restriction::ActiveModel {
             id: Set(id),
             name: Set(input.name),
             rule_type: Set(input.rule_type.as_str().to_string()),
             target: Set(input.target.as_str().to_string()),
             rule_value: Set(input.rule_value),
-            expires_at: Set(input
-                .expires_at
-                .map(|date_time| crate::db_time::truncate_to_millis(date_time.naive_utc()))),
+            expires_at: Set(input.expires_at.map(|date_time| {
+                crate::entity::db_time::truncate_to_millis(date_time.naive_utc())
+            })),
             created_at: Set(now),
             updated_at: Set(now),
             created_by_email: Set(input.created_by_email),
@@ -85,7 +85,7 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
     }
 
     async fn update_rule(&self, input: UpdateUserRestrictionRuleInput) -> anyhow::Result<()> {
-        let now = crate::db_time::now();
+        let now = crate::entity::db_time::now();
         let current = self
             .get_rule_by_id(input.id)
             .await?
@@ -102,8 +102,9 @@ impl UserRestrictionRepository for UserRestrictionRepositoryImpl {
             rule_type: Set(rule_type.as_str().to_string()),
             target: Set(input.target.unwrap_or(current.target).as_str().to_string()),
             rule_value: Set(rule_value),
-            expires_at: Set(expires_at
-                .map(|date_time| crate::db_time::truncate_to_millis(date_time.naive_utc()))),
+            expires_at: Set(expires_at.map(|date_time| {
+                crate::entity::db_time::truncate_to_millis(date_time.naive_utc())
+            })),
             updated_at: Set(now),
             ..Default::default()
         }
