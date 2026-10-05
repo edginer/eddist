@@ -27,6 +27,50 @@ fn parse_etag_byte_size(inm: &str) -> Option<usize> {
     inner.rsplit('-').next()?.parse().ok()
 }
 
+fn dat_retrieval_error_response(
+    error: &anyhow::Error,
+    board_key: &str,
+    thread_number: &str,
+    now: i64,
+) -> Response {
+    // Keep this local classification until retrieval errors are typed in R2.
+    match error.root_cause().to_string().as_str() {
+        "cannot find such thread" if thread_number.parse::<i64>().unwrap_or(i64::MAX) <= now => {
+            Response::builder()
+                .header("Cache-Control", "s-maxage=86400, max-age=86400")
+                .status(StatusCode::FOUND)
+                .header(
+                    "Location",
+                    format!(
+                        "/{board_key}/kako/{}/{}/{thread_number}.dat",
+                        &thread_number[0..4],
+                        &thread_number[0..5],
+                    ),
+                )
+                .body(Body::empty())
+                .unwrap()
+        }
+        "cannot find such thread" | "failed to find board" | "failed to find board info" => {
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::empty())
+                .unwrap()
+        }
+        _ => {
+            tracing::error!(
+                error = %error,
+                board_key,
+                thread_number,
+                "failed to retrieve dat"
+            );
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::empty())
+                .unwrap()
+        }
+    }
+}
+
 pub async fn get_dat_txt(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -69,36 +113,12 @@ pub async fn get_dat_txt(
     {
         Ok(raw) => raw,
         Err(e) => {
-            if e.root_cause()
-                .to_string()
-                .contains("cannot find such thread")
-            {
-                let current_unix_epoch = Utc::now().timestamp();
-                return if thread_number_num > current_unix_epoch {
-                    // Not found response
-                    Response::builder().status(404).body(Body::empty()).unwrap()
-                } else {
-                    // Redirect to kako thread
-                    Response::builder()
-                        .header("Cache-Control", "s-maxage=86400, max-age=86400")
-                        .status(302)
-                        .header(
-                            "Location",
-                            format!(
-                                "/{}/kako/{}/{}/{}.dat",
-                                board_key,
-                                &thread_number[0..4],
-                                &thread_number[0..5],
-                                thread_number
-                            ),
-                        )
-                        .body(Body::empty())
-                        .unwrap()
-                };
-            } else {
-                // Not found response
-                return Response::builder().status(404).body(Body::empty()).unwrap();
-            }
+            return dat_retrieval_error_response(
+                &e,
+                &board_key,
+                thread_number,
+                Utc::now().timestamp(),
+            );
         }
     };
 
@@ -218,4 +238,49 @@ pub async fn get_kako_dat_txt(
         .with_etag(etag)
         .build()
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dependency_failures_are_internal_errors() {
+        for error in [
+            anyhow::anyhow!("database unavailable"),
+            anyhow::anyhow!("redis unavailable"),
+            anyhow::anyhow!("query failed: cannot find such thread")
+                .context("dat retrieval failed"),
+        ] {
+            let response = dat_retrieval_error_response(&error, "bbs", "1234567890", 1234567891);
+            assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+            assert!(!response.headers().contains_key("Location"));
+        }
+    }
+
+    #[test]
+    fn missing_threads_keep_archive_redirect_and_future_not_found() {
+        let error = anyhow::anyhow!("cannot find such thread").context("dat retrieval failed");
+        let response = dat_retrieval_error_response(&error, "bbs", "1234567890", 1234567891);
+        assert_eq!(response.status(), StatusCode::FOUND);
+        assert_eq!(
+            response.headers()["Location"],
+            "/bbs/kako/1234/12345/1234567890.dat"
+        );
+        let response = dat_retrieval_error_response(&error, "bbs", "1234567890", 1234567889);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn missing_board_or_board_info_remains_not_found() {
+        for message in ["failed to find board", "failed to find board info"] {
+            let response = dat_retrieval_error_response(
+                &anyhow::anyhow!(message),
+                "bbs",
+                "1234567890",
+                1234567891,
+            );
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        }
+    }
 }

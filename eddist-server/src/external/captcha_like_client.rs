@@ -68,9 +68,9 @@ fn extract_fields(source: &impl Serialize, fields: &[String]) -> Option<serde_js
 pub fn create_captcha_client(
     config: &CaptchaProviderConfig,
     redis_conn: ConnectionManager,
-) -> Box<dyn CaptchaClient> {
+) -> Result<Box<dyn CaptchaClient>, CaptchaVerificationError> {
     let name = config.name.clone();
-    match config.provider.to_lowercase().as_str() {
+    let client: Box<dyn CaptchaClient> = match config.provider.to_lowercase().as_str() {
         "turnstile" => Box::new(TurnstileClient::new(name, config.secret.clone())),
         "hcaptcha" => Box::new(HCaptchaClient::new(
             name,
@@ -103,10 +103,11 @@ pub fn create_captcha_client(
             config.secret.clone(),
             config.capture_fields.clone(),
             redis_conn,
-        )),
+        )?),
         // For other providers, use the generic client
         _ => Box::new(GenericCaptchaClient::new(config.clone())),
-    }
+    };
+    Ok(client)
 }
 
 pub struct TurnstileClient {
@@ -145,19 +146,17 @@ impl CaptchaClient for TurnstileClient {
             .form(&form_data)
             .send()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let response_text = res
             .text()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let resp = match serde_json::from_str::<TurnstileResponse>(&response_text) {
             Ok(resp) => resp,
-            Err(e) => {
-                log::error!(
-                    "Failed to parse Turnstile response: {e}, response body: {response_text}"
-                );
+            Err(_) => {
+                tracing::error!(provider = %self.name, "failed to parse CAPTCHA response");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
@@ -169,7 +168,7 @@ impl CaptchaClient for TurnstileClient {
         let result = if resp.success {
             CaptchaLikeResult::Success
         } else {
-            log::info!("Turnstile response: {resp:?}");
+            tracing::info!(provider = %self.name, result = "verification_failed", "CAPTCHA verification");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
 
@@ -221,13 +220,13 @@ impl CaptchaClient for HCaptchaClient {
             .form(&form_data)
             .send()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let resp = match res.json::<HCaptchaResponse>().await {
             Ok(resp) => resp,
             Err(e) => {
-                log::error!("Failed to parse HCaptcha response: {e}");
-                return Err(CaptchaVerificationError::Request(e));
+                tracing::error!(provider = %self.name, "failed to parse CAPTCHA response");
+                return Err(CaptchaVerificationError::request(e));
             }
         };
 
@@ -236,7 +235,7 @@ impl CaptchaClient for HCaptchaClient {
         let result = if resp.success {
             CaptchaLikeResult::Success
         } else {
-            log::info!("HCaptcha response: {resp:?}");
+            tracing::info!(provider = %self.name, result = "verification_failed", "CAPTCHA verification");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
 
@@ -307,19 +306,17 @@ impl CaptchaClient for MonocleClient {
             .body(response)
             .send()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let response_text = res
             .text()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let resp = match serde_json::from_str::<MonocleResponse>(&response_text) {
             Ok(resp) => resp,
-            Err(e) => {
-                log::error!(
-                    "Failed to parse Monocle response: {e}, response body: {response_text}"
-                );
+            Err(_) => {
+                tracing::error!(provider = %self.name, "failed to parse CAPTCHA response");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
@@ -331,10 +328,10 @@ impl CaptchaClient for MonocleClient {
         let captured_data = self.extract_captured_data(&resp);
 
         let result = if matches!(resp.anon, Some(true)) {
-            log::info!("Monocle response: {resp:?}");
+            tracing::info!(provider = %self.name, result = "anonymous_access", "CAPTCHA verification");
             CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess)
         } else if !verify_ip(resp.ip.as_deref(), resp.ipv6.as_deref()) && is_prod() {
-            log::info!("Monocle response: {resp:?}");
+            tracing::info!(provider = %self.name, result = "ip_verification_failed", "CAPTCHA verification");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress)
         } else {
             CaptchaLikeResult::Success
@@ -361,16 +358,17 @@ impl Layer3IntelTripwireClient {
         private_key_pem: String,
         capture_fields: Vec<String>,
         redis_conn: ConnectionManager,
-    ) -> Self {
+    ) -> Result<Self, CaptchaVerificationError> {
         let pem = private_key_pem.replace("\\n", "\n");
-        let private_key = P256SecretKey::from_pkcs8_pem(&pem)
-            .expect("layer3intel_tripwire: invalid PKCS8 EC P-256 private key in config");
-        Self {
+        let private_key = P256SecretKey::from_pkcs8_pem(&pem).map_err(|_| {
+            CaptchaVerificationError::InvalidConfig("invalid PKCS8 EC P-256 private key")
+        })?;
+        Ok(Self {
             name,
             private_key,
             capture_fields,
             redis_conn,
-        }
+        })
     }
 
     fn extract_captured_data(&self, assessment: &TripwireAssessment) -> Option<serde_json::Value> {
@@ -508,8 +506,8 @@ impl CaptchaClient for Layer3IntelTripwireClient {
 
         let assessment: TripwireAssessment = match serde_json::from_slice(&plaintext) {
             Ok(a) => a,
-            Err(e) => {
-                log::error!("Tripwire: failed to parse assessment JSON: {e}");
+            Err(_) => {
+                tracing::error!(provider = %self.name, "failed to parse CAPTCHA assessment");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
@@ -522,7 +520,7 @@ impl CaptchaClient for Layer3IntelTripwireClient {
 
         // Rule 2: proxy check
         if matches!(assessment.proxy, Some(true)) {
-            log::info!("Tripwire assessment: {assessment:?}");
+            tracing::info!(provider = %self.name, result = "anonymous_access", "CAPTCHA verification");
             return Ok(CaptchaVerificationOutput {
                 result: CaptchaLikeResult::Failure(CaptchaLikeError::AnonymouseAccess),
                 captured_data,
@@ -539,7 +537,7 @@ impl CaptchaClient for Layer3IntelTripwireClient {
                 .map(|s| ReducedIpAddr::from(s.to_string()) == client_reduced)
                 .unwrap_or(false);
             if !ip_matches {
-                log::info!("Tripwire assessment: {assessment:?}");
+                tracing::info!(provider = %self.name, result = "ip_verification_failed", "CAPTCHA verification");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress),
                     captured_data,
@@ -577,7 +575,7 @@ impl CaptchaClient for Layer3IntelTripwireClient {
                 .await
                 .unwrap_or(Some("OK".to_string())); // on Redis error, allow through
             if newly_set.is_none() {
-                log::info!("Tripwire: replayed UUID detected: {uuid}");
+                tracing::info!(provider = %self.name, result = "replayed_token", "CAPTCHA verification");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data,
@@ -687,19 +685,17 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
             .json(&serde_json::json!({ "event": event }))
             .send()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let response_text = res
             .text()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
 
         let resp: GrecaptchaEnterpriseResponse = match serde_json::from_str(&response_text) {
             Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "Failed to parse reCAPTCHA Enterprise response: {e}, body: {response_text}"
-                );
+            Err(_) => {
+                tracing::error!(provider = %self.name, "failed to parse CAPTCHA response");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
@@ -717,12 +713,7 @@ impl CaptchaClient for RecaptchaEnterpriseClient {
         let result = if valid && score >= self.score_threshold {
             CaptchaLikeResult::Success
         } else {
-            log::debug!(
-                "reCAPTCHA Enterprise verification failed: valid={valid}, invalid_reason={:?}, score={score}, threshold={}, reasons={:?}",
-                resp.token_properties.invalid_reason,
-                self.score_threshold,
-                resp.risk_analysis.reasons,
-            );
+            tracing::info!(provider = %self.name, result = "verification_failed", "CAPTCHA verification");
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
 
@@ -748,11 +739,13 @@ impl GenericCaptchaClient {
         }
     }
 
-    fn verification(&self) -> &CaptchaVerificationConfig {
+    fn verification(&self) -> Result<&CaptchaVerificationConfig, CaptchaVerificationError> {
         self.config
             .verification
             .as_ref()
-            .expect("GenericCaptchaClient requires verification config")
+            .ok_or(CaptchaVerificationError::InvalidConfig(
+                "verification config is required",
+            ))
     }
 
     /// Extract fields from response JSON based on capture_fields config
@@ -778,8 +771,7 @@ impl GenericCaptchaClient {
     }
 
     /// Check if response indicates success based on success_path config
-    fn check_success(&self, resp: &serde_json::Value) -> bool {
-        let cfg = self.verification();
+    fn check_success(&self, resp: &serde_json::Value, cfg: &CaptchaVerificationConfig) -> bool {
         let path_str = format!("$.{}", cfg.success_path);
         let success = if let Ok(results) = resp.query(&path_str) {
             results.first().and_then(|v| v.as_bool()).unwrap_or(false)
@@ -803,7 +795,7 @@ impl CaptchaClient for GenericCaptchaClient {
         response: &str,
         ip_addr: &str,
     ) -> Result<CaptchaVerificationOutput, CaptchaVerificationError> {
-        let cfg = self.verification();
+        let cfg = self.verification()?;
         let url = self.config.resolve_placeholders(
             cfg.url.as_deref().unwrap_or_default(),
             response,
@@ -815,18 +807,24 @@ impl CaptchaClient for GenericCaptchaClient {
             HttpMethod::Get => self.client.get(&url),
         };
 
-        req = req.headers(
-            cfg.headers
-                .iter()
-                .map(|(k, v)| {
-                    let resolved_value = self.config.resolve_placeholders(v, response, ip_addr);
-                    (
-                        k.as_str().parse().unwrap(),
-                        resolved_value.as_str().parse().unwrap(),
-                    )
-                })
-                .collect(),
-        );
+        let mut headers = http::HeaderMap::new();
+        for (name, value) in &cfg.headers {
+            let name = name.parse::<http::HeaderName>().map_err(|_| {
+                CaptchaVerificationError::InvalidConfig("invalid verification header name")
+            })?;
+            let value = self.config.resolve_placeholders(value, response, ip_addr);
+            // Config headers are validated at load, so this is a malformed client token.
+            let Ok(mut value) = http::HeaderValue::from_str(&value) else {
+                return Ok(CaptchaVerificationOutput {
+                    result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
+                    captured_data: None,
+                    provider: self.config.name.clone(),
+                });
+            };
+            value.set_sensitive(true);
+            headers.insert(name, value);
+        }
+        req = req.headers(headers);
 
         // Build request body based on format
         req = match cfg.request_format {
@@ -848,12 +846,6 @@ impl CaptchaClient for GenericCaptchaClient {
                     json["remoteip"] = ip_addr.into();
                 }
 
-                log::info!(
-                    "Sending JSON verification request to {}: {}",
-                    self.config.provider,
-                    json
-                );
-
                 req.json(&json)
             }
             RequestFormat::PlainText => {
@@ -874,25 +866,17 @@ impl CaptchaClient for GenericCaptchaClient {
         let res = req
             .send()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
+            .map_err(CaptchaVerificationError::request)?;
+        let status = res.status();
         let response_text = res
             .text()
             .await
-            .map_err(CaptchaVerificationError::Request)?;
-
-        log::info!(
-            "{} verification response body: {}",
-            self.config.provider,
-            response_text
-        );
+            .map_err(CaptchaVerificationError::request)?;
 
         let resp: serde_json::Value = match serde_json::from_str(&response_text) {
             Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "Failed to parse {} response: {e}, body: {response_text}",
-                    self.config.provider
-                );
+            Err(_) => {
+                tracing::error!(provider = %self.config.name, http_status = status.as_u16(), "failed to parse CAPTCHA response");
                 return Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha),
                     captured_data: None,
@@ -905,12 +889,12 @@ impl CaptchaClient for GenericCaptchaClient {
         let captured_data = self.extract_captured_data(&resp);
 
         // Check success using configured path
-        let success = self.check_success(&resp);
+        let success = self.check_success(&resp, cfg);
+        tracing::info!(provider = %self.config.name, http_status = status.as_u16(), success, "CAPTCHA verification");
 
         let result = if success {
             CaptchaLikeResult::Success
         } else {
-            log::info!("{} response: {:?}", self.config.provider, resp);
             CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
         };
 
@@ -922,16 +906,32 @@ impl CaptchaClient for GenericCaptchaClient {
     }
 }
 
-#[derive(Debug)]
 pub enum CaptchaVerificationError {
     Request(reqwest::Error),
+    InvalidConfig(&'static str),
+}
+
+impl CaptchaVerificationError {
+    // The URL can carry secrets via {{secret}} placeholders.
+    fn request(e: reqwest::Error) -> Self {
+        Self::Request(e.without_url())
+    }
 }
 
 impl std::fmt::Display for CaptchaVerificationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CaptchaVerificationError::Request(e) => write!(f, "Request error: {e}"),
+            CaptchaVerificationError::Request(e) => write!(f, "CAPTCHA request failed: {e}"),
+            CaptchaVerificationError::InvalidConfig(reason) => {
+                write!(f, "Invalid CAPTCHA configuration: {reason}")
+            }
         }
+    }
+}
+
+impl std::fmt::Debug for CaptchaVerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
     }
 }
 
@@ -956,6 +956,106 @@ pub enum CaptchaLikeResult {
 #[cfg(test)]
 mod probe_tests {
     use super::*;
+    use eddist_core::test_utils::LogCapture;
+    use tracing::instrument::WithSubscriber;
+
+    fn generic_config(url: &str) -> CaptchaProviderConfig {
+        serde_json::from_value(serde_json::json!({
+            "name": "custom-test", "provider": "custom", "site_key": "site-key",
+            "secret": "private-secret-value",
+            "widget": { "form_field_name": "response", "script_url": "", "widget_html": "" },
+            "verification": { "url": url, "request_format": "Json", "include_ip": true },
+        }))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn generic_verification_logs_metadata_without_request_or_response_contents() {
+        use axum::{Router, extract::Json, routing::post};
+
+        for body in [
+            r#"{"success":false,"secret":"private-secret-value","response":"private-captcha-token","ip":"192.0.2.99","body":"private-response-body"}"#,
+            r#"{"secret":"private-secret-value","response":"private-captcha-token","ip":"192.0.2.99","body":"private-response-body",invalid}"#,
+        ] {
+            let router = Router::new().route(
+                "/verify",
+                post(move |Json(request): Json<serde_json::Value>| async move {
+                    assert_eq!(request["secret"], "private-secret-value");
+                    assert_eq!(request["response"], "private-captcha-token");
+                    assert_eq!(request["remoteip"], "192.0.2.99");
+                    body
+                }),
+            );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}/verify", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                axum::serve(listener, router).await.unwrap();
+            });
+            let client = GenericCaptchaClient::new(generic_config(&url));
+            let logs = LogCapture::default();
+            let output = client
+                .verify_captcha("private-captcha-token", "192.0.2.99")
+                .with_subscriber(logs.subscriber())
+                .await
+                .unwrap();
+            server.abort();
+            assert!(matches!(output.result, CaptchaLikeResult::Failure(_)));
+            let log = logs.contents();
+            assert!(log.contains("custom-test"));
+            assert!(log.contains("http_status=200"));
+            for sensitive in [
+                "private-secret-value",
+                "private-captcha-token",
+                "192.0.2.99",
+                "private-response-body",
+            ] {
+                assert!(!log.contains(sensitive));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn generic_missing_verification_and_invalid_dynamic_headers_return_errors() {
+        let mut config = generic_config("https://captcha.example/verify");
+        config.verification = None;
+        let result = GenericCaptchaClient::new(config)
+            .verify_captcha("response", "192.0.2.99")
+            .await;
+        assert!(matches!(
+            result,
+            Err(CaptchaVerificationError::InvalidConfig(_))
+        ));
+
+        let mut config = generic_config("https://captcha.example/verify");
+        config
+            .verification
+            .as_mut()
+            .unwrap()
+            .headers
+            .insert("X-Token".into(), "{{response}}".into());
+        config.validate().unwrap();
+        let output = GenericCaptchaClient::new(config)
+            .verify_captcha("malformed\nresponse", "192.0.2.99")
+            .await
+            .unwrap();
+        assert!(matches!(
+            output.result,
+            CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyCaptcha)
+        ));
+    }
+
+    #[tokio::test]
+    async fn request_errors_do_not_display_secret_urls() {
+        let error = reqwest::Client::new()
+            .get("http://127.0.0.1:0/verify?key=private-secret-value")
+            .send()
+            .await
+            .unwrap_err();
+        let error = CaptchaVerificationError::request(error);
+        assert!(error.to_string().contains("error sending request"));
+        assert!(!error.to_string().contains("private-secret-value"));
+        assert!(!format!("{error:?}").contains("private-secret-value"));
+    }
 
     #[test]
     fn decrypts_independently_constructed_jwe_vector() {

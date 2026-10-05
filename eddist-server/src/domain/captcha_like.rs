@@ -1,5 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
+use anyhow::{anyhow, ensure};
+use http::{HeaderName, HeaderValue};
+use jsonpath_rust::JsonPath;
+use p256::{SecretKey, pkcs8::DecodePrivateKey};
 use serde::{Deserialize, Serialize};
 
 pub const GRECAPTCHA_ENTERPRISE_URL: &str =
@@ -156,6 +160,111 @@ pub struct CaptchaProviderConfig {
     /// Verification API configuration (only for custom/generic providers)
     #[serde(default)]
     pub verification: Option<CaptchaVerificationConfig>,
+}
+
+impl CaptchaProviderConfig {
+    /// Error messages must not echo config values; URLs and headers can hold secrets.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        ensure!(!self.name.trim().is_empty(), "name is required");
+        ensure!(!self.provider.trim().is_empty(), "provider is required");
+        ensure!(!self.secret.trim().is_empty(), "secret is required");
+        ensure!(
+            !self.widget.form_field_name.trim().is_empty(),
+            "widget form field name is required"
+        );
+        if !self.widget.script_url.is_empty() {
+            validate_script_url(&self.resolve_placeholders(
+                &self.widget.script_url,
+                "validation-response",
+                "127.0.0.1",
+            ))?;
+        }
+
+        match self.provider.to_lowercase().as_str() {
+            "turnstile" | "hcaptcha" | "monocle" => {
+                ensure!(!self.site_key.trim().is_empty(), "site key is required");
+            }
+            "layer3intel_tripwire" => {
+                ensure!(!self.site_key.trim().is_empty(), "site key is required");
+                SecretKey::from_pkcs8_pem(&self.secret.replace("\\n", "\n"))
+                    .map_err(|_| anyhow!("invalid PKCS8 EC P-256 private key"))?;
+            }
+            "recaptcha_enterprise" => {
+                ensure!(!self.site_key.trim().is_empty(), "site key is required");
+                let project_id = self
+                    .verification
+                    .as_ref()
+                    .and_then(|v| v.project_id.as_deref())
+                    .filter(|id| !id.trim().is_empty())
+                    .ok_or_else(|| anyhow!("reCAPTCHA Enterprise project ID is required"))?;
+                ensure!(
+                    project_id
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || c == b'-'),
+                    "invalid reCAPTCHA Enterprise project ID"
+                );
+                if let Some(threshold) = self.verification.as_ref().and_then(|v| v.score_threshold)
+                {
+                    ensure!(
+                        threshold.is_finite() && (0.0..=1.0).contains(&threshold),
+                        "score threshold must be between 0 and 1"
+                    );
+                }
+            }
+            _ => {
+                let verification = self
+                    .verification
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("verification config is required"))?;
+                self.validate_verification(verification)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_verification(
+        &self,
+        verification: &CaptchaVerificationConfig,
+    ) -> anyhow::Result<()> {
+        let url = verification
+            .url
+            .as_ref()
+            .ok_or_else(|| anyhow!("verification URL is required"))?;
+        validate_http_url(&self.resolve_placeholders(url, "validation-response", "127.0.0.1"))?;
+        for (name, value) in &verification.headers {
+            name.parse::<HeaderName>()
+                .map_err(|_| anyhow!("invalid verification header name"))?;
+            let value = self.resolve_placeholders(value, "validation-response", "127.0.0.1");
+            HeaderValue::from_str(&value)
+                .map_err(|_| anyhow!("invalid verification header value"))?;
+        }
+        ensure!(
+            !verification.success_path.trim().is_empty(),
+            "verification success path is required"
+        );
+        serde_json::json!({})
+            .query(&format!("$.{}", verification.success_path))
+            .map_err(|_| anyhow!("invalid verification success path"))?;
+        Ok(())
+    }
+}
+
+fn validate_script_url(value: &str) -> anyhow::Result<()> {
+    ensure!(!value.contains("{{"), "unresolved URL placeholder");
+    match url::Url::parse(value) {
+        Err(url::ParseError::RelativeUrlWithoutBase) => Ok(()),
+        _ => validate_http_url(value),
+    }
+}
+
+fn validate_http_url(value: &str) -> anyhow::Result<()> {
+    ensure!(!value.contains("{{"), "unresolved URL placeholder");
+    let url = url::Url::parse(value).map_err(|_| anyhow!("invalid HTTP URL"))?;
+    ensure!(
+        matches!(url.scheme(), "http" | "https") && url.host_str().is_some(),
+        "URL must use HTTP or HTTPS and include a host"
+    );
+    Ok(())
 }
 
 impl Debug for CaptchaProviderConfig {
