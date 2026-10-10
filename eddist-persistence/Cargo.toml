@@ -23,6 +23,7 @@ uuid.workspace = true
 reqwest.workspace = true
 
 [dev-dependencies]
+eddist-core = { workspace = true, features = ["test-utils"] }
 sqlx = { workspace = true, features = ["migrate"] }
 testcontainers.workspace = true
 testcontainers-modules.workspace = true

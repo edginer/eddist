@@ -7,6 +7,51 @@ use eddist_core::redis_keys::thread_cache_key;
 use http::{HeaderName, HeaderValue};
 use redis::AsyncCommands;
 
+#[tokio::test]
+async fn r0_auth_code_missing_or_empty_is_bad_request() {
+    let ctx = TestContext::new().await;
+    for form in [
+        std::collections::HashMap::new(),
+        std::collections::HashMap::from([("auth-code", "")]),
+        std::collections::HashMap::from([("auth-code", "  ")]),
+    ] {
+        let response = ctx.server.post("/auth-code").form(&form).await;
+        assert_eq!(response.status_code(), 400);
+    }
+}
+
+#[tokio::test]
+async fn r0_dat_database_failure_does_not_increment_not_found_counter() {
+    use eddist_core::redis_keys::not_found_access_count_key;
+    let ctx = TestContext::new().await;
+    let key = not_found_access_count_key("localhost");
+    let mut redis_conn = ctx.redis_conn.clone();
+    redis_conn.del::<_, ()>(&key).await.unwrap();
+    ctx.pool.close().await;
+
+    let response = ctx.server.get("/bbs/dat/1234567890.dat").await;
+    assert_eq!(response.status_code(), 500);
+    assert!(!redis_conn.exists::<_, bool>(&key).await.unwrap());
+}
+
+#[tokio::test]
+async fn r0_dat_redis_failure_can_use_database_fallback() {
+    let ctx = TestContext::new().await;
+    let board_id = create_test_board(&ctx.pool, "r0cache", "テスト板").await;
+    let (token_id, _) = create_test_authed_token(&ctx.pool, "127.0.0.1", "test-code").await;
+    let thread_id = create_test_thread(&ctx.pool, board_id, 1234567890, "スレッド", token_id).await;
+    create_test_response(&ctx.pool, board_id, thread_id, token_id, 1, "DB fallback").await;
+    // A wrong-type key makes LRANGE fail while the database remains available.
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(thread_cache_key("r0cache", 1234567890), "wrong-type")
+        .await
+        .unwrap();
+    let response = ctx.server.get("/r0cache/dat/1234567890.dat").await;
+    assert_eq!(response.status_code(), 200);
+    assert!(decode_sjis(response.as_bytes()).contains("DB fallback"));
+}
+
 /// Test 1: GET thread list via HTTP
 #[tokio::test]
 async fn test_get_thread_list() {

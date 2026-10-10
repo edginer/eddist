@@ -13,7 +13,7 @@ use eddist_core::{
 };
 use metrics::counter;
 use redis::{Cmd, Value, aio::ConnectionManager};
-use tracing::error_span;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
         bbs_pubsub_repository::{CreationEventRepository, PubRepository},
-        bbs_repository::BbsRepository,
+        bbs_repository::{BbsRepository, ResponseRepository},
         user_repository::UserRepository,
     },
 };
@@ -289,15 +289,7 @@ impl<
         let event_repo = self.4.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = bbs_repo.create_response(cres.clone()).await {
-                error_span!("failed to create response in database",
-                    error = %e
-                );
-                pub_repo
-                    .publish(PubSubItem::CreatingRes(Box::new(cres.clone())))
-                    .await
-                    .unwrap();
-            }
+            persist_response(&bbs_repo, &pub_repo, &cres).await;
 
             if is_res_pub_enabled() {
                 let moderation_result =
@@ -340,6 +332,32 @@ impl<
     }
 }
 
+async fn persist_response<R: ResponseRepository, P: PubRepository>(
+    repo: &R,
+    publisher: &P,
+    res: &CreatingRes,
+) {
+    if let Err(e) = repo.create_response(res.clone()).await {
+        error!(
+            error = %e,
+            res_id = %res.id,
+            thread_id = %res.thread_id,
+            "failed to create response in database"
+        );
+        if let Err(e) = publisher
+            .publish(PubSubItem::CreatingRes(Box::new(res.clone())))
+            .await
+        {
+            error!(
+                error = %e,
+                res_id = %res.id,
+                thread_id = %res.thread_id,
+                "failed to publish response persistence fallback"
+            );
+        }
+    }
+}
+
 pub struct ResCreationServiceInput {
     pub board_key: String,
     pub thread_number: u64,
@@ -359,4 +377,98 @@ pub struct ResCreationServiceOutput {
     pub res_order: Option<i32>,
     pub authed_token_id: Uuid,
     pub is_authed_token_bound: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eddist_core::domain::res::ResView;
+    use eddist_core::test_utils::LogCapture;
+    use std::sync::{Arc, Mutex};
+    use tracing::instrument::WithSubscriber;
+
+    struct Repository {
+        fail: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl ResponseRepository for Repository {
+        async fn get_responses(&self, _: Uuid) -> anyhow::Result<Vec<ResView>> {
+            unreachable!()
+        }
+
+        async fn create_response(&self, _: CreatingRes) -> anyhow::Result<()> {
+            anyhow::ensure!(!self.fail, "database unavailable");
+            Ok(())
+        }
+    }
+
+    #[derive(Clone)]
+    struct Publisher {
+        fail: bool,
+        items: Arc<Mutex<Vec<PubSubItem>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl PubRepository for Publisher {
+        async fn publish(&self, item: PubSubItem) -> anyhow::Result<()> {
+            self.items.lock().unwrap().push(item);
+            anyhow::ensure!(!self.fail, "redis unavailable");
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn persistence_failures_are_logged_and_fallback_does_not_panic() {
+        let res = CreatingRes {
+            id: Uuid::now_v7(),
+            created_at: Utc::now(),
+            body: "private-response-body".into(),
+            name: "name".into(),
+            mail: String::new(),
+            author_ch5id: "author".into(),
+            authed_token_id: Uuid::now_v7(),
+            ip_addr: "192.0.2.99".into(),
+            thread_id: Uuid::now_v7(),
+            board_id: Uuid::now_v7(),
+            client_info: ClientInfo::default(),
+            res_order: 1,
+            is_sage: false,
+            moderation_result: None,
+        };
+        for (db_fail, fallback_fail) in [(false, false), (true, false), (true, true)] {
+            let repo = Repository { fail: db_fail };
+            let publisher = Publisher {
+                fail: fallback_fail,
+                items: Arc::default(),
+            };
+            let logs = LogCapture::default();
+            persist_response(&repo, &publisher, &res)
+                .with_subscriber(logs.subscriber())
+                .await;
+            let items = publisher.items.lock().unwrap();
+            assert_eq!(items.len(), usize::from(db_fail));
+            if db_fail {
+                let PubSubItem::CreatingRes(item) = &items[0] else {
+                    panic!("expected CreatingRes")
+                };
+                assert_eq!(item.id, res.id);
+                assert_eq!(item.body, res.body);
+            }
+            let output = logs.contents();
+            assert_eq!(
+                output.contains("failed to create response in database"),
+                db_fail
+            );
+            assert_eq!(
+                output.contains("failed to publish response persistence fallback"),
+                fallback_fail
+            );
+            if db_fail {
+                assert!(output.contains(&res.id.to_string()));
+            }
+            assert!(!output.contains(&res.body));
+            assert!(!output.contains(&res.ip_addr));
+        }
+    }
 }

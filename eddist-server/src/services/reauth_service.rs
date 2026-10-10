@@ -76,7 +76,7 @@ impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
                 }
             };
             clients_responses.push((
-                create_captcha_client(config, self.redis_conn.clone()),
+                create_captcha_client(config, self.redis_conn.clone())?,
                 (response, input.origin_ip.clone()),
                 config.provider.to_lowercase(),
             ));

@@ -12,6 +12,7 @@ use crate::{
         authed_token::AuthedToken,
         service::oidc_client_service::OidcClientService,
         user::{
+            User,
             user_login_state::UserLoginState,
             user_reg_state::{RegistrationSource, UserRegState},
         },
@@ -112,13 +113,7 @@ impl<
 > UserAuthzIdpCallbackService<I, U, B>
 {
     async fn bind_token(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
-        let tx = self.user_repo.begin().await?;
-        let tx = self
-            .user_repo
-            .bind_user_authed_token(user_id, token_id, tx)
-            .await?;
-        tx.commit().await?;
-        Ok(())
+        bind_token(&self.user_repo, user_id, token_id).await
     }
 
     async fn register_user_with_idp(
@@ -172,11 +167,7 @@ impl<
             .await?
         {
             // Already user is registered
-            self.bind_token(u.id, authed_token_uuid).await?;
-
-            if !u.enabled {
-                return Err(anyhow::anyhow!("user is disabled"));
-            }
+            bind_existing_user_token(&self.user_repo, &u, authed_token_uuid).await?;
 
             u.id
         } else {
@@ -325,6 +316,28 @@ impl<
             None => Err(anyhow::anyhow!("user not found")),
         }
     }
+}
+
+async fn bind_existing_user_token<U: UserRepository + TransactionRepository<MySql>>(
+    repo: &U,
+    user: &User,
+    token_id: Uuid,
+) -> anyhow::Result<()> {
+    if !user.enabled {
+        return Err(anyhow::anyhow!("user is disabled"));
+    }
+    bind_token(repo, user.id, token_id).await
+}
+
+async fn bind_token<U: UserRepository + TransactionRepository<MySql>>(
+    repo: &U,
+    user_id: Uuid,
+    token_id: Uuid,
+) -> anyhow::Result<()> {
+    let tx = repo.begin().await?;
+    let tx = repo.bind_user_authed_token(user_id, token_id, tx).await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 pub struct UserAuthzIdpCallbackServiceInput {
@@ -536,6 +549,32 @@ fn user_name_generator() -> String {
 mod probe_tests {
     use eddist_core::utils::to_hex;
     use sha3::Digest;
+
+    #[tokio::test]
+    async fn disabled_existing_user_is_rejected_before_opening_a_transaction() {
+        use super::*;
+        use crate::repositories::user_repository::UserRepositoryImpl;
+
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .connect_lazy("mysql://root@localhost/test")
+            .unwrap();
+        pool.close().await;
+        let repo = UserRepositoryImpl::new(pool);
+        let now = Utc::now().naive_utc();
+        let user = User {
+            id: Uuid::now_v7(),
+            user_name: "disabled".into(),
+            enabled: false,
+            idps: Vec::new(),
+            created_at: now,
+            updated_at: now,
+        };
+        let error = bind_existing_user_token(&repo, &user, Uuid::now_v7())
+            .await
+            .unwrap_err();
+        // Any attempt to begin a transaction would instead fail with PoolClosed.
+        assert_eq!(error.to_string(), "user is disabled");
+    }
 
     /// user_sid is a fresh Redis session key, not a persisted/compared value across
     /// restarts, so only the hex shape needs to stay stable, not the exact digits.

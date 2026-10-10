@@ -83,6 +83,32 @@ async fn reconnect_pubsub(redis_url: &str) -> anyhow::Result<redis::aio::PubSub>
     Ok(client.get_async_pubsub().await?)
 }
 
+fn parse_pubsub_item(payload: &str) -> Option<PubSubItem> {
+    let item = match serde_json::from_str::<PubSubItem>(payload) {
+        Ok(item) => item,
+        Err(e) => {
+            // Serde errors may quote input values, so log only their category/location.
+            error!(
+                error_category = ?e.classify(),
+                line = e.line(),
+                column = e.column(),
+                "Failed to parse pubsub item"
+            );
+            return None;
+        }
+    };
+    match &item {
+        PubSubItem::CreatingRes(res) => info!(
+            kind = "CreatingRes",
+            res_id = %res.id,
+            thread_id = %res.thread_id,
+            "received pubsub message"
+        ),
+        PubSubItem::Shutdown => info!(kind = "Shutdown", "received pubsub message"),
+    }
+    Some(item)
+}
+
 impl SubRepository for RedisSubRepository {
     async fn subscribe(&mut self) -> Result<(), anyhow::Error> {
         let mut error_count = 0u32;
@@ -200,17 +226,8 @@ impl RedisSubRepository {
                         }
                     };
 
-                    info!(payload = payload.as_str(), "received pubsub message");
-
-                    let item = match serde_json::from_str::<PubSubItem>(&payload) {
-                        Ok(i) => i,
-                        Err(e) => {
-                            error!(
-                                error = e.to_string().as_str(),
-                                "Failed to parse pubsub item"
-                            );
-                            continue;
-                        }
+                    let Some(item) = parse_pubsub_item(&payload) else {
+                        continue;
                     };
 
                     match item {
@@ -382,6 +399,60 @@ impl RedisSubRepository {
                 }
                 _ => {}
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eddist_core::{
+        domain::{client_info::ClientInfo, pubsub_repository::CreatingRes},
+        test_utils::LogCapture,
+    };
+
+    #[test]
+    fn received_payloads_and_parse_errors_do_not_log_sensitive_values() {
+        let res = CreatingRes {
+            id: Uuid::now_v7(),
+            created_at: chrono::Utc::now(),
+            body: "private-response-body".into(),
+            name: "private-name".into(),
+            mail: "private-mail-token".into(),
+            author_ch5id: "author".into(),
+            authed_token_id: Uuid::now_v7(),
+            ip_addr: "192.0.2.99".into(),
+            thread_id: Uuid::now_v7(),
+            board_id: Uuid::now_v7(),
+            client_info: ClientInfo::default(),
+            res_order: 1,
+            is_sage: false,
+            moderation_result: None,
+        };
+        let payload =
+            serde_json::to_string(&PubSubItem::CreatingRes(Box::new(res.clone()))).unwrap();
+        let capture = LogCapture::default();
+        tracing::subscriber::with_default(capture.subscriber(), || {
+            let Some(PubSubItem::CreatingRes(decoded)) = parse_pubsub_item(&payload) else {
+                panic!("expected CreatingRes")
+            };
+            assert_eq!(decoded.body, res.body);
+            assert_eq!(decoded.ip_addr, res.ip_addr);
+            // A serde error for an unknown variant can quote the variant value.
+            assert!(parse_pubsub_item(r#"{"private-response-body":"192.0.2.99"}"#).is_none());
+            assert!(parse_pubsub_item(r#"{"CreatingRes":{"id":"private-mail-token"}}"#).is_none());
+            assert!(matches!(
+                parse_pubsub_item(r#""Shutdown""#),
+                Some(PubSubItem::Shutdown)
+            ));
+        });
+        let output = capture.contents();
+        assert!(output.contains("CreatingRes"));
+        assert!(output.contains(&res.id.to_string()));
+        assert!(output.contains("Shutdown"));
+        assert!(output.contains("Failed to parse pubsub item"));
+        for sensitive in [res.body, res.name, res.mail, res.ip_addr] {
+            assert!(!output.contains(&sensitive));
         }
     }
 }

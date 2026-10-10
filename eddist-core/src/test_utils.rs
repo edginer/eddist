@@ -1,4 +1,7 @@
-use std::sync::{Mutex, MutexGuard};
+use std::{
+    io::Write,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 /// Held for the lifetime of every [`EnvGuard`], so tests that touch the process
 /// environment never overlap with each other.
@@ -74,5 +77,35 @@ mod tests {
             assert!(std::env::var("EDDIST_ENV_GUARD_ABSENT").is_err());
         }
         assert!(std::env::var("EDDIST_ENV_GUARD_PROBE").is_err());
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct LogCapture(Arc<Mutex<Vec<u8>>>);
+
+impl LogCapture {
+    pub fn contents(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+
+    pub fn subscriber(&self) -> impl tracing::Subscriber + Send + Sync + use<> {
+        let capture = self.clone();
+        tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(move || capture.clone())
+            .finish()
+    }
+}
+
+impl Write for LogCapture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }

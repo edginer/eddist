@@ -130,6 +130,10 @@ pub async fn post_auth_code(
     if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
         return new_authentication_closed_response();
     }
+    let Some(code) = form.get("auth-code").filter(|code| !code.trim().is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "認証コードを入力してください").into_response();
+    };
+    let code = code.clone();
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
@@ -145,7 +149,7 @@ pub async fn post_auth_code(
         .services
         .auth_with_code()
         .execute(AuthWithCodeServiceInput {
-            code: form["auth-code"].to_string(),
+            code,
             origin_ip: origin_ip.to_string(),
             user_agent: user_agent.to_string(),
             asn_num,
