@@ -8,7 +8,7 @@ use http::{HeaderName, HeaderValue};
 use redis::AsyncCommands;
 
 #[tokio::test]
-async fn r0_auth_code_missing_or_empty_is_bad_request() {
+async fn test_auth_code_missing_or_empty_is_bad_request() {
     let ctx = TestContext::new().await;
     for form in [
         std::collections::HashMap::new(),
@@ -21,7 +21,7 @@ async fn r0_auth_code_missing_or_empty_is_bad_request() {
 }
 
 #[tokio::test]
-async fn r0_dat_database_failure_does_not_increment_not_found_counter() {
+async fn test_dat_database_failure_does_not_increment_not_found_counter() {
     use eddist_core::redis_keys::not_found_access_count_key;
     let ctx = TestContext::new().await;
     let key = not_found_access_count_key("localhost");
@@ -35,21 +35,34 @@ async fn r0_dat_database_failure_does_not_increment_not_found_counter() {
 }
 
 #[tokio::test]
-async fn r0_dat_redis_failure_can_use_database_fallback() {
+async fn test_dat_redis_failure_falls_back_to_database() {
     let ctx = TestContext::new().await;
-    let board_id = create_test_board(&ctx.pool, "r0cache", "テスト板").await;
+    let board_id = create_test_board(&ctx.pool, "fallback", "テスト板").await;
     let (token_id, _) = create_test_authed_token(&ctx.pool, "127.0.0.1", "test-code").await;
     let thread_id = create_test_thread(&ctx.pool, board_id, 1234567890, "スレッド", token_id).await;
     create_test_response(&ctx.pool, board_id, thread_id, token_id, 1, "DB fallback").await;
     // A wrong-type key makes LRANGE fail while the database remains available.
     ctx.redis_conn
         .clone()
-        .set::<_, _, ()>(thread_cache_key("r0cache", 1234567890), "wrong-type")
+        .set::<_, _, ()>(thread_cache_key("fallback", 1234567890), "wrong-type")
         .await
         .unwrap();
-    let response = ctx.server.get("/r0cache/dat/1234567890.dat").await;
+    let response = ctx.server.get("/fallback/dat/1234567890.dat").await;
     assert_eq!(response.status_code(), 200);
     assert!(decode_sjis(response.as_bytes()).contains("DB fallback"));
+}
+
+#[tokio::test]
+async fn test_apps_load_settings_before_serving_and_do_not_share_them() {
+    let closed =
+        TestContext::with_server_settings(&[("bbs.close_new_authentication", "true")]).await;
+    let open = TestContext::new().await;
+    let empty_form = std::collections::HashMap::<&str, &str>::new();
+
+    let response = closed.server.post("/auth-code").form(&empty_form).await;
+    assert_eq!(response.status_code(), 503);
+    let response = open.server.post("/auth-code").form(&empty_form).await;
+    assert_eq!(response.status_code(), 400);
 }
 
 /// Test 1: GET thread list via HTTP

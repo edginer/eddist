@@ -1,16 +1,19 @@
 use eddist_core::domain::board::BoardInfo;
 use uuid::Uuid;
 
-use crate::{domain, repositories::bbs_repository::BbsRepository};
+use crate::{
+    domain::service::board_info_service::{self, BoardInfoCache},
+    repositories::bbs_repository::BbsRepository,
+};
 
 use super::AppService;
 
-#[derive(Debug, Clone)]
-pub struct BoardInfoService<T: BbsRepository>(T);
+#[derive(Clone)]
+pub struct BoardInfoService<T: BbsRepository>(T, BoardInfoCache);
 
 impl<T: BbsRepository> BoardInfoService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+    pub fn new(repo: T, cache: BoardInfoCache) -> Self {
+        Self(repo, cache)
     }
 }
 
@@ -22,7 +25,7 @@ impl<T: BbsRepository + Clone> AppService<BoardInfoServiceInput, BoardInfoServic
         &self,
         input: BoardInfoServiceInput,
     ) -> anyhow::Result<BoardInfoServiceOutput> {
-        let svc = domain::service::board_info_service::BoardInfoService::new(self.0.clone());
+        let svc = board_info_service::BoardInfoService::new(self.0.clone(), self.1.clone());
 
         let (board, board_info) = svc
             .get_board_info_by_key(&input.board_key)

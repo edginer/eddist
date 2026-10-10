@@ -1,20 +1,18 @@
-use std::env;
-
-use eddist_core::{domain::cap::calculate_cap_hash, simple_rate_limiter::RateLimiter};
+use eddist_core::domain::cap::calculate_cap_hash;
 use redis::aio::ConnectionManager;
-use tokio::sync::Mutex;
 
 use crate::{
+    config::TinkerSecret,
     domain::{
         authed_token::AuthedToken,
         res::{AuthorIdUninitialized, Res},
-        service::bbscgi_auth_service::USER_CREATION_RATE_LIMIT,
+        service::bbscgi_auth_service::UserCreationRateLimit,
     },
     error::BbsCgiError,
     repositories::bbs_repository::BbsRepository,
 };
 
-use super::server_settings_cache::{ServerSettingKey, get_server_setting_bool};
+use super::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot};
 use crate::domain::service::bbscgi_user_reg_temp_url_service::{
     UserRegTempUrlService, UserRegUrlKind,
 };
@@ -25,23 +23,19 @@ pub async fn check_userreg(
     body: &str,
     authed_token: &AuthedToken,
     redis_conn: ConnectionManager,
+    settings: &ServerSettingsSnapshot,
+    base_url: &str,
+    rate_limit: &UserCreationRateLimit,
 ) -> Result<Option<BbsCgiError>, BbsCgiError> {
-    if !get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await
-        || !body.starts_with("!userreg")
-    {
+    if !settings.is_enabled(ServerSettingKey::EnableIdpLinking) || !body.starts_with("!userreg") {
         return Ok(None);
     }
 
-    let rate_limiter = USER_CREATION_RATE_LIMIT
-        .get_or_init(|| Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60))));
-    {
-        let mut rate_limiter = rate_limiter.lock().await;
-        if !rate_limiter.check_and_add(&authed_token.token) {
-            return Ok(Some(BbsCgiError::TooManyUserCreationAttempt));
-        }
+    if !rate_limit.check_and_add(&authed_token.token).await {
+        return Ok(Some(BbsCgiError::TooManyUserCreationAttempt));
     }
 
-    let user_reg_url_svc = UserRegTempUrlService::new(redis_conn);
+    let user_reg_url_svc = UserRegTempUrlService::new(redis_conn, base_url);
     let err = match user_reg_url_svc
         .create_userreg_temp_url(authed_token)
         .await?
@@ -57,9 +51,10 @@ pub async fn resolve_cap_name(
     repo: &impl BbsRepository,
     res: &Res<AuthorIdUninitialized>,
     board_key: &str,
+    tinker_secret: &TinkerSecret,
 ) -> Result<Option<String>, BbsCgiError> {
     if let Some(cap) = res.cap() {
-        let hash = calculate_cap_hash(cap.get(), &env::var("TINKER_SECRET").unwrap());
+        let hash = calculate_cap_hash(cap.get(), tinker_secret.raw());
         Ok(repo
             .get_cap_by_board_key(&hash, board_key)
             .await?

@@ -1,38 +1,54 @@
-use std::{
-    sync::{Arc, OnceLock},
-    time::{Duration, Instant},
-};
-
 use eddist_core::domain::user_restriction::{RestrictionTarget, UserRestrictionRule};
-use tokio::sync::RwLock;
 
 use crate::repositories::user_restriction_repository::UserRestrictionRepository;
 
-use super::AppService;
+use super::{AppService, snapshot_cache::SnapshotCache};
 
-static GLOBAL_RESTRICTION_CACHE: OnceLock<Arc<RwLock<RestrictionCache>>> = OnceLock::new();
-
-fn get_global_cache() -> &'static Arc<RwLock<RestrictionCache>> {
-    GLOBAL_RESTRICTION_CACHE.get_or_init(|| Arc::new(RwLock::new(RestrictionCache::new())))
+#[derive(Debug, Clone)]
+pub struct UserRestrictionService {
+    cache: UserRestrictionCache,
 }
 
 #[derive(Debug, Clone)]
-pub struct UserRestrictionService<T: UserRestrictionRepository> {
-    repo: T,
+pub struct UserRestrictionCache(SnapshotCache<RestrictionRules>);
+
+#[derive(Debug, Default)]
+struct RestrictionRules(Vec<UserRestrictionRule>);
+
+impl RestrictionRules {
+    fn matching_rule(
+        &self,
+        ip: &str,
+        asn: u32,
+        user_agent: &str,
+        target: RestrictionTarget,
+    ) -> Option<UserRestrictionRule> {
+        self.0
+            .iter()
+            .find(|rule| rule.target.applies_to(target) && rule.matches(ip, asn, user_agent))
+            .cloned()
+    }
 }
 
-#[derive(Debug)]
-struct RestrictionCache {
-    rules: Vec<UserRestrictionRule>,
-    last_updated: Instant,
-}
+impl UserRestrictionCache {
+    pub async fn load(repo: &dyn UserRestrictionRepository) -> anyhow::Result<Self> {
+        let cache = Self(SnapshotCache::new(RestrictionRules::default()));
+        cache.refresh(repo).await?;
+        Ok(cache)
+    }
 
-impl RestrictionCache {
-    fn new() -> Self {
-        Self {
-            rules: Vec::new(),
-            last_updated: Instant::now(),
-        }
+    pub fn empty() -> Self {
+        Self(SnapshotCache::new(RestrictionRules::default()))
+    }
+
+    pub async fn refresh(&self, repo: &dyn UserRestrictionRepository) -> anyhow::Result<()> {
+        let rules = repo.get_all_active_rules().await?;
+        tracing::info!(
+            "User restriction cache refreshed with {} rules",
+            rules.len()
+        );
+        self.0.replace(RestrictionRules(rules));
+        Ok(())
     }
 
     fn matching_rule(
@@ -42,34 +58,13 @@ impl RestrictionCache {
         user_agent: &str,
         target: RestrictionTarget,
     ) -> Option<UserRestrictionRule> {
-        self.rules
-            .iter()
-            .find(|rule| rule.target.applies_to(target) && rule.matches(ip, asn, user_agent))
-            .cloned()
-    }
-
-    fn update_rules(&mut self, rules: Vec<UserRestrictionRule>) {
-        self.rules = rules;
-        self.last_updated = Instant::now();
+        self.0.load().matching_rule(ip, asn, user_agent, target)
     }
 }
 
-impl<T: UserRestrictionRepository + Clone> UserRestrictionService<T> {
-    pub fn new(repo: T) -> Self {
-        Self { repo }
-    }
-
-    /// Refresh the cache immediately, typically called by background tasks
-    pub async fn refresh_cache(&self) -> anyhow::Result<()> {
-        let rules = self.repo.get_all_active_rules().await?;
-        let global_cache = get_global_cache();
-        let mut cache = global_cache.write().await;
-        cache.update_rules(rules);
-        tracing::info!(
-            "User restriction cache refreshed with {} rules",
-            cache.rules.len()
-        );
-        Ok(())
+impl UserRestrictionService {
+    pub fn new(cache: UserRestrictionCache) -> Self {
+        Self { cache }
     }
 
     pub async fn is_restricted(
@@ -79,17 +74,12 @@ impl<T: UserRestrictionRepository + Clone> UserRestrictionService<T> {
         user_agent: &str,
         target: RestrictionTarget,
     ) -> anyhow::Result<Option<UserRestrictionRule>> {
-        let global_cache = get_global_cache();
-        let cache = global_cache.read().await;
-        Ok(cache.matching_rule(ip, asn, user_agent, target))
+        Ok(self.cache.matching_rule(ip, asn, user_agent, target))
     }
 }
 
 #[async_trait::async_trait]
-impl<T: UserRestrictionRepository + Clone>
-    AppService<UserRestrictionCheckInput, UserRestrictionCheckOutput>
-    for UserRestrictionService<T>
-{
+impl AppService<UserRestrictionCheckInput, UserRestrictionCheckOutput> for UserRestrictionService {
     async fn execute(
         &self,
         input: UserRestrictionCheckInput,
@@ -113,28 +103,6 @@ pub struct UserRestrictionCheckInput {
 #[derive(Debug, Clone)]
 pub struct UserRestrictionCheckOutput {
     pub matching_rule: Option<UserRestrictionRule>,
-}
-
-/// Start a background task that periodically refreshes the user restriction cache
-pub fn start_cache_refresh_task<T: UserRestrictionRepository + Clone + Send + Sync + 'static>(
-    repo: T,
-    refresh_interval: Duration,
-) {
-    tokio::spawn(async move {
-        let service = UserRestrictionService::new(repo);
-        let mut interval = tokio::time::interval(refresh_interval);
-
-        loop {
-            interval.tick().await;
-            if let Err(e) = service.refresh_cache().await {
-                tracing::error!("Failed to refresh user restriction cache: {e}");
-            }
-        }
-    });
-
-    tracing::info!(
-        "Started user restriction cache refresh task with interval: {refresh_interval:?}",
-    );
 }
 
 #[cfg(test)]
@@ -162,8 +130,12 @@ mod tests {
         let mut expired = posting.clone();
         expired.target = RestrictionTarget::Both;
         expired.expires_at = Some(now - chrono::Duration::seconds(1));
-        let mut cache = RestrictionCache::new();
-        cache.update_rules(vec![expired, auth.clone(), posting.clone()]);
+        let cache = UserRestrictionCache::empty();
+        cache.0.replace(RestrictionRules(vec![
+            expired,
+            auth.clone(),
+            posting.clone(),
+        ]));
         assert_eq!(
             cache
                 .matching_rule("192.0.2.1", 1, "ua", RestrictionTarget::Authentication)
@@ -178,7 +150,7 @@ mod tests {
                 .id,
             posting.id
         );
-        cache.update_rules(vec![auth]);
+        cache.0.replace(RestrictionRules(vec![auth]));
         assert!(
             cache
                 .matching_rule("192.0.2.1", 1, "ua", RestrictionTarget::Posting)

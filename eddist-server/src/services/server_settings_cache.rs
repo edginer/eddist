@@ -1,63 +1,51 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, OnceLock},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc};
 
 pub use eddist_core::server_settings::ServerSettingKey;
-use sqlx::MySqlPool;
-use tokio::sync::RwLock;
 
-static GLOBAL_SERVER_SETTINGS_CACHE: OnceLock<Arc<RwLock<HashMap<String, String>>>> =
-    OnceLock::new();
+use crate::repositories::server_settings_repository::ServerSettingsRepository;
 
-fn get_global_cache() -> &'static Arc<RwLock<HashMap<String, String>>> {
-    GLOBAL_SERVER_SETTINGS_CACHE.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
-}
+use super::snapshot_cache::SnapshotCache;
 
-pub async fn get_server_setting_bool(key: ServerSettingKey) -> bool {
-    get_server_setting(key).await.is_some_and(|v| v == "true")
-}
+#[derive(Debug, Default, Clone)]
+pub struct ServerSettingsSnapshot(HashMap<String, String>);
 
-pub async fn get_server_setting(key: ServerSettingKey) -> Option<String> {
-    let cache = get_global_cache();
-    let map = cache.read().await;
-    map.get(key.as_str()).cloned()
-}
-
-pub async fn refresh_server_settings_cache(pool: &MySqlPool) -> anyhow::Result<()> {
-    let rows =
-        sqlx::query_as::<_, (String, String)>("SELECT setting_key, value FROM server_settings")
-            .fetch_all(pool)
-            .await?;
-
-    let cache = get_global_cache();
-    let mut map = cache.write().await;
-    map.clear();
-    for (key, value) in rows {
-        map.insert(key, value);
+impl ServerSettingsSnapshot {
+    pub fn new(values: HashMap<String, String>) -> Self {
+        Self(values)
     }
 
-    tracing::info!(
-        "Server settings cache refreshed with {} settings",
-        map.len()
-    );
-    Ok(())
+    pub fn get(&self, key: ServerSettingKey) -> Option<&str> {
+        self.0.get(key.as_str()).map(String::as_str)
+    }
+
+    pub fn is_enabled(&self, key: ServerSettingKey) -> bool {
+        self.get(key) == Some("true")
+    }
 }
 
-pub fn start_server_settings_refresh_task(pool: MySqlPool, refresh_interval: Duration) {
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(refresh_interval);
+#[derive(Debug, Clone)]
+pub struct ServerSettingsCache(SnapshotCache<ServerSettingsSnapshot>);
 
-        loop {
-            interval.tick().await;
-            if let Err(e) = refresh_server_settings_cache(&pool).await {
-                tracing::error!("Failed to refresh server settings cache: {e}");
-            }
-        }
-    });
+impl ServerSettingsCache {
+    pub async fn load(repo: &dyn ServerSettingsRepository) -> anyhow::Result<Self> {
+        Ok(Self::from_snapshot(repo.get_all().await?))
+    }
 
-    tracing::info!(
-        "Started server settings cache refresh task with interval: {refresh_interval:?}",
-    );
+    pub fn from_snapshot(snapshot: ServerSettingsSnapshot) -> Self {
+        Self(SnapshotCache::new(snapshot))
+    }
+
+    pub fn snapshot(&self) -> Arc<ServerSettingsSnapshot> {
+        self.0.load()
+    }
+
+    pub async fn refresh(&self, repo: &dyn ServerSettingsRepository) -> anyhow::Result<()> {
+        let snapshot = repo.get_all().await?;
+        tracing::info!(
+            "Server settings cache refreshed with {} settings",
+            snapshot.0.len()
+        );
+        self.0.replace(snapshot);
+        Ok(())
+    }
 }

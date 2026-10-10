@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
 use futures::future::join_all;
@@ -30,7 +30,7 @@ use uuid::Uuid;
 
 use super::{
     AppService,
-    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
 };
 
 const USER_REG_TEMP_URL_LEN: usize = 5;
@@ -264,7 +264,10 @@ impl<T: BbsRepository, E: CreationEventRepository>
         let rate_limit_token = Some(self.generate_rate_limit_token());
 
         // Generate a temp URL for optional IdP linking if enabled
-        let user_reg_url = if get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
+        let user_reg_url = if input
+            .settings
+            .is_enabled(ServerSettingKey::EnableIdpLinking)
+        {
             let mut redis_conn = self.redis_conn.clone();
             let temp_url_path = generate_random_string(USER_REG_TEMP_URL_LEN);
             redis_conn
@@ -299,6 +302,7 @@ pub struct AuthWithCodeServiceInput {
     pub captcha_like_configs: Vec<CaptchaProviderConfig>,
     pub responses: HashMap<String, String>,
     pub rate_limit_token: Option<String>,
+    pub settings: Arc<ServerSettingsSnapshot>,
 }
 
 pub struct AuthWithCodeServiceOutput {

@@ -1,5 +1,4 @@
 pub use axum;
-use base64::Engine;
 pub use chrono;
 pub use handlebars::Handlebars;
 pub use sqlx;
@@ -12,6 +11,7 @@ pub mod repositories {
     pub mod captcha_config_repository;
     pub mod idp_repository;
     pub mod notice_repository;
+    pub mod server_settings_repository;
     pub mod stats_repository;
     pub mod terms_repository;
     pub mod user_repository;
@@ -39,6 +39,8 @@ mod domain {
     pub(crate) mod user;
     pub(crate) mod utils;
 }
+pub mod config;
+pub mod context;
 mod error;
 pub mod middleware;
 pub mod services;
@@ -65,31 +67,19 @@ mod routes {
 pub mod app;
 
 pub use app::AppState;
-use uuid::Uuid;
 
-use crate::repositories::notice_repository::NoticeRepositoryImpl;
-use crate::services::captcha_config_cache::start_captcha_config_refresh_task;
-use crate::services::server_settings_cache::{
-    refresh_server_settings_cache, start_server_settings_refresh_task,
-};
-pub use crate::services::user_restriction_service::start_cache_refresh_task;
-pub use crate::template::load_template_engine;
-
-// Test app factory for integration tests
-pub fn create_test_app(
+pub async fn create_test_app(
     pool: sqlx::MySqlPool,
     redis_conn: redis::aio::ConnectionManager,
-) -> axum::Router {
-    use crate::middleware::not_found_rate_limit::NotFoundPenaltyCache;
-    use crate::repositories::{
-        bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
-        bbs_repository::BbsRepositoryImpl,
-        idp_repository::IdpRepositoryImpl,
-        user_repository::UserRepositoryImpl,
-        user_restriction_repository::UserRestrictionRepositoryImpl,
-    };
-    use crate::services::{AppServiceContainer, PubSubRepos};
+) -> anyhow::Result<axum::Router> {
+    create_test_app_with_config(pool, redis_conn, config::AppConfig::for_test()).await
+}
 
+pub async fn create_test_app_with_config(
+    pool: sqlx::MySqlPool,
+    redis_conn: redis::aio::ConnectionManager,
+    config: config::AppConfig,
+) -> anyhow::Result<axum::Router> {
     let s3_creds = aws_sdk_s3::config::Credentials::new("test", "test", None, None, "custom");
     let s3_config = aws_sdk_s3::Config::builder()
         .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
@@ -97,46 +87,18 @@ pub fn create_test_app(
         .region(aws_sdk_s3::config::Region::new("auto"))
         .endpoint_url("https://test.r2.cloudflarestorage.com")
         .build();
-    let s3_client = aws_sdk_s3::Client::from_conf(s3_config);
 
-    let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
-    let pub_repo = RedisPubRepository::new(redis_conn.clone());
-    let event_repo = RedisCreationEventRepository::new(redis_conn.clone());
-    let notice_repo = NoticeRepositoryImpl::new(pool.clone());
-    let terms_repo = crate::repositories::terms_repository::TermsRepositoryImpl::new(pool.clone());
-    let stats_repo = crate::repositories::stats_repository::StatsRepositoryImpl::new(pool.clone());
-
-    drop(refresh_server_settings_cache(&pool));
-    start_captcha_config_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
-    start_server_settings_refresh_task(pool.clone(), std::time::Duration::from_secs(300));
-
-    let app_state = AppState {
-        services: AppServiceContainer::new(
-            BbsRepositoryImpl::new(pool.clone()),
-            UserRepositoryImpl::new(pool.clone()),
-            IdpRepositoryImpl::new(pool.clone()),
-            user_restriction_repo,
-            redis_conn.clone(),
-            PubSubRepos {
-                pub_repo,
-                event_repo,
-            },
-            s3_client,
-            "test-bucket".to_string(),
-        ),
-        notice_repo,
-        terms_repo,
-        stats_repo,
-        template_engine: std::sync::Arc::new(load_template_engine()),
-        tinker_secret: base64::engine::general_purpose::STANDARD
-            .encode(Uuid::now_v7().as_bytes())
-            .to_string(),
-        redis_conn: redis_conn.clone(),
-        not_found_penalty_cache: NotFoundPenaltyCache::new(),
-    };
-
-    // Use the actual create_app from app module
-    app::create_app(app_state, redis_conn)
+    let app = app::build_app(
+        config,
+        app::AppDependencies {
+            pool,
+            redis_conn,
+            s3_client: aws_sdk_s3::Client::from_conf(s3_config),
+            s3_bucket_name: "test-bucket".to_string(),
+        },
+    )
+    .await?;
+    Ok(app.router)
 }
 
 // Simple test helper that doesn't require exposing private types

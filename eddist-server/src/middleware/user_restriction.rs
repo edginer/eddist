@@ -29,7 +29,7 @@ pub async fn user_restriction_middleware(
     let headers = request.headers();
     let (Some(ip), Some(asn), Some(ua)) = (
         get_origin_ip(headers),
-        get_asn_num(headers),
+        get_asn_num(headers, &state.ctx.config.asn_header_name),
         get_ua(headers),
     ) else {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();

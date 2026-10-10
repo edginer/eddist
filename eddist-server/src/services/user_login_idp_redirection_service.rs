@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use redis::{AsyncCommands, aio::ConnectionManager};
 use uuid::Uuid;
 
 use crate::{
+    config::AppConfig,
     domain::{
         service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
     },
@@ -12,11 +15,11 @@ use eddist_core::redis_keys::user_login_oauth2_authreq_key;
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserLoginIdpRedirectionService<I: IdpRepository>(I, ConnectionManager);
+pub struct UserLoginIdpRedirectionService<I: IdpRepository>(I, ConnectionManager, Arc<AppConfig>);
 
 impl<I: IdpRepository> UserLoginIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, redis_conn: ConnectionManager) -> Self {
-        Self(idp_repo, redis_conn)
+    pub fn new(idp_repo: I, redis_conn: ConnectionManager, config: Arc<AppConfig>) -> Self {
+        Self(idp_repo, redis_conn, config)
     }
 }
 
@@ -31,7 +34,7 @@ impl<I: IdpRepository + Clone>
     ) -> anyhow::Result<UserLoginIdpRedirectionServiceOutput> {
         let mut redis_conn = self.1.clone();
 
-        let idp_clients_svc = OidcClientService::new(self.0.clone());
+        let idp_clients_svc = OidcClientService::new(self.0.clone(), self.2.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (_, idp_client) = idp_clients

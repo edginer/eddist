@@ -12,17 +12,14 @@ use serde_json::json;
 use crate::{
     AppState,
     error::BbsPostAuthWithCodeError,
-    services::{
-        AppService, captcha_config_cache::get_cached_captcha_configs_for_reauth,
-        reauth_service::ReAuthServiceInput,
-    },
+    services::{AppService, reauth_service::ReAuthServiceInput},
     utils::get_origin_ip,
 };
 
 use super::auth_code::build_template_variables;
 
 pub async fn get_re_auth(State(state): State<AppState>) -> impl IntoResponse {
-    let captcha_configs = get_cached_captcha_configs_for_reauth().await;
+    let captcha_configs = state.ctx.captcha_configs.for_reauth();
     let template_vars = build_template_variables(&captcha_configs);
 
     let html = state
@@ -41,7 +38,7 @@ pub async fn post_re_auth(
     State(state): State<AppState>,
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let captcha_configs = get_cached_captcha_configs_for_reauth().await;
+    let captcha_configs = state.ctx.captcha_configs.for_reauth();
     let temp_key = form.get("temp_key").cloned().unwrap_or_default();
     let Some(origin_ip) = get_origin_ip(&headers) else {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();

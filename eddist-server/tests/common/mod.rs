@@ -17,9 +17,12 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new() -> Self {
-        unsafe { std::env::set_var("BASE_URL", "http://localhost:8000") };
+        Self::with_server_settings(&[]).await
+    }
+
+    /// Settings are written before the app is built, so they are part of its initial load.
+    pub async fn with_server_settings(settings: &[(&str, &str)]) -> Self {
         unsafe { std::env::set_var("RUST_ENV", "prod") };
-        unsafe { std::env::set_var("DISABLE_METRICS", "true") };
 
         let mysql_container = Mysql::default()
             .with_name("mysql")
@@ -60,6 +63,18 @@ impl TestContext {
             .await
             .expect("Failed to run migrations");
 
+        for (key, value) in settings {
+            sqlx::query(
+                "INSERT INTO server_settings (id, setting_key, value, created_at, updated_at)
+                 VALUES (UUID_TO_BIN(UUID()), ?, ?, NOW(3), NOW(3))",
+            )
+            .bind(key)
+            .bind(value)
+            .execute(&pool)
+            .await
+            .expect("Failed to insert server setting");
+        }
+
         println!("MySQL is ready.");
 
         let redis_container = Redis::default()
@@ -85,7 +100,9 @@ impl TestContext {
 
         println!("Redis is ready.");
 
-        let app = eddist::create_test_app(pool.clone(), redis_conn.clone());
+        let app = eddist::create_test_app(pool.clone(), redis_conn.clone())
+            .await
+            .expect("Failed to build test app");
         let mut server = TestServer::new(app);
         server.add_header("CF-Connecting-IP", "localhost");
         server.add_header("X-ASN-Num", "1");

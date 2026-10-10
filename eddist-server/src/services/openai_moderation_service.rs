@@ -3,11 +3,11 @@ use metrics::counter;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use super::server_settings_cache::{ServerSettingKey, get_server_setting};
+use super::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot};
 
-pub async fn moderate(text: &str) -> Option<ModerationResult> {
-    let encrypted_key = get_server_setting(ServerSettingKey::AiOpenAiApiKey).await?;
-    let api_key = match symmetric::decrypt(&encrypted_key) {
+pub async fn moderate(settings: &ServerSettingsSnapshot, text: &str) -> Option<ModerationResult> {
+    let encrypted_key = settings.get(ServerSettingKey::AiOpenAiApiKey)?;
+    let api_key = match symmetric::decrypt(encrypted_key) {
         Ok(k) => k,
         Err(e) => {
             error!(error = %e, "Failed to decrypt OpenAI API key; skipping moderation");
