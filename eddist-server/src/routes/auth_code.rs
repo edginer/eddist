@@ -20,8 +20,7 @@ use crate::{
         AppService,
         auth_with_code_service::{AuthWithCodeServiceInput, AuthWithCodeServiceOutput},
         bind_token_to_user_service::BindTokenToUserServiceInput,
-        captcha_config_cache::get_cached_captcha_configs_for_auth_code,
-        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+        server_settings_cache::ServerSettingKey,
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
 };
@@ -103,10 +102,15 @@ fn new_authentication_closed_response() -> Response {
 
 // NOTE: this system will be changed in the future
 pub async fn get_auth_code(State(state): State<AppState>) -> impl IntoResponse {
-    if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+    if state
+        .ctx
+        .server_settings
+        .snapshot()
+        .is_enabled(ServerSettingKey::CloseNewAuthentication)
+    {
         return new_authentication_closed_response();
     }
-    let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
+    let captcha_configs = state.ctx.captcha_configs.for_auth_code();
     let template_vars = build_template_variables(&captcha_configs);
 
     let html = state
@@ -127,7 +131,8 @@ pub async fn post_auth_code(
     State(state): State<AppState>,
     Form(form): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+    let settings = state.ctx.server_settings.snapshot();
+    if settings.is_enabled(ServerSettingKey::CloseNewAuthentication) {
         return new_authentication_closed_response();
     }
     let Some(code) = form.get("auth-code").filter(|code| !code.trim().is_empty()) else {
@@ -137,11 +142,11 @@ pub async fn post_auth_code(
     let rate_limit_token = jar
         .get("auth_rate_limit")
         .map(|cookie| cookie.value().to_string());
-    let captcha_configs = get_cached_captcha_configs_for_auth_code().await;
+    let captcha_configs = state.ctx.captcha_configs.for_auth_code();
     let (Some(origin_ip), Some(user_agent), Some(asn_num)) = (
         get_origin_ip(&headers),
         get_ua(&headers),
-        get_asn_num(&headers),
+        get_asn_num(&headers, &state.ctx.config.asn_header_name),
     ) else {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();
     };
@@ -156,6 +161,7 @@ pub async fn post_auth_code(
             captcha_like_configs: captcha_configs,
             responses: form,
             rate_limit_token,
+            settings,
         })
         .await
     {

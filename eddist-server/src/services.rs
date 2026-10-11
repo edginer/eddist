@@ -1,5 +1,4 @@
 use auth_with_code_service::AuthWithCodeService;
-use aws_sdk_s3::Client;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
 use edge_token_validation_service::EdgeTokenValidationService;
@@ -22,13 +21,13 @@ use user_reg_temp_url_service::UserRegTempUrlService;
 use user_restriction_service::UserRestrictionService;
 
 use crate::{
+    context::AppContext,
     error::BbsCgiError,
     repositories::{
         bbs_pubsub_repository::{CreationEventRepository, PubRepository},
         bbs_repository::BbsRepository,
         idp_repository::IdpRepository,
         user_repository::UserRepository,
-        user_restriction_repository::UserRestrictionRepository,
     },
 };
 
@@ -50,6 +49,7 @@ pub(crate) mod openai_moderation_service;
 pub(crate) mod reauth_service;
 pub(crate) mod res_creation_service;
 pub mod server_settings_cache;
+pub(crate) mod snapshot_cache;
 pub mod stats_counter;
 pub(crate) mod thread_creation_service;
 pub(crate) mod thread_list_service;
@@ -82,7 +82,6 @@ pub struct AppServiceContainer<
     U: UserRepository + 'static,
     I: IdpRepository + 'static,
     P: PubRepository,
-    R: UserRestrictionRepository + 'static,
     E: CreationEventRepository + 'static,
 > {
     auth_with_code: AuthWithCodeService<B, E>,
@@ -104,7 +103,7 @@ pub struct AppServiceContainer<
     user_login_page: UserLoginPageService<U, I>,
     user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
     user_logout: UserLogoutService,
-    user_restriction: UserRestrictionService<R>,
+    user_restriction: UserRestrictionService,
     bind_token_to_user: BindTokenToUserService<U>,
 }
 
@@ -113,19 +112,17 @@ impl<
     U: UserRepository + Clone,
     I: IdpRepository + Clone,
     P: PubRepository,
-    R: UserRestrictionRepository + Clone,
     E: CreationEventRepository + Clone,
-> AppServiceContainer<B, U, I, P, R, E>
+> AppServiceContainer<B, U, I, P, E>
 {
-    pub fn new(
+    pub(crate) fn new(
         bbs_repo: B,
         user_repo: U,
         idp_repo: I,
-        user_restriction_repo: R,
         redis_conn: ConnectionManager,
         pubsub: PubSubRepos<P, E>,
-        client: Client,
-        bucket_name: String,
+        kako_thread_retrieval: KakoThreadRetrievalService,
+        ctx: &AppContext,
     ) -> Self {
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
@@ -134,7 +131,7 @@ impl<
                 pubsub.event_repo.clone(),
             ),
             reauth: ReAuthService::new(bbs_repo.clone(), redis_conn.clone()),
-            board_info: BoardInfoService::new(bbs_repo.clone()),
+            board_info: BoardInfoService::new(bbs_repo.clone(), ctx.board_info.clone()),
             edge_token_validation: EdgeTokenValidationService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
@@ -143,17 +140,19 @@ impl<
                 redis_conn.clone(),
                 pubsub.pub_repo.clone(),
                 pubsub.event_repo.clone(),
+                ctx.clone(),
             ),
             thread_creation: ThreadCreationService::new(
                 bbs_repo.clone(),
                 user_repo.clone(),
                 redis_conn.clone(),
                 pubsub.event_repo.clone(),
+                ctx.clone(),
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
             thread_retrieval: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
-            kako_thread_retrieval: KakoThreadRetrievalService::new(client, bucket_name),
+            kako_thread_retrieval,
 
             user_reg_temp_url: UserRegTempUrlService::new(
                 idp_repo.clone(),
@@ -164,12 +163,14 @@ impl<
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
                 idp_repo.clone(),
                 redis_conn.clone(),
+                ctx.config.clone(),
             ),
             user_authz_idp_callback: UserAuthzIdpCallbackService::new(
                 idp_repo.clone(),
                 user_repo.clone(),
                 bbs_repo,
                 redis_conn.clone(),
+                ctx.config.clone(),
             ),
             user_page: UserPageService::new(user_repo.clone(), redis_conn.clone()),
             user_login_page: UserLoginPageService::new(
@@ -180,9 +181,10 @@ impl<
             user_login_idp_redirection: UserLoginIdpRedirectionService::new(
                 idp_repo,
                 redis_conn.clone(),
+                ctx.config.clone(),
             ),
             user_logout: UserLogoutService::new(redis_conn.clone()),
-            user_restriction: UserRestrictionService::new(user_restriction_repo),
+            user_restriction: UserRestrictionService::new(ctx.user_restrictions.clone()),
             bind_token_to_user: BindTokenToUserService::new(user_repo, redis_conn),
         }
     }
@@ -193,9 +195,8 @@ impl<
     U: UserRepository + 'static,
     I: IdpRepository + 'static,
     P: PubRepository,
-    R: UserRestrictionRepository + 'static,
     E: CreationEventRepository + 'static,
-> AppServiceContainer<B, U, I, P, R, E>
+> AppServiceContainer<B, U, I, P, E>
 {
     pub fn auth_with_code(&self) -> &AuthWithCodeService<B, E> {
         &self.auth_with_code
@@ -269,7 +270,7 @@ impl<
         &self.user_login_idp_redirection
     }
 
-    pub fn user_restriction(&self) -> &UserRestrictionService<R> {
+    pub fn user_restriction(&self) -> &UserRestrictionService {
         &self.user_restriction
     }
 

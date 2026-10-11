@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use anyhow::anyhow;
 use chrono::Utc;
@@ -17,6 +17,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
+    context::AppContext,
     domain::{
         ng_word::NgWordRestrictable,
         res::Res,
@@ -43,7 +44,7 @@ use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
     BbsCgiService, openai_moderation_service,
-    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
     validation::{check_userreg, resolve_cap_name},
 };
 
@@ -53,7 +54,7 @@ pub struct ResCreationService<
     U: UserRepository,
     P: PubRepository,
     E: CreationEventRepository,
->(T, U, ConnectionManager, P, E);
+>(T, U, ConnectionManager, P, E, AppContext);
 
 impl<T: BbsRepository, U: UserRepository, P: PubRepository, E: CreationEventRepository>
     ResCreationService<T, U, P, E>
@@ -64,8 +65,9 @@ impl<T: BbsRepository, U: UserRepository, P: PubRepository, E: CreationEventRepo
         redis_conn: ConnectionManager,
         pub_repo: P,
         event_repo: E,
+        ctx: AppContext,
     ) -> Self {
-        Self(repo, user_repo, redis_conn, pub_repo, event_repo)
+        Self(repo, user_repo, redis_conn, pub_repo, event_repo, ctx)
     }
 }
 
@@ -87,7 +89,7 @@ impl<
         let pub_repo = self.3.clone();
 
         let res_id = Uuid::now_v7();
-        let board_info_svc = BoardInfoService::new(self.0.clone());
+        let board_info_svc = BoardInfoService::new(self.0.clone(), self.5.board_info.clone());
         let (board, board_info) = board_info_svc
             .get_board_info_by_key(&input.board_key)
             .await?
@@ -125,7 +127,11 @@ impl<
         };
 
         res_core.validate_content_length(&board_info)?;
-        client_info.validate_client_info(&board_info, false)?;
+        client_info.validate_client_info(
+            &board_info,
+            false,
+            self.5.config.restrict_thread_creation_on_no_tinker,
+        )?;
 
         let metadent_type = board_info
             .force_metadent_type
@@ -143,8 +149,13 @@ impl<
             false,
         );
 
-        let auth_service =
-            BbsCgiAuthService::new(self.0.clone(), redis_conn.clone(), self.4.clone());
+        let auth_service = BbsCgiAuthService::new(
+            self.0.clone(),
+            redis_conn.clone(),
+            self.4.clone(),
+            self.5.config.clone(),
+            self.5.user_creation_rate_limit.clone(),
+        );
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
@@ -152,7 +163,7 @@ impl<
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
-                input.require_user_registration,
+                &input.settings,
             )
             .await?;
 
@@ -166,11 +177,26 @@ impl<
             )
             .await?;
 
-        if let Some(err) = check_userreg(&input.body, &authed_token, redis_conn.clone()).await? {
+        if let Some(err) = check_userreg(
+            &input.body,
+            &authed_token,
+            redis_conn.clone(),
+            &input.settings,
+            &self.5.config.base_url,
+            &self.5.user_creation_rate_limit,
+        )
+        .await?
+        {
             return Err(err);
         }
 
-        let cap_name = resolve_cap_name(&self.0, &res, &input.board_key).await?;
+        let cap_name = resolve_cap_name(
+            &self.0,
+            &res,
+            &input.board_key,
+            &self.5.config.tinker_secret,
+        )
+        .await?;
         let mut res = res.set_author_id(&authed_token, cap_name);
 
         // Restrict the image posting below internal_level 2
@@ -287,17 +313,18 @@ impl<
         };
 
         let event_repo = self.4.clone();
+        let settings = input.settings.clone();
 
         tokio::spawn(async move {
             persist_response(&bbs_repo, &pub_repo, &cres).await;
 
             if is_res_pub_enabled() {
-                let moderation_result =
-                    if get_server_setting_bool(ServerSettingKey::AiModerationOnRes).await {
-                        openai_moderation_service::moderate(&cres.body).await
-                    } else {
-                        None
-                    };
+                let moderation_result = if settings.is_enabled(ServerSettingKey::AiModerationOnRes)
+                {
+                    openai_moderation_service::moderate(&settings, &cres.body).await
+                } else {
+                    None
+                };
                 let mut cres = cres;
                 cres.moderation_result = moderation_result;
                 let _ = event_repo.publish_res_created(cres).await;
@@ -369,7 +396,7 @@ pub struct ResCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
-    pub require_user_registration: bool,
+    pub settings: Arc<ServerSettingsSnapshot>,
 }
 
 pub struct ResCreationServiceOutput {

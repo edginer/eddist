@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use redis::{AsyncCommands, aio::ConnectionManager};
 
 use crate::{
+    config::AppConfig,
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
     repositories::idp_repository::IdpRepository,
 };
@@ -12,13 +15,15 @@ use super::AppService;
 pub struct UserRegIdpRedirectionService<I: IdpRepository> {
     idp_repo: I,
     redis_conn: ConnectionManager,
+    config: Arc<AppConfig>,
 }
 
 impl<I: IdpRepository + Clone> UserRegIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, redis_conn: ConnectionManager) -> Self {
+    pub fn new(idp_repo: I, redis_conn: ConnectionManager, config: Arc<AppConfig>) -> Self {
         Self {
             idp_repo,
             redis_conn,
+            config,
         }
     }
 }
@@ -34,7 +39,7 @@ impl<I: IdpRepository + Clone>
     ) -> anyhow::Result<UserRegIdpRedirectionServiceOutput> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (_, idp_client) = idp_clients

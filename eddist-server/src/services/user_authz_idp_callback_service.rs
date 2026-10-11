@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::Utc;
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
@@ -8,6 +10,7 @@ use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
+    config::AppConfig,
     domain::{
         authed_token::AuthedToken,
         service::oidc_client_service::OidcClientService,
@@ -37,17 +40,25 @@ pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository, B: B
     user_repo: U,
     bbs_repo: B,
     redis_conn: ConnectionManager,
+    config: Arc<AppConfig>,
 }
 
 impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
     UserAuthzIdpCallbackService<I, U, B>
 {
-    pub fn new(idp_repo: I, user_repo: U, bbs_repo: B, redis_conn: ConnectionManager) -> Self {
+    pub fn new(
+        idp_repo: I,
+        user_repo: U,
+        bbs_repo: B,
+        redis_conn: ConnectionManager,
+        config: Arc<AppConfig>,
+    ) -> Self {
         Self {
             idp_repo,
             user_repo,
             bbs_repo,
             redis_conn,
+            config,
         }
     }
 }
@@ -138,7 +149,7 @@ impl<
             ));
         }
 
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients
@@ -232,7 +243,7 @@ impl<
     ) -> anyhow::Result<(String, Option<String>)> {
         let mut redis_conn = self.redis_conn.clone();
 
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone());
+        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
         let (idp, idp_client) = idp_clients

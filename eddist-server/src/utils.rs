@@ -1,10 +1,8 @@
-use std::env;
-
 use ::redis::AsyncCommands as _;
 use base64::Engine;
 use eddist_core::redis_keys::csrf_key;
 use eddist_core::{domain::tinker::Tinker, utils::is_prod};
-use http::HeaderMap;
+use http::{HeaderMap, HeaderName};
 use sqlx::{Database, Transaction};
 use uuid::Uuid;
 
@@ -35,9 +33,7 @@ pub fn get_ua(headers: &HeaderMap) -> Option<&str> {
 
 /// Returns the client ASN, or `None` in production when no valid CDN-provided
 /// header is present. In non-prod, a missing/invalid header falls back to `0`.
-pub fn get_asn_num(headers: &HeaderMap) -> Option<u32> {
-    let header_name = env::var("ASN_NUMBER_HEADER_NAME").unwrap_or("X-ASN-Num".to_string());
-
+pub fn get_asn_num(headers: &HeaderMap, header_name: &HeaderName) -> Option<u32> {
     let asn = headers
         .get(header_name)
         .and_then(|x| x.to_str().ok())
@@ -50,24 +46,16 @@ pub fn get_asn_num(headers: &HeaderMap) -> Option<u32> {
     }
 }
 
-pub fn get_tinker(tinker: &str, secret: &str) -> Option<Tinker> {
+pub fn get_tinker(tinker: &str, key: &jsonwebtoken::DecodingKey) -> Option<Tinker> {
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
     validation.validate_exp = false;
     validation.validate_nbf = false;
     validation.validate_aud = false;
     validation.required_spec_claims.clear();
 
-    let secret_bytes = base64::engine::general_purpose::STANDARD
-        .decode(secret.trim())
-        .ok()?;
-
-    let tinker = jsonwebtoken::decode::<Tinker>(
-        tinker,
-        &jsonwebtoken::DecodingKey::from_secret(&secret_bytes),
-        &validation,
-    )
-    .ok()?
-    .claims;
+    let tinker = jsonwebtoken::decode::<Tinker>(tinker, key, &validation)
+        .ok()?
+        .claims;
 
     // Legacy cookies pre-date the internal_level field; promote to level so restrictions are unchanged.
     let level = tinker.level();
@@ -200,7 +188,10 @@ mod tests {
     #[test]
     fn test_get_asn_num_missing_fallback() {
         let headers = HeaderMap::new();
-        assert_eq!(get_asn_num(&headers), Some(0));
+        assert_eq!(
+            get_asn_num(&headers, &HeaderName::from_static("x-asn-num")),
+            Some(0)
+        );
     }
 
     #[test]
@@ -208,7 +199,8 @@ mod tests {
         let secret = "cHJvYmUtdGlua2VyLXNlY3JldC0zMi1ieXRlcyEh";
         let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdXRoZWRfdG9rZW4iOiJhdXRoZWQtdG9rZW4tYWJjIiwid3JvdGVfY291bnQiOjMsImNyZWF0ZWRfdGhyZWFkX2NvdW50IjoxLCJsZXZlbCI6MiwiaWx2bCI6MiwibGFzdF9sZXZlbF91cF9hdCI6MTcwMDAwMDAwMCwibGFzdF93cm90ZV9hdCI6MTcwMDAwMDUwMCwibGFzdF9jcmVhdGVkX3RocmVhZF9hdCI6bnVsbH0.PmpA-TzAgUH0bxUXpMTcOlp6c6D_tjnl_WoJRO1sqUA";
 
-        let tinker = get_tinker(token, secret).expect("token should decode");
+        let secret = crate::config::TinkerSecret::new(secret.to_string()).unwrap();
+        let tinker = get_tinker(token, secret.decoding_key()).expect("token should decode");
         assert_eq!(tinker.level(), 2);
     }
 }

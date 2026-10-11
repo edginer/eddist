@@ -7,7 +7,6 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 use http::HeaderMap;
-use jsonwebtoken::EncodingKey;
 
 use crate::{
     AppState,
@@ -16,8 +15,6 @@ use crate::{
         AppService, BbsCgiService,
         bind_token_to_user_service::BindTokenToUserServiceInput,
         res_creation_service::{ResCreationServiceInput, ResCreationServiceOutput},
-        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
-        stats_counter::{increment_board_response_delta, increment_board_thread_delta},
         thread_creation_service::{ThreadCreationServiceInput, ThreadCreationServiceOutput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType, shift_jis_url_encodeded_body_to_vec},
@@ -48,7 +45,7 @@ pub async fn post_bbs_cgi(
     let (Some(origin_ip), Some(ua), Some(asn_num)) = (
         get_origin_ip(&headers),
         get_ua(&headers),
-        get_asn_num(&headers),
+        get_asn_num(&headers, &state.ctx.config.asn_header_name),
     ) else {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();
     };
@@ -56,7 +53,10 @@ pub async fn post_bbs_cgi(
     // that is present yet fails to decode is a malformed request - reject it rather
     // than silently treating the client as if it had no tinker.
     let tinker = match jar.get("tinker-token") {
-        Some(cookie) => match get_tinker(cookie.value(), state.tinker_secret()) {
+        Some(cookie) => match get_tinker(
+            cookie.value(),
+            state.ctx.config.tinker_secret.decoding_key(),
+        ) {
             Some(tinker) => Some(tinker),
             None => return (StatusCode::BAD_REQUEST, "invalid tinker-token").into_response(),
         },
@@ -110,8 +110,7 @@ pub async fn post_bbs_cgi(
         resp
     }
 
-    let require_user_registration =
-        get_server_setting_bool(ServerSettingKey::RequireIdpLinking).await;
+    let settings = state.ctx.server_settings.snapshot();
 
     let (tinker, res_order, authed_token_id, is_authed_token_bound) = if is_thread {
         let Some(title) = form.get("subject").map(|x| x.to_string()) else {
@@ -131,7 +130,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
-                require_user_registration,
+                settings: settings.clone(),
             })
             .await
         {
@@ -140,7 +139,7 @@ pub async fn post_bbs_cgi(
                 authed_token_id,
                 is_authed_token_bound,
             }) => {
-                increment_board_thread_delta(&board_key);
+                state.ctx.stats.increment_board_thread_delta(&board_key);
                 (tinker, authed_token_id, is_authed_token_bound)
             }
             Err(e) => {
@@ -169,7 +168,7 @@ pub async fn post_bbs_cgi(
                 ip_addr: origin_ip.to_string(),
                 user_agent: ua.to_string(),
                 asn_num,
-                require_user_registration,
+                settings: settings.clone(),
             })
             .await
         {
@@ -179,7 +178,7 @@ pub async fn post_bbs_cgi(
                 authed_token_id,
                 is_authed_token_bound,
             }) => {
-                increment_board_response_delta(&board_key);
+                state.ctx.stats.increment_board_response_delta(&board_key);
                 (tinker, res_order, authed_token_id, is_authed_token_bound)
             }
             Err(e) => {
@@ -216,7 +215,7 @@ pub async fn post_bbs_cgi(
         jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
             &tinker,
-            &EncodingKey::from_base64_secret(state.tinker_secret()).unwrap(),
+            state.ctx.config.tinker_secret.encoding_key(),
         )
         .unwrap(),
         time::Duration::days(365),

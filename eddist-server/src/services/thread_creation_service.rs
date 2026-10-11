@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use chrono::Utc;
 use eddist_core::{
@@ -10,6 +10,7 @@ use redis::{Cmd, aio::ConnectionManager};
 use uuid::Uuid;
 
 use crate::{
+    context::AppContext,
     domain::{
         ng_word::NgWordRestrictable,
         res::Res,
@@ -36,7 +37,7 @@ use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
     BbsCgiService, openai_moderation_service,
-    server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
     validation::{check_userreg, resolve_cap_name},
 };
 
@@ -46,13 +47,20 @@ pub struct ThreadCreationService<T: BbsRepository, U: UserRepository, E: Creatio
     U,
     ConnectionManager,
     E,
+    AppContext,
 );
 
 impl<T: BbsRepository, U: UserRepository, E: CreationEventRepository>
     ThreadCreationService<T, U, E>
 {
-    pub fn new(repo: T, user_repo: U, redis_conn: ConnectionManager, event_repo: E) -> Self {
-        Self(repo, user_repo, redis_conn, event_repo)
+    pub fn new(
+        repo: T,
+        user_repo: U,
+        redis_conn: ConnectionManager,
+        event_repo: E,
+        ctx: AppContext,
+    ) -> Self {
+        Self(repo, user_repo, redis_conn, event_repo, ctx)
     }
 }
 
@@ -69,7 +77,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         let bbs_repo = self.0.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
-        let board_info_svc = BoardInfoService::new(self.0.clone());
+        let board_info_svc = BoardInfoService::new(self.0.clone(), self.4.board_info.clone());
         let (board, board_info) = board_info_svc
             .get_board_info_by_key(&input.board_key)
             .await?
@@ -107,7 +115,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         };
 
         (&res_core, &input.title as &str).validate_content_length(&board_info)?;
-        client_info.validate_client_info(&board_info, true)?;
+        client_info.validate_client_info(
+            &board_info,
+            true,
+            self.4.config.restrict_thread_creation_on_no_tinker,
+        )?;
 
         let force_metadent = board_info
             .force_metadent_type
@@ -124,8 +136,13 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             force_metadent,
         );
 
-        let auth_service =
-            BbsCgiAuthService::new(self.0.clone(), redis_conn.clone(), self.3.clone());
+        let auth_service = BbsCgiAuthService::new(
+            self.0.clone(),
+            redis_conn.clone(),
+            self.3.clone(),
+            self.4.config.clone(),
+            self.4.user_creation_rate_limit.clone(),
+        );
         let authed_token = auth_service
             .check_validity(
                 res.authed_token().map(|x| x.as_str()),
@@ -133,7 +150,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 input.user_agent.clone(),
                 input.asn_num as i32,
                 created_at,
-                input.require_user_registration,
+                &input.settings,
             )
             .await?;
 
@@ -147,11 +164,26 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             )
             .await?;
 
-        if let Some(err) = check_userreg(&input.body, &authed_token, redis_conn.clone()).await? {
+        if let Some(err) = check_userreg(
+            &input.body,
+            &authed_token,
+            redis_conn.clone(),
+            &input.settings,
+            &self.4.config.base_url,
+            &self.4.user_creation_rate_limit,
+        )
+        .await?
+        {
             return Err(err);
         }
 
-        let cap_name = resolve_cap_name(&self.0, &res, &input.board_key).await?;
+        let cap_name = resolve_cap_name(
+            &self.0,
+            &res,
+            &input.board_key,
+            &self.4.config.tinker_secret,
+        )
+        .await?;
         let res = res.set_author_id(&authed_token, cap_name);
 
         let board_key = input.board_key.clone();
@@ -203,15 +235,16 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
 
         let db_result = bbs_repo.create_thread(creating_th).await;
         if db_result.is_ok() && is_thread_pub_enabled() {
+            let settings = input.settings.clone();
             tokio::spawn(async move {
-                let moderation_result =
-                    if get_server_setting_bool(ServerSettingKey::AiModerationOnThread).await {
-                        let text =
-                            format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
-                        openai_moderation_service::moderate(&text).await
-                    } else {
-                        None
-                    };
+                let moderation_result = if settings
+                    .is_enabled(ServerSettingKey::AiModerationOnThread)
+                {
+                    let text = format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
+                    openai_moderation_service::moderate(&settings, &text).await
+                } else {
+                    None
+                };
                 let mut creating_th_clone = creating_th_clone;
                 creating_th_clone.moderation_result = moderation_result;
                 let _ = event_repo.publish_thread_created(creating_th_clone).await;
@@ -296,7 +329,7 @@ pub struct ThreadCreationServiceInput {
     pub ip_addr: String,
     pub user_agent: String,
     pub asn_num: u32,
-    pub require_user_registration: bool,
+    pub settings: Arc<ServerSettingsSnapshot>,
 }
 
 pub struct ThreadCreationServiceOutput {

@@ -1,21 +1,22 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use eddist_core::symmetric;
 use openidconnect::{ClientId, ClientSecret, IssuerUrl, core::CoreProviderMetadata};
 
 use crate::{
-    domain::user::idp::Idp, external::oidc_client::OidcClient,
+    config::AppConfig, domain::user::idp::Idp, external::oidc_client::OidcClient,
     repositories::idp_repository::IdpRepository,
 };
 
 #[derive(Clone)]
 pub struct OidcClientService<T: IdpRepository> {
     idp_repo: T,
+    config: Arc<AppConfig>,
 }
 
 impl<T: IdpRepository + Clone> OidcClientService<T> {
-    pub fn new(idp_repo: T) -> Self {
-        Self { idp_repo }
+    pub fn new(idp_repo: T, config: Arc<AppConfig>) -> Self {
+        Self { idp_repo, config }
     }
 
     pub async fn get_idp_clients(&self) -> anyhow::Result<HashMap<String, (Idp, OidcClient)>> {
@@ -35,23 +36,16 @@ impl<T: IdpRepository + Clone> OidcClientService<T> {
             let idp_name = idp.idp_name.clone();
             let (client_id, client_secret) = (
                 ClientId::new(idp.client_id.clone()),
-                ClientSecret::new({
-                    std::env::var("CLIENT_SECRET_SYMMETRIC_ENCRYPTION")
-                        .map(|b| {
-                            let b = b.parse::<bool>().unwrap();
-                            if b {
-                                decrypt_client_secret(&idp.client_secret)
-                            } else {
-                                idp.client_secret.clone()
-                            }
-                        })
-                        .unwrap_or(idp.client_secret.clone())
+                ClientSecret::new(if self.config.client_secret_symmetric_encryption {
+                    decrypt_client_secret(&idp.client_secret)
+                } else {
+                    idp.client_secret.clone()
                 }),
             );
 
             let idp_value = (
                 idp,
-                OidcClient::new(client_id, client_secret, metadata).await,
+                OidcClient::new(client_id, client_secret, metadata, &self.config.base_url).await,
             );
             idps.insert(idp_name, idp_value);
         }

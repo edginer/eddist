@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
-    env,
-    sync::{OnceLock, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use eddist_core::{
@@ -37,17 +36,18 @@ impl AsCacheRef<BoardInfo> for BoardInfoLocalCacheItem {
     }
 }
 
-pub struct BoardInfoService<T: BbsRepository>(T);
+#[derive(Clone, Default)]
+pub struct BoardInfoCache(Arc<RwLock<HashMap<Uuid, BoardInfoLocalCacheItem>>>);
+
+pub struct BoardInfoService<T: BbsRepository>(T, BoardInfoCache);
 
 impl<T: BbsRepository + Clone> BoardInfoService<T> {
-    pub fn new(repo: T) -> Self {
-        Self(repo)
+    pub fn new(repo: T, cache: BoardInfoCache) -> Self {
+        Self(repo, cache)
     }
 
     pub async fn get_board_info_by_id(&self, board_id: Uuid) -> anyhow::Result<Option<BoardInfo>> {
-        static BOARD_INFO_LOCAL_CACHE: OnceLock<RwLock<HashMap<Uuid, BoardInfoLocalCacheItem>>> =
-            OnceLock::new();
-        let cache = BOARD_INFO_LOCAL_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+        let cache = &self.1.0;
 
         match cache.read() {
             Ok(cache) => {
@@ -179,6 +179,7 @@ pub trait BoardInfoClientInfoResRestrictable {
         &self,
         board_info: &BoardInfo,
         is_thread: bool,
+        restrict_thread_creation_on_no_tinker: bool,
     ) -> Result<(), BbsCgiError>;
 }
 
@@ -187,6 +188,7 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
         &self,
         board_info: &BoardInfo,
         is_thread: bool,
+        restrict_thread_creation_on_no_tinker: bool,
     ) -> Result<(), BbsCgiError> {
         if let Some(tinker) = &self.tinker {
             // Response creation span multiplier based on tinker internal_level
@@ -230,10 +232,7 @@ impl BoardInfoClientInfoResRestrictable for ClientInfo {
 
             Ok(())
         } else {
-            if is_thread
-                && env::var("RESTRICT_THREAD_CREATION_ON_NO_TINKER").unwrap_or("false".to_string())
-                    == "true"
-            {
+            if is_thread && restrict_thread_creation_on_no_tinker {
                 return Err(BbsCgiError::TmpCanNotCreateThread);
             }
             Ok(())

@@ -15,7 +15,7 @@ use crate::{
     AppState,
     services::{
         AppService,
-        server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+        server_settings_cache::ServerSettingKey,
         user_authz_idp_callback_service::{
             CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
         },
@@ -29,7 +29,7 @@ use crate::{
     utils::{get_asn_num, get_origin_ip, get_ua},
 };
 
-pub fn user_routes() -> Router<AppState> {
+pub fn user_routes(app_state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(get_user_page))
         .route("/register/{tempUrlPath}", get(get_user_register_temp_url))
@@ -44,9 +44,15 @@ pub fn user_routes() -> Router<AppState> {
         )
         .route("/logout", post(post_user_logout))
         .route("/auth/callback", get(get_user_authz_idp_callback))
-        .layer(axum::middleware::from_fn(
-            |req, next: axum::middleware::Next| async move {
-                if !get_server_setting_bool(ServerSettingKey::EnableIdpLinking).await {
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            |State(state): State<AppState>, req, next: axum::middleware::Next| async move {
+                if !state
+                    .ctx
+                    .server_settings
+                    .snapshot()
+                    .is_enabled(ServerSettingKey::EnableIdpLinking)
+                {
                     return Response::builder()
                         .status(404)
                         .body(Body::from("User registration is disabled"))
@@ -377,7 +383,7 @@ async fn get_user_authz_idp_callback(
     let (Some(ip_addr), Some(user_agent), Some(asn_num)) = (
         get_origin_ip(&headers),
         get_ua(&headers),
-        get_asn_num(&headers),
+        get_asn_num(&headers, &state.ctx.config.asn_header_name),
     ) else {
         return Response::builder()
             .status(403)

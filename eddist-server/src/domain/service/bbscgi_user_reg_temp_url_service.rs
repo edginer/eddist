@@ -9,14 +9,17 @@ use eddist_core::redis_keys::user_reg_temp_url_register_key;
 
 pub const USER_REG_TEMP_URL_LEN: usize = 5;
 
-#[derive(Clone)]
-pub struct UserRegTempUrlService {
+pub struct UserRegTempUrlService<'a> {
     redis_conn: ConnectionManager,
+    base_url: &'a str,
 }
 
-impl UserRegTempUrlService {
-    pub fn new(redis_conn: ConnectionManager) -> Self {
-        Self { redis_conn }
+impl<'a> UserRegTempUrlService<'a> {
+    pub fn new(redis_conn: ConnectionManager, base_url: &'a str) -> Self {
+        Self {
+            redis_conn,
+            base_url,
+        }
     }
 
     pub async fn create_userreg_temp_url(
@@ -61,7 +64,7 @@ impl UserRegTempUrlService {
 
         Ok(UserRegUrlKind::NotRegistered(format!(
             "{}/user/register/{temp_url_path}",
-            std::env::var("BASE_URL").unwrap(),
+            self.base_url,
         )))
     }
 }

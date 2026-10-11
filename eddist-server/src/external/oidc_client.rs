@@ -1,5 +1,3 @@
-use std::env;
-
 use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
     EmptyAdditionalClaims, IdTokenClaims, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
@@ -24,6 +22,7 @@ impl OidcClient {
         client_id: ClientId,
         client_secret: openidconnect::ClientSecret,
         oidc_config: CoreProviderMetadata,
+        base_url: &str,
     ) -> Self {
         let mut id_token_signing_alg_values_supported =
             oidc_config.id_token_signing_alg_values_supported().clone();
@@ -35,11 +34,7 @@ impl OidcClient {
             client_id,
             client_secret,
             metadata,
-            redirect_url: RedirectUrl::new(format!(
-                "{}/user/auth/callback",
-                env::var("BASE_URL").unwrap()
-            ))
-            .unwrap(),
+            redirect_url: RedirectUrl::new(format!("{base_url}/user/auth/callback")).unwrap(),
         }
     }
 

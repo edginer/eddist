@@ -1,4 +1,4 @@
-use std::{env, sync::OnceLock};
+use std::sync::Arc;
 
 use rand::RngExt;
 
@@ -9,6 +9,7 @@ use redis::{AsyncCommands, aio::ConnectionManager};
 use tokio::sync::Mutex;
 
 use crate::{
+    config::AppConfig,
     domain::{
         authed_token::AuthedToken,
         service::bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
@@ -18,7 +19,7 @@ use crate::{
         bbs_pubsub_repository::CreationEventRepository,
         bbs_repository::{BbsRepository, CreatingAuthedToken},
     },
-    services::server_settings_cache::{ServerSettingKey, get_server_setting_bool},
+    services::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
 };
 use eddist_core::{
     domain::pubsub_repository::AuthTokenInitiated,
@@ -26,21 +27,47 @@ use eddist_core::{
     utils::is_auth_token_pub_enabled,
 };
 
-pub static USER_CREATION_RATE_LIMIT: OnceLock<Mutex<RateLimiter>> = OnceLock::new();
+#[derive(Clone)]
+pub struct UserCreationRateLimit(Arc<Mutex<RateLimiter>>);
+
+impl Default for UserCreationRateLimit {
+    fn default() -> Self {
+        Self(Arc::new(Mutex::new(RateLimiter::new(
+            5,
+            std::time::Duration::from_secs(60 * 60),
+        ))))
+    }
+}
+
+impl UserCreationRateLimit {
+    pub async fn check_and_add(&self, token: &str) -> bool {
+        self.0.lock().await.check_and_add(token)
+    }
+}
 
 #[derive(Clone)]
 pub struct BbsCgiAuthService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
     redis_conn: ConnectionManager,
     event_repo: E,
+    config: Arc<AppConfig>,
+    user_creation_rate_limit: UserCreationRateLimit,
 }
 
 impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
-    pub fn new(repo: T, redis_conn: ConnectionManager, event_repo: E) -> Self {
+    pub fn new(
+        repo: T,
+        redis_conn: ConnectionManager,
+        event_repo: E,
+        config: Arc<AppConfig>,
+        user_creation_rate_limit: UserCreationRateLimit,
+    ) -> Self {
         Self {
             repo,
             redis_conn,
             event_repo,
+            config,
+            user_creation_rate_limit,
         }
     }
 
@@ -72,11 +99,12 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         user_agent: String,
         asn_num: i32,
         created_at: chrono::DateTime<chrono::Utc>,
-        require_user_registration: bool,
+        settings: &ServerSettingsSnapshot,
     ) -> Result<AuthedToken, BbsCgiError> {
-        if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+        if settings.is_enabled(ServerSettingKey::CloseNewAuthentication) {
             return Err(BbsCgiError::NewAuthenticationClosed);
         }
+        let require_user_registration = settings.is_enabled(ServerSettingKey::RequireIdpLinking);
 
         let authed_token = AuthedToken::new(ip_addr.clone(), user_agent.clone(), asn_num);
         self.repo
@@ -97,7 +125,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 
         Err(BbsCgiError::Unauthenticated {
             auth_code: authed_token.auth_code,
-            base_url: env::var("BASE_URL").unwrap(),
+            base_url: self.config.base_url.clone(),
             auth_token: authed_token.token,
         })
     }
@@ -109,7 +137,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         user_agent: String,
         asn_num: i32,
         created_at: chrono::DateTime<chrono::Utc>,
-        require_user_registration: bool,
+        settings: &ServerSettingsSnapshot,
     ) -> Result<AuthedToken, BbsCgiError> {
         let authed_token = match token {
             Some(token) => self
@@ -121,13 +149,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         };
         let Some(authed_token) = authed_token else {
             return self
-                .issue_auth_code(
-                    ip_addr,
-                    user_agent,
-                    asn_num,
-                    created_at,
-                    require_user_registration,
-                )
+                .issue_auth_code(ip_addr, user_agent, asn_num, created_at, settings)
                 .await;
         };
 
@@ -137,22 +159,16 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             }
             if authed_token.is_activation_expired(Utc::now()) {
                 return self
-                    .issue_auth_code(
-                        ip_addr,
-                        user_agent,
-                        asn_num,
-                        created_at,
-                        require_user_registration,
-                    )
+                    .issue_auth_code(ip_addr, user_agent, asn_num, created_at, settings)
                     .await;
             }
             // /auth-code is closed too, so a pending code could not be redeemed anyway.
-            if get_server_setting_bool(ServerSettingKey::CloseNewAuthentication).await {
+            if settings.is_enabled(ServerSettingKey::CloseNewAuthentication) {
                 return Err(BbsCgiError::NewAuthenticationClosed);
             }
             return Err(BbsCgiError::Unauthenticated {
                 auth_code: authed_token.auth_code,
-                base_url: env::var("BASE_URL").unwrap(),
+                base_url: self.config.base_url.clone(),
                 auth_token: authed_token.token,
             });
         }
@@ -194,23 +210,22 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             };
             return Err(BbsCgiError::ReAuthRequired {
                 temp_key,
-                base_url: env::var("BASE_URL").unwrap(),
+                base_url: self.config.base_url.clone(),
             });
         }
 
         // Check if user registration is required but not linked
         if authed_token.require_user_registration && authed_token.registered_user_id.is_none() {
-            let rate_limiter = USER_CREATION_RATE_LIMIT.get_or_init(|| {
-                Mutex::new(RateLimiter::new(5, std::time::Duration::from_secs(60 * 60)))
-            });
+            if !self
+                .user_creation_rate_limit
+                .check_and_add(&authed_token.token)
+                .await
             {
-                let mut rate_limiter = rate_limiter.lock().await;
-                if !rate_limiter.check_and_add(&authed_token.token) {
-                    return Err(BbsCgiError::TooManyUserCreationAttempt);
-                }
+                return Err(BbsCgiError::TooManyUserCreationAttempt);
             }
 
-            let user_reg_url_svc = UserRegTempUrlService::new(self.redis_conn.clone());
+            let user_reg_url_svc =
+                UserRegTempUrlService::new(self.redis_conn.clone(), &self.config.base_url);
             return match user_reg_url_svc
                 .create_userreg_temp_url(&authed_token)
                 .await?

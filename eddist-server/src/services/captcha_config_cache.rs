@@ -1,111 +1,60 @@
-use std::{
-    sync::{Arc, OnceLock},
-    time::Duration,
-};
-
-use tokio::sync::RwLock;
+use std::sync::Arc;
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
-    repositories::captcha_config_repository::{
-        CaptchaConfigRepository, CaptchaConfigRepositoryImpl,
-    },
+    repositories::captcha_config_repository::CaptchaConfigRepository,
 };
 
-static GLOBAL_CAPTCHA_CONFIG_CACHE: OnceLock<Arc<RwLock<CaptchaConfigCache>>> = OnceLock::new();
+use super::snapshot_cache::SnapshotCache;
 
-fn get_global_cache() -> &'static Arc<RwLock<CaptchaConfigCache>> {
-    GLOBAL_CAPTCHA_CONFIG_CACHE.get_or_init(|| Arc::new(RwLock::new(CaptchaConfigCache::new())))
-}
-
-#[derive(Debug)]
-struct CaptchaConfigCache {
-    configs: Vec<CaptchaProviderConfig>,
-}
+#[derive(Debug, Clone)]
+pub struct CaptchaConfigCache(SnapshotCache<Vec<CaptchaProviderConfig>>);
 
 impl CaptchaConfigCache {
-    fn new() -> Self {
-        Self {
-            configs: Vec::new(),
+    /// Unlike a refresh, a failed initial load has no previous snapshot to fall back on.
+    pub async fn load(repo: &dyn CaptchaConfigRepository) -> anyhow::Result<Self> {
+        let cache = Self::from_configs(Vec::new());
+        cache.refresh(repo).await?;
+        Ok(cache)
+    }
+
+    pub fn from_configs(configs: Vec<CaptchaProviderConfig>) -> Self {
+        Self(SnapshotCache::new(configs))
+    }
+
+    pub fn for_auth_code(&self) -> Vec<CaptchaProviderConfig> {
+        self.filtered(|c| c.endpoint_usage.matches_auth_code())
+    }
+
+    pub fn for_reauth(&self) -> Vec<CaptchaProviderConfig> {
+        self.filtered(|c| c.endpoint_usage.matches_reauth())
+    }
+
+    fn filtered(&self, f: impl Fn(&CaptchaProviderConfig) -> bool) -> Vec<CaptchaProviderConfig> {
+        self.snapshot().iter().filter(|c| f(c)).cloned().collect()
+    }
+
+    fn snapshot(&self) -> Arc<Vec<CaptchaProviderConfig>> {
+        self.0.load()
+    }
+
+    /// On error the previous snapshot is kept; an empty snapshot disables CAPTCHA.
+    pub async fn refresh(&self, repo: &dyn CaptchaConfigRepository) -> anyhow::Result<()> {
+        let configs = repo.get_active_captcha_configs().await?;
+        for config in &configs {
+            tracing::debug!(
+                "Loaded captcha config: provider={}, capture_fields={:?}",
+                config.provider,
+                config.capture_fields
+            );
         }
-    }
-
-    fn update_configs(&mut self, configs: Vec<CaptchaProviderConfig>) {
-        self.configs = configs;
-    }
-}
-
-/// Get cached captcha configs for the /auth-code endpoint
-pub async fn get_cached_captcha_configs_for_auth_code() -> Vec<CaptchaProviderConfig> {
-    let cache = get_global_cache().read().await;
-    cache
-        .configs
-        .iter()
-        .filter(|c| c.endpoint_usage.matches_auth_code())
-        .cloned()
-        .collect()
-}
-
-/// Get cached captcha configs for the /re-auth endpoint
-pub async fn get_cached_captcha_configs_for_reauth() -> Vec<CaptchaProviderConfig> {
-    let cache = get_global_cache().read().await;
-    cache
-        .configs
-        .iter()
-        .filter(|c| c.endpoint_usage.matches_reauth())
-        .cloned()
-        .collect()
-}
-
-/// On error the previous snapshot is kept; an empty snapshot disables CAPTCHA.
-pub async fn refresh_captcha_config_cache(
-    repo: &dyn CaptchaConfigRepository,
-) -> anyhow::Result<()> {
-    refresh_cache(get_global_cache(), repo).await
-}
-
-async fn refresh_cache(
-    cache: &RwLock<CaptchaConfigCache>,
-    repo: &dyn CaptchaConfigRepository,
-) -> anyhow::Result<()> {
-    let configs = repo.get_active_captcha_configs().await?;
-    let mut cache = cache.write().await;
-
-    // Log details about each config for debugging
-    for config in &configs {
-        tracing::debug!(
-            "Loaded captcha config: provider={}, capture_fields={:?}",
-            config.provider,
-            config.capture_fields
+        tracing::info!(
+            "Captcha config cache refreshed with {} configs",
+            configs.len()
         );
+        self.0.replace(configs);
+        Ok(())
     }
-
-    cache.update_configs(configs);
-    tracing::info!(
-        "Captcha config cache refreshed with {} configs",
-        cache.configs.len()
-    );
-    Ok(())
-}
-
-/// Start a background task that periodically refreshes the captcha config cache
-pub fn start_captcha_config_refresh_task(pool: sqlx::MySqlPool, refresh_interval: Duration) {
-    let repo = CaptchaConfigRepositoryImpl::new(pool);
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(refresh_interval);
-
-        loop {
-            interval.tick().await;
-            if let Err(e) = refresh_captcha_config_cache(&repo).await {
-                tracing::error!(
-                    error = %format_args!("{e:#}"),
-                    "Failed to refresh captcha config cache; keeping the previous snapshot"
-                );
-            }
-        }
-    });
-
-    tracing::info!("Started captcha config cache refresh task with interval: {refresh_interval:?}",);
 }
 
 #[cfg(test)]
@@ -147,35 +96,33 @@ mod tests {
 
     #[tokio::test]
     async fn failed_loads_keep_previous_snapshot_and_valid_empty_load_disables_captcha() {
-        let cache = RwLock::new(CaptchaConfigCache::new());
         let valid = Repository {
             configs: vec![valid_config()],
             fail: false,
         };
-        refresh_cache(&cache, &valid).await.unwrap();
+        let cache = CaptchaConfigCache::load(&valid).await.unwrap();
 
         let failed = Repository {
             configs: Vec::new(),
             fail: true,
         };
-        assert!(refresh_cache(&cache, &failed).await.is_err());
-        assert_eq!(cache.read().await.configs.len(), 1);
+        assert!(cache.refresh(&failed).await.is_err());
+        assert_eq!(cache.snapshot().len(), 1);
 
         let empty = Repository {
             configs: Vec::new(),
             fail: false,
         };
-        refresh_cache(&cache, &empty).await.unwrap();
-        assert!(cache.read().await.configs.is_empty());
+        cache.refresh(&empty).await.unwrap();
+        assert!(cache.snapshot().is_empty());
     }
 
     #[tokio::test]
     async fn initial_load_failure_is_not_a_successful_empty_snapshot() {
-        let cache = RwLock::new(CaptchaConfigCache::new());
         let failed = Repository {
             configs: Vec::new(),
             fail: true,
         };
-        assert!(refresh_cache(&cache, &failed).await.is_err());
+        assert!(CaptchaConfigCache::load(&failed).await.is_err());
     }
 }
