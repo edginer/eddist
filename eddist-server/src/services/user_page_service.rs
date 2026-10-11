@@ -30,7 +30,9 @@ impl<U: UserRepository + Clone>
             return Err(UserPageError::SessionNotFound);
         };
 
-        let user_id = user_id.parse::<uuid::Uuid>()?;
+        let Ok(user_id) = user_id.parse() else {
+            return Err(UserPageError::SessionNotFound);
+        };
         let Some(user) = self.0.get_user_by_id(user_id).await? else {
             return Err(UserPageError::SessionNotFound);
         };
@@ -53,7 +55,7 @@ pub enum UserPageError {
     Other(#[from] anyhow::Error),
 }
 
-impl_from_for_other!(UserPageError: redis::RedisError, uuid::Error);
+impl_from_for_other!(UserPageError: redis::RedisError);
 
 #[derive(Debug, Clone)]
 pub struct UserPageServiceInput {

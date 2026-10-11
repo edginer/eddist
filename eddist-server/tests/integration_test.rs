@@ -139,6 +139,29 @@ async fn test_user_page_internal_failure_keeps_session_cookie() {
 }
 
 #[tokio::test]
+async fn test_user_page_malformed_session_resets_session_cookie() {
+    use eddist_core::redis_keys::user_session_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(user_session_key("bad-sid"), "not-a-uuid")
+        .await
+        .unwrap();
+
+    let response = ctx
+        .server
+        .get("/user")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_static("user-sid=bad-sid"),
+        )
+        .await;
+
+    assert_eq!(response.status_code(), 302);
+    assert!(response.headers().get("set-cookie").is_some());
+}
+
+#[tokio::test]
 async fn test_idp_registration_redirect_separates_unknown_idp_from_internal_failure() {
     let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
     let request = || {
