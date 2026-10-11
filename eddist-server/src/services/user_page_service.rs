@@ -25,13 +25,12 @@ impl<U: UserRepository + Clone>
         let mut redis_conn = self.1.clone();
         let Some(user_id) = redis_conn
             .get::<_, Option<String>>(user_session_key(&input.user_sid))
-            .await
-            .map_err(anyhow::Error::from)?
+            .await?
         else {
             return Err(UserPageError::SessionNotFound);
         };
 
-        let user_id = user_id.parse().map_err(anyhow::Error::from)?;
+        let user_id = user_id.parse::<uuid::Uuid>()?;
         let Some(user) = self.0.get_user_by_id(user_id).await? else {
             return Err(UserPageError::SessionNotFound);
         };
@@ -53,6 +52,8 @@ pub enum UserPageError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
+
+impl_from_for_other!(UserPageError: redis::RedisError, uuid::Error);
 
 #[derive(Debug, Clone)]
 pub struct UserPageServiceInput {

@@ -87,27 +87,19 @@ impl<
         };
 
         // TODO: currently, get_del does not work well
-        let user_state = redis_conn
-            .get::<_, String>(&redis_authreq_key)
-            .await
-            .map_err(anyhow::Error::from)?;
-        redis_conn
-            .del::<_, ()>(&redis_authreq_key)
-            .await
-            .map_err(anyhow::Error::from)?;
+        let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
+        redis_conn.del::<_, ()>(&redis_authreq_key).await?;
 
         let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
-                let reg_state = serde_json::from_str::<UserRegState>(&user_state)
-                    .map_err(anyhow::Error::from)?;
+                let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
                 let (user_sid, edge_token) = self
                     .register_user_with_idp(reg_state, input.code, input.browser_edge_token)
                     .await?;
                 (user_sid, edge_token)
             }
             CallbackKind::Login => {
-                let login_state = serde_json::from_str::<UserLoginState>(&user_state)
-                    .map_err(anyhow::Error::from)?;
+                let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
                 let (user_sid, edge_token) = self
                     .login_user_with_idp(
                         login_state,
@@ -386,6 +378,8 @@ pub enum UserAuthzIdpCallbackError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
+
+impl_from_for_other!(UserAuthzIdpCallbackError: redis::RedisError, serde_json::Error);
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,

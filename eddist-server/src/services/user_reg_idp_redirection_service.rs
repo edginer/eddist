@@ -51,14 +51,12 @@ impl<I: IdpRepository + Clone>
 
         let Some(user_reg_state) = redis_conn
             .get_del::<_, Option<String>>(user_reg_oauth2_state_key(&input.user_reg_state_id))
-            .await
-            .map_err(anyhow::Error::from)?
+            .await?
         else {
             return Err(UserRegIdpRedirectionError::StateNotFound);
         };
 
-        let user_reg_state =
-            serde_json::from_str::<UserRegState>(&user_reg_state).map_err(anyhow::Error::from)?;
+        let user_reg_state = serde_json::from_str::<UserRegState>(&user_reg_state)?;
 
         let (authz_url, nonce, code_verifier) =
             idp_client.create_authz_request(input.user_reg_state_id.clone());
@@ -73,11 +71,10 @@ impl<I: IdpRepository + Clone>
         redis_conn
             .set_ex::<_, _, ()>(
                 user_reg_oauth2_authreq_key(&input.user_reg_state_id),
-                serde_json::to_string(&user_reg_state).map_err(anyhow::Error::from)?,
+                serde_json::to_string(&user_reg_state)?,
                 60 * 15,
             )
-            .await
-            .map_err(anyhow::Error::from)?;
+            .await?;
 
         Ok(UserRegIdpRedirectionServiceOutput {
             authz_url: authz_url.to_string(),
@@ -92,6 +89,8 @@ pub enum UserRegIdpRedirectionError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
+
+impl_from_for_other!(UserRegIdpRedirectionError: redis::RedisError, serde_json::Error);
 
 pub struct UserRegIdpRedirectionServiceInput {
     pub idp_name: String,

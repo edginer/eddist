@@ -37,6 +37,19 @@ pub struct PubSubRepos<P: PubRepository, E: CreationEventRepository> {
     pub event_repo: E,
 }
 
+// Defined above the `mod` declarations so child modules see it by textual scope.
+macro_rules! impl_from_for_other {
+    ($err:ty: $($src:ty),+ $(,)?) => {
+        $(
+            impl From<$src> for $err {
+                fn from(e: $src) -> Self {
+                    Self::Other(e.into())
+                }
+            }
+        )+
+    };
+}
+
 pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
