@@ -65,6 +65,79 @@ async fn test_apps_load_settings_before_serving_and_do_not_share_them() {
     assert_eq!(response.status_code(), 400);
 }
 
+#[tokio::test]
+async fn test_board_lookup_separates_missing_board_from_database_failure() {
+    let ctx = TestContext::with_server_settings(&[("bbs.enable_safe_mode", "true")]).await;
+    let paths = [
+        "/nosuch/SETTING.TXT",
+        "/nosuch/head.txt",
+        "/api/nosuch/unsafe-thread-ids",
+    ];
+    for path in paths {
+        assert_eq!(ctx.server.get(path).await.status_code(), 404, "{path}");
+    }
+
+    ctx.pool.close().await;
+    for path in paths {
+        assert_eq!(ctx.server.get(path).await.status_code(), 500, "{path}");
+    }
+}
+
+#[tokio::test]
+async fn test_post_to_missing_board_is_not_found_error() {
+    let ctx = TestContext::new().await;
+    let (_token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.1", "code-nb").await;
+    let form_data = encode_sjis_form(&[
+        ("bbs", "nosuch"),
+        ("submit", "新規スレッド作成"),
+        ("subject", "存在しない板"),
+        ("FROM", ""),
+        ("mail", ""),
+        ("MESSAGE", "本文"),
+    ]);
+
+    let response = ctx
+        .server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={}", token)).unwrap(),
+        )
+        .bytes(Bytes::from(form_data.into_bytes()))
+        .await;
+
+    assert_eq!(response.status_code(), 200);
+    assert!(decode_sjis(response.as_bytes()).contains("E-NotFound"));
+}
+
+#[tokio::test]
+async fn test_user_page_internal_failure_keeps_session_cookie() {
+    use eddist_core::redis_keys::user_session_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(
+            user_session_key("live-sid"),
+            uuid::Uuid::now_v7().to_string(),
+        )
+        .await
+        .unwrap();
+    ctx.pool.close().await;
+
+    let response = ctx
+        .server
+        .get("/user")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_static("user-sid=live-sid"),
+        )
+        .await;
+
+    assert_eq!(response.status_code(), 500);
+    assert!(response.headers().get("set-cookie").is_none());
+}
+
 /// Test 1: GET thread list via HTTP
 #[tokio::test]
 async fn test_get_thread_list() {

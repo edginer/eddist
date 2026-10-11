@@ -49,9 +49,10 @@ impl<I: IdpRepository + Clone>
             .get(&input.idp_name)
             .ok_or_else(|| anyhow::anyhow!("idp client not found: {}", input.idp_name))?;
 
-        let Ok(user_reg_state) = redis_conn
-            .get_del::<_, String>(user_reg_oauth2_state_key(&input.user_reg_state_id))
+        let Some(user_reg_state) = redis_conn
+            .get_del::<_, Option<String>>(user_reg_oauth2_state_key(&input.user_reg_state_id))
             .await
+            .map_err(anyhow::Error::from)?
         else {
             return Err(UserRegIdpRedirectionError::StateNotFound);
         };

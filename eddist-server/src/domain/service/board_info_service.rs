@@ -60,11 +60,7 @@ impl<T: BbsRepository + Clone> BoardInfoService<T> {
             Err(e) => return Err(anyhow::anyhow!("failed to read cache: {e:?}")),
         }
 
-        let board_info = self
-            .0
-            .get_board_info(board_id)
-            .await
-            .map_err(|_| anyhow::anyhow!("failed to find board info"))?;
+        let board_info = self.0.get_board_info(board_id).await?;
         if board_info.is_none() {
             return Ok(None);
         }
@@ -88,19 +84,12 @@ impl<T: BbsRepository + Clone> BoardInfoService<T> {
         &self,
         board_key: &str,
     ) -> anyhow::Result<Option<(Board, BoardInfo)>> {
-        let board = self
-            .0
-            .get_board(board_key)
-            .await
-            .map_err(|_| anyhow::anyhow!("failed to find board info"))?
-            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
+        let Some(board) = self.0.get_board(board_key).await? else {
+            return Ok(None);
+        };
+        let board_info = self.get_board_info_by_id(board.id).await?;
 
-        let board_info = self
-            .get_board_info_by_id(board.id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
-
-        Ok(Some((board, board_info)))
+        Ok(board_info.map(|board_info| (board, board_info)))
     }
 }
 

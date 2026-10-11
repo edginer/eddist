@@ -31,7 +31,8 @@ impl<U: UserRepository + Clone>
             return Err(UserPageError::SessionNotFound);
         };
 
-        let Some(user) = self.0.get_user_by_id(user_id.parse().unwrap()).await? else {
+        let user_id = user_id.parse().map_err(anyhow::Error::from)?;
+        let Some(user) = self.0.get_user_by_id(user_id).await? else {
             return Err(UserPageError::SessionNotFound);
         };
 

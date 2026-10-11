@@ -23,7 +23,7 @@ use crate::{
         user_login_idp_redirection_service::UserLoginIdpRedirectionServiceInput,
         user_login_page_service::{UserLoginPageServiceInput, UserLoginPageServiceOutput},
         user_logout_service::UserLogoutServiceInput,
-        user_page_service::{UserPageServiceInput, UserPageServiceOutput},
+        user_page_service::{UserPageError, UserPageServiceInput, UserPageServiceOutput},
         user_reg_idp_redirection_service::{
             UserRegIdpRedirectionError, UserRegIdpRedirectionServiceInput,
         },
@@ -82,23 +82,33 @@ async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl In
             .unwrap();
     };
 
-    let Ok(UserPageServiceOutput { user }) = state
+    let user = match state
         .services
         .user_page()
         .execute(UserPageServiceInput {
             user_sid: user_sid.clone(),
         })
         .await
-    else {
-        return Response::builder()
-            .status(302)
-            .header(
-                "Set-Cookie",
-                HeaderValue::from_str(&reset_user_sid_cookie().to_string()).unwrap(),
-            )
-            .header("Location", "/user/login?utm_source=user-page")
-            .body(Body::from("User not found"))
-            .unwrap();
+    {
+        Ok(UserPageServiceOutput { user }) => user,
+        Err(UserPageError::Other(e)) => {
+            log::error!("Failed to get user page: {e:?}");
+            return Response::builder()
+                .status(500)
+                .body(Body::from("Failed to get user"))
+                .unwrap();
+        }
+        Err(UserPageError::SessionNotFound | UserPageError::UserDisabled) => {
+            return Response::builder()
+                .status(302)
+                .header(
+                    "Set-Cookie",
+                    HeaderValue::from_str(&reset_user_sid_cookie().to_string()).unwrap(),
+                )
+                .header("Location", "/user/login?utm_source=user-page")
+                .body(Body::from("User not found"))
+                .unwrap();
+        }
     };
 
     let html = state

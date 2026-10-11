@@ -59,7 +59,7 @@ use crate::{
         user::user_routes,
     },
     services::{
-        AppService, AppServiceContainer, PubSubRepos,
+        AppService, AppServiceContainer, BoardLookupError, PubSubRepos,
         board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         captcha_config_cache::CaptchaConfigCache,
         kako_thread_retrieval_service::KakoThreadRetrievalService,
@@ -236,6 +236,16 @@ async fn health_check() -> StatusCode {
     StatusCode::OK
 }
 
+fn board_lookup_error_response(error: BoardLookupError) -> Response {
+    match error {
+        BoardLookupError::NotFound => Response::builder().status(404).body(Body::empty()).unwrap(),
+        BoardLookupError::Other(e) => {
+            tracing::error!(error = ?e, "failed to get board info");
+            Response::builder().status(500).body(Body::empty()).unwrap()
+        }
+    }
+}
+
 async fn get_setting_txt(
     Path(board_key): Path<String>,
     State(state): State<AppState>,
@@ -244,7 +254,7 @@ async fn get_setting_txt(
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
 
-    let Ok(BoardInfoServiceOutput {
+    let BoardInfoServiceOutput {
         board_key,
         name,
         default_name,
@@ -258,13 +268,14 @@ async fn get_setting_txt(
                 ..
             },
         ..
-    }) = state
+    } = match state
         .services
         .board_info()
         .execute(BoardInfoServiceInput { board_key })
         .await
-    else {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
+    {
+        Ok(output) => output,
+        Err(e) => return board_lookup_error_response(e),
     };
     let max_response_body_lines = max_response_body_lines / 2;
 
@@ -301,16 +312,17 @@ async fn get_head_txt(
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
 
-    let Ok(BoardInfoServiceOutput {
+    let BoardInfoServiceOutput {
         board_info: BoardInfo { local_rules, .. },
         ..
-    }) = state
+    } = match state
         .services
         .board_info()
         .execute(BoardInfoServiceInput { board_key })
         .await
-    else {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
+    {
+        Ok(output) => output,
+        Err(e) => return board_lookup_error_response(e),
     };
 
     SJisResponseBuilder::new((&local_rules as &str).into())
