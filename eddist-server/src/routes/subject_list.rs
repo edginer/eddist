@@ -7,7 +7,7 @@ use eddist_core::domain::{board::validate_board_key, sjis_str::SJisStr};
 
 use crate::{
     AppState,
-    services::{AppService, BoardLookupError, thread_list_service::BoardKey},
+    services::{AppService, thread_list_service::BoardKey},
     shiftjis::{SJisResponseBuilder, SjisContentType},
 };
 
@@ -22,13 +22,7 @@ pub async fn get_subject_txt(
     let svc = state.get_container().thread_list();
     let threads = match svc.execute(BoardKey(board_key)).await {
         Ok(threads) => threads,
-        Err(BoardLookupError::NotFound) => {
-            return Response::builder().status(404).body(Body::empty()).unwrap();
-        }
-        Err(BoardLookupError::Other(e)) => {
-            log::error!("Failed to get thread list: {e:?}");
-            return Response::builder().status(500).body(Body::empty()).unwrap();
-        }
+        Err(e) => return e.into_response(),
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
@@ -55,13 +49,7 @@ pub async fn get_subject_txt_with_metadent(
         .await
     {
         Ok(threads) => threads,
-        Err(BoardLookupError::NotFound) => {
-            return Response::builder().status(404).body(Body::empty()).unwrap();
-        }
-        Err(BoardLookupError::Other(e)) => {
-            log::error!("Failed to get thread list: {e:?}");
-            return Response::builder().status(500).body(Body::empty()).unwrap();
-        }
+        Err(e) => return e.into_response(),
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))

@@ -90,6 +90,18 @@ pub enum BoardLookupError {
     Other(#[from] anyhow::Error),
 }
 
+impl axum::response::IntoResponse for BoardLookupError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            BoardLookupError::NotFound => http::StatusCode::NOT_FOUND.into_response(),
+            BoardLookupError::Other(e) => {
+                tracing::error!(error = ?e, "failed to look up board");
+                http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+    }
+}
+
 #[mockall::automock]
 #[async_trait::async_trait]
 pub trait BbsCgiService<I: Send + Sync, O: Send + Sync> {
