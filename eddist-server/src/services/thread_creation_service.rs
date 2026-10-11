@@ -94,7 +94,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             .0
             .get_thread_by_board_key_and_thread_number(&input.board_key, unix_time as u64)
             .await
-            .unwrap()
+            .map_err(BbsCgiError::Other)?
             .is_some()
         {
             return Err(BbsCgiError::SameTimeThreadCration);

@@ -87,7 +87,12 @@ impl<
         };
 
         // TODO: currently, get_del does not work well
-        let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
+        let Some(user_state) = redis_conn
+            .get::<_, Option<String>>(&redis_authreq_key)
+            .await?
+        else {
+            return Err(UserAuthzIdpCallbackError::StateNotFound);
+        };
         redis_conn.del::<_, ()>(&redis_authreq_key).await?;
 
         let (user_sid, edge_token) = match input.callback_kind {
@@ -137,7 +142,7 @@ impl<
         user_reg_state: UserRegState,
         code: String,
         browser_edge_token: Option<String>,
-    ) -> anyhow::Result<(String, Option<String>)> {
+    ) -> Result<(String, Option<String>), UserAuthzIdpCallbackError> {
         let mut redis_conn = self.redis_conn.clone();
 
         let edge_token = user_reg_state.edge_token.clone();
@@ -148,9 +153,10 @@ impl<
         if matches!(user_reg_state.source, RegistrationSource::AuthCode)
             && browser_edge_token.as_deref() != edge_token.as_deref()
         {
-            return Err(anyhow::anyhow!(
+            return Err(UserAuthzIdpCallbackError::Rejected(
                 "edge-token mismatch: registration was initiated from auth-code page \
                  but callback arrived with a different browser token"
+                    .to_string(),
             ));
         }
 
@@ -160,7 +166,10 @@ impl<
         let (idp, idp_client) = idp_clients
             .get(&user_reg_state.idp_name.clone().unwrap())
             .ok_or_else(|| {
-                anyhow::anyhow!("idp client not found: {}", user_reg_state.idp_name.unwrap())
+                UserAuthzIdpCallbackError::Rejected(format!(
+                    "idp client not found: {}",
+                    user_reg_state.idp_name.unwrap()
+                ))
             })?;
 
         let id_token_claims = idp_client
@@ -169,7 +178,10 @@ impl<
                 PkceCodeVerifier::new(user_reg_state.code_verifier.unwrap()),
                 Nonce::new(user_reg_state.nonce.unwrap()),
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                UserAuthzIdpCallbackError::Rejected(format!("code exchange failed: {e}"))
+            })?;
 
         let sub_hash = hash_idp_sub(
             &id_token_claims.subject().to_string(),
@@ -245,7 +257,7 @@ impl<
         ip_addr: String,
         user_agent: String,
         asn_num: i32,
-    ) -> anyhow::Result<Option<(String, Option<String>)>> {
+    ) -> Result<Option<(String, Option<String>)>, UserAuthzIdpCallbackError> {
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
@@ -254,7 +266,10 @@ impl<
         let (idp, idp_client) = idp_clients
             .get(&user_login_state.idp_name.clone())
             .ok_or_else(|| {
-                anyhow::anyhow!("idp client not found: {}", user_login_state.idp_name)
+                UserAuthzIdpCallbackError::Rejected(format!(
+                    "idp client not found: {}",
+                    user_login_state.idp_name
+                ))
             })?;
 
         let id_token_claims = idp_client
@@ -263,7 +278,10 @@ impl<
                 PkceCodeVerifier::new(user_login_state.code_verifier),
                 Nonce::new(user_login_state.nonce),
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                UserAuthzIdpCallbackError::Rejected(format!("code exchange failed: {e}"))
+            })?;
 
         let sub_hash = hash_idp_sub(
             &id_token_claims.subject().to_string(),
@@ -276,7 +294,9 @@ impl<
             .await?;
 
         match user {
-            Some(user) if !user.enabled => Err(anyhow::anyhow!("user is disabled")),
+            Some(user) if !user.enabled => Err(UserAuthzIdpCallbackError::Rejected(
+                "user is disabled".to_string(),
+            )),
             Some(user) => {
                 let mut hasher = sha3::Sha3_512::new();
                 hasher.update(Uuid::now_v7().to_string());
@@ -338,11 +358,13 @@ async fn bind_existing_user_token<U: UserRepository + TransactionRepository<MySq
     repo: &U,
     user: &User,
     token_id: Uuid,
-) -> anyhow::Result<()> {
+) -> Result<(), UserAuthzIdpCallbackError> {
     if !user.enabled {
-        return Err(anyhow::anyhow!("user is disabled"));
+        return Err(UserAuthzIdpCallbackError::Rejected(
+            "user is disabled".to_string(),
+        ));
     }
-    bind_token(repo, user.id, token_id).await
+    Ok(bind_token(repo, user.id, token_id).await?)
 }
 
 async fn bind_token<U: UserRepository + TransactionRepository<MySql>>(
@@ -375,11 +397,20 @@ pub enum CallbackKind {
 pub enum UserAuthzIdpCallbackError {
     #[error("user not found")]
     UserNotFound,
+    #[error("authorization request state not found")]
+    StateNotFound,
+    #[error("callback rejected: {0}")]
+    Rejected(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
-impl_from_for_other!(UserAuthzIdpCallbackError: redis::RedisError, serde_json::Error);
+impl_from_for_other!(
+    UserAuthzIdpCallbackError: redis::RedisError,
+    serde_json::Error,
+    sqlx::Error,
+    uuid::Error,
+);
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
@@ -599,7 +630,7 @@ mod probe_tests {
             .await
             .unwrap_err();
         // Any attempt to begin a transaction would instead fail with PoolClosed.
-        assert_eq!(error.to_string(), "user is disabled");
+        assert!(matches!(error, UserAuthzIdpCallbackError::Rejected(_)));
     }
 
     /// user_sid is a fresh Redis session key, not a persisted/compared value across

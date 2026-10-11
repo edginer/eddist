@@ -236,9 +236,16 @@ async fn get_user_reg_redirect_to_idp_authz(
                 .body(Body::from("User registration state session is not found"))
                 .unwrap();
         }
-        Err(_) => {
+        Err(UserRegIdpRedirectionError::UnknownIdp) => {
             return Response::builder()
                 .status(400)
+                .body(Body::from("Unknown IdP"))
+                .unwrap();
+        }
+        Err(UserRegIdpRedirectionError::Other(e)) => {
+            log::error!("Failed to redirect to IdP: {e:?}");
+            return Response::builder()
+                .status(500)
                 .body(Body::from("Failed to redirect to IDP"))
                 .unwrap();
         }
@@ -429,12 +436,24 @@ async fn get_user_authz_idp_callback(
                 .body(Body::from("Failed to get user (maybe unregistered)"))
                 .unwrap();
         }
-        Err(e) => {
-            log::error!("Failed to get user: {e}");
+        Err(
+            e @ (UserAuthzIdpCallbackError::StateNotFound | UserAuthzIdpCallbackError::Rejected(_)),
+        ) => {
+            log::warn!("Rejected IdP callback: {e}");
             return Response::builder()
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
                 .status(400)
+                .body(Body::from("Failed to get user".to_string()))
+                .unwrap();
+        }
+        // The state cookies are cleared because the authorization state and code are single-use.
+        Err(UserAuthzIdpCallbackError::Other(e)) => {
+            log::error!("Failed to get user: {e:?}");
+            return Response::builder()
+                .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
+                .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
+                .status(500)
                 .body(Body::from("Failed to get user".to_string()))
                 .unwrap();
         }

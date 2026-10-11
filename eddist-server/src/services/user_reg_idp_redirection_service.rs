@@ -45,9 +45,9 @@ impl<I: IdpRepository + Clone>
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
-        let (_, idp_client) = idp_clients
-            .get(&input.idp_name)
-            .ok_or_else(|| anyhow::anyhow!("idp client not found: {}", input.idp_name))?;
+        let Some((_, idp_client)) = idp_clients.get(&input.idp_name) else {
+            return Err(UserRegIdpRedirectionError::UnknownIdp);
+        };
 
         let Some(user_reg_state) = redis_conn
             .get_del::<_, Option<String>>(user_reg_oauth2_state_key(&input.user_reg_state_id))
@@ -86,6 +86,8 @@ impl<I: IdpRepository + Clone>
 pub enum UserRegIdpRedirectionError {
     #[error("user registration state not found")]
     StateNotFound,
+    #[error("unknown idp")]
+    UnknownIdp,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

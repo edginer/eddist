@@ -138,6 +138,61 @@ async fn test_user_page_internal_failure_keeps_session_cookie() {
     assert!(response.headers().get("set-cookie").is_none());
 }
 
+#[tokio::test]
+async fn test_idp_registration_redirect_separates_unknown_idp_from_internal_failure() {
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    let request = || {
+        ctx.server
+            .get("/user/register/authz/idp/nosuch")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_static("userreg-state-id=reg-state"),
+            )
+    };
+
+    assert_eq!(request().await.status_code(), 400);
+
+    ctx.pool.close().await;
+    let response = request().await;
+    assert_eq!(response.status_code(), 500);
+    assert!(response.headers().get("set-cookie").is_none());
+}
+
+#[tokio::test]
+async fn test_idp_callback_separates_rejection_from_internal_failure() {
+    use eddist_core::redis_keys::user_login_oauth2_authreq_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    let request = || {
+        ctx.server
+            .get("/user/auth/callback?code=code&state=login-state")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_static("user-login-state-id=login-state"),
+            )
+            .add_header(
+                HeaderName::from_static("x-forwarded-for"),
+                HeaderValue::from_static("127.0.0.1"),
+            )
+            .add_header(
+                HeaderName::from_static("user-agent"),
+                HeaderValue::from_static("test-agent"),
+            )
+            .add_header(
+                HeaderName::from_static("x-asn-num"),
+                HeaderValue::from_static("1"),
+            )
+    };
+
+    assert_eq!(request().await.status_code(), 400);
+
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(user_login_oauth2_authreq_key("login-state"), "not-json")
+        .await
+        .unwrap();
+    assert_eq!(request().await.status_code(), 500);
+}
+
 /// Test 1: GET thread list via HTTP
 #[tokio::test]
 async fn test_get_thread_list() {
