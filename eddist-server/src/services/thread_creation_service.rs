@@ -29,7 +29,7 @@ use crate::{
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
         bbs_pubsub_repository::CreationEventRepository,
-        bbs_repository::{BbsRepository, CreatingThread},
+        bbs_repository::{BbsRepository, CreateThreadError, CreatingThread},
         user_repository::UserRepository,
     },
 };
@@ -250,12 +250,9 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
                 let _ = event_repo.publish_thread_created(creating_th_clone).await;
             });
         }
-        db_result.map_err(|e| {
-            if e.to_string() == "Given thread number is already exists" {
-                BbsCgiError::SameTimeThreadCration
-            } else {
-                BbsCgiError::Other(e)
-            }
+        db_result.map_err(|e| match e {
+            CreateThreadError::ThreadNumberConflict => BbsCgiError::SameTimeThreadCration,
+            CreateThreadError::Other(e) => BbsCgiError::Other(e),
         })?;
         let redis_result = tokio::spawn(async move {
             redis_conn

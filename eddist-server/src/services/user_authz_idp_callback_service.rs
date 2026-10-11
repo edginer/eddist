@@ -68,13 +68,17 @@ impl<
     I: IdpRepository + Clone,
     U: UserRepository + TransactionRepository<MySql> + Clone,
     B: BbsRepository + Clone,
-> AppService<UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput>
-    for UserAuthzIdpCallbackService<I, U, B>
+>
+    AppService<
+        UserAuthzIdpCallbackServiceInput,
+        UserAuthzIdpCallbackServiceOutput,
+        UserAuthzIdpCallbackError,
+    > for UserAuthzIdpCallbackService<I, U, B>
 {
     async fn execute(
         &self,
         input: UserAuthzIdpCallbackServiceInput,
-    ) -> anyhow::Result<UserAuthzIdpCallbackServiceOutput> {
+    ) -> Result<UserAuthzIdpCallbackServiceOutput, UserAuthzIdpCallbackError> {
         let mut redis_conn = self.redis_conn.clone();
 
         let redis_authreq_key = match input.callback_kind {
@@ -83,19 +87,27 @@ impl<
         };
 
         // TODO: currently, get_del does not work well
-        let user_state = redis_conn.get::<_, String>(&redis_authreq_key).await?;
-        redis_conn.del::<_, ()>(&redis_authreq_key).await?;
+        let user_state = redis_conn
+            .get::<_, String>(&redis_authreq_key)
+            .await
+            .map_err(anyhow::Error::from)?;
+        redis_conn
+            .del::<_, ()>(&redis_authreq_key)
+            .await
+            .map_err(anyhow::Error::from)?;
 
         let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
-                let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
+                let reg_state = serde_json::from_str::<UserRegState>(&user_state)
+                    .map_err(anyhow::Error::from)?;
                 let (user_sid, edge_token) = self
                     .register_user_with_idp(reg_state, input.code, input.browser_edge_token)
                     .await?;
                 (user_sid, edge_token)
             }
             CallbackKind::Login => {
-                let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
+                let login_state = serde_json::from_str::<UserLoginState>(&user_state)
+                    .map_err(anyhow::Error::from)?;
                 let (user_sid, edge_token) = self
                     .login_user_with_idp(
                         login_state,
@@ -105,7 +117,8 @@ impl<
                         input.user_agent,
                         input.asn_num,
                     )
-                    .await?;
+                    .await?
+                    .ok_or(UserAuthzIdpCallbackError::UserNotFound)?;
                 (user_sid, edge_token)
             }
         };
@@ -240,7 +253,7 @@ impl<
         ip_addr: String,
         user_agent: String,
         asn_num: i32,
-    ) -> anyhow::Result<(String, Option<String>)> {
+    ) -> anyhow::Result<Option<(String, Option<String>)>> {
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
@@ -322,9 +335,9 @@ impl<
                     Some(new_token.token)
                 };
 
-                Ok((user_sid, edge_token))
+                Ok(Some((user_sid, edge_token)))
             }
-            None => Err(anyhow::anyhow!("user not found")),
+            None => Ok(None),
         }
     }
 }
@@ -364,6 +377,14 @@ pub struct UserAuthzIdpCallbackServiceInput {
 pub enum CallbackKind {
     Register,
     Login,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UserAuthzIdpCallbackError {
+    #[error("user not found")]
+    UserNotFound,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 pub struct UserAuthzIdpCallbackServiceOutput {

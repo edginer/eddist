@@ -12,8 +12,11 @@ use http::{HeaderMap, StatusCode};
 use crate::{
     AppState,
     services::{
-        AppService, kako_thread_retrieval_service::KakoThreadRetrievalServiceInput,
-        thread_retrieval_service::ThreadRetrievalServiceInput,
+        AppService,
+        kako_thread_retrieval_service::{
+            KakoThreadRetrievalError, KakoThreadRetrievalServiceInput,
+        },
+        thread_retrieval_service::{DatRetrievalError, ThreadRetrievalServiceInput},
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
     utils::get_ua,
@@ -28,14 +31,15 @@ fn parse_etag_byte_size(inm: &str) -> Option<usize> {
 }
 
 fn dat_retrieval_error_response(
-    error: &anyhow::Error,
+    error: &DatRetrievalError,
     board_key: &str,
     thread_number: &str,
     now: i64,
 ) -> Response {
-    // Keep this local classification until retrieval errors are typed in R2.
-    match error.root_cause().to_string().as_str() {
-        "cannot find such thread" if thread_number.parse::<i64>().unwrap_or(i64::MAX) <= now => {
+    match error {
+        DatRetrievalError::ThreadNotFound
+            if thread_number.parse::<i64>().unwrap_or(i64::MAX) <= now =>
+        {
             Response::builder()
                 .header("Cache-Control", "s-maxage=86400, max-age=86400")
                 .status(StatusCode::FOUND)
@@ -50,13 +54,11 @@ fn dat_retrieval_error_response(
                 .body(Body::empty())
                 .unwrap()
         }
-        "cannot find such thread" | "failed to find board" | "failed to find board info" => {
-            Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::empty())
-                .unwrap()
-        }
-        _ => {
+        DatRetrievalError::ThreadNotFound | DatRetrievalError::BoardNotFound => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap(),
+        DatRetrievalError::Other(error) => {
             tracing::error!(
                 error = %error,
                 board_key,
@@ -205,12 +207,11 @@ pub async fn get_kako_dat_txt(
         .await
     {
         Ok(result) => result,
-        Err(err) => {
-            return if err.to_string().contains("Thread not found") {
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            } else {
-                Response::builder().status(500).body(Body::empty()).unwrap()
-            };
+        Err(KakoThreadRetrievalError::NotFound) => {
+            return Response::builder().status(404).body(Body::empty()).unwrap();
+        }
+        Err(KakoThreadRetrievalError::Other(_)) => {
+            return Response::builder().status(500).body(Body::empty()).unwrap();
         }
     };
 
@@ -248,11 +249,14 @@ mod tests {
     fn dependency_failures_are_internal_errors() {
         for error in [
             anyhow::anyhow!("database unavailable"),
-            anyhow::anyhow!("redis unavailable"),
-            anyhow::anyhow!("query failed: cannot find such thread")
-                .context("dat retrieval failed"),
+            anyhow::anyhow!("query failed: cannot find such thread"),
         ] {
-            let response = dat_retrieval_error_response(&error, "bbs", "1234567890", 1234567891);
+            let response = dat_retrieval_error_response(
+                &DatRetrievalError::Other(error),
+                "bbs",
+                "1234567890",
+                1234567891,
+            );
             assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
             assert!(!response.headers().contains_key("Location"));
         }
@@ -260,7 +264,7 @@ mod tests {
 
     #[test]
     fn missing_threads_keep_archive_redirect_and_future_not_found() {
-        let error = anyhow::anyhow!("cannot find such thread").context("dat retrieval failed");
+        let error = DatRetrievalError::ThreadNotFound;
         let response = dat_retrieval_error_response(&error, "bbs", "1234567890", 1234567891);
         assert_eq!(response.status(), StatusCode::FOUND);
         assert_eq!(
@@ -272,15 +276,13 @@ mod tests {
     }
 
     #[test]
-    fn missing_board_or_board_info_remains_not_found() {
-        for message in ["failed to find board", "failed to find board info"] {
-            let response = dat_retrieval_error_response(
-                &anyhow::anyhow!(message),
-                "bbs",
-                "1234567890",
-                1234567891,
-            );
-            assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        }
+    fn missing_board_remains_not_found() {
+        let response = dat_retrieval_error_response(
+            &DatRetrievalError::BoardNotFound,
+            "bbs",
+            "1234567890",
+            1234567891,
+        );
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }

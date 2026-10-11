@@ -30,13 +30,16 @@ impl<I: IdpRepository + Clone> UserRegIdpRedirectionService<I> {
 
 #[async_trait::async_trait]
 impl<I: IdpRepository + Clone>
-    AppService<UserRegIdpRedirectionServiceInput, UserRegIdpRedirectionServiceOutput>
-    for UserRegIdpRedirectionService<I>
+    AppService<
+        UserRegIdpRedirectionServiceInput,
+        UserRegIdpRedirectionServiceOutput,
+        UserRegIdpRedirectionError,
+    > for UserRegIdpRedirectionService<I>
 {
     async fn execute(
         &self,
         input: UserRegIdpRedirectionServiceInput,
-    ) -> anyhow::Result<UserRegIdpRedirectionServiceOutput> {
+    ) -> Result<UserRegIdpRedirectionServiceOutput, UserRegIdpRedirectionError> {
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
@@ -50,10 +53,11 @@ impl<I: IdpRepository + Clone>
             .get_del::<_, String>(user_reg_oauth2_state_key(&input.user_reg_state_id))
             .await
         else {
-            return Err(anyhow::anyhow!("user_reg_state_id not found"));
+            return Err(UserRegIdpRedirectionError::StateNotFound);
         };
 
-        let user_reg_state = serde_json::from_str::<UserRegState>(&user_reg_state)?;
+        let user_reg_state =
+            serde_json::from_str::<UserRegState>(&user_reg_state).map_err(anyhow::Error::from)?;
 
         let (authz_url, nonce, code_verifier) =
             idp_client.create_authz_request(input.user_reg_state_id.clone());
@@ -68,15 +72,24 @@ impl<I: IdpRepository + Clone>
         redis_conn
             .set_ex::<_, _, ()>(
                 user_reg_oauth2_authreq_key(&input.user_reg_state_id),
-                serde_json::to_string(&user_reg_state)?,
+                serde_json::to_string(&user_reg_state).map_err(anyhow::Error::from)?,
                 60 * 15,
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         Ok(UserRegIdpRedirectionServiceOutput {
             authz_url: authz_url.to_string(),
         })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UserRegIdpRedirectionError {
+    #[error("user registration state not found")]
+    StateNotFound,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 pub struct UserRegIdpRedirectionServiceInput {

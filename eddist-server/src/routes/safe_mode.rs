@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{
     AppState,
     services::{
-        AppService, board_info_service::BoardInfoServiceInput,
+        AppService, BoardLookupError, board_info_service::BoardInfoServiceInput,
         server_settings_cache::ServerSettingKey,
     },
 };
@@ -46,10 +46,10 @@ pub async fn get_unsafe_thread_ids(
 
     let board_key = match board_info {
         Ok(info) => info.board_key,
-        Err(e) => {
-            if e.to_string().contains("board not found") {
-                return Response::builder().status(404).body(Body::empty()).unwrap();
-            }
+        Err(BoardLookupError::NotFound) => {
+            return Response::builder().status(404).body(Body::empty()).unwrap();
+        }
+        Err(BoardLookupError::Other(e)) => {
             log::error!("Failed to get board info for safe mode: {e:?}");
             return Response::builder().status(500).body(Body::empty()).unwrap();
         }

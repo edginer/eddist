@@ -64,10 +64,17 @@ pub(crate) mod user_reg_temp_url_service;
 pub mod user_restriction_service;
 pub(crate) mod validation;
 
-#[mockall::automock]
 #[async_trait::async_trait]
-pub trait AppService<I: Send + Sync, O: Send + Sync> {
-    async fn execute(&self, input: I) -> anyhow::Result<O>;
+pub trait AppService<I: Send + Sync, O: Send + Sync, E = anyhow::Error> {
+    async fn execute(&self, input: I) -> Result<O, E>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BoardLookupError {
+    #[error("board not found")]
+    NotFound,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 #[mockall::automock]

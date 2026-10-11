@@ -17,13 +17,16 @@ use crate::{
         AppService,
         server_settings_cache::ServerSettingKey,
         user_authz_idp_callback_service::{
-            CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
+            CallbackKind, UserAuthzIdpCallbackError, UserAuthzIdpCallbackServiceInput,
+            UserAuthzIdpCallbackServiceOutput,
         },
         user_login_idp_redirection_service::UserLoginIdpRedirectionServiceInput,
         user_login_page_service::{UserLoginPageServiceInput, UserLoginPageServiceOutput},
         user_logout_service::UserLogoutServiceInput,
         user_page_service::{UserPageServiceInput, UserPageServiceOutput},
-        user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
+        user_reg_idp_redirection_service::{
+            UserRegIdpRedirectionError, UserRegIdpRedirectionServiceInput,
+        },
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
@@ -216,7 +219,7 @@ async fn get_user_reg_redirect_to_idp_authz(
         .await
     {
         Ok(o) => o,
-        Err(e) if e.to_string().contains("user_reg_state_id not found") => {
+        Err(UserRegIdpRedirectionError::StateNotFound) => {
             return Response::builder()
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
                 .status(400)
@@ -409,7 +412,7 @@ async fn get_user_authz_idp_callback(
             user_sid,
             edge_token,
         }) => (user_sid, edge_token),
-        Err(e) if e.to_string().contains("user not found") => {
+        Err(UserAuthzIdpCallbackError::UserNotFound) => {
             return Response::builder()
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
                 .status(400)

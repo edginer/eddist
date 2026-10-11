@@ -38,7 +38,21 @@ pub trait ThreadRepository: Send + Sync + 'static {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<Option<Thread>>;
-    async fn create_thread(&self, thread: CreatingThread) -> anyhow::Result<()>;
+    async fn create_thread(&self, thread: CreatingThread) -> Result<(), CreateThreadError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CreateThreadError {
+    #[error("thread number already exists")]
+    ThreadNumberConflict,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl From<sqlx::Error> for CreateThreadError {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 #[async_trait::async_trait]
@@ -282,11 +296,12 @@ impl ThreadRepository for BbsRepositoryImpl {
         Ok(th.map(SelectionThread::into_thread))
     }
 
-    async fn create_thread(&self, thread: CreatingThread) -> anyhow::Result<()> {
+    async fn create_thread(&self, thread: CreatingThread) -> Result<(), CreateThreadError> {
         let metadent = Option::<&str>::from(thread.metadent).unwrap_or("");
         let (response_id, thread_id, board_id) =
             (thread.response_id, thread.thread_id, thread.board_id);
-        let client_info_json = serde_json::to_string(&thread.client_info)?;
+        let client_info_json =
+            serde_json::to_string(&thread.client_info).map_err(anyhow::Error::from)?;
 
         let th_query = query!(
             r"INSERT INTO threads
@@ -350,12 +365,10 @@ impl ThreadRepository for BbsRepositoryImpl {
 
         let mut tx = self.pool.begin().await?;
         th_query.execute(&mut *tx).await.map_err(|e| {
-            if let Some(de) = e.as_database_error() {
-                if de.is_unique_violation() {
-                    anyhow::anyhow!("Given thread number is already exists")
-                } else {
-                    e.into()
-                }
+            if e.as_database_error()
+                .is_some_and(|de| de.is_unique_violation())
+            {
+                CreateThreadError::ThreadNumberConflict
             } else {
                 e.into()
             }

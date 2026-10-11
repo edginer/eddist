@@ -15,28 +15,42 @@ impl<U: UserRepository> UserPageService<U> {
 }
 
 #[async_trait::async_trait]
-impl<U: UserRepository + Clone> AppService<UserPageServiceInput, UserPageServiceOutput>
-    for UserPageService<U>
+impl<U: UserRepository + Clone>
+    AppService<UserPageServiceInput, UserPageServiceOutput, UserPageError> for UserPageService<U>
 {
-    async fn execute(&self, input: UserPageServiceInput) -> anyhow::Result<UserPageServiceOutput> {
+    async fn execute(
+        &self,
+        input: UserPageServiceInput,
+    ) -> Result<UserPageServiceOutput, UserPageError> {
         let mut redis_conn = self.1.clone();
         let Some(user_id) = redis_conn
             .get::<_, Option<String>>(user_session_key(&input.user_sid))
-            .await?
+            .await
+            .map_err(anyhow::Error::from)?
         else {
-            return Err(anyhow::anyhow!("user not found"));
+            return Err(UserPageError::SessionNotFound);
         };
 
         let Some(user) = self.0.get_user_by_id(user_id.parse().unwrap()).await? else {
-            return Err(anyhow::anyhow!("user not found"));
+            return Err(UserPageError::SessionNotFound);
         };
 
         if !user.enabled {
-            return Err(anyhow::anyhow!("user not enabled"));
+            return Err(UserPageError::UserDisabled);
         }
 
         Ok(UserPageServiceOutput { user })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UserPageError {
+    #[error("user session not found")]
+    SessionNotFound,
+    #[error("user is disabled")]
+    UserDisabled,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Clone)]
