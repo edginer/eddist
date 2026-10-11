@@ -35,6 +35,20 @@ async fn test_dat_database_failure_does_not_increment_not_found_counter() {
 }
 
 #[tokio::test]
+async fn test_dat_board_without_board_info_is_not_found() {
+    let ctx = TestContext::new().await;
+    let board_id = create_test_board(&ctx.pool, "noinfo", "テスト板").await;
+    sqlx::query("DELETE FROM boards_info WHERE id = ?")
+        .bind(board_id)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+
+    let response = ctx.server.get("/noinfo/dat/1234567890.dat").await;
+    assert_eq!(response.status_code(), 404);
+}
+
+#[tokio::test]
 async fn test_dat_redis_failure_falls_back_to_database() {
     let ctx = TestContext::new().await;
     let board_id = create_test_board(&ctx.pool, "fallback", "テスト板").await;
