@@ -1,28 +1,26 @@
 use std::sync::Arc;
 
-use redis::{AsyncCommands, aio::ConnectionManager};
-
 use crate::{
     config::AppConfig,
     domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
     repositories::idp_repository::IdpRepository,
+    stores::oidc_state_store::OidcStateStore,
 };
-use eddist_core::redis_keys::{user_reg_oauth2_authreq_key, user_reg_oauth2_state_key};
 
 use super::AppService;
 
 #[derive(Clone)]
 pub struct UserRegIdpRedirectionService<I: IdpRepository> {
     idp_repo: I,
-    redis_conn: ConnectionManager,
+    oidc_state: Arc<dyn OidcStateStore>,
     config: Arc<AppConfig>,
 }
 
 impl<I: IdpRepository + Clone> UserRegIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, redis_conn: ConnectionManager, config: Arc<AppConfig>) -> Self {
+    pub fn new(idp_repo: I, oidc_state: Arc<dyn OidcStateStore>, config: Arc<AppConfig>) -> Self {
         Self {
             idp_repo,
-            redis_conn,
+            oidc_state,
             config,
         }
     }
@@ -40,8 +38,6 @@ impl<I: IdpRepository + Clone>
         &self,
         input: UserRegIdpRedirectionServiceInput,
     ) -> Result<UserRegIdpRedirectionServiceOutput, UserRegIdpRedirectionError> {
-        let mut redis_conn = self.redis_conn.clone();
-
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
@@ -49,14 +45,13 @@ impl<I: IdpRepository + Clone>
             return Err(UserRegIdpRedirectionError::UnknownIdp);
         };
 
-        let Some(user_reg_state) = redis_conn
-            .get_del::<_, Option<String>>(user_reg_oauth2_state_key(&input.user_reg_state_id))
+        let Some(user_reg_state) = self
+            .oidc_state
+            .take_user_reg_state(&input.user_reg_state_id)
             .await?
         else {
             return Err(UserRegIdpRedirectionError::StateNotFound);
         };
-
-        let user_reg_state = serde_json::from_str::<UserRegState>(&user_reg_state)?;
 
         let (authz_url, nonce, code_verifier) =
             idp_client.create_authz_request(input.user_reg_state_id.clone());
@@ -68,12 +63,8 @@ impl<I: IdpRepository + Clone>
             ..user_reg_state
         };
 
-        redis_conn
-            .set_ex::<_, _, ()>(
-                user_reg_oauth2_authreq_key(&input.user_reg_state_id),
-                serde_json::to_string(&user_reg_state)?,
-                60 * 15,
-            )
+        self.oidc_state
+            .save_user_reg_authreq(&input.user_reg_state_id, &user_reg_state)
             .await?;
 
         Ok(UserRegIdpRedirectionServiceOutput {
@@ -91,8 +82,6 @@ pub enum UserRegIdpRedirectionError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
-
-impl_from_for_other!(UserRegIdpRedirectionError: redis::RedisError, serde_json::Error);
 
 pub struct UserRegIdpRedirectionServiceInput {
     pub idp_name: String,

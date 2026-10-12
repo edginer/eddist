@@ -1,4 +1,5 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
+
 use serde::Serialize;
 use sqlx::MySql;
 use uuid::Uuid;
@@ -6,16 +7,17 @@ use uuid::Uuid;
 use crate::{
     domain::{
         service::bbscgi_user_reg_temp_url_service::USER_REG_TEMP_URL_LEN,
-        user::user_reg_state::{TempUrlRegistrationRecord, UserRegState},
+        user::user_reg_state::UserRegState,
     },
     repositories::{
         bbs_repository::BbsRepository, idp_repository::IdpRepository,
         user_repository::UserRepository,
     },
+    stores::{
+        auth_state_store::AuthStateStore, oidc_state_store::OidcStateStore,
+        user_session_store::UserSessionStore,
+    },
     utils::TransactionRepository,
-};
-use eddist_core::redis_keys::{
-    user_reg_oauth2_state_key, user_reg_temp_url_register_key, user_session_key,
 };
 
 use super::AppService;
@@ -25,18 +27,29 @@ pub struct UserRegTempUrlService<I: IdpRepository, U: UserRepository, B: BbsRepo
     idp_repo: I,
     user_repo: U,
     bbs_repo: B,
-    redis_conn: ConnectionManager,
+    sessions: Arc<dyn UserSessionStore>,
+    auth_state: Arc<dyn AuthStateStore>,
+    oidc_state: Arc<dyn OidcStateStore>,
 }
 
 impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
     UserRegTempUrlService<I, U, B>
 {
-    pub fn new(idp_repo: I, user_repo: U, bbs_repo: B, redis_conn: ConnectionManager) -> Self {
+    pub fn new(
+        idp_repo: I,
+        user_repo: U,
+        bbs_repo: B,
+        sessions: Arc<dyn UserSessionStore>,
+        auth_state: Arc<dyn AuthStateStore>,
+        oidc_state: Arc<dyn OidcStateStore>,
+    ) -> Self {
         Self {
             idp_repo,
             user_repo,
             bbs_repo,
-            redis_conn,
+            sessions,
+            auth_state,
+            oidc_state,
         }
     }
 }
@@ -57,20 +70,16 @@ impl<
             return Ok(UserRegTempUrlServiceOutput::NotFound);
         }
 
-        let mut redis_conn = self.redis_conn.clone();
-
         if let Some(user_sid) = &input.user_sid
-            && let Some(user_id) = redis_conn
-                .get::<_, Option<String>>(user_session_key(user_sid))
-                .await?
+            && let Some(user_id) = self.sessions.get_user_id(user_sid).await?
         {
-            let Some(record_str) = redis_conn
-                .get_del::<_, Option<String>>(user_reg_temp_url_register_key(&input.temp_url_path))
+            let Some(record) = self
+                .auth_state
+                .consume_user_reg_temp_url(&input.temp_url_path)
                 .await?
             else {
                 return Ok(UserRegTempUrlServiceOutput::NotFound);
             };
-            let record = serde_json::from_str::<TempUrlRegistrationRecord>(&record_str)?;
 
             let mut tx = self.user_repo.begin().await?;
             tx = self
@@ -82,13 +91,13 @@ impl<
             return Ok(UserRegTempUrlServiceOutput::Registered);
         }
 
-        let Some(record_str) = redis_conn
-            .get_del::<_, Option<String>>(user_reg_temp_url_register_key(&input.temp_url_path))
+        let Some(record) = self
+            .auth_state
+            .consume_user_reg_temp_url(&input.temp_url_path)
             .await?
         else {
             return Ok(UserRegTempUrlServiceOutput::NotFound);
         };
-        let record = serde_json::from_str::<TempUrlRegistrationRecord>(&record_str)?;
 
         let authed_token_id: Uuid = record.authed_token_id.parse()?;
         let authed_token_record = self
@@ -122,12 +131,8 @@ impl<
             source: record.source,
         };
 
-        redis_conn
-            .set_ex::<_, _, ()>(
-                user_reg_oauth2_state_key(&state_cookie),
-                serde_json::to_string(&user_reg_state)?,
-                60 * 3,
-            )
+        self.oidc_state
+            .save_user_reg_state(&state_cookie, &user_reg_state)
             .await?;
 
         Ok(UserRegTempUrlServiceOutput::NotRegistered {

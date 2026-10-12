@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use auth_with_code_service::AuthWithCodeService;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
@@ -29,7 +31,11 @@ use crate::{
         idp_repository::IdpRepository,
         user_repository::UserRepository,
     },
-    stores::PostingStores,
+    stores::{
+        PostingStores,
+        oidc_state_store::{OidcStateStore, RedisOidcStateStore},
+        user_session_store::{RedisUserSessionStore, UserSessionStore},
+    },
 };
 
 /// Groups the two pub/sub repositories to keep `AppServiceContainer::new` within argument limits.
@@ -158,13 +164,19 @@ impl<
         ctx: &AppContext,
     ) -> Self {
         let posting_stores = PostingStores::redis(redis_conn.clone(), bbs_repo.clone());
+        let auth_state = posting_stores.auth_state.clone();
+        let sessions: Arc<dyn UserSessionStore> =
+            Arc::new(RedisUserSessionStore::new(redis_conn.clone()));
+        let oidc_state: Arc<dyn OidcStateStore> =
+            Arc::new(RedisOidcStateStore::new(redis_conn.clone()));
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
                 bbs_repo.clone(),
+                auth_state.clone(),
                 redis_conn.clone(),
                 pubsub.event_repo.clone(),
             ),
-            reauth: ReAuthService::new(bbs_repo.clone(), redis_conn.clone()),
+            reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), redis_conn.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone(), ctx.board_info.clone()),
             edge_token_validation: EdgeTokenValidationService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
@@ -193,34 +205,37 @@ impl<
                 idp_repo.clone(),
                 user_repo.clone(),
                 bbs_repo.clone(),
-                redis_conn.clone(),
+                sessions.clone(),
+                auth_state,
+                oidc_state.clone(),
             ),
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
                 idp_repo.clone(),
-                redis_conn.clone(),
+                oidc_state.clone(),
                 ctx.config.clone(),
             ),
             user_authz_idp_callback: UserAuthzIdpCallbackService::new(
                 idp_repo.clone(),
                 user_repo.clone(),
                 bbs_repo,
-                redis_conn.clone(),
+                sessions.clone(),
+                oidc_state.clone(),
                 ctx.config.clone(),
             ),
-            user_page: UserPageService::new(user_repo.clone(), redis_conn.clone()),
+            user_page: UserPageService::new(user_repo.clone(), sessions.clone()),
             user_login_page: UserLoginPageService::new(
                 user_repo.clone(),
                 idp_repo.clone(),
-                redis_conn.clone(),
+                sessions.clone(),
             ),
             user_login_idp_redirection: UserLoginIdpRedirectionService::new(
                 idp_repo,
-                redis_conn.clone(),
+                oidc_state,
                 ctx.config.clone(),
             ),
-            user_logout: UserLogoutService::new(redis_conn.clone()),
+            user_logout: UserLogoutService::new(sessions.clone()),
             user_restriction: UserRestrictionService::new(ctx.user_restrictions.clone()),
-            bind_token_to_user: BindTokenToUserService::new(user_repo, redis_conn),
+            bind_token_to_user: BindTokenToUserService::new(user_repo, sessions),
         }
     }
 }

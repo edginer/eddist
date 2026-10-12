@@ -24,11 +24,20 @@ pub trait AuthStateStore: Send + Sync {
     /// two keys per token. Redis failures are ignored and still yield a code.
     async fn issue_reauth_code(&self, authed_token_id: Uuid) -> String;
 
+    /// Single use, and frees the token to be issued a new code. A Redis failure or a
+    /// malformed stored value counts as an unknown code.
+    async fn consume_reauth_code(&self, code: &str) -> Option<Uuid>;
+
     /// Returns the URL path segment under `/user/register/`.
     async fn issue_user_reg_temp_url(
         &self,
         record: &TempUrlRegistrationRecord,
     ) -> anyhow::Result<String>;
+
+    async fn consume_user_reg_temp_url(
+        &self,
+        path: &str,
+    ) -> anyhow::Result<Option<TempUrlRegistrationRecord>>;
 
     async fn has_used_email_auth(&self, token: &str) -> anyhow::Result<bool>;
 
@@ -85,6 +94,17 @@ impl AuthStateStore for RedisAuthStateStore {
         }
     }
 
+    async fn consume_reauth_code(&self, code: &str) -> Option<Uuid> {
+        let mut conn = self.0.clone();
+        let token_id_str: Option<String> =
+            conn.get_del(reauth_temp_key(code)).await.unwrap_or(None);
+        let token_id = Uuid::parse_str(&token_id_str?).ok()?;
+        let _ = conn
+            .del::<_, ()>(reauth_lock_key(&token_id.to_string()))
+            .await;
+        Some(token_id)
+    }
+
     async fn issue_user_reg_temp_url(
         &self,
         record: &TempUrlRegistrationRecord,
@@ -114,6 +134,20 @@ impl AuthStateStore for RedisAuthStateStore {
         .await?;
 
         Ok(path)
+    }
+
+    async fn consume_user_reg_temp_url(
+        &self,
+        path: &str,
+    ) -> anyhow::Result<Option<TempUrlRegistrationRecord>> {
+        let mut conn = self.0.clone();
+        let Some(record) = conn
+            .get_del::<_, Option<String>>(user_reg_temp_url_register_key(path))
+            .await?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(serde_json::from_str(&record)?))
     }
 
     async fn has_used_email_auth(&self, token: &str) -> anyhow::Result<bool> {

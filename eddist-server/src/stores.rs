@@ -6,8 +6,11 @@ use crate::repositories::bbs_repository::BbsRepository;
 
 pub mod auth_state_store;
 pub mod ng_word_cache;
+pub mod oidc_state_store;
 pub mod posting_rate_limit_store;
+pub mod shared_ng_store;
 pub mod thread_dat_cache;
+pub mod user_session_store;
 
 use auth_state_store::{AuthStateStore, RedisAuthStateStore};
 use ng_word_cache::{NgWordCache, RedisNgWordCache};

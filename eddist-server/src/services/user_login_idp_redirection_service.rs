@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use redis::{AsyncCommands, aio::ConnectionManager};
 use uuid::Uuid;
 
 use crate::{
@@ -9,17 +8,21 @@ use crate::{
         service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
     },
     repositories::idp_repository::IdpRepository,
+    stores::oidc_state_store::OidcStateStore,
 };
-use eddist_core::redis_keys::user_login_oauth2_authreq_key;
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserLoginIdpRedirectionService<I: IdpRepository>(I, ConnectionManager, Arc<AppConfig>);
+pub struct UserLoginIdpRedirectionService<I: IdpRepository>(
+    I,
+    Arc<dyn OidcStateStore>,
+    Arc<AppConfig>,
+);
 
 impl<I: IdpRepository> UserLoginIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, redis_conn: ConnectionManager, config: Arc<AppConfig>) -> Self {
-        Self(idp_repo, redis_conn, config)
+    pub fn new(idp_repo: I, oidc_state: Arc<dyn OidcStateStore>, config: Arc<AppConfig>) -> Self {
+        Self(idp_repo, oidc_state, config)
     }
 }
 
@@ -32,8 +35,6 @@ impl<I: IdpRepository + Clone>
         &self,
         input: UserLoginIdpRedirectionServiceInput,
     ) -> anyhow::Result<UserLoginIdpRedirectionServiceOutput> {
-        let mut redis_conn = self.1.clone();
-
         let idp_clients_svc = OidcClientService::new(self.0.clone(), self.2.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
@@ -53,13 +54,7 @@ impl<I: IdpRepository + Clone>
             user_login_state_id: user_login_state_id.to_string(),
         };
 
-        redis_conn
-            .set_ex::<_, _, String>(
-                user_login_oauth2_authreq_key(&user_login_state.user_login_state_id),
-                serde_json::to_string(&user_login_state)?,
-                60 * 15,
-            )
-            .await?;
+        self.1.save_user_login_authreq(&user_login_state).await?;
 
         Ok(UserLoginIdpRedirectionServiceOutput {
             authz_url: authz_url.to_string(),

@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use chrono::Utc;
 use futures::future::join_all;
 use metrics::counter;
-use redis::{AsyncCommands, aio::ConnectionManager};
+use redis::aio::ConnectionManager;
 use tracing::info_span;
 
 use crate::{
@@ -16,16 +16,15 @@ use crate::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
     repositories::{bbs_pubsub_repository::CreationEventRepository, bbs_repository::BbsRepository},
+    stores::auth_state_store::AuthStateStore,
 };
 use eddist_core::{
     domain::{
         ip_addr::ReducedIpAddr,
         pubsub_repository::{AuthTokenRequested, AuthTokenSucceeded},
     },
-    redis_keys::user_reg_temp_url_register_key,
     utils::is_auth_token_pub_enabled,
 };
-use rand::{RngExt, distr::Uniform};
 use uuid::Uuid;
 
 use super::{
@@ -33,19 +32,24 @@ use super::{
     server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
 };
 
-const USER_REG_TEMP_URL_LEN: usize = 5;
-
 #[derive(Clone)]
 pub struct AuthWithCodeService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
+    auth_state: Arc<dyn AuthStateStore>,
     redis_conn: ConnectionManager,
     event_repo: E,
 }
 
 impl<T: BbsRepository, E: CreationEventRepository> AuthWithCodeService<T, E> {
-    pub fn new(repo: T, redis_conn: ConnectionManager, event_repo: E) -> Self {
+    pub fn new(
+        repo: T,
+        auth_state: Arc<dyn AuthStateStore>,
+        redis_conn: ConnectionManager,
+        event_repo: E,
+    ) -> Self {
         Self {
             repo,
+            auth_state,
             redis_conn,
             event_repo,
         }
@@ -268,17 +272,12 @@ impl<T: BbsRepository, E: CreationEventRepository>
             .settings
             .is_enabled(ServerSettingKey::EnableIdpLinking)
         {
-            let mut redis_conn = self.redis_conn.clone();
-            let temp_url_path = generate_random_string(USER_REG_TEMP_URL_LEN);
-            redis_conn
-                .set_ex::<_, _, ()>(
-                    user_reg_temp_url_register_key(&temp_url_path),
-                    serde_json::to_string(&TempUrlRegistrationRecord {
-                        authed_token_id: token.id.to_string(),
-                        source: RegistrationSource::AuthCode,
-                    })?,
-                    60 * 3, // 3 minutes TTL
-                )
+            let temp_url_path = self
+                .auth_state
+                .issue_user_reg_temp_url(&TempUrlRegistrationRecord {
+                    authed_token_id: token.id.to_string(),
+                    source: RegistrationSource::AuthCode,
+                })
                 .await?;
             Some(format!("/user/register/{temp_url_path}"))
         } else {
@@ -311,15 +310,4 @@ pub struct AuthWithCodeServiceOutput {
     pub rate_limit_token: Option<String>,
     /// URL path for optional user registration/IdP linking (only set when IdP linking is enabled)
     pub user_reg_url: Option<String>,
-}
-
-fn generate_random_string(len: usize) -> String {
-    let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
-    let index_dist = Uniform::try_from(0..charset.len()).unwrap();
-    (0..len)
-        .map(|_| {
-            let idx = rand::rng().sample(index_dist);
-            charset[idx] as char
-        })
-        .collect()
 }

@@ -1,17 +1,24 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
+
 use serde::Serialize;
 
-use crate::repositories::{idp_repository::IdpRepository, user_repository::UserRepository};
-use eddist_core::redis_keys::user_session_key;
+use crate::{
+    repositories::{idp_repository::IdpRepository, user_repository::UserRepository},
+    stores::user_session_store::UserSessionStore,
+};
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserLoginPageService<U: UserRepository, I: IdpRepository>(U, I, ConnectionManager);
+pub struct UserLoginPageService<U: UserRepository, I: IdpRepository>(
+    U,
+    I,
+    Arc<dyn UserSessionStore>,
+);
 
 impl<U: UserRepository, I: IdpRepository> UserLoginPageService<U, I> {
-    pub fn new(user_repo: U, idp_repo: I, redis_conn: ConnectionManager) -> Self {
-        Self(user_repo, idp_repo, redis_conn)
+    pub fn new(user_repo: U, idp_repo: I, sessions: Arc<dyn UserSessionStore>) -> Self {
+        Self(user_repo, idp_repo, sessions)
     }
 }
 
@@ -24,12 +31,8 @@ impl<U: UserRepository + Clone, I: IdpRepository + Clone>
         &self,
         input: UserLoginPageServiceInput,
     ) -> anyhow::Result<UserLoginPageServiceOutput> {
-        let mut redis_conn = self.2.clone();
-
         if let Some(user_sid) = input.user_sid
-            && redis_conn
-                .exists::<_, bool>(user_session_key(&user_sid))
-                .await?
+            && self.2.exists(&user_sid).await?
         {
             return Ok(UserLoginPageServiceOutput::LoggedIn);
         }

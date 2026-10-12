@@ -69,6 +69,7 @@ use crate::{
         user_restriction_service::UserRestrictionCache,
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
+    stores::shared_ng_store::{RedisSharedNgStore, SharedNgStore},
     template::load_template_engine,
     utils::CsrfState,
 };
@@ -93,6 +94,7 @@ pub struct AppState {
     pub template_engine: Arc<Handlebars<'static>>,
     pub ctx: AppContext,
     pub redis_conn: redis::aio::ConnectionManager,
+    pub shared_ng: Arc<dyn SharedNgStore>,
     pub not_found_penalty_cache: NotFoundPenaltyCache,
     _background_tasks: Arc<BackgroundTasks>,
 }
@@ -221,6 +223,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         stats_repo,
         template_engine: Arc::new(load_template_engine()),
         ctx,
+        shared_ng: Arc::new(RedisSharedNgStore::new(redis_conn.clone())),
         redis_conn,
         not_found_penalty_cache: NotFoundPenaltyCache::new(),
         _background_tasks: Arc::new(background_tasks),
