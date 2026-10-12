@@ -1,7 +1,6 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
 
-use crate::error::BbsCgiError;
-use eddist_core::redis_keys::email_auth_used_key;
+use crate::{error::BbsCgiError, stores::auth_state_store::AuthStateStore};
 
 pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] = &[
     "2chMate",
@@ -14,32 +13,12 @@ pub const EMAIL_AUTH_PROHIBITED_USER_AGENTS: &[&str] = &[
 
 #[derive(Clone)]
 pub struct EmailAuthRestrictionService {
-    redis_conn: ConnectionManager,
+    auth_state: Arc<dyn AuthStateStore>,
 }
 
 impl EmailAuthRestrictionService {
-    pub fn new(redis_conn: ConnectionManager) -> Self {
-        Self { redis_conn }
-    }
-
-    /// Check if email auth has been used for this authed token
-    pub async fn has_used_email_auth(&self, authed_token_id: &str) -> anyhow::Result<bool> {
-        let key = email_auth_used_key(authed_token_id);
-        let mut redis_conn = self.redis_conn.clone();
-        let exists = redis_conn.exists::<_, bool>(&key).await?;
-        Ok(exists)
-    }
-
-    /// Mark email auth as used for this authed token (1 month expiry)
-    pub async fn mark_email_auth_used(&self, authed_token_id: &str) -> anyhow::Result<()> {
-        let key = email_auth_used_key(authed_token_id);
-        let mut redis_conn = self.redis_conn.clone();
-
-        // Store empty value with 30 days expiration (2,592,000 seconds)
-        redis_conn
-            .set_ex::<_, _, ()>(&key, "", 60 * 60 * 24 * 30)
-            .await?;
-        Ok(())
+    pub fn new(auth_state: Arc<dyn AuthStateStore>) -> Self {
+        Self { auth_state }
     }
 
     /// Check and enforce email auth restriction for prohibited user agents
@@ -59,7 +38,7 @@ impl EmailAuthRestrictionService {
             return Ok(());
         }
 
-        match self.has_used_email_auth(authed_token_id).await {
+        match self.auth_state.has_used_email_auth(authed_token_id).await {
             Ok(true) => {
                 // This authed token has already used email auth once - block
                 log::warn!(
@@ -69,7 +48,7 @@ impl EmailAuthRestrictionService {
             }
             Ok(false) => {
                 // First time email auth for this token - mark as used and allow
-                if let Err(e) = self.mark_email_auth_used(authed_token_id).await {
+                if let Err(e) = self.auth_state.mark_email_auth_used(authed_token_id).await {
                     log::error!("Failed to mark email auth as used: {e:?}");
                 }
                 log::info!(

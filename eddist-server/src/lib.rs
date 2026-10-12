@@ -23,9 +23,7 @@ mod domain {
         pub mod bbscgi_user_reg_temp_url_service;
         pub mod board_info_service;
         pub mod email_auth_restriction_service;
-        pub mod ng_word_reading_service;
         pub mod oidc_client_service;
-        pub mod res_creation_span_management_service;
     }
     pub(crate) mod authed_token;
     pub(crate) mod captcha_like;
@@ -44,6 +42,7 @@ pub mod context;
 mod error;
 pub mod middleware;
 pub mod services;
+pub(crate) mod stores;
 mod template;
 pub(crate) mod external {
     pub mod captcha_like_client;

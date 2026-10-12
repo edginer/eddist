@@ -1,18 +1,15 @@
 use std::sync::Arc;
 
-use rand::RngExt;
-
 use chrono::Utc;
 use eddist_core::simple_rate_limiter::RateLimiter;
 use metrics::counter;
-use redis::{AsyncCommands, aio::ConnectionManager};
 use tokio::sync::Mutex;
 
 use crate::{
     config::AppConfig,
     domain::{
         authed_token::AuthedToken,
-        service::bbscgi_user_reg_temp_url_service::{UserRegTempUrlService, UserRegUrlKind},
+        service::bbscgi_user_reg_temp_url_service::{UserRegUrlKind, create_userreg_temp_url},
     },
     error::BbsCgiError,
     repositories::{
@@ -20,11 +17,10 @@ use crate::{
         bbs_repository::{BbsRepository, CreatingAuthedToken},
     },
     services::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
+    stores::auth_state_store::AuthStateStore,
 };
 use eddist_core::{
-    domain::pubsub_repository::AuthTokenInitiated,
-    redis_keys::{authed_token_suspended_key, reauth_lock_key, reauth_temp_key},
-    utils::is_auth_token_pub_enabled,
+    domain::pubsub_repository::AuthTokenInitiated, utils::is_auth_token_pub_enabled,
 };
 
 #[derive(Clone)]
@@ -48,7 +44,7 @@ impl UserCreationRateLimit {
 #[derive(Clone)]
 pub struct BbsCgiAuthService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
-    redis_conn: ConnectionManager,
+    auth_state: Arc<dyn AuthStateStore>,
     event_repo: E,
     config: Arc<AppConfig>,
     user_creation_rate_limit: UserCreationRateLimit,
@@ -57,14 +53,14 @@ pub struct BbsCgiAuthService<T: BbsRepository, E: CreationEventRepository> {
 impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
     pub fn new(
         repo: T,
-        redis_conn: ConnectionManager,
+        auth_state: Arc<dyn AuthStateStore>,
         event_repo: E,
         config: Arc<AppConfig>,
         user_creation_rate_limit: UserCreationRateLimit,
     ) -> Self {
         Self {
             repo,
-            redis_conn,
+            auth_state,
             event_repo,
             config,
             user_creation_rate_limit,
@@ -173,43 +169,15 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             });
         }
 
-        // Check temporary suspension flag in Redis
-        let suspension_key = authed_token_suspended_key(&authed_token.id.to_string());
-        let mut conn = self.redis_conn.clone();
-        let is_suspended = conn
-            .exists::<_, bool>(&suspension_key)
-            .await
-            .unwrap_or(false);
-        if is_suspended {
+        if self.auth_state.is_token_suspended(authed_token.id).await {
             return Err(BbsCgiError::TemporarilySuspended);
         }
 
-        // Check require_reauth flag — generate a one-time temp key so the re-auth page
-        // can uniquely identify this token without relying on IP (which may change on mobile).
-        // A per-token lock key (reauth:lock:{id}) caps Redis entries at 2 per token regardless
-        // of how many post attempts are made; repeated attempts reuse the existing code.
+        // A one-time code lets the re-auth page identify the token without relying on the
+        // IP, which may change on mobile.
         if authed_token.require_reauth {
-            let token_id_str = authed_token.id.to_string();
-            let lock_key = reauth_lock_key(&token_id_str);
-            let existing_code: Option<String> = conn.get(&lock_key).await.unwrap_or(None);
-            let temp_key = match existing_code {
-                Some(code) => {
-                    // Refresh TTL on both keys so the window resets from the latest attempt
-                    let _ = conn.expire::<_, ()>(&lock_key, 60 * 5).await;
-                    let _ = conn.expire::<_, ()>(&reauth_temp_key(&code), 60 * 5).await;
-                    code
-                }
-                None => {
-                    let code = gen_reauth_temp_key();
-                    let _ = conn
-                        .set_ex::<_, _, ()>(&reauth_temp_key(&code), &token_id_str, 60 * 5)
-                        .await;
-                    let _ = conn.set_ex::<_, _, ()>(&lock_key, &code, 60 * 5).await;
-                    code
-                }
-            };
             return Err(BbsCgiError::ReAuthRequired {
-                temp_key,
+                temp_key: self.auth_state.issue_reauth_code(authed_token.id).await,
                 base_url: self.config.base_url.clone(),
             });
         }
@@ -224,11 +192,12 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
                 return Err(BbsCgiError::TooManyUserCreationAttempt);
             }
 
-            let user_reg_url_svc =
-                UserRegTempUrlService::new(self.redis_conn.clone(), &self.config.base_url);
-            return match user_reg_url_svc
-                .create_userreg_temp_url(&authed_token)
-                .await?
+            return match create_userreg_temp_url(
+                self.auth_state.as_ref(),
+                &self.config.base_url,
+                &authed_token,
+            )
+            .await?
             {
                 UserRegUrlKind::Registered => Err(BbsCgiError::UserAlreadyRegistered),
                 UserRegUrlKind::NotRegistered(user_reg_url) => {
@@ -239,14 +208,4 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
 
         Ok(authed_token)
     }
-}
-
-/// Generates an 8-character Crockford Base32 key (digits + uppercase letters, no I/L/O/U).
-/// 32^8 ≈ 1 trillion combinations — sufficient for a 5-minute TTL key.
-fn gen_reauth_temp_key() -> String {
-    const CHARS: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-    let mut rng = rand::rng();
-    (0..8)
-        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
-        .collect()
 }

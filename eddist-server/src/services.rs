@@ -29,6 +29,7 @@ use crate::{
         idp_repository::IdpRepository,
         user_repository::UserRepository,
     },
+    stores::PostingStores,
 };
 
 /// Groups the two pub/sub repositories to keep `AppServiceContainer::new` within argument limits.
@@ -121,8 +122,8 @@ pub struct AppServiceContainer<
     board_info: BoardInfoService<B>,
     edge_token_validation: EdgeTokenValidationService<B>,
     list_boards: ListBoardsService<B>,
-    res_creation: ResCreationService<B, U, P, E>,
-    thread_creation: ThreadCreationService<B, U, E>,
+    res_creation: ResCreationService<B, P, E>,
+    thread_creation: ThreadCreationService<B, E>,
     thread_list: ThreadListService<B>,
     metadent_thread_list: MetadentThreadListService<B>,
     thread_retrieval: ThreadRetrievalService<B>,
@@ -156,6 +157,7 @@ impl<
         kako_thread_retrieval: KakoThreadRetrievalService,
         ctx: &AppContext,
     ) -> Self {
+        let posting_stores = PostingStores::redis(redis_conn.clone(), bbs_repo.clone());
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
                 bbs_repo.clone(),
@@ -168,22 +170,23 @@ impl<
             list_boards: ListBoardsService::new(bbs_repo.clone()),
             res_creation: ResCreationService::new(
                 bbs_repo.clone(),
-                user_repo.clone(),
-                redis_conn.clone(),
+                posting_stores.clone(),
                 pubsub.pub_repo.clone(),
                 pubsub.event_repo.clone(),
                 ctx.clone(),
             ),
             thread_creation: ThreadCreationService::new(
                 bbs_repo.clone(),
-                user_repo.clone(),
-                redis_conn.clone(),
+                posting_stores.clone(),
                 pubsub.event_repo.clone(),
                 ctx.clone(),
             ),
             thread_list: ThreadListService::new(bbs_repo.clone()),
             metadent_thread_list: MetadentThreadListService::new(bbs_repo.clone()),
-            thread_retrieval: ThreadRetrievalService::new(bbs_repo.clone(), redis_conn.clone()),
+            thread_retrieval: ThreadRetrievalService::new(
+                bbs_repo.clone(),
+                posting_stores.dat_cache.clone(),
+            ),
             kako_thread_retrieval,
 
             user_reg_temp_url: UserRegTempUrlService::new(
@@ -246,11 +249,11 @@ impl<
         &self.edge_token_validation
     }
 
-    pub fn res_creation(&self) -> &ResCreationService<B, U, P, E> {
+    pub fn res_creation(&self) -> &ResCreationService<B, P, E> {
         &self.res_creation
     }
 
-    pub fn thread_creation(&self) -> &ThreadCreationService<B, U, E> {
+    pub fn thread_creation(&self) -> &ThreadCreationService<B, E> {
         &self.thread_creation
     }
 

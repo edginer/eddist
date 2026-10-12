@@ -1,72 +1,34 @@
 use rand::{RngExt, distr::Uniform};
-use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::domain::{
-    authed_token::AuthedToken,
-    user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
+use crate::{
+    domain::{
+        authed_token::AuthedToken,
+        user::user_reg_state::{RegistrationSource, TempUrlRegistrationRecord},
+    },
+    stores::auth_state_store::AuthStateStore,
 };
-use eddist_core::redis_keys::user_reg_temp_url_register_key;
 
 pub const USER_REG_TEMP_URL_LEN: usize = 5;
 
-pub struct UserRegTempUrlService<'a> {
-    redis_conn: ConnectionManager,
-    base_url: &'a str,
-}
-
-impl<'a> UserRegTempUrlService<'a> {
-    pub fn new(redis_conn: ConnectionManager, base_url: &'a str) -> Self {
-        Self {
-            redis_conn,
-            base_url,
-        }
+pub async fn create_userreg_temp_url(
+    auth_state: &dyn AuthStateStore,
+    base_url: &str,
+    authed_token: &AuthedToken,
+) -> anyhow::Result<UserRegUrlKind> {
+    if authed_token.registered_user_id.is_some() {
+        return Ok(UserRegUrlKind::Registered);
     }
 
-    pub async fn create_userreg_temp_url(
-        &self,
-        authed_token: &AuthedToken,
-    ) -> anyhow::Result<UserRegUrlKind> {
-        let mut redis_conn = self.redis_conn.clone();
+    let temp_url_path = auth_state
+        .issue_user_reg_temp_url(&TempUrlRegistrationRecord {
+            authed_token_id: authed_token.id.to_string(),
+            source: RegistrationSource::BbsCgi,
+        })
+        .await?;
 
-        if authed_token.registered_user_id.is_some() {
-            return Ok(UserRegUrlKind::Registered);
-        }
-
-        let temp_url_query = generate_random_string(USER_REG_TEMP_URL_LEN);
-        // first, duplicate check
-        let temp_url_path = if redis_conn
-            .exists::<_, bool>(user_reg_temp_url_register_key(&temp_url_query))
-            .await?
-        {
-            // NOTE: retry only once (we does not consider collision between `exists` and `set`, it's very rare case)
-            let temp_url_query = generate_random_string(USER_REG_TEMP_URL_LEN);
-            if redis_conn
-                .exists::<_, bool>(user_reg_temp_url_register_key(&temp_url_query))
-                .await?
-            {
-                return Err(anyhow::anyhow!("Failed to generate temp_url_query"));
-            }
-            temp_url_query
-        } else {
-            temp_url_query
-        };
-
-        redis_conn
-            .set_ex::<_, _, ()>(
-                user_reg_temp_url_register_key(&temp_url_path),
-                serde_json::to_string(&TempUrlRegistrationRecord {
-                    authed_token_id: authed_token.id.to_string(),
-                    source: RegistrationSource::BbsCgi,
-                })?,
-                60 * 3,
-            )
-            .await?;
-
-        Ok(UserRegUrlKind::NotRegistered(format!(
-            "{}/user/register/{temp_url_path}",
-            self.base_url,
-        )))
-    }
+    Ok(UserRegUrlKind::NotRegistered(format!(
+        "{base_url}/user/register/{temp_url_path}"
+    )))
 }
 
 #[derive(Debug)]
@@ -75,7 +37,7 @@ pub enum UserRegUrlKind {
     NotRegistered(String),
 }
 
-fn generate_random_string(len: usize) -> String {
+pub(crate) fn generate_random_string(len: usize) -> String {
     // NOTE: We have removed 'I', 'i', 'L', 'l', 'O', 'o', '0', '1' from the usual alphanumeric set.
     let charset: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
 

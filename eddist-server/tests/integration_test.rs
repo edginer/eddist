@@ -678,6 +678,75 @@ async fn test_dat_cache_and_db_parity() {
     );
 }
 
+#[tokio::test]
+async fn test_thread_creation_records_dat_ttl_and_posting_limits() {
+    let mut ctx = TestContext::new().await;
+
+    let board_key = "postlimit";
+    create_test_board(&ctx.pool, board_key, "投稿制限板").await;
+    let (_token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.7", "code-test7").await;
+    let post = |form: Vec<(&str, String)>| {
+        let form: Vec<(&str, &str)> = form.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        ctx.server
+            .post("/test/bbs.cgi")
+            .content_type("application/x-www-form-urlencoded")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_str(&format!("edge-token={token}")).unwrap(),
+            )
+            .bytes(Bytes::from(encode_sjis_form(&form).into_bytes()))
+    };
+
+    let response = post(vec![
+        ("bbs", board_key.into()),
+        ("submit", "新規スレッド作成".into()),
+        ("subject", "制限テスト".into()),
+        ("FROM", "".into()),
+        ("mail", "".into()),
+        ("MESSAGE", "1".into()),
+    ])
+    .await;
+    assert!(decode_sjis(response.as_bytes()).contains("書きこみました"));
+
+    let (thread_number,): (i64,) = sqlx::query_as(
+        "SELECT thread_number FROM threads WHERE board_id = (SELECT id FROM boards WHERE board_key = ?)",
+    )
+    .bind(board_key)
+    .fetch_one(&ctx.pool)
+    .await
+    .unwrap();
+    let dat_key = thread_cache_key(board_key, thread_number as u64);
+
+    let dat_ttl: i64 = ctx.redis_conn.ttl(&dat_key).await.unwrap();
+    assert!((60 * 60 * 24 * 7 - 60..=60 * 60 * 24 * 7).contains(&dat_ttl));
+
+    // Board defaults: thread span 120s, response span 5s (the auth-IP key keeps 3x the span).
+    for (pattern, span) in [
+        ("thread_creation_span:*", 120),
+        ("thread_creation_span_ip:*", 120),
+        ("res_creation_span:*", 15),
+        ("res_creation_span_ip:*", 5),
+    ] {
+        let keys: Vec<String> = ctx.redis_conn.keys(pattern).await.unwrap();
+        assert_eq!(keys.len(), 1, "{pattern}");
+        let ttl: i64 = ctx.redis_conn.ttl(&keys[0]).await.unwrap();
+        assert!((1..=span).contains(&ttl), "{pattern}: ttl {ttl}");
+    }
+
+    let response = post(vec![
+        ("bbs", board_key.into()),
+        ("submit", "書き込む".into()),
+        ("key", thread_number.to_string()),
+        ("FROM", "".into()),
+        ("mail", "".into()),
+        ("MESSAGE", "2".into()),
+    ])
+    .await;
+    assert!(decode_sjis(response.as_bytes()).contains("E-ResCreationSpanRestriction"));
+    let dat_len: usize = ctx.redis_conn.llen(&dat_key).await.unwrap();
+    assert_eq!(dat_len, 1);
+}
+
 /// Shared NG: a value is served board-wide only once enough distinct contributors
 /// have marked it, and stays board-wide even after a contributor retracts — it only
 /// expires via TTL.
