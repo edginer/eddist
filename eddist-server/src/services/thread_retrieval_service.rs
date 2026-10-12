@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use eddist_core::domain::res::get_1001_sjis_bytes;
 use metrics::counter;
 use redis::{AsyncCommands, aio::ConnectionManager};
@@ -39,13 +38,13 @@ impl<T: BbsRepository> ThreadRetrievalService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
+impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw, DatRetrievalError>
     for ThreadRetrievalService<T>
 {
     async fn execute(
         &self,
         input: ThreadRetrievalServiceInput,
-    ) -> anyhow::Result<ThreadResListRaw> {
+    ) -> Result<ThreadResListRaw, DatRetrievalError> {
         let mut redis_conn = self.1.clone();
 
         match redis_conn
@@ -88,13 +87,13 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
             _ => {
                 counter!("dat_retrieval", "source" => "db").increment(1);
                 let Some(board) = self.0.get_board(&input.board_key).await? else {
-                    return Err(anyhow!("failed to find board"));
+                    return Err(DatRetrievalError::BoardNotFound);
                 };
                 let board_info = self
                     .0
                     .get_board_info(board.id)
                     .await?
-                    .ok_or_else(|| anyhow!("failed to find board info"))?;
+                    .ok_or(DatRetrievalError::BoardNotFound)?;
 
                 let th = self
                     .0
@@ -104,7 +103,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
                     )
                     .await?;
                 let Some(th) = th else {
-                    return Err(anyhow!("cannot find such thread"));
+                    return Err(DatRetrievalError::ThreadNotFound);
                 };
                 let responses = self.0.get_responses(th.id).await?;
 
@@ -132,6 +131,16 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw>
             }
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DatRetrievalError {
+    #[error("board not found")]
+    BoardNotFound,
+    #[error("thread not found")]
+    ThreadNotFound,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 pub struct ThreadRetrievalServiceInput {

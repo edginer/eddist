@@ -22,14 +22,7 @@ pub async fn get_subject_txt(
     let svc = state.get_container().thread_list();
     let threads = match svc.execute(BoardKey(board_key)).await {
         Ok(threads) => threads,
-        Err(e) => {
-            return if e.to_string().contains("failed to find board info") {
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            } else {
-                log::error!("Failed to get thread list: {e:?}");
-                Response::builder().status(500).body(Body::empty()).unwrap()
-            };
-        }
+        Err(e) => return e.into_response(),
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))
@@ -56,14 +49,7 @@ pub async fn get_subject_txt_with_metadent(
         .await
     {
         Ok(threads) => threads,
-        Err(e) => {
-            return if e.to_string().contains("failed to find board info") {
-                Response::builder().status(404).body(Body::empty()).unwrap()
-            } else {
-                log::error!("Failed to get thread list: {e:?}");
-                Response::builder().status(500).body(Body::empty()).unwrap()
-            };
-        }
+        Err(e) => return e.into_response(),
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(threads.get_sjis_thread_list()))

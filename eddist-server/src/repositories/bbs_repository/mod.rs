@@ -7,7 +7,7 @@ pub use authed_token::{AuthedTokenRepository, CreatingAuthedToken};
 pub use board::BoardRepository;
 pub use eddist_core::domain::pubsub_repository::CreatingThread;
 pub use response::ResponseRepository;
-pub use thread::{ThreadRepository, ThreadStatus};
+pub use thread::{CreateThreadError, ThreadRepository, ThreadStatus};
 
 use sqlx::MySqlPool;
 

@@ -35,6 +35,20 @@ async fn test_dat_database_failure_does_not_increment_not_found_counter() {
 }
 
 #[tokio::test]
+async fn test_dat_board_without_board_info_is_not_found() {
+    let ctx = TestContext::new().await;
+    let board_id = create_test_board(&ctx.pool, "noinfo", "テスト板").await;
+    sqlx::query("DELETE FROM boards_info WHERE id = ?")
+        .bind(board_id)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+
+    let response = ctx.server.get("/noinfo/dat/1234567890.dat").await;
+    assert_eq!(response.status_code(), 404);
+}
+
+#[tokio::test]
 async fn test_dat_redis_failure_falls_back_to_database() {
     let ctx = TestContext::new().await;
     let board_id = create_test_board(&ctx.pool, "fallback", "テスト板").await;
@@ -63,6 +77,157 @@ async fn test_apps_load_settings_before_serving_and_do_not_share_them() {
     assert_eq!(response.status_code(), 503);
     let response = open.server.post("/auth-code").form(&empty_form).await;
     assert_eq!(response.status_code(), 400);
+}
+
+#[tokio::test]
+async fn test_board_lookup_separates_missing_board_from_database_failure() {
+    let ctx = TestContext::with_server_settings(&[("bbs.enable_safe_mode", "true")]).await;
+    let paths = [
+        "/nosuch/SETTING.TXT",
+        "/nosuch/head.txt",
+        "/api/nosuch/unsafe-thread-ids",
+    ];
+    for path in paths {
+        assert_eq!(ctx.server.get(path).await.status_code(), 404, "{path}");
+    }
+
+    ctx.pool.close().await;
+    for path in paths {
+        assert_eq!(ctx.server.get(path).await.status_code(), 500, "{path}");
+    }
+}
+
+#[tokio::test]
+async fn test_post_to_missing_board_is_not_found_error() {
+    let ctx = TestContext::new().await;
+    let (_token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.1", "code-nb").await;
+    let form_data = encode_sjis_form(&[
+        ("bbs", "nosuch"),
+        ("submit", "新規スレッド作成"),
+        ("subject", "存在しない板"),
+        ("FROM", ""),
+        ("mail", ""),
+        ("MESSAGE", "本文"),
+    ]);
+
+    let response = ctx
+        .server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={}", token)).unwrap(),
+        )
+        .bytes(Bytes::from(form_data.into_bytes()))
+        .await;
+
+    assert_eq!(response.status_code(), 200);
+    assert!(decode_sjis(response.as_bytes()).contains("E-NotFound"));
+}
+
+#[tokio::test]
+async fn test_user_page_internal_failure_keeps_session_cookie() {
+    use eddist_core::redis_keys::user_session_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(
+            user_session_key("live-sid"),
+            uuid::Uuid::now_v7().to_string(),
+        )
+        .await
+        .unwrap();
+    ctx.pool.close().await;
+
+    let response = ctx
+        .server
+        .get("/user")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_static("user-sid=live-sid"),
+        )
+        .await;
+
+    assert_eq!(response.status_code(), 500);
+    assert!(response.headers().get("set-cookie").is_none());
+}
+
+#[tokio::test]
+async fn test_user_page_malformed_session_resets_session_cookie() {
+    use eddist_core::redis_keys::user_session_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(user_session_key("bad-sid"), "not-a-uuid")
+        .await
+        .unwrap();
+
+    let response = ctx
+        .server
+        .get("/user")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_static("user-sid=bad-sid"),
+        )
+        .await;
+
+    assert_eq!(response.status_code(), 302);
+    assert!(response.headers().get("set-cookie").is_some());
+}
+
+#[tokio::test]
+async fn test_idp_registration_redirect_separates_unknown_idp_from_internal_failure() {
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    let request = || {
+        ctx.server
+            .get("/user/register/authz/idp/nosuch")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_static("userreg-state-id=reg-state"),
+            )
+    };
+
+    assert_eq!(request().await.status_code(), 400);
+
+    ctx.pool.close().await;
+    let response = request().await;
+    assert_eq!(response.status_code(), 500);
+    assert!(response.headers().get("set-cookie").is_none());
+}
+
+#[tokio::test]
+async fn test_idp_callback_separates_rejection_from_internal_failure() {
+    use eddist_core::redis_keys::user_login_oauth2_authreq_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    let request = || {
+        ctx.server
+            .get("/user/auth/callback?code=code&state=login-state")
+            .add_header(
+                HeaderName::from_static("cookie"),
+                HeaderValue::from_static("user-login-state-id=login-state"),
+            )
+            .add_header(
+                HeaderName::from_static("x-forwarded-for"),
+                HeaderValue::from_static("127.0.0.1"),
+            )
+            .add_header(
+                HeaderName::from_static("user-agent"),
+                HeaderValue::from_static("test-agent"),
+            )
+            .add_header(
+                HeaderName::from_static("x-asn-num"),
+                HeaderValue::from_static("1"),
+            )
+    };
+
+    assert_eq!(request().await.status_code(), 400);
+
+    ctx.redis_conn
+        .clone()
+        .set::<_, _, ()>(user_login_oauth2_authreq_key("login-state"), "not-json")
+        .await
+        .unwrap();
+    assert_eq!(request().await.status_code(), 500);
 }
 
 /// Test 1: GET thread list via HTTP

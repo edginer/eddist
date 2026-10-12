@@ -30,27 +30,30 @@ impl<I: IdpRepository + Clone> UserRegIdpRedirectionService<I> {
 
 #[async_trait::async_trait]
 impl<I: IdpRepository + Clone>
-    AppService<UserRegIdpRedirectionServiceInput, UserRegIdpRedirectionServiceOutput>
-    for UserRegIdpRedirectionService<I>
+    AppService<
+        UserRegIdpRedirectionServiceInput,
+        UserRegIdpRedirectionServiceOutput,
+        UserRegIdpRedirectionError,
+    > for UserRegIdpRedirectionService<I>
 {
     async fn execute(
         &self,
         input: UserRegIdpRedirectionServiceInput,
-    ) -> anyhow::Result<UserRegIdpRedirectionServiceOutput> {
+    ) -> Result<UserRegIdpRedirectionServiceOutput, UserRegIdpRedirectionError> {
         let mut redis_conn = self.redis_conn.clone();
 
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
-        let (_, idp_client) = idp_clients
-            .get(&input.idp_name)
-            .ok_or_else(|| anyhow::anyhow!("idp client not found: {}", input.idp_name))?;
+        let Some((_, idp_client)) = idp_clients.get(&input.idp_name) else {
+            return Err(UserRegIdpRedirectionError::UnknownIdp);
+        };
 
-        let Ok(user_reg_state) = redis_conn
-            .get_del::<_, String>(user_reg_oauth2_state_key(&input.user_reg_state_id))
-            .await
+        let Some(user_reg_state) = redis_conn
+            .get_del::<_, Option<String>>(user_reg_oauth2_state_key(&input.user_reg_state_id))
+            .await?
         else {
-            return Err(anyhow::anyhow!("user_reg_state_id not found"));
+            return Err(UserRegIdpRedirectionError::StateNotFound);
         };
 
         let user_reg_state = serde_json::from_str::<UserRegState>(&user_reg_state)?;
@@ -78,6 +81,18 @@ impl<I: IdpRepository + Clone>
         })
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum UserRegIdpRedirectionError {
+    #[error("user registration state not found")]
+    StateNotFound,
+    #[error("unknown idp")]
+    UnknownIdp,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl_from_for_other!(UserRegIdpRedirectionError: redis::RedisError, serde_json::Error);
 
 pub struct UserRegIdpRedirectionServiceInput {
     pub idp_name: String,

@@ -46,13 +46,7 @@ pub async fn get_unsafe_thread_ids(
 
     let board_key = match board_info {
         Ok(info) => info.board_key,
-        Err(e) => {
-            if e.to_string().contains("board not found") {
-                return Response::builder().status(404).body(Body::empty()).unwrap();
-            }
-            log::error!("Failed to get board info for safe mode: {e:?}");
-            return Response::builder().status(500).body(Body::empty()).unwrap();
-        }
+        Err(e) => return e.into_response(),
     };
 
     let key = unsafe_threads_key(&board_key);

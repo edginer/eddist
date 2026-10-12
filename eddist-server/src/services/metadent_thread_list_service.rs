@@ -15,7 +15,7 @@ use crate::{
     repositories::bbs_repository::BbsRepository,
 };
 
-use super::AppService;
+use super::{AppService, BoardLookupError};
 
 #[derive(Debug, Clone)]
 pub struct MetadentThreadListService<T: BbsRepository>(T);
@@ -27,15 +27,15 @@ impl<T: BbsRepository> MetadentThreadListService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent>
+impl<T: BbsRepository> AppService<BoardKey, ThreadListWithMetadent, BoardLookupError>
     for MetadentThreadListService<T>
 {
-    async fn execute(&self, input: BoardKey) -> anyhow::Result<ThreadListWithMetadent> {
+    async fn execute(&self, input: BoardKey) -> Result<ThreadListWithMetadent, BoardLookupError> {
         let board = self
             .0
             .get_board(&input.0)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("failed to find board info"))?;
+            .ok_or(BoardLookupError::NotFound)?;
 
         let threads = self.0.get_threads_with_metadent(board.id).await?;
         let threads = threads

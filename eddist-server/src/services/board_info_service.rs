@@ -6,7 +6,7 @@ use crate::{
     repositories::bbs_repository::BbsRepository,
 };
 
-use super::AppService;
+use super::{AppService, BoardLookupError};
 
 #[derive(Clone)]
 pub struct BoardInfoService<T: BbsRepository>(T, BoardInfoCache);
@@ -18,19 +18,20 @@ impl<T: BbsRepository> BoardInfoService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone> AppService<BoardInfoServiceInput, BoardInfoServiceOutput>
+impl<T: BbsRepository + Clone>
+    AppService<BoardInfoServiceInput, BoardInfoServiceOutput, BoardLookupError>
     for BoardInfoService<T>
 {
     async fn execute(
         &self,
         input: BoardInfoServiceInput,
-    ) -> anyhow::Result<BoardInfoServiceOutput> {
+    ) -> Result<BoardInfoServiceOutput, BoardLookupError> {
         let svc = board_info_service::BoardInfoService::new(self.0.clone(), self.1.clone());
 
         let (board, board_info) = svc
             .get_board_info_by_key(&input.board_key)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("board not found"))?;
+            .ok_or(BoardLookupError::NotFound)?;
 
         Ok(BoardInfoServiceOutput {
             board_id: board.id,

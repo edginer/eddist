@@ -17,13 +17,16 @@ use crate::{
         AppService,
         server_settings_cache::ServerSettingKey,
         user_authz_idp_callback_service::{
-            CallbackKind, UserAuthzIdpCallbackServiceInput, UserAuthzIdpCallbackServiceOutput,
+            CallbackKind, UserAuthzIdpCallbackError, UserAuthzIdpCallbackServiceInput,
+            UserAuthzIdpCallbackServiceOutput,
         },
         user_login_idp_redirection_service::UserLoginIdpRedirectionServiceInput,
         user_login_page_service::{UserLoginPageServiceInput, UserLoginPageServiceOutput},
         user_logout_service::UserLogoutServiceInput,
-        user_page_service::{UserPageServiceInput, UserPageServiceOutput},
-        user_reg_idp_redirection_service::UserRegIdpRedirectionServiceInput,
+        user_page_service::{UserPageError, UserPageServiceInput, UserPageServiceOutput},
+        user_reg_idp_redirection_service::{
+            UserRegIdpRedirectionError, UserRegIdpRedirectionServiceInput,
+        },
         user_reg_temp_url_service::{UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput},
     },
     utils::{get_asn_num, get_origin_ip, get_ua},
@@ -79,23 +82,33 @@ async fn get_user_page(State(state): State<AppState>, jar: CookieJar) -> impl In
             .unwrap();
     };
 
-    let Ok(UserPageServiceOutput { user }) = state
+    let user = match state
         .services
         .user_page()
         .execute(UserPageServiceInput {
             user_sid: user_sid.clone(),
         })
         .await
-    else {
-        return Response::builder()
-            .status(302)
-            .header(
-                "Set-Cookie",
-                HeaderValue::from_str(&reset_user_sid_cookie().to_string()).unwrap(),
-            )
-            .header("Location", "/user/login?utm_source=user-page")
-            .body(Body::from("User not found"))
-            .unwrap();
+    {
+        Ok(UserPageServiceOutput { user }) => user,
+        Err(UserPageError::Other(e)) => {
+            log::error!("Failed to get user page: {e:?}");
+            return Response::builder()
+                .status(500)
+                .body(Body::from("Failed to get user"))
+                .unwrap();
+        }
+        Err(UserPageError::SessionNotFound | UserPageError::UserDisabled) => {
+            return Response::builder()
+                .status(302)
+                .header(
+                    "Set-Cookie",
+                    HeaderValue::from_str(&reset_user_sid_cookie().to_string()).unwrap(),
+                )
+                .header("Location", "/user/login?utm_source=user-page")
+                .body(Body::from("User not found"))
+                .unwrap();
+        }
     };
 
     let html = state
@@ -216,16 +229,23 @@ async fn get_user_reg_redirect_to_idp_authz(
         .await
     {
         Ok(o) => o,
-        Err(e) if e.to_string().contains("user_reg_state_id not found") => {
+        Err(UserRegIdpRedirectionError::StateNotFound) => {
             return Response::builder()
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
                 .status(400)
                 .body(Body::from("User registration state session is not found"))
                 .unwrap();
         }
-        Err(_) => {
+        Err(UserRegIdpRedirectionError::UnknownIdp) => {
             return Response::builder()
                 .status(400)
+                .body(Body::from("Unknown IdP"))
+                .unwrap();
+        }
+        Err(UserRegIdpRedirectionError::Other(e)) => {
+            log::error!("Failed to redirect to IdP: {e:?}");
+            return Response::builder()
+                .status(500)
                 .body(Body::from("Failed to redirect to IDP"))
                 .unwrap();
         }
@@ -409,19 +429,31 @@ async fn get_user_authz_idp_callback(
             user_sid,
             edge_token,
         }) => (user_sid, edge_token),
-        Err(e) if e.to_string().contains("user not found") => {
+        Err(UserAuthzIdpCallbackError::UserNotFound) => {
             return Response::builder()
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
                 .status(400)
                 .body(Body::from("Failed to get user (maybe unregistered)"))
                 .unwrap();
         }
-        Err(e) => {
-            log::error!("Failed to get user: {e}");
+        Err(
+            e @ (UserAuthzIdpCallbackError::StateNotFound | UserAuthzIdpCallbackError::Rejected(_)),
+        ) => {
+            log::warn!("Rejected IdP callback: {e}");
             return Response::builder()
                 .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
                 .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
                 .status(400)
+                .body(Body::from("Failed to get user".to_string()))
+                .unwrap();
+        }
+        // The state cookies are cleared because the authorization state and code are single-use.
+        Err(UserAuthzIdpCallbackError::Other(e)) => {
+            log::error!("Failed to get user: {e:?}");
+            return Response::builder()
+                .header("Set-Cookie", reset_user_login_state_id_cookie().to_string())
+                .header("Set-Cookie", reset_userreg_state_id_cookie().to_string())
+                .status(500)
                 .body(Body::from("Failed to get user".to_string()))
                 .unwrap();
         }

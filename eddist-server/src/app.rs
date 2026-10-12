@@ -244,7 +244,7 @@ async fn get_setting_txt(
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
 
-    let Ok(BoardInfoServiceOutput {
+    let BoardInfoServiceOutput {
         board_key,
         name,
         default_name,
@@ -258,13 +258,14 @@ async fn get_setting_txt(
                 ..
             },
         ..
-    }) = state
+    } = match state
         .services
         .board_info()
         .execute(BoardInfoServiceInput { board_key })
         .await
-    else {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
+    {
+        Ok(output) => output,
+        Err(e) => return e.into_response(),
     };
     let max_response_body_lines = max_response_body_lines / 2;
 
@@ -301,16 +302,17 @@ async fn get_head_txt(
         return Response::builder().status(404).body(Body::empty()).unwrap();
     }
 
-    let Ok(BoardInfoServiceOutput {
+    let BoardInfoServiceOutput {
         board_info: BoardInfo { local_rules, .. },
         ..
-    }) = state
+    } = match state
         .services
         .board_info()
         .execute(BoardInfoServiceInput { board_key })
         .await
-    else {
-        return Response::builder().status(404).body(Body::empty()).unwrap();
+    {
+        Ok(output) => output,
+        Err(e) => return e.into_response(),
     };
 
     SJisResponseBuilder::new((&local_rules as &str).into())

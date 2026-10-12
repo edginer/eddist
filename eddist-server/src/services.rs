@@ -37,6 +37,19 @@ pub struct PubSubRepos<P: PubRepository, E: CreationEventRepository> {
     pub event_repo: E,
 }
 
+// Defined above the `mod` declarations so child modules see it by textual scope.
+macro_rules! impl_from_for_other {
+    ($err:ty: $($src:ty),+ $(,)?) => {
+        $(
+            impl From<$src> for $err {
+                fn from(e: $src) -> Self {
+                    Self::Other(e.into())
+                }
+            }
+        )+
+    };
+}
+
 pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
@@ -64,10 +77,29 @@ pub(crate) mod user_reg_temp_url_service;
 pub mod user_restriction_service;
 pub(crate) mod validation;
 
-#[mockall::automock]
 #[async_trait::async_trait]
-pub trait AppService<I: Send + Sync, O: Send + Sync> {
-    async fn execute(&self, input: I) -> anyhow::Result<O>;
+pub trait AppService<I: Send + Sync, O: Send + Sync, E = anyhow::Error> {
+    async fn execute(&self, input: I) -> Result<O, E>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BoardLookupError {
+    #[error("board not found")]
+    NotFound,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl axum::response::IntoResponse for BoardLookupError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            BoardLookupError::NotFound => http::StatusCode::NOT_FOUND.into_response(),
+            BoardLookupError::Other(e) => {
+                tracing::error!(error = ?e, "failed to look up board");
+                http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+    }
 }
 
 #[mockall::automock]
