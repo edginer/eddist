@@ -29,6 +29,7 @@ mod domain {
     pub(crate) mod captcha_like;
     pub(crate) mod metadent;
     pub(crate) mod ng_word;
+    pub(crate) mod posting_policy;
     pub(crate) mod res;
     pub(crate) mod res_core;
     pub(crate) mod thread;
