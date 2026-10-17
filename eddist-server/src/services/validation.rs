@@ -1,5 +1,4 @@
 use eddist_core::domain::cap::calculate_cap_hash;
-use redis::aio::ConnectionManager;
 
 use crate::{
     config::TinkerSecret,
@@ -10,11 +9,12 @@ use crate::{
     },
     error::BbsCgiError,
     repositories::bbs_repository::BbsRepository,
+    stores::auth_state_store::AuthStateStore,
 };
 
 use super::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot};
 use crate::domain::service::bbscgi_user_reg_temp_url_service::{
-    UserRegTempUrlService, UserRegUrlKind,
+    UserRegUrlKind, create_userreg_temp_url,
 };
 
 /// Returns `Some(err)` if `body` is a `!userreg` command and execution should halt,
@@ -22,7 +22,7 @@ use crate::domain::service::bbscgi_user_reg_temp_url_service::{
 pub async fn check_userreg(
     body: &str,
     authed_token: &AuthedToken,
-    redis_conn: ConnectionManager,
+    auth_state: &dyn AuthStateStore,
     settings: &ServerSettingsSnapshot,
     base_url: &str,
     rate_limit: &UserCreationRateLimit,
@@ -35,11 +35,7 @@ pub async fn check_userreg(
         return Ok(Some(BbsCgiError::TooManyUserCreationAttempt));
     }
 
-    let user_reg_url_svc = UserRegTempUrlService::new(redis_conn, base_url);
-    let err = match user_reg_url_svc
-        .create_userreg_temp_url(authed_token)
-        .await?
-    {
+    let err = match create_userreg_temp_url(auth_state, base_url, authed_token).await? {
         UserRegUrlKind::Registered => BbsCgiError::UserAlreadyRegistered,
         UserRegUrlKind::NotRegistered(url) => BbsCgiError::UserRegTempUrl { url },
     };

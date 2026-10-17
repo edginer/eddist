@@ -6,7 +6,6 @@ use eddist_core::{
     utils::is_thread_pub_enabled,
 };
 use metrics::counter;
-use redis::{Cmd, aio::ConnectionManager};
 use uuid::Uuid;
 
 use crate::{
@@ -21,8 +20,6 @@ use crate::{
                 BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
             },
             email_auth_restriction_service::EmailAuthRestrictionService,
-            ng_word_reading_service::NgWordReadingService,
-            res_creation_span_management_service::ResCreationSpanManagementService,
         },
         utils::{sanitize_base, sanitize_num_refs},
     },
@@ -30,10 +27,9 @@ use crate::{
     repositories::{
         bbs_pubsub_repository::CreationEventRepository,
         bbs_repository::{BbsRepository, CreateThreadError, CreatingThread},
-        user_repository::UserRepository,
     },
+    stores::PostingStores,
 };
-use eddist_core::redis_keys::thread_cache_key;
 
 use super::{
     BbsCgiService, openai_moderation_service,
@@ -42,42 +38,38 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct ThreadCreationService<T: BbsRepository, U: UserRepository, E: CreationEventRepository>(
-    T,
-    U,
-    ConnectionManager,
-    E,
-    AppContext,
-);
+pub struct ThreadCreationService<T: BbsRepository, E: CreationEventRepository> {
+    bbs_repo: T,
+    stores: PostingStores,
+    event_repo: E,
+    ctx: AppContext,
+}
 
-impl<T: BbsRepository, U: UserRepository, E: CreationEventRepository>
-    ThreadCreationService<T, U, E>
-{
-    pub fn new(
-        repo: T,
-        user_repo: U,
-        redis_conn: ConnectionManager,
-        event_repo: E,
-        ctx: AppContext,
-    ) -> Self {
-        Self(repo, user_repo, redis_conn, event_repo, ctx)
+impl<T: BbsRepository, E: CreationEventRepository> ThreadCreationService<T, E> {
+    pub fn new(bbs_repo: T, stores: PostingStores, event_repo: E, ctx: AppContext) -> Self {
+        Self {
+            bbs_repo,
+            stores,
+            event_repo,
+            ctx,
+        }
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventRepository>
+impl<T: BbsRepository + Clone, E: CreationEventRepository>
     BbsCgiService<ThreadCreationServiceInput, ThreadCreationServiceOutput>
-    for ThreadCreationService<T, U, E>
+    for ThreadCreationService<T, E>
 {
     async fn execute(
         &self,
         input: ThreadCreationServiceInput,
     ) -> Result<ThreadCreationServiceOutput, BbsCgiError> {
-        let mut redis_conn = self.2.clone();
-        let bbs_repo = self.0.clone();
+        let bbs_repo = self.bbs_repo.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
-        let board_info_svc = BoardInfoService::new(self.0.clone(), self.4.board_info.clone());
+        let board_info_svc =
+            BoardInfoService::new(self.bbs_repo.clone(), self.ctx.board_info.clone());
         let (board, board_info) = board_info_svc
             .get_board_info_by_key(&input.board_key)
             .await?
@@ -91,7 +83,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         let unix_time = created_at.timestamp();
 
         if self
-            .0
+            .bbs_repo
             .get_thread_by_board_key_and_thread_number(&input.board_key, unix_time as u64)
             .await
             .map_err(BbsCgiError::Other)?
@@ -118,7 +110,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         client_info.validate_client_info(
             &board_info,
             true,
-            self.4.config.restrict_thread_creation_on_no_tinker,
+            self.ctx.config.restrict_thread_creation_on_no_tinker,
         )?;
 
         let force_metadent = board_info
@@ -137,11 +129,11 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         );
 
         let auth_service = BbsCgiAuthService::new(
-            self.0.clone(),
-            redis_conn.clone(),
-            self.3.clone(),
-            self.4.config.clone(),
-            self.4.user_creation_rate_limit.clone(),
+            self.bbs_repo.clone(),
+            self.stores.auth_state.clone(),
+            self.event_repo.clone(),
+            self.ctx.config.clone(),
+            self.ctx.user_creation_rate_limit.clone(),
         );
         let authed_token = auth_service
             .check_validity(
@@ -154,7 +146,7 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             )
             .await?;
 
-        let email_auth_service = EmailAuthRestrictionService::new(self.2.clone());
+        let email_auth_service = EmailAuthRestrictionService::new(self.stores.auth_state.clone());
         email_auth_service
             .check_and_enforce_restriction(
                 res.is_email_authed(),
@@ -167,10 +159,10 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         if let Some(err) = check_userreg(
             &input.body,
             &authed_token,
-            redis_conn.clone(),
+            self.stores.auth_state.as_ref(),
             &input.settings,
-            &self.4.config.base_url,
-            &self.4.user_creation_rate_limit,
+            &self.ctx.config.base_url,
+            &self.ctx.user_creation_rate_limit,
         )
         .await?
         {
@@ -178,10 +170,10 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
         }
 
         let cap_name = resolve_cap_name(
-            &self.0,
+            &self.bbs_repo,
             &res,
             &input.board_key,
-            &self.4.config.tinker_secret,
+            &self.ctx.config.tinker_secret,
         )
         .await?;
         let res = res.set_author_id(&authed_token, cap_name);
@@ -205,15 +197,14 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             moderation_result: None,
         };
 
-        let res_span_svc = ResCreationSpanManagementService::new(
-            redis_conn.clone(),
-            board_info.base_response_creation_span_sec as u64,
-            board_info.base_thread_creation_span_sec as u64,
-        );
-
+        let res_span = board_info.base_response_creation_span_sec as u64;
+        let thread_span = board_info.base_thread_creation_span_sec as u64;
         let authed_token_reduced_ip = authed_token.reduced_ip.to_string();
-        if res_span_svc
-            .is_thread_within_creation_span(
+        if self
+            .stores
+            .rate_limit
+            .is_thread_restricted(
+                thread_span,
                 &authed_token_reduced_ip,
                 &input.ip_addr,
                 unix_time as u64,
@@ -223,14 +214,12 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             return Err(BbsCgiError::TooManyCreatingThreadWithoutTinker);
         }
 
-        let ng_words = NgWordReadingService::new(self.0.clone(), redis_conn.clone())
-            .get_ng_words(&input.board_key)
-            .await?;
+        let ng_words = self.stores.ng_words.get_ng_words(&input.board_key).await?;
         if (&res, title.clone()).contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
         }
 
-        let event_repo = self.3.clone();
+        let event_repo = self.event_repo.clone();
         let creating_th_clone = creating_th.clone();
 
         let db_result = bbs_repo.create_thread(creating_th).await;
@@ -254,40 +243,38 @@ impl<T: BbsRepository + Clone, U: UserRepository + Clone, E: CreationEventReposi
             CreateThreadError::ThreadNumberConflict => BbsCgiError::SameTimeThreadCration,
             CreateThreadError::Other(e) => BbsCgiError::Other(e),
         })?;
-        let redis_result = tokio::spawn(async move {
-            redis_conn
-                .send_packed_command(&Cmd::rpush(
-                    thread_cache_key(&input.board_key, unix_time as u64),
+        let stores = self.stores.clone();
+        tokio::spawn(async move {
+            stores
+                .dat_cache
+                .create(
+                    &input.board_key,
+                    unix_time as u64,
                     res.get_sjis_bytes(&board.default_name, Some(&title))
                         .get_inner(),
-                ))
+                )
                 .await?;
-            res_span_svc
-                .update_last_res_creation_time(
+            stores
+                .rate_limit
+                .record_res(
+                    res_span,
                     &authed_token_reduced_ip,
                     &input.ip_addr,
                     unix_time as u64,
                 )
-                .await;
-            res_span_svc
-                .update_last_thread_creation_time(
+                .await?;
+            stores
+                .rate_limit
+                .record_thread(
+                    thread_span,
                     &authed_token_reduced_ip,
                     &input.ip_addr,
                     unix_time as u64,
                 )
-                .await;
-            redis_conn
-                .send_packed_command(&Cmd::expire(
-                    thread_cache_key(&input.board_key, unix_time as u64),
-                    60 * 60 * 24 * 7,
-                ))
                 .await
         })
-        .await;
-
-        redis_result
-            .map_err(|e| BbsCgiError::Other(e.into()))?
-            .map_err(|e| BbsCgiError::Other(e.into()))?;
+        .await
+        .map_err(|e| BbsCgiError::Other(e.into()))??;
 
         let tinker = if let Some(tinker) = input.tinker {
             if tinker.authed_token() != authed_token.token {

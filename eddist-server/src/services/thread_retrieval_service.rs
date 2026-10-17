@@ -1,18 +1,21 @@
+use std::sync::Arc;
+
 use eddist_core::domain::res::get_1001_sjis_bytes;
 use metrics::counter;
-use redis::{AsyncCommands, aio::ConnectionManager};
 
-use crate::{domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository};
-use eddist_core::redis_keys::thread_cache_key;
+use crate::{
+    domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,
+    stores::thread_dat_cache::ThreadDatCache,
+};
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct ThreadRetrievalService<T: BbsRepository>(T, ConnectionManager);
+pub struct ThreadRetrievalService<T: BbsRepository>(T, Arc<dyn ThreadDatCache>);
 
 impl<T: BbsRepository> ThreadRetrievalService<T> {
-    pub fn new(repo: T, redis_conn: ConnectionManager) -> Self {
-        Self(repo, redis_conn)
+    pub fn new(repo: T, dat_cache: Arc<dyn ThreadDatCache>) -> Self {
+        Self(repo, dat_cache)
     }
 
     async fn compute_stopper_bytes(&self, board_key: &str, thread_number: u64) -> Option<Vec<u8>> {
@@ -45,16 +48,7 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw,
         &self,
         input: ThreadRetrievalServiceInput,
     ) -> Result<ThreadResListRaw, DatRetrievalError> {
-        let mut redis_conn = self.1.clone();
-
-        match redis_conn
-            .lrange::<_, Vec<Vec<u8>>>(
-                thread_cache_key(&input.board_key, input.thread_number),
-                0,
-                -1,
-            )
-            .await
-        {
+        match self.1.read(&input.board_key, input.thread_number).await {
             Ok(chunks) if !chunks.is_empty() => {
                 counter!("dat_retrieval", "source" => "cache").increment(1);
 
