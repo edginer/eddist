@@ -1,10 +1,6 @@
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
-use chrono::Utc;
-use eddist_core::{
-    domain::{client_info::ClientInfo, tinker::Tinker},
-    utils::is_thread_pub_enabled,
-};
+use eddist_core::{domain::tinker::Tinker, utils::is_thread_pub_enabled};
 use metrics::counter;
 use uuid::Uuid;
 
@@ -12,18 +8,9 @@ use crate::{
     context::AppContext,
     domain::{
         ng_word::NgWordRestrictable,
-        res::Res,
-        res_core::ResCore,
-        service::{
-            bbscgi_auth_service::BbsCgiAuthService,
-            board_info_service::{
-                BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
-            },
-            email_auth_restriction_service::EmailAuthRestrictionService,
-        },
         utils::{sanitize_base, sanitize_num_refs},
     },
-    error::{BbsCgiError, NotFoundParamType},
+    error::BbsCgiError,
     repositories::{
         bbs_pubsub_repository::{CreationEventRepository, record_event_publish},
         bbs_repository::{BbsRepository, CreateThreadError, CreatingThread},
@@ -33,8 +20,10 @@ use crate::{
 
 use super::{
     BbsCgiService, openai_moderation_service,
+    posting_preparation_service::{
+        PostingPreparationInput, PostingPreparationService, PostingTarget, PreparedPosting,
+    },
     server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
-    validation::{check_userreg, resolve_cap_name},
 };
 
 #[derive(Clone)]
@@ -68,135 +57,42 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
         let bbs_repo = self.bbs_repo.clone();
 
         let (res_id, th_id) = (Uuid::now_v7(), Uuid::now_v7());
-        let board_info_svc =
-            BoardInfoService::new(self.bbs_repo.clone(), self.ctx.board_info.clone());
-        let (board, board_info) = board_info_svc
-            .get_board_info_by_key(&input.board_key)
-            .await?
-            .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
 
-        if board_info.read_only {
-            return Err(BbsCgiError::ReadOnlyBoard);
-        }
-
-        let created_at = Utc::now();
-        let unix_time = created_at.timestamp();
-
-        if self
-            .bbs_repo
-            .get_thread_by_board_key_and_thread_number(&input.board_key, unix_time as u64)
-            .await
-            .map_err(BbsCgiError::Other)?
-            .is_some()
-        {
-            return Err(BbsCgiError::SameTimeThreadCration);
-        }
-
-        let title = sanitize_thread_name(&input.title);
-
-        let res_core = ResCore {
-            from: &input.name,
-            mail: &input.mail,
-            body: Cow::Borrowed(&input.body),
-        };
-        let client_info = ClientInfo {
-            user_agent: input.user_agent.clone(),
-            asn_num: input.asn_num,
-            ip_addr: input.ip_addr.clone(),
-            tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
-        };
-
-        (&res_core, &input.title as &str).validate_content_length(&board_info)?;
-        client_info.validate_client_info(
-            &board_info,
-            true,
-            self.ctx.config.restrict_thread_creation_on_no_tinker,
-        )?;
-
-        let force_metadent = board_info
-            .force_metadent_type
-            .as_deref()
-            .and_then(|s| s.parse().ok());
-
-        let res = Res::new_from_thread(
-            res_core,
-            &input.board_key,
-            created_at,
-            client_info.clone(),
-            input.authed_token,
-            false,
-            force_metadent,
-        );
-
-        let auth_service = BbsCgiAuthService::new(
+        let preparation = PostingPreparationService::new(
             self.bbs_repo.clone(),
-            self.stores.auth_state.clone(),
+            self.stores.clone(),
             self.event_repo.clone(),
-            self.ctx.config.clone(),
-            self.ctx.user_creation_rate_limit.clone(),
-            self.ctx.background_tasks.clone(),
+            self.ctx.clone(),
         );
-        let authed_token = auth_service
-            .check_validity(
-                res.authed_token().map(|x| x.as_str()),
-                input.ip_addr.clone(),
-                input.user_agent.clone(),
-                input.asn_num as i32,
-                created_at,
-                &input.settings,
-            )
-            .await?;
-
-        let email_auth_service = EmailAuthRestrictionService::new(self.stores.auth_state.clone());
-        email_auth_service
-            .check_and_enforce_restriction(
-                res.is_email_authed(),
-                &input.user_agent,
-                &authed_token.token,
-                &input.ip_addr,
-            )
-            .await?;
-
-        if let Some(err) = check_userreg(
-            &input.body,
-            &authed_token,
-            self.stores.auth_state.as_ref(),
-            &input.settings,
-            &self.ctx.config.base_url,
-            &self.ctx.user_creation_rate_limit,
-        )
-        .await?
-        {
-            return Err(err);
-        }
-
-        let cap_name = resolve_cap_name(
-            &self.bbs_repo,
-            &res,
-            &input.board_key,
-            &self.ctx.config.tinker_secret,
-        )
-        .await?;
-        let res = res.set_author_id(&authed_token, cap_name);
-
-        let board_key = input.board_key.clone();
-        let creating_th = CreatingThread {
-            thread_id: th_id,
-            response_id: res_id,
-            title: title.to_string(),
-            unix_time: unix_time as u64,
-            body: res.body().to_string(),
-            name: res.pretty_author_name(&board.default_name),
-            mail: res.mail().to_string(),
+        let PreparedPosting {
+            board,
+            board_info,
+            thread: _,
             created_at,
-            author_ch5id: res.author_id().to_string(),
-            authed_token_id: authed_token.id,
-            ip_addr: input.ip_addr.to_string(),
-            board_id: board.id,
-            metadent: res.metadent_type(),
+            authed_token,
             client_info,
-            moderation_result: None,
-        };
+            res,
+        } = preparation
+            .prepare(PostingPreparationInput {
+                board_key: &input.board_key,
+                target: PostingTarget::Thread {
+                    title: &input.title,
+                },
+                authed_token: input.authed_token.as_deref(),
+                name: &input.name,
+                mail: &input.mail,
+                body: &input.body,
+                tinker: input.tinker.as_ref(),
+                ip_addr: &input.ip_addr,
+                user_agent: &input.user_agent,
+                asn_num: input.asn_num,
+                settings: &input.settings,
+            })
+            .await?;
+
+        let unix_time = created_at.timestamp();
+        let title = sanitize_thread_name(&input.title);
+        let board_key = input.board_key.clone();
 
         let res_span = board_info.base_response_creation_span_sec as u64;
         let thread_span = board_info.base_thread_creation_span_sec as u64;
@@ -219,6 +115,24 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
         if (&res, title.clone()).contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
         }
+
+        let creating_th = CreatingThread {
+            thread_id: th_id,
+            response_id: res_id,
+            title: title.to_string(),
+            unix_time: unix_time as u64,
+            body: res.body().to_string(),
+            name: res.pretty_author_name(&board.default_name),
+            mail: res.mail().to_string(),
+            created_at,
+            author_ch5id: res.author_id().to_string(),
+            authed_token_id: authed_token.id,
+            ip_addr: input.ip_addr.to_string(),
+            board_id: board.id,
+            metadent: res.metadent_type(),
+            client_info,
+            moderation_result: None,
+        };
 
         let event_repo = self.event_repo.clone();
         let creating_th_clone = creating_th.clone();
