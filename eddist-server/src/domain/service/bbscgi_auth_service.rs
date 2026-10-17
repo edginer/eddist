@@ -13,11 +13,12 @@ use crate::{
     },
     error::BbsCgiError,
     repositories::{
-        bbs_pubsub_repository::CreationEventRepository,
+        bbs_pubsub_repository::{CreationEventRepository, record_event_publish},
         bbs_repository::{BbsRepository, CreatingAuthedToken},
     },
     services::server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
     stores::auth_state_store::AuthStateStore,
+    tasks::BackgroundTasks,
 };
 use eddist_core::{
     domain::pubsub_repository::AuthTokenInitiated, utils::is_auth_token_pub_enabled,
@@ -48,6 +49,7 @@ pub struct BbsCgiAuthService<T: BbsRepository, E: CreationEventRepository> {
     event_repo: E,
     config: Arc<AppConfig>,
     user_creation_rate_limit: UserCreationRateLimit,
+    background_tasks: BackgroundTasks,
 }
 
 impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
@@ -57,6 +59,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
         event_repo: E,
         config: Arc<AppConfig>,
         user_creation_rate_limit: UserCreationRateLimit,
+        background_tasks: BackgroundTasks,
     ) -> Self {
         Self {
             repo,
@@ -64,6 +67,7 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
             event_repo,
             config,
             user_creation_rate_limit,
+            background_tasks,
         }
     }
 
@@ -76,16 +80,20 @@ impl<T: BbsRepository, E: CreationEventRepository> BbsCgiAuthService<T, E> {
     ) {
         if is_auth_token_pub_enabled() {
             let event_repo = self.event_repo.clone();
-            tokio::spawn(async move {
-                let _ = event_repo
-                    .publish_auth_token_initiated(AuthTokenInitiated {
-                        authed_token_id,
-                        origin_ip,
-                        user_agent,
-                        asn_num,
-                    })
-                    .await;
-            });
+            self.background_tasks
+                .spawn_detached("auth_token_initiated_publish", async move {
+                    record_event_publish(
+                        "auth_token_initiated",
+                        event_repo
+                            .publish_auth_token_initiated(AuthTokenInitiated {
+                                authed_token_id,
+                                origin_ip,
+                                user_agent,
+                                asn_num,
+                            })
+                            .await,
+                    );
+                });
         }
     }
 

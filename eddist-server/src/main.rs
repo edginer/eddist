@@ -16,8 +16,13 @@ use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
 use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
+use tokio_util::sync::CancellationToken;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
+
+const SHUTDOWN_ENDPOINT_PORT: u16 = 44608;
+/// Matches the per-request `TimeoutLayer`, so only stuck connections are cut off.
+const HTTP_DRAIN_DEADLINE: Duration = Duration::from_secs(10);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -109,42 +114,134 @@ async fn main() -> anyhow::Result<()> {
         "openai_moderation_retries",
         "OpenAI moderation retry count (excludes first attempt)"
     );
+    describe_counter!(
+        "background_task_panic",
+        "background task panics by task name"
+    );
+    describe_counter!(
+        "response_persistence",
+        "response persistence result (db_success/db_failure/fallback_success/fallback_failure)"
+    );
+    describe_counter!(
+        "event_publish",
+        "pub/sub event publish result by event name (success/failure)"
+    );
+    describe_counter!(
+        "token_binding",
+        "authed token binding to a logged-in user result (success/failure)"
+    );
 
     let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
 
     let router = NormalizePathLayer::trim_trailing_slash().layer(app.router.clone());
     let router = AxumServiceExt::<AxumRequest>::into_make_service(router);
-    axum::serve(listener, router)
-        .with_graceful_shutdown(graceful_shutdown_http())
-        .await
-        .unwrap();
-
-    if app.flush_stats().await.is_ok() {
-        tracing::info!("Flushed stats on shutdown.");
+    let shutdown = CancellationToken::new();
+    tokio::spawn(watch_shutdown_signals(shutdown.clone()));
+    let serve =
+        axum::serve(listener, router).with_graceful_shutdown(shutdown.clone().cancelled_owned());
+    tokio::select! {
+        result = serve => result.unwrap(),
+        () = async {
+            shutdown.cancelled().await;
+            tokio::time::sleep(HTTP_DRAIN_DEADLINE).await;
+        } => {
+            tracing::warn!(
+                deadline = ?HTTP_DRAIN_DEADLINE,
+                "HTTP connections did not close before the shutdown deadline; dropping them"
+            );
+        }
     }
 
-    tokio::time::sleep(Duration::from_millis(3000)).await;
+    app.shutdown().await;
 
-    tracing::info!("Server has shut down gracufully.");
+    tracing::info!("Server has shut down gracefully.");
     Ok(())
 }
 
-async fn graceful_shutdown_http() {
-    let listener = TcpListener::bind(("0.0.0.0", 44608)).await.unwrap();
-    let (stream, _) = listener.accept().await.unwrap();
+async fn watch_shutdown_signals(shutdown: CancellationToken) {
+    shutdown_signal().await;
+    shutdown.cancel();
 
-    http1::Builder::new()
+    // tokio's handlers have replaced the default SIGTERM/SIGINT action of exiting.
+    tokio::select! {
+        _ = terminate_signal() => {}
+        _ = tokio::signal::ctrl_c() => {}
+    }
+    tracing::warn!("Received a second shutdown signal; exiting immediately.");
+    std::process::exit(1);
+}
+
+async fn shutdown_signal() {
+    tokio::select! {
+        _ = shutdown_endpoint() => {
+            tracing::info!("Received a shutdown request on the HTTP shutdown endpoint.");
+        }
+        _ = terminate_signal() => {
+            tracing::info!("Received SIGTERM; shutting down.");
+        }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("Received an interrupt; shutting down.");
+        }
+    }
+}
+
+async fn shutdown_endpoint() {
+    let listener = match TcpListener::bind(("0.0.0.0", SHUTDOWN_ENDPOINT_PORT)).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                port = SHUTDOWN_ENDPOINT_PORT,
+                "failed to bind the HTTP shutdown endpoint; SIGTERM/SIGINT remain available"
+            );
+            std::future::pending().await
+        }
+    };
+
+    let stream = loop {
+        match listener.accept().await {
+            Ok((stream, _)) => break stream,
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to accept on the HTTP shutdown endpoint");
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    };
+    let result = http1::Builder::new()
         .timer(TokioTimer::new())
         .serve_connection(
             TokioIo::new(stream),
-            service_fn(|_| async move {
+            service_fn(|_| async {
                 let response = Response::new(Body::from("Request received. Shutting down.\n"));
-
                 Ok::<_, Infallible>(response)
             }),
         )
-        .await
-        .unwrap();
+        .await;
+    if let Err(e) = result {
+        tracing::warn!(error = %e, "shutdown endpoint connection ended with an error");
+    }
 
-    tracing::info!("Server starts gracefull shutdown.");
+    tracing::info!("Server starts graceful shutdown.");
+}
+
+#[cfg(unix)]
+async fn terminate_signal() {
+    use tokio::signal::unix::{SignalKind, signal};
+    match signal(SignalKind::terminate()) {
+        Ok(mut sigterm) => {
+            sigterm.recv().await;
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "failed to listen for SIGTERM; SIGINT and the shutdown endpoint remain available"
+            );
+            std::future::pending().await
+        }
+    }
+}
+
+#[cfg(not(unix))]
+async fn terminate_signal() {
+    std::future::pending().await
 }

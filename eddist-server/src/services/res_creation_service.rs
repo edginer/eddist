@@ -31,7 +31,7 @@ use crate::{
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
-        bbs_pubsub_repository::{CreationEventRepository, PubRepository},
+        bbs_pubsub_repository::{CreationEventRepository, PubRepository, record_event_publish},
         bbs_repository::{BbsRepository, ResponseRepository},
     },
     stores::PostingStores,
@@ -150,6 +150,7 @@ impl<T: BbsRepository + Clone, P: PubRepository, E: CreationEventRepository>
             self.event_repo.clone(),
             self.ctx.config.clone(),
             self.ctx.user_creation_rate_limit.clone(),
+            self.ctx.background_tasks.clone(),
         );
         let authed_token = auth_service
             .check_validity(
@@ -285,25 +286,27 @@ impl<T: BbsRepository + Clone, P: PubRepository, E: CreationEventRepository>
         let event_repo = self.event_repo.clone();
         let settings = input.settings.clone();
 
-        tokio::spawn(async move {
-            persist_response(&bbs_repo, &pub_repo, &cres).await;
+        self.ctx
+            .background_tasks
+            .spawn_detached("res_persistence", async move {
+                persist_response(&bbs_repo, &pub_repo, &cres).await;
 
-            if is_res_pub_enabled() {
-                let moderation_result = if settings.is_enabled(ServerSettingKey::AiModerationOnRes)
-                {
-                    openai_moderation_service::moderate(&settings, &cres.body).await
-                } else {
-                    None
-                };
-                let mut cres = cres;
-                cres.moderation_result = moderation_result;
-                let _ = event_repo.publish_res_created(cres).await;
-            }
+                if is_res_pub_enabled() {
+                    let moderation_result =
+                        if settings.is_enabled(ServerSettingKey::AiModerationOnRes) {
+                            openai_moderation_service::moderate(&settings, &cres.body).await
+                        } else {
+                            None
+                        };
+                    let mut cres = cres;
+                    cres.moderation_result = moderation_result;
+                    record_event_publish("res_created", event_repo.publish_res_created(cres).await);
+                }
 
-            let _ = bbs_repo
-                .update_authed_token_last_wrote(authed_token.id, created_at)
-                .await;
-        });
+                let _ = bbs_repo
+                    .update_authed_token_last_wrote(authed_token.id, created_at)
+                    .await;
+            });
 
         let tinker = if let Some(tinker) = input.tinker {
             if tinker.authed_token() != authed_token.token {
@@ -334,23 +337,35 @@ async fn persist_response<R: ResponseRepository, P: PubRepository>(
     publisher: &P,
     res: &CreatingRes,
 ) {
-    if let Err(e) = repo.create_response(res.clone()).await {
-        error!(
-            error = %e,
-            res_id = %res.id,
-            thread_id = %res.thread_id,
-            "failed to create response in database"
-        );
-        if let Err(e) = publisher
-            .publish(PubSubItem::CreatingRes(Box::new(res.clone())))
-            .await
-        {
+    match repo.create_response(res.clone()).await {
+        Ok(()) => {
+            counter!("response_persistence", "result" => "db_success").increment(1);
+        }
+        Err(e) => {
+            counter!("response_persistence", "result" => "db_failure").increment(1);
             error!(
                 error = %e,
                 res_id = %res.id,
                 thread_id = %res.thread_id,
-                "failed to publish response persistence fallback"
+                "failed to create response in database"
             );
+            match publisher
+                .publish(PubSubItem::CreatingRes(Box::new(res.clone())))
+                .await
+            {
+                Ok(()) => {
+                    counter!("response_persistence", "result" => "fallback_success").increment(1);
+                }
+                Err(e) => {
+                    counter!("response_persistence", "result" => "fallback_failure").increment(1);
+                    error!(
+                        error = %e,
+                        res_id = %res.id,
+                        thread_id = %res.thread_id,
+                        "failed to publish response persistence fallback"
+                    );
+                }
+            }
         }
     }
 }

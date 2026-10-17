@@ -25,7 +25,7 @@ use crate::{
     },
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
-        bbs_pubsub_repository::CreationEventRepository,
+        bbs_pubsub_repository::{CreationEventRepository, record_event_publish},
         bbs_repository::{BbsRepository, CreateThreadError, CreatingThread},
     },
     stores::PostingStores,
@@ -134,6 +134,7 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
             self.event_repo.clone(),
             self.ctx.config.clone(),
             self.ctx.user_creation_rate_limit.clone(),
+            self.ctx.background_tasks.clone(),
         );
         let authed_token = auth_service
             .check_validity(
@@ -225,56 +226,63 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
         let db_result = bbs_repo.create_thread(creating_th).await;
         if db_result.is_ok() && is_thread_pub_enabled() {
             let settings = input.settings.clone();
-            tokio::spawn(async move {
-                let moderation_result = if settings
-                    .is_enabled(ServerSettingKey::AiModerationOnThread)
-                {
-                    let text = format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
-                    openai_moderation_service::moderate(&settings, &text).await
-                } else {
-                    None
-                };
-                let mut creating_th_clone = creating_th_clone;
-                creating_th_clone.moderation_result = moderation_result;
-                let _ = event_repo.publish_thread_created(creating_th_clone).await;
-            });
+            self.ctx
+                .background_tasks
+                .spawn_detached("thread_event_publish", async move {
+                    let moderation_result =
+                        if settings.is_enabled(ServerSettingKey::AiModerationOnThread) {
+                            let text =
+                                format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
+                            openai_moderation_service::moderate(&settings, &text).await
+                        } else {
+                            None
+                        };
+                    let mut creating_th_clone = creating_th_clone;
+                    creating_th_clone.moderation_result = moderation_result;
+                    record_event_publish(
+                        "thread_created",
+                        event_repo.publish_thread_created(creating_th_clone).await,
+                    );
+                });
         }
         db_result.map_err(|e| match e {
             CreateThreadError::ThreadNumberConflict => BbsCgiError::SameTimeThreadCration,
             CreateThreadError::Other(e) => BbsCgiError::Other(e),
         })?;
         let stores = self.stores.clone();
-        tokio::spawn(async move {
-            stores
-                .dat_cache
-                .create(
-                    &input.board_key,
-                    unix_time as u64,
-                    res.get_sjis_bytes(&board.default_name, Some(&title))
-                        .get_inner(),
-                )
-                .await?;
-            stores
-                .rate_limit
-                .record_res(
-                    res_span,
-                    &authed_token_reduced_ip,
-                    &input.ip_addr,
-                    unix_time as u64,
-                )
-                .await?;
-            stores
-                .rate_limit
-                .record_thread(
-                    thread_span,
-                    &authed_token_reduced_ip,
-                    &input.ip_addr,
-                    unix_time as u64,
-                )
-                .await
-        })
-        .await
-        .map_err(|e| BbsCgiError::Other(e.into()))??;
+        self.ctx
+            .background_tasks
+            .spawn("thread_dat_and_limits", async move {
+                stores
+                    .dat_cache
+                    .create(
+                        &input.board_key,
+                        unix_time as u64,
+                        res.get_sjis_bytes(&board.default_name, Some(&title))
+                            .get_inner(),
+                    )
+                    .await?;
+                stores
+                    .rate_limit
+                    .record_res(
+                        res_span,
+                        &authed_token_reduced_ip,
+                        &input.ip_addr,
+                        unix_time as u64,
+                    )
+                    .await?;
+                stores
+                    .rate_limit
+                    .record_thread(
+                        thread_span,
+                        &authed_token_reduced_ip,
+                        &input.ip_addr,
+                        unix_time as u64,
+                    )
+                    .await
+            })
+            .await
+            .map_err(|e| BbsCgiError::Other(e.into()))??;
 
         let tinker = if let Some(tinker) = input.tinker {
             if tinker.authed_token() != authed_token.token {
