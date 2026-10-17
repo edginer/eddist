@@ -1,15 +1,15 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
 
-use eddist_core::redis_keys::user_session_key;
+use crate::stores::user_session_store::UserSessionStore;
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserLogoutService(ConnectionManager);
+pub struct UserLogoutService(Arc<dyn UserSessionStore>);
 
 impl UserLogoutService {
-    pub fn new(redis_conn: ConnectionManager) -> Self {
-        Self(redis_conn)
+    pub fn new(sessions: Arc<dyn UserSessionStore>) -> Self {
+        Self(sessions)
     }
 }
 
@@ -19,13 +19,7 @@ impl AppService<UserLogoutServiceInput, ()> for UserLogoutService {
         &self,
         UserLogoutServiceInput { user_sid }: UserLogoutServiceInput,
     ) -> anyhow::Result<()> {
-        let mut redis_conn = self.0.clone();
-
-        redis_conn
-            .del::<_, bool>(user_session_key(&user_sid))
-            .await?;
-
-        Ok(())
+        self.0.delete(&user_sid).await
     }
 }
 

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use std::sync::Arc;
+
 use futures::future::join_all;
 use metrics::counter;
-use redis::AsyncCommands;
-use uuid::Uuid;
 
 use crate::{
     domain::captcha_like::CaptchaProviderConfig,
@@ -12,40 +12,43 @@ use crate::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
     repositories::bbs_repository::BbsRepository,
+    stores::auth_state_store::AuthStateStore,
 };
-use eddist_core::redis_keys::{reauth_lock_key, reauth_temp_key};
 
 use super::AppService;
 
 #[derive(Clone)]
 pub struct ReAuthService<T: BbsRepository> {
     repo: T,
+    auth_state: Arc<dyn AuthStateStore>,
     redis_conn: redis::aio::ConnectionManager,
 }
 
 impl<T: BbsRepository> ReAuthService<T> {
-    pub fn new(repo: T, redis_conn: redis::aio::ConnectionManager) -> Self {
-        Self { repo, redis_conn }
+    pub fn new(
+        repo: T,
+        auth_state: Arc<dyn AuthStateStore>,
+        redis_conn: redis::aio::ConnectionManager,
+    ) -> Self {
+        Self {
+            repo,
+            auth_state,
+            redis_conn,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl<T: BbsRepository> AppService<ReAuthServiceInput, ()> for ReAuthService<T> {
     async fn execute(&self, input: ReAuthServiceInput) -> anyhow::Result<()> {
-        let redis_key = reauth_temp_key(&input.temp_key);
-        // Atomically read and delete the temp key — one-time use, closes replay window
-        let mut conn = self.redis_conn.clone();
-        let token_id_str: Option<String> = conn.get_del(&redis_key).await.unwrap_or(None);
-        let token_id_str = token_id_str.ok_or_else(|| {
-            counter!("reauth_failure", "reason" => "invalid_temp_key").increment(1);
-            BbsPostAuthWithCodeError::FailedToFindAuthedToken
-        })?;
-        let token_id = Uuid::parse_str(&token_id_str).map_err(|_| {
-            counter!("reauth_failure", "reason" => "invalid_temp_key").increment(1);
-            BbsPostAuthWithCodeError::FailedToFindAuthedToken
-        })?;
-        // Delete the lock key so new codes can be issued after successful re-auth
-        let _ = conn.del::<_, ()>(&reauth_lock_key(&token_id_str)).await;
+        let token_id = self
+            .auth_state
+            .consume_reauth_code(&input.temp_key)
+            .await
+            .ok_or_else(|| {
+                counter!("reauth_failure", "reason" => "invalid_temp_key").increment(1);
+                BbsPostAuthWithCodeError::FailedToFindAuthedToken
+            })?;
 
         let token = self
             .repo

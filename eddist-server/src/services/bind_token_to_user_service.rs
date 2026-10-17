@@ -1,23 +1,26 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
+
 use sqlx::MySql;
 use uuid::Uuid;
 
-use crate::{repositories::user_repository::UserRepository, utils::TransactionRepository};
-use eddist_core::redis_keys::user_session_key;
+use crate::{
+    repositories::user_repository::UserRepository, stores::user_session_store::UserSessionStore,
+    utils::TransactionRepository,
+};
 
 use super::AppService;
 
 #[derive(Clone)]
 pub struct BindTokenToUserService<U: UserRepository> {
     user_repo: U,
-    redis_conn: ConnectionManager,
+    sessions: Arc<dyn UserSessionStore>,
 }
 
 impl<U: UserRepository + Clone> BindTokenToUserService<U> {
-    pub fn new(user_repo: U, redis_conn: ConnectionManager) -> Self {
+    pub fn new(user_repo: U, sessions: Arc<dyn UserSessionStore>) -> Self {
         Self {
             user_repo,
-            redis_conn,
+            sessions,
         }
     }
 }
@@ -27,14 +30,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone>
     AppService<BindTokenToUserServiceInput, ()> for BindTokenToUserService<U>
 {
     async fn execute(&self, input: BindTokenToUserServiceInput) -> anyhow::Result<()> {
-        let mut redis_conn = self.redis_conn.clone();
-
-        // Get user_id from session
-        let user_id_str = redis_conn
-            .get::<_, Option<String>>(user_session_key(&input.user_sid))
-            .await?;
-
-        let Some(user_id_str) = user_id_str else {
+        let Some(user_id_str) = self.sessions.get_user_id(&input.user_sid).await? else {
             // User session not found, silently return
             return Ok(());
         };

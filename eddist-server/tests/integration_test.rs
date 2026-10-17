@@ -747,6 +747,124 @@ async fn test_thread_creation_records_dat_ttl_and_posting_limits() {
     assert_eq!(dat_len, 1);
 }
 
+async fn post_response(
+    ctx: &TestContext,
+    board_key: &str,
+    thread_number: i64,
+    token: &str,
+    body: &str,
+) -> String {
+    let form = encode_sjis_form(&[
+        ("bbs", board_key),
+        ("submit", "書き込む"),
+        ("key", &thread_number.to_string()),
+        ("FROM", ""),
+        ("mail", ""),
+        ("MESSAGE", body),
+    ]);
+    let response = ctx
+        .server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={token}")).unwrap(),
+        )
+        .bytes(Bytes::from(form.into_bytes()))
+        .await;
+    decode_sjis(response.as_bytes())
+}
+
+#[tokio::test]
+async fn test_reauth_code_is_reused_until_consumed_once() {
+    use eddist_core::redis_keys::reauth_lock_key;
+    let ctx = TestContext::new().await;
+
+    let board_id = create_test_board(&ctx.pool, "reauth", "再認証板").await;
+    let (token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.8", "code-test8").await;
+    create_test_thread(&ctx.pool, board_id, 1222222222, "再認証", token_id).await;
+    sqlx::query("UPDATE authed_tokens SET require_reauth = TRUE WHERE id = ?")
+        .bind(token_id)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+
+    let temp_key = |body: &str| {
+        assert!(body.contains("E-ReAuthRequired"), "{body}");
+        body.split("再認証コード'").nth(1).unwrap()[..8].to_string()
+    };
+    let first = temp_key(&post_response(&ctx, "reauth", 1222222222, &token, "1").await);
+    let second = temp_key(&post_response(&ctx, "reauth", 1222222222, &token, "2").await);
+    assert_eq!(first, second);
+
+    let reauth = || {
+        ctx.server
+            .post("/re-auth")
+            .form(&[("temp_key", first.as_str())])
+    };
+    reauth().await;
+    let (require_reauth,): (bool,) =
+        sqlx::query_as("SELECT require_reauth FROM authed_tokens WHERE id = ?")
+            .bind(token_id)
+            .fetch_one(&ctx.pool)
+            .await
+            .unwrap();
+    assert!(!require_reauth);
+    let lock_exists: bool = ctx
+        .redis_conn
+        .clone()
+        .exists(reauth_lock_key(&token_id.to_string()))
+        .await
+        .unwrap();
+    assert!(!lock_exists);
+
+    let replay = reauth().await.text();
+    assert!(
+        replay.contains("書き込み時のIPアドレスと異なるか"),
+        "{replay}"
+    );
+}
+
+#[tokio::test]
+async fn test_user_reg_temp_url_is_consumed_once() {
+    use eddist_core::redis_keys::user_reg_oauth2_state_key;
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+
+    let board_id = create_test_board(&ctx.pool, "userreg", "登録板").await;
+    let (token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.9", "code-test9").await;
+    create_test_thread(&ctx.pool, board_id, 1333333333, "登録", token_id).await;
+    sqlx::query(
+        "INSERT INTO idps (id, idp_name, idp_display_name, oidc_config_url, client_id, client_secret, enabled)
+         VALUES (UUID_TO_BIN(UUID()), 'test', 'Test', 'http://localhost/none', 'id', 'secret', TRUE)",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+
+    let body = post_response(&ctx, "userreg", 1333333333, &token, "!userreg").await;
+    assert!(body.contains("E-UserRegTempUrl"), "{body}");
+    let path = &body.split("/user/register/").nth(1).unwrap()[..5];
+
+    let response = ctx.server.get(&format!("/user/register/{path}")).await;
+    assert_eq!(response.status_code(), 200);
+    let state_id = response
+        .iter_headers_by_name("set-cookie")
+        .filter_map(|v| v.to_str().ok()?.strip_prefix("userreg-state-id="))
+        .map(|v| v.split(';').next().unwrap().to_string())
+        .next()
+        .unwrap();
+    let ttl: i64 = ctx
+        .redis_conn
+        .clone()
+        .ttl(user_reg_oauth2_state_key(&state_id))
+        .await
+        .unwrap();
+    assert!((1..=180).contains(&ttl), "ttl {ttl}");
+
+    let replay = ctx.server.get(&format!("/user/register/{path}")).await;
+    assert_eq!(replay.status_code(), 404);
+}
+
 /// Shared NG: a value is served board-wide only once enough distinct contributors
 /// have marked it, and stays board-wide even after a contributor retracts — it only
 /// expires via TTL.

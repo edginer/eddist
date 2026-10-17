@@ -5,36 +5,21 @@ use axum::{
     response::Response,
 };
 use axum_extra::extract::CookieJar;
-use eddist_core::{
-    domain::board::validate_board_key,
-    redis_keys::{
-        shared_ng_id_active_key, shared_ng_id_key, shared_ng_id_rate_limit_key,
-        shared_ng_thread_metadent_active_key, shared_ng_thread_metadent_key,
-    },
-    utils::to_hex,
-};
-use redis::pipe;
+use eddist_core::{domain::board::validate_board_key, utils::to_hex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
     AppState,
     services::{AppService, edge_token_validation_service::EdgeTokenValidationServiceInput},
-    utils::incr_fixed_window,
+    stores::shared_ng_store::SharedNgKind,
 };
-
-// Shared NG marks are intentionally short-lived. They represent recent community
-// signals rather than permanent moderation decisions.
-const SHARED_NG_TTL_SECS: i64 = 3 * 24 * 60 * 60;
 
 const MAX_SHARED_VALUE_LEN: usize = 64;
 
 const THREAD_METADENT_LEN: usize = 8;
 
 const MAX_NG_IDS_PER_DELETE: usize = 200;
-
-const SHARED_NG_RATE_LIMIT: i64 = 25;
-const SHARED_NG_RATE_LIMIT_WINDOW_SECS: i64 = 24 * 60 * 60;
 
 // How many distinct contributors a value needs before it is served to every reader
 // of the board.
@@ -114,70 +99,45 @@ fn is_valid_thread_metadent(metadent: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '/'))
 }
 
-async fn within_shared_ng_rate_limit(
-    conn: &mut redis::aio::ConnectionManager,
-    token_hash: &str,
-) -> redis::RedisResult<bool> {
-    let rate_key = shared_ng_id_rate_limit_key(token_hash);
-    let count = incr_fixed_window(conn, &rate_key, SHARED_NG_RATE_LIMIT_WINDOW_SECS).await?;
-
-    Ok(count <= SHARED_NG_RATE_LIMIT)
-}
-
 async fn add_shared_value(
     state: &AppState,
     jar: &CookieJar,
-    key: String,
-    active_key: String,
+    kind: SharedNgKind,
+    board_key: &str,
     value: &str,
-    kind: &str,
+    kind_label: &str,
 ) -> Response {
     let hash = match resolve_contributor_hash(state, jar).await {
         Ok(hash) => hash,
         Err(resp) => return resp,
     };
 
-    let mut conn = state.redis_conn.clone();
-
-    // The rate-limit key is shared by author IDs and thread metadents, so adding
-    // the second signal type cannot be used to bypass the mutation limit.
-    match within_shared_ng_rate_limit(&mut conn, &hash).await {
+    let store = &state.shared_ng;
+    match store.take_contribution_quota(&hash).await {
         Ok(true) => {}
         Ok(false) => return empty(429),
         Err(e) => {
-            log::error!("Failed to check shared {kind} rate limit: {e:?}");
+            log::error!("Failed to check shared {kind_label} rate limit: {e:?}");
             return empty(500);
         }
     }
 
-    let contributors = match pipe()
-        .sadd(&key, &hash)
-        .ignore()
-        .expire(&key, SHARED_NG_TTL_SECS)
-        .ignore()
-        .scard(&key)
-        .query_async::<(usize,)>(&mut conn)
-        .await
-    {
-        Ok((contributors,)) => contributors,
+    let contributors = match store.add_contributor(kind, board_key, value, &hash).await {
+        Ok(contributors) => contributors,
         Err(e) => {
-            log::error!("Failed to add shared {kind} to Redis: {e:?}");
+            log::error!("Failed to add shared {kind_label} to Redis: {e:?}");
             return empty(500);
         }
     };
 
     if contributors >= SHARED_NG_PROMOTION_THRESHOLD
-        && let Err(e) = pipe()
-            .zadd(&active_key, value, chrono::Utc::now().timestamp())
-            .ignore()
-            .expire(&active_key, SHARED_NG_TTL_SECS)
-            .ignore()
-            .query_async::<()>(&mut conn)
+        && let Err(e) = store
+            .promote(kind, board_key, value, chrono::Utc::now().timestamp())
             .await
     {
         // The contribution itself landed, so report success and let the next
         // contribution re-attempt the promotion.
-        log::error!("Failed to promote shared {kind} to the board-wide list: {e:?}");
+        log::error!("Failed to promote shared {kind_label} to the board-wide list: {e:?}");
     }
 
     empty(204)
@@ -186,23 +146,22 @@ async fn add_shared_value(
 async fn remove_shared_values(
     state: &AppState,
     jar: &CookieJar,
-    keys: Vec<String>,
-    kind: &str,
+    kind: SharedNgKind,
+    board_key: &str,
+    values: &[String],
+    kind_label: &str,
 ) -> Response {
     let hash = match resolve_contributor_hash(state, jar).await {
         Ok(hash) => hash,
         Err(resp) => return resp,
     };
 
-    let mut conn = state.redis_conn.clone();
-    let mut pipe = pipe();
-    for key in &keys {
-        // SREM is a no-op if the member/key is missing.
-        pipe.srem(key, &hash).ignore();
-    }
-
-    if let Err(e) = pipe.query_async::<()>(&mut conn).await {
-        log::error!("Failed to remove shared {kind} from Redis: {e:?}");
+    if let Err(e) = state
+        .shared_ng
+        .remove_contributor(kind, board_key, values, &hash)
+        .await
+    {
+        log::error!("Failed to remove shared {kind_label} from Redis: {e:?}");
         return empty(500);
     }
 
@@ -223,25 +182,16 @@ pub async fn get_shared_ng(
         return empty(404);
     }
 
-    let ng_id_key = shared_ng_id_active_key(&board_key);
-    let metadent_key = shared_ng_thread_metadent_active_key(&board_key);
-    // Promotions are only refreshed on contribution, so entries older than the
-    // contributor sets' own TTL are dropped here rather than being served forever.
-    let cutoff = chrono::Utc::now().timestamp() - SHARED_NG_TTL_SECS;
-    let last = MAX_SHARED_NG_RESPONSE_LEN - 1;
-
-    let mut conn = state.redis_conn.clone();
-    let (ng_ids, thread_metadents) = match pipe()
-        .zrembyscore(&ng_id_key, "-inf", cutoff)
-        .ignore()
-        .zrembyscore(&metadent_key, "-inf", cutoff)
-        .ignore()
-        .zrevrange(&ng_id_key, 0, last)
-        .zrevrange(&metadent_key, 0, last)
-        .query_async::<(Vec<String>, Vec<String>)>(&mut conn)
+    let active = match state
+        .shared_ng
+        .active(
+            &board_key,
+            chrono::Utc::now().timestamp(),
+            MAX_SHARED_NG_RESPONSE_LEN,
+        )
         .await
     {
-        Ok(lists) => lists,
+        Ok(active) => active,
         Err(e) => {
             log::error!("Failed to read shared NG lists from Redis: {e:?}");
             return empty(500);
@@ -249,8 +199,8 @@ pub async fn get_shared_ng(
     };
 
     let body = SharedNgResponse {
-        ng_ids,
-        thread_metadents,
+        ng_ids: active.author_ids,
+        thread_metadents: active.thread_metadents,
     };
 
     match serde_json::to_vec(&body) {
@@ -280,9 +230,15 @@ pub async fn post_ng_id(
         return empty(400);
     }
 
-    let key = shared_ng_id_key(&board_key, &req.ng_id);
-    let active_key = shared_ng_id_active_key(&board_key);
-    add_shared_value(&state, &jar, key, active_key, &req.ng_id, "NG ID").await
+    add_shared_value(
+        &state,
+        &jar,
+        SharedNgKind::AuthorId,
+        &board_key,
+        &req.ng_id,
+        "NG ID",
+    )
+    .await
 }
 
 pub async fn delete_ng_ids(
@@ -301,12 +257,15 @@ pub async fn delete_ng_ids(
         return empty(400);
     }
 
-    let keys = req
-        .ng_ids
-        .iter()
-        .map(|ng_id| shared_ng_id_key(&board_key, ng_id))
-        .collect();
-    remove_shared_values(&state, &jar, keys, "NG IDs").await
+    remove_shared_values(
+        &state,
+        &jar,
+        SharedNgKind::AuthorId,
+        &board_key,
+        &req.ng_ids,
+        "NG IDs",
+    )
+    .await
 }
 
 pub async fn post_thread_metadent(
@@ -322,13 +281,11 @@ pub async fn post_thread_metadent(
         return empty(400);
     }
 
-    let key = shared_ng_thread_metadent_key(&board_key, &req.metadent);
-    let active_key = shared_ng_thread_metadent_active_key(&board_key);
     add_shared_value(
         &state,
         &jar,
-        key,
-        active_key,
+        SharedNgKind::ThreadMetadent,
+        &board_key,
         &req.metadent,
         "thread metadent",
     )
@@ -355,12 +312,15 @@ pub async fn delete_thread_metadents(
         return empty(400);
     }
 
-    let keys = req
-        .metadents
-        .iter()
-        .map(|metadent| shared_ng_thread_metadent_key(&board_key, metadent))
-        .collect();
-    remove_shared_values(&state, &jar, keys, "thread metadents").await
+    remove_shared_values(
+        &state,
+        &jar,
+        SharedNgKind::ThreadMetadent,
+        &board_key,
+        &req.metadents,
+        "thread metadents",
+    )
+    .await
 }
 
 #[cfg(test)]

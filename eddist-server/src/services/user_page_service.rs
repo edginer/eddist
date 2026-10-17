@@ -1,16 +1,18 @@
-use redis::{AsyncCommands, aio::ConnectionManager};
+use std::sync::Arc;
 
-use crate::{domain::user::User, repositories::user_repository::UserRepository};
-use eddist_core::redis_keys::user_session_key;
+use crate::{
+    domain::user::User, repositories::user_repository::UserRepository,
+    stores::user_session_store::UserSessionStore,
+};
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserPageService<U: UserRepository>(U, ConnectionManager);
+pub struct UserPageService<U: UserRepository>(U, Arc<dyn UserSessionStore>);
 
 impl<U: UserRepository> UserPageService<U> {
-    pub fn new(user_repo: U, redis_conn: ConnectionManager) -> Self {
-        Self(user_repo, redis_conn)
+    pub fn new(user_repo: U, sessions: Arc<dyn UserSessionStore>) -> Self {
+        Self(user_repo, sessions)
     }
 }
 
@@ -22,11 +24,7 @@ impl<U: UserRepository + Clone>
         &self,
         input: UserPageServiceInput,
     ) -> Result<UserPageServiceOutput, UserPageError> {
-        let mut redis_conn = self.1.clone();
-        let Some(user_id) = redis_conn
-            .get::<_, Option<String>>(user_session_key(&input.user_sid))
-            .await?
-        else {
+        let Some(user_id) = self.1.get_user_id(&input.user_sid).await? else {
             return Err(UserPageError::SessionNotFound);
         };
 
@@ -54,8 +52,6 @@ pub enum UserPageError {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
-
-impl_from_for_other!(UserPageError: redis::RedisError);
 
 #[derive(Debug, Clone)]
 pub struct UserPageServiceInput {

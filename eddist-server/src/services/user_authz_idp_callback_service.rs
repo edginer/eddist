@@ -4,7 +4,6 @@ use chrono::Utc;
 use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
 use rand::{RngExt, distr::Alphanumeric};
-use redis::{AsyncCommands, aio::ConnectionManager};
 use sha2::Sha256;
 use sqlx::MySql;
 use uuid::Uuid;
@@ -25,12 +24,10 @@ use crate::{
         idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
+    stores::{oidc_state_store::OidcStateStore, user_session_store::UserSessionStore},
     utils::TransactionRepository,
 };
-use eddist_core::{
-    redis_keys::{user_login_oauth2_authreq_key, user_reg_oauth2_authreq_key, user_session_key},
-    utils::to_hex,
-};
+use eddist_core::utils::to_hex;
 
 use super::AppService;
 
@@ -39,7 +36,8 @@ pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository, B: B
     idp_repo: I,
     user_repo: U,
     bbs_repo: B,
-    redis_conn: ConnectionManager,
+    sessions: Arc<dyn UserSessionStore>,
+    oidc_state: Arc<dyn OidcStateStore>,
     config: Arc<AppConfig>,
 }
 
@@ -50,14 +48,16 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
         idp_repo: I,
         user_repo: U,
         bbs_repo: B,
-        redis_conn: ConnectionManager,
+        sessions: Arc<dyn UserSessionStore>,
+        oidc_state: Arc<dyn OidcStateStore>,
         config: Arc<AppConfig>,
     ) -> Self {
         Self {
             idp_repo,
             user_repo,
             bbs_repo,
-            redis_conn,
+            sessions,
+            oidc_state,
             config,
         }
     }
@@ -79,32 +79,24 @@ impl<
         &self,
         input: UserAuthzIdpCallbackServiceInput,
     ) -> Result<UserAuthzIdpCallbackServiceOutput, UserAuthzIdpCallbackError> {
-        let mut redis_conn = self.redis_conn.clone();
-
-        let redis_authreq_key = match input.callback_kind {
-            CallbackKind::Register => user_reg_oauth2_authreq_key(&input.state_id),
-            CallbackKind::Login => user_login_oauth2_authreq_key(&input.state_id),
-        };
-
-        // TODO: currently, get_del does not work well
-        let Some(user_state) = redis_conn
-            .get::<_, Option<String>>(&redis_authreq_key)
-            .await?
-        else {
-            return Err(UserAuthzIdpCallbackError::StateNotFound);
-        };
-        redis_conn.del::<_, ()>(&redis_authreq_key).await?;
-
         let (user_sid, edge_token) = match input.callback_kind {
             CallbackKind::Register => {
-                let reg_state = serde_json::from_str::<UserRegState>(&user_state)?;
+                let reg_state = self
+                    .oidc_state
+                    .take_user_reg_authreq(&input.state_id)
+                    .await?
+                    .ok_or(UserAuthzIdpCallbackError::StateNotFound)?;
                 let (user_sid, edge_token) = self
                     .register_user_with_idp(reg_state, input.code, input.browser_edge_token)
                     .await?;
                 (user_sid, edge_token)
             }
             CallbackKind::Login => {
-                let login_state = serde_json::from_str::<UserLoginState>(&user_state)?;
+                let login_state = self
+                    .oidc_state
+                    .take_user_login_authreq(&input.state_id)
+                    .await?
+                    .ok_or(UserAuthzIdpCallbackError::StateNotFound)?;
                 let (user_sid, edge_token) = self
                     .login_user_with_idp(
                         login_state,
@@ -143,8 +135,6 @@ impl<
         code: String,
         browser_edge_token: Option<String>,
     ) -> Result<(String, Option<String>), UserAuthzIdpCallbackError> {
-        let mut redis_conn = self.redis_conn.clone();
-
         let edge_token = user_reg_state.edge_token.clone();
         let authed_token_id = user_reg_state.authed_token.clone();
 
@@ -234,17 +224,7 @@ impl<
             self.bind_token(user_id, token.id).await?;
         }
 
-        let mut hasher = sha3::Sha3_512::new();
-        hasher.update(Uuid::now_v7().to_string());
-        let user_sid = to_hex(hasher.finalize());
-
-        redis_conn
-            .set_ex::<_, _, ()>(
-                user_session_key(&user_sid),
-                user_id.to_string(),
-                60 * 60 * 24 * 365,
-            )
-            .await?;
+        let user_sid = self.sessions.create(user_id).await?;
 
         Ok((user_sid, edge_token))
     }
@@ -258,8 +238,6 @@ impl<
         user_agent: String,
         asn_num: i32,
     ) -> Result<Option<(String, Option<String>)>, UserAuthzIdpCallbackError> {
-        let mut redis_conn = self.redis_conn.clone();
-
         let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
         let idp_clients = idp_clients_svc.get_idp_clients().await?;
 
@@ -298,17 +276,7 @@ impl<
                 "user is disabled".to_string(),
             )),
             Some(user) => {
-                let mut hasher = sha3::Sha3_512::new();
-                hasher.update(Uuid::now_v7().to_string());
-                let user_sid = to_hex(hasher.finalize());
-
-                redis_conn
-                    .set_ex::<_, _, ()>(
-                        user_session_key(&user_sid),
-                        user.id.to_string(),
-                        60 * 60 * 24 * 365,
-                    )
-                    .await?;
+                let user_sid = self.sessions.create(user.id).await?;
 
                 // Sweep browser token: try to bind the current browser's token if valid and
                 // unbound. Otherwise issue a fresh token for this browser session — the user's
@@ -405,12 +373,7 @@ pub enum UserAuthzIdpCallbackError {
     Other(#[from] anyhow::Error),
 }
 
-impl_from_for_other!(
-    UserAuthzIdpCallbackError: redis::RedisError,
-    serde_json::Error,
-    sqlx::Error,
-    uuid::Error,
-);
+impl_from_for_other!(UserAuthzIdpCallbackError: sqlx::Error, uuid::Error);
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
@@ -604,9 +567,6 @@ fn user_name_generator() -> String {
 
 #[cfg(test)]
 mod probe_tests {
-    use eddist_core::utils::to_hex;
-    use sha3::Digest;
-
     #[tokio::test]
     async fn disabled_existing_user_is_rejected_before_opening_a_transaction() {
         use super::*;
@@ -631,17 +591,6 @@ mod probe_tests {
             .unwrap_err();
         // Any attempt to begin a transaction would instead fail with PoolClosed.
         assert!(matches!(error, UserAuthzIdpCallbackError::Rejected(_)));
-    }
-
-    /// user_sid is a fresh Redis session key, not a persisted/compared value across
-    /// restarts, so only the hex shape needs to stay stable, not the exact digits.
-    #[test]
-    fn hex_output_shape_stable_across_digest_crate_bump() {
-        let mut hasher = sha3::Sha3_512::new();
-        hasher.update("fixed-uuid-for-probe");
-        let user_sid = to_hex(hasher.finalize());
-        assert_eq!(user_sid.len(), 128);
-        assert!(user_sid.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]
