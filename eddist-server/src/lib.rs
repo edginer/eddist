@@ -43,6 +43,7 @@ mod error;
 pub mod middleware;
 pub mod services;
 pub(crate) mod stores;
+pub mod tasks;
 mod template;
 pub(crate) mod external {
     pub mod captcha_like_client;

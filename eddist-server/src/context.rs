@@ -9,6 +9,7 @@ use crate::{
         captcha_config_cache::CaptchaConfigCache, server_settings_cache::ServerSettingsCache,
         stats_counter::StatsCounter, user_restriction_service::UserRestrictionCache,
     },
+    tasks::BackgroundTasks,
 };
 
 /// Configuration and in-process state owned by one app instance.
@@ -21,4 +22,5 @@ pub struct AppContext {
     pub board_info: BoardInfoCache,
     pub stats: StatsCounter,
     pub user_creation_rate_limit: UserCreationRateLimit,
+    pub background_tasks: BackgroundTasks,
 }

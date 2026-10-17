@@ -15,8 +15,12 @@ use crate::{
     external::captcha_like_client::{
         CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
     },
-    repositories::{bbs_pubsub_repository::CreationEventRepository, bbs_repository::BbsRepository},
+    repositories::{
+        bbs_pubsub_repository::{CreationEventRepository, record_event_publish},
+        bbs_repository::BbsRepository,
+    },
     stores::auth_state_store::AuthStateStore,
+    tasks::BackgroundTasks,
 };
 use eddist_core::{
     domain::{
@@ -38,6 +42,7 @@ pub struct AuthWithCodeService<T: BbsRepository, E: CreationEventRepository> {
     auth_state: Arc<dyn AuthStateStore>,
     redis_conn: ConnectionManager,
     event_repo: E,
+    background_tasks: BackgroundTasks,
 }
 
 impl<T: BbsRepository, E: CreationEventRepository> AuthWithCodeService<T, E> {
@@ -46,12 +51,14 @@ impl<T: BbsRepository, E: CreationEventRepository> AuthWithCodeService<T, E> {
         auth_state: Arc<dyn AuthStateStore>,
         redis_conn: ConnectionManager,
         event_repo: E,
+        background_tasks: BackgroundTasks,
     ) -> Self {
         Self {
             repo,
             auth_state,
             redis_conn,
             event_repo,
+            background_tasks,
         }
     }
 
@@ -130,9 +137,13 @@ impl<T: BbsRepository, E: CreationEventRepository>
                 asn_num: input.asn_num,
                 auth_code: input.code.clone(),
             };
-            tokio::spawn(async move {
-                let _ = event_repo.publish_auth_token_requested(event).await;
-            });
+            self.background_tasks
+                .spawn_detached("auth_token_requested_publish", async move {
+                    record_event_publish(
+                        "auth_token_requested",
+                        event_repo.publish_auth_token_requested(event).await,
+                    );
+                });
         }
 
         // Handle auth_code collisions - if multiple unauthed tokens exist, delete them and return error
@@ -259,9 +270,13 @@ impl<T: BbsRepository, E: CreationEventRepository>
                 authed_at: now,
                 additional_info,
             };
-            tokio::spawn(async move {
-                let _ = event_repo.publish_auth_token_succeeded(event).await;
-            });
+            self.background_tasks
+                .spawn_detached("auth_token_succeeded_publish", async move {
+                    record_event_publish(
+                        "auth_token_succeeded",
+                        event_repo.publish_auth_token_succeeded(event).await,
+                    );
+                });
         }
 
         // Generate rate limiting token after successful authentication

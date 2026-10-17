@@ -175,6 +175,7 @@ impl<
                 auth_state.clone(),
                 redis_conn.clone(),
                 pubsub.event_repo.clone(),
+                ctx.background_tasks.clone(),
             ),
             reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), redis_conn.clone()),
             board_info: BoardInfoService::new(bbs_repo.clone(), ctx.board_info.clone()),

@@ -190,14 +190,26 @@ pub async fn post_bbs_cgi(
     // Fire-and-forget: bind the token to the user if logged in and not yet bound
     if !is_authed_token_bound && let Some(sid) = user_sid {
         let bind_svc = state.services.bind_token_to_user().clone();
-        tokio::spawn(async move {
-            let _ = bind_svc
-                .execute(BindTokenToUserServiceInput {
-                    user_sid: sid,
-                    authed_token_id,
-                })
-                .await;
-        });
+        state
+            .ctx
+            .background_tasks
+            .spawn_detached("bind_token_to_user", async move {
+                match bind_svc
+                    .execute(BindTokenToUserServiceInput {
+                        user_sid: sid,
+                        authed_token_id,
+                    })
+                    .await
+                {
+                    Ok(()) => {
+                        metrics::counter!("token_binding", "result" => "success").increment(1)
+                    }
+                    Err(e) => {
+                        metrics::counter!("token_binding", "result" => "failure").increment(1);
+                        tracing::error!(error = %e, "failed to bind authed token to the user");
+                    }
+                }
+            });
     }
 
     let mut response = SJisResponseBuilder::new(SJisStr::from(

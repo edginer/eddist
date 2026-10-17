@@ -123,3 +123,16 @@ impl CreationEventRepository for RedisCreationEventRepository {
         .await
     }
 }
+
+pub(crate) fn record_event_publish(event: &'static str, result: Result<(), anyhow::Error>) {
+    match result {
+        Ok(()) => {
+            metrics::counter!("event_publish", "event" => event, "result" => "success").increment(1)
+        }
+        Err(e) => {
+            metrics::counter!("event_publish", "event" => event, "result" => "failure")
+                .increment(1);
+            tracing::error!(event, error = %e, "failed to publish event");
+        }
+    }
+}

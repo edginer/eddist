@@ -1874,6 +1874,7 @@ dependencies = [
  "log",
  "md-5 0.11.0",
  "metrics",
+ "metrics-util",
  "mimalloc",
  "mockall",
  "openidconnect",
@@ -1894,6 +1895,7 @@ dependencies = [
  "thiserror 2.0.20",
  "time",
  "tokio",
+ "tokio-util",
  "toml",
  "tower",
  "tower-http 0.7.0",
@@ -3595,7 +3597,9 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.16.1",
+ "indexmap 2.14.0",
  "metrics",
+ "ordered-float 5.5.0",
  "quanta",
  "rand 0.9.5",
  "rand_xoshiro",
@@ -3914,6 +3918,15 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "5.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c7c9e0d9b23589f26070720bac724174bfec1083e82f7854cdd0267518343c0"
 dependencies = [
  "num-traits",
 ]
@@ -6168,6 +6181,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",

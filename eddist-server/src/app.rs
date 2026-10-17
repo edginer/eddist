@@ -70,12 +70,15 @@ use crate::{
     },
     shiftjis::{SJisResponseBuilder, SjisContentType},
     stores::shared_ng_store::{RedisSharedNgStore, SharedNgStore},
+    tasks::BackgroundTasks,
     template::load_template_engine,
     utils::CsrfState,
 };
 
 const SETTINGS_REFRESH_INTERVAL: Duration = Duration::from_secs(300);
 const STATS_FLUSH_INTERVAL: Duration = Duration::from_secs(30);
+/// Longer than the 5s pool acquire timeout so a stuck DB still reaches the Redis fallback.
+const PENDING_TASK_DRAIN_DEADLINE: Duration = Duration::from_secs(10);
 
 pub type Services = AppServiceContainer<
     BbsRepositoryImpl,
@@ -96,7 +99,7 @@ pub struct AppState {
     pub redis_conn: redis::aio::ConnectionManager,
     pub shared_ng: Arc<dyn SharedNgStore>,
     pub not_found_penalty_cache: NotFoundPenaltyCache,
-    _background_tasks: Arc<BackgroundTasks>,
+    _periodic_tasks: Arc<PeriodicTasks>,
 }
 
 impl AppState {
@@ -106,9 +109,9 @@ impl AppState {
 }
 
 /// Refresh tasks stop once every clone of the owning `AppState` (and thus the router) is gone.
-struct BackgroundTasks(Vec<JoinHandle<()>>);
+struct PeriodicTasks(Vec<JoinHandle<()>>);
 
-impl Drop for BackgroundTasks {
+impl Drop for PeriodicTasks {
     fn drop(&mut self) {
         for task in &self.0 {
             task.abort();
@@ -131,6 +134,21 @@ pub struct App {
 impl App {
     pub async fn flush_stats(&self) -> anyhow::Result<()> {
         self.state.ctx.stats.flush_now(&self.state.stats_repo).await
+    }
+
+    pub async fn shutdown(&self) {
+        self.state
+            .ctx
+            .background_tasks
+            .drain(PENDING_TASK_DRAIN_DEADLINE)
+            .await;
+
+        match self.flush_stats().await {
+            Ok(()) => tracing::info!("Flushed stats on shutdown."),
+            Err(e) => {
+                tracing::error!(error = %format_args!("{e:#}"), "Failed to flush stats on shutdown.")
+            }
+        }
     }
 }
 
@@ -175,9 +193,10 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         board_info: BoardInfoCache::default(),
         stats: StatsCounter::default(),
         user_creation_rate_limit: UserCreationRateLimit::default(),
+        background_tasks: BackgroundTasks::default(),
     };
 
-    let background_tasks = BackgroundTasks(vec![
+    let periodic_tasks = PeriodicTasks(vec![
         spawn_refresh_task("server_settings", SETTINGS_REFRESH_INTERVAL, {
             let cache = ctx.server_settings.clone();
             move || {
@@ -226,7 +245,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         shared_ng: Arc::new(RedisSharedNgStore::new(redis_conn.clone())),
         redis_conn,
         not_found_penalty_cache: NotFoundPenaltyCache::new(),
-        _background_tasks: Arc::new(background_tasks),
+        _periodic_tasks: Arc::new(periodic_tasks),
     };
 
     Ok(App {
