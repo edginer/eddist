@@ -9,10 +9,9 @@ use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
-    config::AppConfig,
     domain::{
         authed_token::AuthedToken,
-        service::oidc_client_service::OidcClientService,
+        service::oidc_client_service::{MetadataFreshness, OidcClientRegistry},
         user::{
             User,
             user_login_state::UserLoginState,
@@ -21,7 +20,6 @@ use crate::{
     },
     repositories::{
         bbs_repository::{BbsRepository, CreatingAuthedToken},
-        idp_repository::IdpRepository,
         user_repository::{CreatingUser, UserRepository},
     },
     stores::{oidc_state_store::OidcStateStore, user_session_store::UserSessionStore},
@@ -32,48 +30,39 @@ use eddist_core::utils::to_hex;
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserAuthzIdpCallbackService<I: IdpRepository, U: UserRepository, B: BbsRepository> {
-    idp_repo: I,
+pub struct UserAuthzIdpCallbackService<U: UserRepository, B: BbsRepository> {
     user_repo: U,
     bbs_repo: B,
     sessions: Arc<dyn UserSessionStore>,
     oidc_state: Arc<dyn OidcStateStore>,
-    config: Arc<AppConfig>,
+    oidc_clients: Arc<OidcClientRegistry>,
 }
 
-impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
-    UserAuthzIdpCallbackService<I, U, B>
-{
+impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackService<U, B> {
     pub fn new(
-        idp_repo: I,
         user_repo: U,
         bbs_repo: B,
         sessions: Arc<dyn UserSessionStore>,
         oidc_state: Arc<dyn OidcStateStore>,
-        config: Arc<AppConfig>,
+        oidc_clients: Arc<OidcClientRegistry>,
     ) -> Self {
         Self {
-            idp_repo,
             user_repo,
             bbs_repo,
             sessions,
             oidc_state,
-            config,
+            oidc_clients,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<
-    I: IdpRepository + Clone,
-    U: UserRepository + TransactionRepository<MySql> + Clone,
-    B: BbsRepository + Clone,
->
+impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository + Clone>
     AppService<
         UserAuthzIdpCallbackServiceInput,
         UserAuthzIdpCallbackServiceOutput,
         UserAuthzIdpCallbackError,
-    > for UserAuthzIdpCallbackService<I, U, B>
+    > for UserAuthzIdpCallbackService<U, B>
 {
     async fn execute(
         &self,
@@ -119,11 +108,8 @@ impl<
     }
 }
 
-impl<
-    I: IdpRepository + Clone,
-    U: UserRepository + TransactionRepository<MySql> + Clone,
-    B: BbsRepository + Clone,
-> UserAuthzIdpCallbackService<I, U, B>
+impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository + Clone>
+    UserAuthzIdpCallbackService<U, B>
 {
     async fn bind_token(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
         bind_token(&self.user_repo, user_id, token_id).await
@@ -150,16 +136,13 @@ impl<
             ));
         }
 
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
-        let idp_clients = idp_clients_svc.get_idp_clients().await?;
-
-        let (idp, idp_client) = idp_clients
-            .get(&user_reg_state.idp_name.clone().unwrap())
+        let idp_name = user_reg_state.idp_name.clone().unwrap_or_default();
+        let (idp, idp_client) = self
+            .oidc_clients
+            .get(&idp_name, MetadataFreshness::Fresh)
+            .await?
             .ok_or_else(|| {
-                UserAuthzIdpCallbackError::Rejected(format!(
-                    "idp client not found: {}",
-                    user_reg_state.idp_name.unwrap()
-                ))
+                UserAuthzIdpCallbackError::Rejected(format!("idp client not found: {idp_name}"))
             })?;
 
         let id_token_claims = idp_client
@@ -238,11 +221,10 @@ impl<
         user_agent: String,
         asn_num: i32,
     ) -> Result<Option<(String, Option<String>)>, UserAuthzIdpCallbackError> {
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
-        let idp_clients = idp_clients_svc.get_idp_clients().await?;
-
-        let (idp, idp_client) = idp_clients
-            .get(&user_login_state.idp_name.clone())
+        let (idp, idp_client) = self
+            .oidc_clients
+            .get(&user_login_state.idp_name, MetadataFreshness::Fresh)
+            .await?
             .ok_or_else(|| {
                 UserAuthzIdpCallbackError::Rejected(format!(
                     "idp client not found: {}",
