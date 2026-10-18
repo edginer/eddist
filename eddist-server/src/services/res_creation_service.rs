@@ -1,9 +1,7 @@
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
-use chrono::Utc;
 use eddist_core::{
     domain::{
-        client_info::ClientInfo,
         ip_addr::ReducedIpAddr,
         pubsub_repository::{CreatingRes, PubSubItem},
         tinker::Tinker,
@@ -16,19 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     context::AppContext,
-    domain::{
-        ng_word::NgWordRestrictable,
-        res::Res,
-        res_core::ResCore,
-        service::{
-            bbscgi_auth_service::BbsCgiAuthService,
-            board_info_service::{
-                BoardInfoClientInfoResRestrictable, BoardInfoResRestrictable, BoardInfoService,
-            },
-            email_auth_restriction_service::EmailAuthRestrictionService,
-        },
-        utils::count_anchors,
-    },
+    domain::{ng_word::NgWordRestrictable, posting_policy},
     error::{BbsCgiError, NotFoundParamType},
     repositories::{
         bbs_pubsub_repository::{CreationEventRepository, PubRepository, record_event_publish},
@@ -39,8 +25,10 @@ use crate::{
 
 use super::{
     BbsCgiService, openai_moderation_service,
+    posting_preparation_service::{
+        PostingPreparationInput, PostingPreparationService, PostingTarget, PreparedPosting,
+    },
     server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
-    validation::{check_userreg, resolve_cap_name},
 };
 
 #[derive(Clone)]
@@ -83,159 +71,52 @@ impl<T: BbsRepository + Clone, P: PubRepository, E: CreationEventRepository>
         let pub_repo = self.pub_repo.clone();
 
         let res_id = Uuid::now_v7();
-        let board_info_svc =
-            BoardInfoService::new(self.bbs_repo.clone(), self.ctx.board_info.clone());
-        let (board, board_info) = board_info_svc
-            .get_board_info_by_key(&input.board_key)
-            .await?
-            .ok_or_else(|| BbsCgiError::from(NotFoundParamType::Board))?;
 
-        if board_info.read_only {
-            return Err(BbsCgiError::ReadOnlyBoard);
-        }
-
-        let created_at = Utc::now();
-
-        let Some(th) = self
-            .bbs_repo
-            .get_thread_by_board_key_and_thread_number(&input.board_key, input.thread_number)
-            .await
-            .map_err(BbsCgiError::Other)?
-        else {
-            return Err(BbsCgiError::from(NotFoundParamType::Thread));
-        };
-
-        if !th.active {
-            return Err(BbsCgiError::InactiveThread);
-        }
-
-        let res_core = ResCore {
-            from: &input.name,
-            mail: &input.mail,
-            body: Cow::Borrowed(&input.body),
-        };
-        let client_info = ClientInfo {
-            user_agent: input.user_agent.clone(),
-            asn_num: input.asn_num,
-            ip_addr: input.ip_addr.clone(),
-            tinker: input.tinker.as_ref().map(|x| Box::new(x.clone())),
-        };
-
-        res_core.validate_content_length(&board_info)?;
-        client_info.validate_client_info(
-            &board_info,
-            false,
-            self.ctx.config.restrict_thread_creation_on_no_tinker,
-        )?;
-
-        let metadent_type = board_info
-            .force_metadent_type
-            .as_deref()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or_else(|| (&th.metadent as &str).into());
-
-        let res = Res::new_from_res(
-            res_core,
-            &input.board_key,
-            created_at,
-            metadent_type,
-            client_info.clone(),
-            input.authed_token_cookie,
-            false,
-        );
-
-        let auth_service = BbsCgiAuthService::new(
+        let preparation = PostingPreparationService::new(
             self.bbs_repo.clone(),
-            self.stores.auth_state.clone(),
+            self.stores.clone(),
             self.event_repo.clone(),
-            self.ctx.config.clone(),
-            self.ctx.user_creation_rate_limit.clone(),
-            self.ctx.background_tasks.clone(),
+            self.ctx.clone(),
         );
-        let authed_token = auth_service
-            .check_validity(
-                res.authed_token().map(|x| x.as_str()),
-                input.ip_addr.clone(),
-                input.user_agent.clone(),
-                input.asn_num as i32,
-                created_at,
-                &input.settings,
-            )
+        let PreparedPosting {
+            board,
+            board_info,
+            thread,
+            created_at,
+            authed_token,
+            client_info,
+            mut res,
+        } = preparation
+            .prepare(PostingPreparationInput {
+                board_key: &input.board_key,
+                target: PostingTarget::Res {
+                    thread_number: input.thread_number,
+                },
+                authed_token: input.authed_token_cookie.as_deref(),
+                name: &input.name,
+                mail: &input.mail,
+                body: &input.body,
+                tinker: input.tinker.as_ref(),
+                ip_addr: &input.ip_addr,
+                user_agent: &input.user_agent,
+                asn_num: input.asn_num,
+                settings: &input.settings,
+            })
             .await?;
+        // The reply target lookup in the preparation always yields a thread.
+        let th = thread.ok_or_else(|| BbsCgiError::from(NotFoundParamType::Thread))?;
 
-        let email_auth_service = EmailAuthRestrictionService::new(self.stores.auth_state.clone());
-        email_auth_service
-            .check_and_enforce_restriction(
-                res.is_email_authed(),
-                &input.user_agent,
-                &authed_token.token,
-                &input.ip_addr,
-            )
-            .await?;
-
-        if let Some(err) = check_userreg(
-            &input.body,
-            &authed_token,
-            self.stores.auth_state.as_ref(),
-            &input.settings,
-            &self.ctx.config.base_url,
-            &self.ctx.user_creation_rate_limit,
-        )
-        .await?
-        {
-            return Err(err);
-        }
-
-        let cap_name = resolve_cap_name(
-            &self.bbs_repo,
-            &res,
-            &input.board_key,
-            &self.ctx.config.tinker_secret,
-        )
-        .await?;
-        let mut res = res.set_author_id(&authed_token, cap_name);
-
-        // Restrict the image posting below internal_level 2
-        if let Some(tinker) = &input.tinker {
-            if tinker.internal_level() < 2 && !res.get_all_images().is_empty() {
-                return Err(BbsCgiError::ImageUrlBelowLv2);
-            }
-        } else if !res.get_all_images().is_empty() {
-            // Does not allow image URL
-            return Err(BbsCgiError::ImageUrlBelowLv2);
-        }
-
-        // Restrict the anchor count below internal_level 2
-        const MAX_ANCHORS_BELOW_LV2: usize = 3;
-        let needs_anchor_check = if let Some(tinker) = &input.tinker {
-            tinker.internal_level() < 2
-        } else {
-            true
-        };
-
-        if needs_anchor_check && count_anchors(&input.body) > MAX_ANCHORS_BELOW_LV2 {
-            return Err(BbsCgiError::NgWordDetected);
-        }
+        posting_policy::validate_res_images(&mut res, input.tinker.as_ref())?;
+        posting_policy::validate_res_anchors(&input.body, input.tinker.as_ref())?;
 
         let ng_words = self.stores.ng_words.get_ng_words(&input.board_key).await?;
         if res.contains_ng_word(&ng_words) {
             return Err(BbsCgiError::NgWordDetected);
         }
 
-        // Determine response creation span and tinker level based on tinker
-        // Level 1 users: 30 seconds, Level 2+ users: 5 seconds (base_response_creation_span_sec)
-        let (_, response_span_sec) = if let Some(tinker) = &input.tinker {
-            let level = tinker.level();
-            let span = if level < 2 {
-                30_u64
-            } else {
-                board_info.base_response_creation_span_sec as u64
-            };
-            (level, span)
-        } else {
-            // No tinker (not authenticated) - use level 1 and 30 seconds restriction
-            (1, 30_u64)
-        };
+        // Level 1 users: 30 seconds, level 2+ users: base_response_creation_span_sec
+        let response_span_sec =
+            posting_policy::res_creation_span_sec(input.tinker.as_ref(), &board_info);
 
         let auth_ip = authed_token.reduced_ip.to_string();
         let ip = ReducedIpAddr::from(input.ip_addr.clone()).to_string();
@@ -394,7 +275,8 @@ pub struct ResCreationServiceOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eddist_core::domain::res::ResView;
+    use chrono::Utc;
+    use eddist_core::domain::{client_info::ClientInfo, res::ResView};
     use eddist_core::test_utils::LogCapture;
     use std::sync::{Arc, Mutex};
     use tracing::instrument::WithSubscriber;
