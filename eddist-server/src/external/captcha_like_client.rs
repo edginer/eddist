@@ -68,19 +68,26 @@ fn extract_fields(source: &impl Serialize, fields: &[String]) -> Option<serde_js
 pub fn create_captcha_client(
     config: &CaptchaProviderConfig,
     redis_conn: ConnectionManager,
+    http_client: reqwest::Client,
 ) -> Result<Box<dyn CaptchaClient>, CaptchaVerificationError> {
     let name = config.name.clone();
     let client: Box<dyn CaptchaClient> = match config.provider.to_lowercase().as_str() {
-        "turnstile" => Box::new(TurnstileClient::new(name, config.secret.clone())),
+        "turnstile" => Box::new(TurnstileClient::new(
+            name,
+            config.secret.clone(),
+            http_client,
+        )),
         "hcaptcha" => Box::new(HCaptchaClient::new(
             name,
             config.secret.clone(),
             config.capture_fields.clone(),
+            http_client,
         )),
         "monocle" => Box::new(MonocleClient::new(
             name,
             config.secret.clone(),
             config.capture_fields.clone(),
+            http_client,
         )),
         "recaptcha_enterprise" => Box::new(RecaptchaEnterpriseClient::new(
             name,
@@ -97,6 +104,7 @@ pub fn create_captcha_client(
                 .and_then(|v| v.score_threshold)
                 .unwrap_or(0.5),
             config.capture_fields.clone(),
+            http_client,
         )),
         "layer3intel_tripwire" => Box::new(Layer3IntelTripwireClient::new(
             name,
@@ -105,7 +113,7 @@ pub fn create_captcha_client(
             redis_conn,
         )?),
         // For other providers, use the generic client
-        _ => Box::new(GenericCaptchaClient::new(config.clone())),
+        _ => Box::new(GenericCaptchaClient::new(config.clone(), http_client)),
     };
     Ok(client)
 }
@@ -117,10 +125,10 @@ pub struct TurnstileClient {
 }
 
 impl TurnstileClient {
-    pub fn new(name: String, secret: String) -> Self {
+    pub fn new(name: String, secret: String, client: reqwest::Client) -> Self {
         Self {
             name,
-            client: reqwest::Client::new(),
+            client,
             secret: SimpleSecret::new(&secret),
         }
     }
@@ -188,10 +196,15 @@ pub struct HCaptchaClient {
 }
 
 impl HCaptchaClient {
-    pub fn new(name: String, secret: String, capture_fields: Vec<String>) -> Self {
+    pub fn new(
+        name: String,
+        secret: String,
+        capture_fields: Vec<String>,
+        client: reqwest::Client,
+    ) -> Self {
         Self {
             name,
-            client: reqwest::Client::new(),
+            client,
             secret: SimpleSecret::new(&secret),
             capture_fields,
         }
@@ -255,10 +268,15 @@ pub struct MonocleClient {
 }
 
 impl MonocleClient {
-    pub fn new(name: String, token: String, capture_fields: Vec<String>) -> Self {
+    pub fn new(
+        name: String,
+        token: String,
+        capture_fields: Vec<String>,
+        client: reqwest::Client,
+    ) -> Self {
         Self {
             name,
-            client: reqwest::Client::new(),
+            client,
             token: SimpleSecret::new(&token),
             capture_fields,
         }
@@ -603,6 +621,7 @@ pub struct RecaptchaEnterpriseClient {
 }
 
 impl RecaptchaEnterpriseClient {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         api_key: String,
@@ -610,10 +629,11 @@ impl RecaptchaEnterpriseClient {
         project_id: String,
         score_threshold: f64,
         capture_fields: Vec<String>,
+        client: reqwest::Client,
     ) -> Self {
         Self {
             name,
-            client: reqwest::Client::new(),
+            client,
             api_key: SimpleSecret::new(&api_key),
             site_key,
             project_id,
@@ -732,11 +752,8 @@ pub struct GenericCaptchaClient {
 }
 
 impl GenericCaptchaClient {
-    pub fn new(config: CaptchaProviderConfig) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            config,
-        }
+    pub fn new(config: CaptchaProviderConfig, client: reqwest::Client) -> Self {
+        Self { client, config }
     }
 
     fn verification(&self) -> Result<&CaptchaVerificationConfig, CaptchaVerificationError> {
@@ -991,7 +1008,7 @@ mod probe_tests {
             let server = tokio::spawn(async move {
                 axum::serve(listener, router).await.unwrap();
             });
-            let client = GenericCaptchaClient::new(generic_config(&url));
+            let client = GenericCaptchaClient::new(generic_config(&url), reqwest::Client::new());
             let logs = LogCapture::default();
             let output = client
                 .verify_captcha("private-captcha-token", "192.0.2.99")
@@ -1018,7 +1035,7 @@ mod probe_tests {
     async fn generic_missing_verification_and_invalid_dynamic_headers_return_errors() {
         let mut config = generic_config("https://captcha.example/verify");
         config.verification = None;
-        let result = GenericCaptchaClient::new(config)
+        let result = GenericCaptchaClient::new(config, reqwest::Client::new())
             .verify_captcha("response", "192.0.2.99")
             .await;
         assert!(matches!(
@@ -1034,7 +1051,7 @@ mod probe_tests {
             .headers
             .insert("X-Token".into(), "{{response}}".into());
         config.validate().unwrap();
-        let output = GenericCaptchaClient::new(config)
+        let output = GenericCaptchaClient::new(config, reqwest::Client::new())
             .verify_captcha("malformed\nresponse", "192.0.2.99")
             .await
             .unwrap();
