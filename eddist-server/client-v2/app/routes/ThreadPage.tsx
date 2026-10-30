@@ -297,10 +297,9 @@ const ThreadPage = ({
   );
 
   const boardName = currentBoard?.name || "";
-  const threadName = useMemo(
-    () => decodeNumericCharRefsStr(posts?.threadName || ""),
-    [posts?.threadName],
-  );
+  // Decoded refs can reconstruct markup (e.g. &#60;), so only the raw title may go to innerHTML.
+  const threadNameHtml = posts?.threadName || "";
+  const threadName = useMemo(() => decodeNumericCharRefsStr(threadNameHtml), [threadNameHtml]);
 
   const filterResults = useMemo(
     () => posts?.responses.map(shouldFilterResponse) ?? [],
@@ -369,7 +368,7 @@ const ThreadPage = ({
             className="text-sm line-clamp-2 font-medium break-all"
             title={threadName}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-            dangerouslySetInnerHTML={{ __html: threadName }}
+            dangerouslySetInnerHTML={{ __html: threadNameHtml }}
           ></h1>
         </div>
 
@@ -385,7 +384,7 @@ const ThreadPage = ({
                 className="text-xl line-clamp-2 break-all"
                 title={threadName}
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: BBS thread name rendered as HTML
-                dangerouslySetInnerHTML={{ __html: threadName }}
+                dangerouslySetInnerHTML={{ __html: threadNameHtml }}
               ></p>
             </>
           )}
