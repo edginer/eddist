@@ -3,43 +3,42 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    config::AppConfig,
     domain::{
-        service::oidc_client_service::OidcClientService, user::user_login_state::UserLoginState,
+        service::oidc_client_service::{MetadataFreshness, OidcClientRegistry},
+        user::user_login_state::UserLoginState,
     },
-    repositories::idp_repository::IdpRepository,
     stores::oidc_state_store::OidcStateStore,
 };
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserLoginIdpRedirectionService<I: IdpRepository>(
-    I,
-    Arc<dyn OidcStateStore>,
-    Arc<AppConfig>,
-);
+pub struct UserLoginIdpRedirectionService {
+    oidc_clients: Arc<OidcClientRegistry>,
+    oidc_state: Arc<dyn OidcStateStore>,
+}
 
-impl<I: IdpRepository> UserLoginIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, oidc_state: Arc<dyn OidcStateStore>, config: Arc<AppConfig>) -> Self {
-        Self(idp_repo, oidc_state, config)
+impl UserLoginIdpRedirectionService {
+    pub fn new(oidc_clients: Arc<OidcClientRegistry>, oidc_state: Arc<dyn OidcStateStore>) -> Self {
+        Self {
+            oidc_clients,
+            oidc_state,
+        }
     }
 }
 
 #[async_trait::async_trait]
-impl<I: IdpRepository + Clone>
-    AppService<UserLoginIdpRedirectionServiceInput, UserLoginIdpRedirectionServiceOutput>
-    for UserLoginIdpRedirectionService<I>
+impl AppService<UserLoginIdpRedirectionServiceInput, UserLoginIdpRedirectionServiceOutput>
+    for UserLoginIdpRedirectionService
 {
     async fn execute(
         &self,
         input: UserLoginIdpRedirectionServiceInput,
     ) -> anyhow::Result<UserLoginIdpRedirectionServiceOutput> {
-        let idp_clients_svc = OidcClientService::new(self.0.clone(), self.2.clone());
-        let idp_clients = idp_clients_svc.get_idp_clients().await?;
-
-        let (_, idp_client) = idp_clients
-            .get(&input.idp_name)
+        let (_, idp_client) = self
+            .oidc_clients
+            .get(&input.idp_name, MetadataFreshness::Cached)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("idp client not found: {}", input.idp_name))?;
 
         let user_login_state_id = Uuid::now_v7();
@@ -54,7 +53,9 @@ impl<I: IdpRepository + Clone>
             user_login_state_id: user_login_state_id.to_string(),
         };
 
-        self.1.save_user_login_authreq(&user_login_state).await?;
+        self.oidc_state
+            .save_user_login_authreq(&user_login_state)
+            .await?;
 
         Ok(UserLoginIdpRedirectionServiceOutput {
             authz_url: authz_url.to_string(),
