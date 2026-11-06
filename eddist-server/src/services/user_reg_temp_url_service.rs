@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
@@ -17,7 +16,6 @@ use crate::{
         auth_state_store::AuthStateStore, oidc_state_store::OidcStateStore,
         user_session_store::UserSessionStore,
     },
-    utils::TransactionRepository,
 };
 
 use super::AppService;
@@ -55,11 +53,8 @@ impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clo
 }
 
 #[async_trait::async_trait]
-impl<
-    I: IdpRepository + Clone,
-    U: UserRepository + Clone + TransactionRepository<MySql>,
-    B: BbsRepository + Clone,
-> AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
+impl<I: IdpRepository + Clone, U: UserRepository + Clone, B: BbsRepository + Clone>
+    AppService<UserRegTempUrlServiceInput, UserRegTempUrlServiceOutput>
     for UserRegTempUrlService<I, U, B>
 {
     async fn execute(
@@ -81,12 +76,9 @@ impl<
                 return Ok(UserRegTempUrlServiceOutput::NotFound);
             };
 
-            let mut tx = self.user_repo.begin().await?;
-            tx = self
-                .user_repo
-                .bind_user_authed_token(user_id.parse()?, record.authed_token_id.parse()?, tx)
+            self.user_repo
+                .bind_user_authed_token(user_id.parse()?, record.authed_token_id.parse()?)
                 .await?;
-            tx.commit().await?;
 
             return Ok(UserRegTempUrlServiceOutput::Registered);
         }

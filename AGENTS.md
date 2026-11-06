@@ -138,7 +138,9 @@ USE_CLOUDFLARE_CDN=true    # Enables CF-Connecting-IP header
 - All UUIDs stored as `BINARY(16)` — always use `BIN_TO_UUID()` / `UUID_TO_BIN()` in SQLX queries
 
 ### Repository Pattern
-- `TransactionRepository<T: Database>` trait in `eddist-server/src/utils.rs` — use the `transaction_repository!` macro to implement it on repository structs
+- Migrated server repositories take a shared SeaORM `DatabaseConnection`.
+- User registration and token binding own their transactions inside `UserRepository`; application services do not pass database transaction types. Preserve `READ COMMITTED`, user-row locking, and canonical seed selection order.
+- The BBS repository temporarily holds the original SQLx pool alongside the adopted SeaORM connection while thread/response queries are migrated. Both handles must share one physical pool.
 - `eddist-cron` is the exception: it uses raw structs instead of the repository trait
 
 ### Admin API Type Generation
