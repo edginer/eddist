@@ -678,6 +678,85 @@ async fn test_dat_cache_and_db_parity() {
     );
 }
 
+/// A dat ETag is scoped to its board and thread: a tag from another resource must
+/// not produce 304 even when the byte size is identical.
+#[tokio::test]
+async fn test_dat_etag_is_scoped_to_its_resource() {
+    let mut ctx = TestContext::new().await;
+
+    let board_key = "etag1";
+    create_test_board(&ctx.pool, board_key, "ETag板").await;
+    let (_token_id, token) = create_test_authed_token(&ctx.pool, "192.168.1.10", "code-etag").await;
+
+    let form_data = encode_sjis_form(&[
+        ("bbs", board_key),
+        ("submit", "新規スレッド作成"),
+        ("subject", "ETagテスト"),
+        ("FROM", "テスト太郎"),
+        ("mail", ""),
+        ("MESSAGE", "ETag確認用レス"),
+    ]);
+    ctx.server
+        .post("/test/bbs.cgi")
+        .content_type("application/x-www-form-urlencoded")
+        .add_header(
+            HeaderName::from_static("cookie"),
+            HeaderValue::from_str(&format!("edge-token={}", token)).unwrap(),
+        )
+        .bytes(Bytes::from(form_data.into_bytes()))
+        .await;
+
+    let row: (i64,) = sqlx::query_as("SELECT thread_number FROM threads WHERE board_id = (SELECT id FROM boards WHERE board_key = ?) LIMIT 1")
+        .bind(board_key)
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("Failed to fetch thread number");
+    let thread_number = row.0 as u64;
+
+    let dat_key = thread_cache_key(board_key, thread_number);
+    let list_len: usize = ctx.redis_conn.llen(&dat_key).await.unwrap();
+    assert!(list_len > 0, "the cache path must serve this request");
+
+    let dat_path = format!("/{board_key}/dat/{thread_number}.dat");
+    let response = ctx.server.get(&dat_path).await;
+    assert_eq!(response.status_code(), 200);
+    let etag = response
+        .headers()
+        .get("etag")
+        .expect("dat responses carry an ETag")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let byte_size = response.as_bytes().len();
+
+    // The client's own tag returns 304.
+    let response = ctx
+        .server
+        .get(&dat_path)
+        .add_header(
+            HeaderName::from_static("if-none-match"),
+            HeaderValue::from_str(&etag).unwrap(),
+        )
+        .await;
+    assert_eq!(response.status_code(), 304);
+
+    // Tags from other resources with the same byte size must return 200.
+    for foreign in [
+        format!("W/\"other-{thread_number}-{byte_size}\""),
+        format!("W/\"{board_key}-9999999999-{byte_size}\""),
+    ] {
+        let response = ctx
+            .server
+            .get(&dat_path)
+            .add_header(
+                HeaderName::from_static("if-none-match"),
+                HeaderValue::from_str(&foreign).unwrap(),
+            )
+            .await;
+        assert_eq!(response.status_code(), 200, "{foreign}");
+    }
+}
+
 #[tokio::test]
 async fn test_thread_creation_records_dat_ttl_and_posting_limits() {
     let mut ctx = TestContext::new().await;
