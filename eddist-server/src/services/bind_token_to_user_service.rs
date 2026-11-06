@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
     repositories::user_repository::UserRepository, stores::user_session_store::UserSessionStore,
-    utils::TransactionRepository,
 };
 
 use super::AppService;
@@ -26,8 +24,8 @@ impl<U: UserRepository + Clone> BindTokenToUserService<U> {
 }
 
 #[async_trait::async_trait]
-impl<U: UserRepository + TransactionRepository<MySql> + Clone>
-    AppService<BindTokenToUserServiceInput, ()> for BindTokenToUserService<U>
+impl<U: UserRepository + Clone> AppService<BindTokenToUserServiceInput, ()>
+    for BindTokenToUserService<U>
 {
     async fn execute(&self, input: BindTokenToUserServiceInput) -> anyhow::Result<()> {
         let Some(user_id_str) = self.sessions.get_user_id(&input.user_sid).await? else {
@@ -48,12 +46,9 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone>
         }
 
         // Bind the token to the user
-        let tx = self.user_repo.begin().await?;
-        let tx = self
-            .user_repo
-            .bind_user_authed_token(user_id, input.authed_token_id, tx)
+        self.user_repo
+            .bind_user_authed_token(user_id, input.authed_token_id)
             .await?;
-        tx.commit().await?;
 
         log::info!(
             "Auto-bound token {} to user {}",

@@ -3,7 +3,6 @@ use base64::Engine;
 use eddist_core::redis_keys::csrf_key;
 use eddist_core::{domain::tinker::Tinker, utils::is_prod};
 use http::{HeaderMap, HeaderName};
-use sqlx::{Database, Transaction};
 use uuid::Uuid;
 
 /// Returns the client origin IP, or `None` in production when no valid CDN-provided
@@ -78,24 +77,6 @@ pub async fn incr_fixed_window(
         .await?;
 
     Ok(count)
-}
-
-#[async_trait::async_trait]
-pub trait TransactionRepository<T: Database> {
-    async fn begin(&self) -> anyhow::Result<Transaction<'_, T>>;
-}
-
-#[macro_export]
-macro_rules! transaction_repository {
-    ($impl_struct:ident, $conn:ident, $database:ident) => {
-        #[async_trait::async_trait]
-        impl $crate::utils::TransactionRepository<$database> for $impl_struct {
-            async fn begin(&self) -> anyhow::Result<::sqlx::Transaction<'_, $database>> {
-                let tx = self.$conn.begin().await?;
-                Ok(tx)
-            }
-        }
-    };
 }
 
 #[derive(Clone)]

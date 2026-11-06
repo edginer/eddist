@@ -35,26 +35,17 @@ type RecordedSql = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
 
 impl TestDatabase {
     fn users(&self) -> UserRepositoryImpl {
-        UserRepositoryImpl::new(self.pool.clone())
+        UserRepositoryImpl::new(self.orm())
     }
 
     async fn register_user(&self, user: CreatingUser, token_id: Uuid) -> anyhow::Result<()> {
-        let repo = self.users();
-        let tx = self.pool.begin().await?;
-        let tx = repo.create_user_with_idp(user.clone(), tx).await?;
-        let tx = repo
-            .bind_user_authed_token(user.user_id, token_id, tx)
-            .await?;
-        tx.commit().await?;
-        Ok(())
+        self.users()
+            .register_user_and_bind_token(user, token_id)
+            .await
     }
 
     async fn bind_user(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
-        let repo = self.users();
-        let tx = self.pool.begin().await?;
-        let tx = repo.bind_user_authed_token(user_id, token_id, tx).await?;
-        tx.commit().await?;
-        Ok(())
+        self.users().bind_user_authed_token(user_id, token_id).await
     }
 
     async fn insert_idp(&self, name: &str, enabled: bool) -> Uuid {
@@ -324,7 +315,24 @@ async fn user_registration_is_atomic_and_keeps_database_second_precision() {
         .execute(&db.pool)
         .await
         .unwrap();
-    db.register_user(user.clone(), token.id).await.unwrap();
+    let mut orm = db.orm();
+    let statements = RecordedSql::default();
+    orm.set_metric_callback({
+        let statements = statements.clone();
+        move |info| statements.lock().unwrap().push(info.statement.sql.clone())
+    });
+    UserRepositoryImpl::new(orm)
+        .register_user_and_bind_token(user.clone(), token.id)
+        .await
+        .unwrap();
+    {
+        let sql = statements.lock().unwrap();
+        assert_eq!(sql.len(), 6); // Four DMLs plus the user lock and canonical seed SELECTs.
+        assert_eq!(
+            sql.iter().filter(|sql| sql.starts_with("SELECT")).count(),
+            2
+        );
+    }
     let found = db
         .users()
         .get_user_by_id(user.user_id)
@@ -386,6 +394,18 @@ async fn user_registration_is_atomic_and_keeps_database_second_precision() {
 #[tokio::test]
 async fn user_binding_serializes_first_tokens_and_inherits_the_canonical_seed() {
     let db = TestDatabase::with_max_connections(4).await;
+    // The repository must set READ COMMITTED per transaction, independent of pool defaults.
+    let mut connections = Vec::new();
+    for _ in 0..4 {
+        connections.push(db.pool.acquire().await.unwrap());
+    }
+    for connection in &mut connections {
+        sqlx::query("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            .execute(&mut **connection)
+            .await
+            .unwrap();
+    }
+    drop(connections);
     let idp = db.insert_idp("first", true).await;
     let first = token_fixture("seedfirst", "192.0.2.1", "first");
     let mut second = token_fixture("seedsecond", "192.0.2.2", "second");
@@ -435,8 +455,11 @@ async fn user_binding_serializes_first_tokens_and_inherits_the_canonical_seed() 
             loop {
                 let modes: Vec<String> = sqlx::query_scalar("SELECT LOCK_MODE FROM performance_schema.data_locks WHERE OBJECT_NAME = 'users' AND LOCK_STATUS = 'WAITING'")
                     .fetch_all(&db.pool).await.unwrap();
-                if modes.len() >= 2 {
+                let levels: Vec<String> = sqlx::query_scalar("SELECT trx_isolation_level FROM information_schema.innodb_trx WHERE trx_state = 'LOCK WAIT'")
+                    .fetch_all(&db.pool).await.unwrap();
+                if modes.len() >= 2 && levels.len() >= 2 {
                     assert!(modes.iter().all(|mode| mode.starts_with('X')));
+                    assert!(levels.iter().all(|level| level == "READ COMMITTED"));
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;

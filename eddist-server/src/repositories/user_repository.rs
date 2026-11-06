@@ -1,10 +1,14 @@
-use sqlx::{MySql, MySqlPool, Transaction};
+use anyhow::Context as _;
+use eddist_entity::{authed_token, idp, user, user_authed_token, user_idp_binding};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    FromQueryResult, IsolationLevel, JoinType, Order, QueryFilter, QueryOrder, QuerySelect,
+    RelationTrait, TransactionTrait,
+    sea_query::{Expr, InsertStatement, NullOrdering, Query},
+};
 use uuid::Uuid;
 
-use crate::{
-    domain::user::{User, UserIdp},
-    transaction_repository,
-};
+use crate::domain::user::{User, UserIdp};
 
 #[async_trait::async_trait]
 pub trait UserRepository: Send + Sync + 'static {
@@ -21,61 +25,178 @@ pub trait UserRepository: Send + Sync + 'static {
         user_id: Uuid,
     ) -> anyhow::Result<Option<String>>;
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool>;
-    async fn create_user_with_idp<'a>(
-        &'a self,
+    /// Create the user, IdP binding and token binding in one transaction.
+    async fn register_user_and_bind_token(
+        &self,
         user: CreatingUser,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
-    async fn bind_user_authed_token<'a>(
-        &'a self,
+        token_id: Uuid,
+    ) -> anyhow::Result<()>;
+    /// Lock the user, bind the token and inherit the canonical seed atomically.
+    async fn bind_user_authed_token(
+        &self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>>;
+    ) -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Clone)]
 pub struct UserRepositoryImpl {
-    pool: MySqlPool,
+    db: DatabaseConnection,
 }
 
 impl UserRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self { pool }
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
     }
 }
 
-transaction_repository!(UserRepositoryImpl, pool, MySql);
+fn user_idp_select() -> sea_orm::Select<user::Entity> {
+    user::Entity::find()
+        .select_only()
+        .column_as(user::Column::Id, "user_id")
+        .column_as(user::Column::UserName, "user_name")
+        .column_as(user::Column::Enabled, "user_enabled")
+        .column_as(user::Column::CreatedAt, "user_created_at")
+        .column_as(user::Column::UpdatedAt, "user_updated_at")
+        .column_as(idp::Column::Id, "idp_id")
+        .column_as(idp::Column::IdpName, "idp_name")
+        .column_as(idp::Column::IdpDisplayName, "idp_display_name")
+        .column_as(user_idp_binding::Column::IdpSub, "idp_sub")
+        .column_as(user_idp_binding::Column::CreatedAt, "idp_bind_created_at")
+        .column_as(user_idp_binding::Column::UpdatedAt, "idp_bind_updated_at")
+        .join(JoinType::InnerJoin, user::Relation::UserIdpBinding.def())
+        .join(JoinType::InnerJoin, user_idp_binding::Relation::Idp.def())
+}
+
+fn locked_user(user_id: Uuid) -> sea_orm::Select<user::Entity> {
+    user::Entity::find()
+        .select_only()
+        .column(user::Column::Id)
+        .filter(user::Column::Id.eq(user_id))
+        .lock_exclusive()
+}
+
+// Keep NOW()'s database clock and default second precision. ActiveModel values
+// would require an application timestamp for these required columns.
+fn user_insert(input: &CreatingUser) -> InsertStatement {
+    Query::insert()
+        .into_table(user::Entity)
+        .columns([
+            user::Column::Id,
+            user::Column::UserName,
+            user::Column::CreatedAt,
+            user::Column::UpdatedAt,
+        ])
+        .values_panic([
+            Expr::value(input.user_id),
+            Expr::value(input.user_name.clone()),
+            Expr::current_timestamp(),
+            Expr::current_timestamp(),
+        ])
+        .to_owned()
+}
+
+fn idp_binding_insert(input: &CreatingUser) -> InsertStatement {
+    use user_idp_binding::Column;
+    Query::insert()
+        .into_table(user_idp_binding::Entity)
+        .columns([
+            Column::Id,
+            Column::UserId,
+            Column::IdpId,
+            Column::IdpSub,
+            Column::CreatedAt,
+            Column::UpdatedAt,
+        ])
+        .values_panic([
+            Expr::value(Uuid::now_v7()),
+            Expr::value(input.user_id),
+            Expr::value(input.idp_id),
+            Expr::value(input.idp_sub.clone()),
+            Expr::current_timestamp(),
+            Expr::current_timestamp(),
+        ])
+        .to_owned()
+}
+
+fn token_binding_insert(user_id: Uuid, token_id: Uuid) -> InsertStatement {
+    use user_authed_token::Column;
+    Query::insert()
+        .into_table(user_authed_token::Entity)
+        .columns([
+            Column::Id,
+            Column::UserId,
+            Column::AuthedTokenId,
+            Column::CreatedAt,
+            Column::UpdatedAt,
+        ])
+        .values_panic([
+            Expr::value(Uuid::now_v7()),
+            Expr::value(user_id),
+            Expr::value(token_id),
+            Expr::current_timestamp(),
+            Expr::current_timestamp(),
+        ])
+        .to_owned()
+}
+
+async fn bind_in_transaction(
+    tx: &DatabaseTransaction,
+    user_id: Uuid,
+    token_id: Uuid,
+) -> anyhow::Result<()> {
+    log::info!(
+        "insert: bind_user_authed_token: user_id: {}, authed_token_id: {}",
+        user_id,
+        token_id
+    );
+    // Lock order is user -> binding/token. Keep this before the binding INSERT.
+    if locked_user(user_id)
+        .into_tuple::<Uuid>()
+        .one(tx)
+        .await?
+        .is_none()
+    {
+        anyhow::bail!("user {user_id} not found");
+    }
+    tx.execute(&token_binding_insert(user_id, token_id)).await?;
+    log::info!(
+        "update: bind_user_authed_token: user_id: {}, authed_token_id: {}",
+        user_id,
+        token_id
+    );
+    // Preserve the existing selection order, including its unspecified tie order.
+    let seed = authed_token::Entity::find()
+        .select_only()
+        .column(authed_token::Column::AuthorIdSeed)
+        .join(
+            JoinType::InnerJoin,
+            authed_token::Relation::UserAuthedToken.def(),
+        )
+        .filter(user_authed_token::Column::UserId.eq(user_id))
+        .order_by_asc(user_authed_token::Column::CreatedAt)
+        .into_tuple::<Vec<u8>>()
+        .one(tx)
+        .await?;
+    let mut update = authed_token::Entity::update_many()
+        .col_expr(authed_token::Column::RegisteredUserId, Expr::value(user_id))
+        .filter(authed_token::Column::Id.eq(token_id));
+    if let Some(seed) = seed {
+        update = update.col_expr(authed_token::Column::AuthorIdSeed, Expr::value(seed));
+    }
+    update.exec(tx).await?;
+    Ok(())
+}
 
 #[async_trait::async_trait]
 impl UserRepository for UserRepositoryImpl {
     async fn get_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>> {
-        let user_idps = sqlx::query_as!(
-            UserIdpSelection,
-            r#"
-            SELECT
-                us.id AS "user_id: Uuid",
-                us.user_name AS "user_name: String",
-                us.enabled AS "user_enabled: bool",
-                us.created_at AS "user_created_at: chrono::NaiveDateTime",
-                us.updated_at AS "user_updated_at: chrono::NaiveDateTime",
-                idps.id AS "idp_id: Uuid",
-                idps.idp_name AS "idp_name: String",
-                idps.idp_display_name AS "idp_display_name: String",
-                uib.idp_sub AS "idp_sub: String",
-                uib.created_at AS "idp_bind_created_at: chrono::NaiveDateTime",
-                uib.updated_at AS "idp_bind_updated_at: chrono::NaiveDateTime"
-            FROM users AS us
-            JOIN user_idp_bindings AS uib ON us.id = uib.user_id
-            JOIN idps AS idps ON uib.idp_id = idps.id
-            WHERE us.id = ?
-            "#,
-            id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(assemble_user_from_user_idp_rows(user_idps))
+        let rows = user_idp_select()
+            .filter(user::Column::Id.eq(id))
+            .into_model::<UserIdpSelection>()
+            .all(&self.db)
+            .await?;
+        Ok(assemble_user_from_user_idp_rows(rows))
     }
 
     async fn get_user_by_idp_sub(
@@ -83,222 +204,92 @@ impl UserRepository for UserRepositoryImpl {
         idp_name: &str,
         idp_sub: &str,
     ) -> anyhow::Result<Option<User>> {
-        let user_idps = sqlx::query_as!(
-            UserIdpSelection,
-            r#"
-            SELECT
-                us.id AS "user_id: Uuid",
-                us.user_name AS "user_name: String",
-                us.enabled AS "user_enabled: bool",
-                us.created_at AS "user_created_at: chrono::NaiveDateTime",
-                us.updated_at AS "user_updated_at: chrono::NaiveDateTime",
-                idps.id AS "idp_id: Uuid",
-                idps.idp_name AS "idp_name: String",
-                idps.idp_display_name AS "idp_display_name: String",
-                uib.idp_sub AS "idp_sub: String",
-                uib.created_at AS "idp_bind_created_at: chrono::NaiveDateTime",
-                uib.updated_at AS "idp_bind_updated_at: chrono::NaiveDateTime"
-            FROM users AS us
-            JOIN user_idp_bindings AS uib ON us.id = uib.user_id
-            JOIN idps AS idps ON uib.idp_id = idps.id
-            WHERE idps.idp_name = ? AND uib.idp_sub = ?
-            "#,
-            idp_name,
-            idp_sub
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(assemble_user_from_user_idp_rows(user_idps))
+        let rows = user_idp_select()
+            .filter(idp::Column::IdpName.eq(idp_name))
+            .filter(user_idp_binding::Column::IdpSub.eq(idp_sub))
+            .into_model::<UserIdpSelection>()
+            .all(&self.db)
+            .await?;
+        Ok(assemble_user_from_user_idp_rows(rows))
     }
 
     async fn get_all_authed_tokens_by_user_id(&self, user_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
-        let authed_tokens = sqlx::query!(
-            r#"
-            SELECT authed_token_id AS "authed_token_id: Uuid"
-            FROM user_authed_tokens
-            WHERE user_id = ?
-            ORDER BY created_at
-            "#,
-            user_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let authed_tokens = authed_tokens
-            .into_iter()
-            .map(|row| row.authed_token_id)
-            .collect::<Vec<_>>();
-
-        Ok(authed_tokens)
+        Ok(user_authed_token::Entity::find()
+            .select_only()
+            .column(user_authed_token::Column::AuthedTokenId)
+            .filter(user_authed_token::Column::UserId.eq(user_id))
+            .order_by_asc(user_authed_token::Column::CreatedAt)
+            .into_tuple::<Uuid>()
+            .all(&self.db)
+            .await?)
     }
 
     async fn get_valid_authed_token_by_user_id(
         &self,
         user_id: Uuid,
     ) -> anyhow::Result<Option<String>> {
-        let authed_token = sqlx::query!(
-            r#"
-            SELECT at.token AS token
-            FROM authed_tokens at
-            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
-            WHERE uat.user_id = ? AND at.validity = true
-            ORDER BY at.authed_at DESC
-            LIMIT 1
-            "#,
-            user_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(authed_token.map(|row| row.token))
-    }
-
-    /// !!! You need to call begin / commit / rollback outside of this function !!!
-    async fn create_user_with_idp<'a>(
-        &'a self,
-        user: CreatingUser,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
-        sqlx::query!(
-            r#"
-            INSERT INTO users (id, user_name, created_at, updated_at)
-            VALUES (?, ?, NOW(), NOW())
-            "#,
-            user.user_id,
-            user.user_name
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        sqlx::query!(
-            r#"
-            INSERT INTO user_idp_bindings (id, user_id, idp_id, idp_sub, created_at, updated_at)
-            VALUES (?, ?, ?, ?, NOW(), NOW())
-            "#,
-            Uuid::now_v7(),
-            user.user_id,
-            user.idp_id,
-            user.idp_sub
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        Ok(tx)
+        Ok(authed_token::Entity::find()
+            .select_only()
+            .column(authed_token::Column::Token)
+            .join(
+                JoinType::InnerJoin,
+                authed_token::Relation::UserAuthedToken.def(),
+            )
+            .filter(user_authed_token::Column::UserId.eq(user_id))
+            .filter(authed_token::Column::Validity.eq(true))
+            // MySQL sorts NULL activation times last for DESC; spell it out for other backends.
+            .order_by_with_nulls(
+                authed_token::Column::AuthedAt,
+                Order::Desc,
+                NullOrdering::Last,
+            )
+            .into_tuple::<String>()
+            .one(&self.db)
+            .await?)
     }
 
     async fn is_user_binded_authed_token(&self, authed_token_id: Uuid) -> anyhow::Result<bool> {
-        let is_binded = sqlx::query!(
-            r#"
-            SELECT COALESCE(registered_user_id IS NOT NULL, false) AS "is_binded: bool"
-            FROM authed_tokens
-            WHERE id = ?
-            "#,
-            authed_token_id
-        )
-        .fetch_one(&self.pool)
-        .await?
-        .is_binded;
-
-        Ok(is_binded)
+        authed_token::Entity::find()
+            .select_only()
+            .expr_as(
+                authed_token::Column::RegisteredUserId.is_not_null(),
+                "is_binded",
+            )
+            .filter(authed_token::Column::Id.eq(authed_token_id))
+            .into_tuple::<bool>()
+            .one(&self.db)
+            .await?
+            .with_context(|| format!("authed token {authed_token_id} not found"))
     }
 
-    /// !!! You need to call begin / commit / rollback outside of this function !!!
-    async fn bind_user_authed_token<'a>(
-        &'a self,
+    async fn register_user_and_bind_token(
+        &self,
+        user: CreatingUser,
+        token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let tx = self
+            .db
+            .begin_with_config(Some(IsolationLevel::ReadCommitted), None)
+            .await?;
+        tx.execute(&user_insert(&user)).await?;
+        tx.execute(&idp_binding_insert(&user)).await?;
+        bind_in_transaction(&tx, user.user_id, token_id).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn bind_user_authed_token(
+        &self,
         user_id: Uuid,
         authed_token_id: Uuid,
-        mut tx: Transaction<'a, MySql>,
-    ) -> anyhow::Result<Transaction<'a, MySql>> {
-        log::info!(
-            "insert: bind_user_authed_token: user_id: {}, authed_token_id: {}",
-            user_id,
-            authed_token_id
-        );
-
-        // Serialize concurrent bindings for the same user to prevent seed normalization races.
-        // Under READ COMMITTED, two concurrent transactions without this lock could both see
-        // "no canonical seed" and end up assigning different author_id_seed values.
-        let user_exists = sqlx::query!(
-            r#"SELECT id AS "id: Uuid" FROM users WHERE id = ? FOR UPDATE"#,
-            user_id
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        if user_exists.is_none() {
-            anyhow::bail!("user {user_id} not found");
-        }
-
-        sqlx::query!(
-            r#"
-            INSERT INTO user_authed_tokens (id, user_id, authed_token_id, created_at, updated_at)
-            VALUES (?, ?, ?, NOW(), NOW())
-            "#,
-            Uuid::now_v7(),
-            user_id,
-            authed_token_id
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        log::info!(
-            "update: bind_user_authed_token: user_id: {}, authed_token_id: {}",
-            user_id,
-            authed_token_id
-        );
-
-        // TODO: It is not good idea that update authed_tokens outside of BbsRepository
-        //
-        // Inherit the canonical seed from the user's existing linked tokens so that
-        // the author ID is consistent before and after registration:
-        //   - First token bound  → keep its own seed (no change, preserving continuity)
-        //   - Later tokens bound → copy the seed from the first token
-        let canonical_seed = sqlx::query!(
-            r#"
-            SELECT at.author_id_seed AS "author_id_seed: Vec<u8>"
-            FROM authed_tokens at
-            JOIN user_authed_tokens uat ON at.id = uat.authed_token_id
-            WHERE uat.user_id = ?
-            ORDER BY uat.created_at ASC
-            LIMIT 1
-            "#,
-            user_id
-        )
-        .fetch_optional(&mut *tx)
-        .await?
-        .map(|row| row.author_id_seed);
-
-        if let Some(seed) = canonical_seed {
-            // Propagate the existing user seed to the newly bound token
-            sqlx::query!(
-                r#"
-                UPDATE authed_tokens
-                SET registered_user_id = ?, author_id_seed = ?
-                WHERE id = ?
-                "#,
-                user_id,
-                seed,
-                authed_token_id
-            )
-            .execute(&mut *tx)
+    ) -> anyhow::Result<()> {
+        let tx = self
+            .db
+            .begin_with_config(Some(IsolationLevel::ReadCommitted), None)
             .await?;
-        } else {
-            // First token for this user — preserve its existing seed
-            sqlx::query!(
-                r#"
-                UPDATE authed_tokens
-                SET registered_user_id = ?
-                WHERE id = ?
-                "#,
-                user_id,
-                authed_token_id
-            )
-            .execute(&mut *tx)
-            .await?;
-        }
-
-        Ok(tx)
+        bind_in_transaction(&tx, user_id, authed_token_id).await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 
@@ -336,6 +327,7 @@ fn assemble_user_from_user_idp_rows(user_idp_rows: Vec<UserIdpSelection>) -> Opt
         })
 }
 
+#[derive(FromQueryResult)]
 struct UserIdpSelection {
     pub user_id: Uuid,
     pub user_name: String,
@@ -357,4 +349,44 @@ pub struct CreatingUser {
     pub idp_id: Uuid,
     /// Must already be hashed (see `hash_idp_sub`), not the raw IdP `sub` claim.
     pub idp_sub: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DbBackend, QueryTrait};
+
+    #[test]
+    fn user_lock_is_exclusive_in_both_dialects() {
+        let query = locked_user(Uuid::nil());
+        assert_eq!(
+            query.build(DbBackend::MySql).sql,
+            "SELECT `users`.`id` FROM `users` WHERE `users`.`id` = ? FOR UPDATE"
+        );
+        assert_eq!(
+            query.build(DbBackend::Postgres).sql,
+            "SELECT \"users\".\"id\" FROM \"users\" WHERE \"users\".\"id\" = $1 FOR UPDATE"
+        );
+    }
+
+    #[test]
+    fn registration_timestamps_remain_database_expressions() {
+        let input = CreatingUser {
+            user_id: Uuid::nil(),
+            user_name: "user".into(),
+            idp_id: Uuid::nil(),
+            idp_sub: "hashed".into(),
+        };
+        for (query, expected_parameters) in [
+            (user_insert(&input), 2),
+            (idp_binding_insert(&input), 4),
+            (token_binding_insert(input.user_id, Uuid::nil()), 3),
+        ] {
+            for backend in [DbBackend::MySql, DbBackend::Postgres] {
+                let statement = backend.build(&query);
+                assert_eq!(statement.sql.matches("CURRENT_TIMESTAMP").count(), 2);
+                assert_eq!(statement.values.unwrap().0.len(), expected_parameters);
+            }
+        }
+    }
 }
