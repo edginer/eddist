@@ -6,8 +6,10 @@ use crate::{
         bbscgi_auth_service::UserCreationRateLimit, board_info_service::BoardInfoCache,
     },
     services::{
-        captcha_config_cache::CaptchaConfigCache, server_settings_cache::ServerSettingsCache,
-        stats_counter::StatsCounter, user_restriction_service::UserRestrictionCache,
+        captcha_config_cache::CaptchaConfigCache,
+        openai_moderation_service::OpenAiModerationService,
+        server_settings_cache::ServerSettingsCache, stats_counter::StatsCounter,
+        user_restriction_service::UserRestrictionCache,
     },
     tasks::BackgroundTasks,
 };
@@ -23,4 +25,5 @@ pub struct AppContext {
     pub stats: StatsCounter,
     pub user_creation_rate_limit: UserCreationRateLimit,
     pub background_tasks: BackgroundTasks,
+    pub moderation: OpenAiModerationService,
 }
