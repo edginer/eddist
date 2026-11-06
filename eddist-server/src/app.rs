@@ -25,6 +25,7 @@ use crate::{
     context::AppContext,
     domain::service::{
         bbscgi_auth_service::UserCreationRateLimit, board_info_service::BoardInfoCache,
+        oidc_client_service::OidcClientRegistry,
     },
     middleware::{
         ng_id_rate_limit::ng_id_rate_limit_middleware,
@@ -63,6 +64,7 @@ use crate::{
         board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         captcha_config_cache::CaptchaConfigCache,
         kako_thread_retrieval_service::KakoThreadRetrievalService,
+        openai_moderation_service::OpenAiModerationService,
         server_settings_cache::{ServerSettingKey, ServerSettingsCache},
         snapshot_cache::spawn_refresh_task,
         stats_counter::StatsCounter,
@@ -166,6 +168,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     let captcha_config_repo = CaptchaConfigRepositoryImpl::new(pool.clone());
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
     let stats_repo = StatsRepositoryImpl::new(pool.clone());
+    let idp_repo = IdpRepositoryImpl::new(pool.clone());
 
     let (server_settings, captcha_configs, user_restrictions) = tokio::try_join!(
         async {
@@ -185,8 +188,14 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         },
     )?;
 
+    let config = Arc::new(config);
+    // Discovery is lazy so an unreachable IdP does not block startup.
+    let oidc_clients = Arc::new(OidcClientRegistry::new(
+        Arc::new(idp_repo.clone()),
+        config.clone(),
+    ));
     let ctx = AppContext {
-        config: Arc::new(config),
+        config,
         server_settings,
         captcha_configs,
         user_restrictions,
@@ -194,6 +203,8 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         stats: StatsCounter::default(),
         user_creation_rate_limit: UserCreationRateLimit::default(),
         background_tasks: BackgroundTasks::default(),
+        oidc_clients,
+        moderation: OpenAiModerationService::new(),
     };
 
     let periodic_tasks = PeriodicTasks(vec![
@@ -225,7 +236,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     let services = AppServiceContainer::new(
         BbsRepositoryImpl::new(pool.clone()),
         UserRepositoryImpl::new(pool.clone()),
-        IdpRepositoryImpl::new(pool.clone()),
+        idp_repo,
         redis_conn.clone(),
         PubSubRepos {
             pub_repo: RedisPubRepository::new(redis_conn.clone()),

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use auth_with_code_service::AuthWithCodeService;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
+use captcha_verification_service::CaptchaVerificationService;
 use edge_token_validation_service::EdgeTokenValidationService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
@@ -61,6 +62,7 @@ pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
 pub mod captcha_config_cache;
+pub(crate) mod captcha_verification_service;
 pub(crate) mod edge_token_validation_service;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
@@ -137,11 +139,11 @@ pub struct AppServiceContainer<
     kako_thread_retrieval: KakoThreadRetrievalService,
 
     user_reg_temp_url: UserRegTempUrlService<I, U, B>,
-    user_reg_idp_redirection: UserRegIdpRedirectionService<I>,
-    user_authz_idp_callback: UserAuthzIdpCallbackService<I, U, B>,
+    user_reg_idp_redirection: UserRegIdpRedirectionService,
+    user_authz_idp_callback: UserAuthzIdpCallbackService<U, B>,
     user_page: UserPageService<U>,
     user_login_page: UserLoginPageService<U, I>,
-    user_login_idp_redirection: UserLoginIdpRedirectionService<I>,
+    user_login_idp_redirection: UserLoginIdpRedirectionService,
     user_logout: UserLogoutService,
     user_restriction: UserRestrictionService,
     bind_token_to_user: BindTokenToUserService<U>,
@@ -170,15 +172,16 @@ impl<
             Arc::new(RedisUserSessionStore::new(redis_conn.clone()));
         let oidc_state: Arc<dyn OidcStateStore> =
             Arc::new(RedisOidcStateStore::new(redis_conn.clone()));
+        let captcha = CaptchaVerificationService::new(redis_conn.clone());
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
                 bbs_repo.clone(),
                 auth_state.clone(),
-                redis_conn.clone(),
+                captcha.clone(),
                 pubsub.event_repo.clone(),
                 ctx.background_tasks.clone(),
             ),
-            reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), redis_conn.clone()),
+            reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), captcha),
             board_info: BoardInfoService::new(bbs_repo.clone(), ctx.board_info.clone()),
             edge_token_validation: EdgeTokenValidationService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
@@ -212,17 +215,15 @@ impl<
                 oidc_state.clone(),
             ),
             user_reg_idp_redirection: UserRegIdpRedirectionService::new(
-                idp_repo.clone(),
+                ctx.oidc_clients.clone(),
                 oidc_state.clone(),
-                ctx.config.clone(),
             ),
             user_authz_idp_callback: UserAuthzIdpCallbackService::new(
-                idp_repo.clone(),
                 user_repo.clone(),
                 bbs_repo,
                 sessions.clone(),
                 oidc_state.clone(),
-                ctx.config.clone(),
+                ctx.oidc_clients.clone(),
             ),
             user_page: UserPageService::new(user_repo.clone(), sessions.clone()),
             user_login_page: UserLoginPageService::new(
@@ -231,9 +232,8 @@ impl<
                 sessions.clone(),
             ),
             user_login_idp_redirection: UserLoginIdpRedirectionService::new(
-                idp_repo,
+                ctx.oidc_clients.clone(),
                 oidc_state,
-                ctx.config.clone(),
             ),
             user_logout: UserLogoutService::new(sessions.clone()),
             user_restriction: UserRestrictionService::new(ctx.user_restrictions.clone()),
@@ -298,11 +298,11 @@ impl<
         &self.user_reg_temp_url
     }
 
-    pub fn user_reg_idp_redirection(&self) -> &UserRegIdpRedirectionService<I> {
+    pub fn user_reg_idp_redirection(&self) -> &UserRegIdpRedirectionService {
         &self.user_reg_idp_redirection
     }
 
-    pub fn user_authz_idp_callback(&self) -> &UserAuthzIdpCallbackService<I, U, B> {
+    pub fn user_authz_idp_callback(&self) -> &UserAuthzIdpCallbackService<U, B> {
         &self.user_authz_idp_callback
     }
 
@@ -318,7 +318,7 @@ impl<
         &self.user_logout
     }
 
-    pub fn user_login_idp_redirection(&self) -> &UserLoginIdpRedirectionService<I> {
+    pub fn user_login_idp_redirection(&self) -> &UserLoginIdpRedirectionService {
         &self.user_login_idp_redirection
     }
 
