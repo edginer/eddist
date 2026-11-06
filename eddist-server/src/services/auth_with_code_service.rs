@@ -1,9 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
-use futures::future::join_all;
 use metrics::counter;
-use redis::aio::ConnectionManager;
 use tracing::info_span;
 
 use crate::{
@@ -13,7 +11,7 @@ use crate::{
     },
     error::BbsPostAuthWithCodeError,
     external::captcha_like_client::{
-        CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput, create_captcha_client,
+        CaptchaLikeError, CaptchaLikeResult, CaptchaVerificationOutput,
     },
     repositories::{
         bbs_pubsub_repository::{CreationEventRepository, record_event_publish},
@@ -33,6 +31,9 @@ use uuid::Uuid;
 
 use super::{
     AppService,
+    captcha_verification_service::{
+        CaptchaVerification, CaptchaVerificationRunError, CaptchaVerificationService,
+    },
     server_settings_cache::{ServerSettingKey, ServerSettingsSnapshot},
 };
 
@@ -40,7 +41,7 @@ use super::{
 pub struct AuthWithCodeService<T: BbsRepository, E: CreationEventRepository> {
     repo: T,
     auth_state: Arc<dyn AuthStateStore>,
-    redis_conn: ConnectionManager,
+    captcha: CaptchaVerificationService,
     event_repo: E,
     background_tasks: BackgroundTasks,
 }
@@ -49,14 +50,14 @@ impl<T: BbsRepository, E: CreationEventRepository> AuthWithCodeService<T, E> {
     pub fn new(
         repo: T,
         auth_state: Arc<dyn AuthStateStore>,
-        redis_conn: ConnectionManager,
+        captcha: CaptchaVerificationService,
         event_repo: E,
         background_tasks: BackgroundTasks,
     ) -> Self {
         Self {
             repo,
             auth_state,
-            redis_conn,
+            captcha,
             event_repo,
             background_tasks,
         }
@@ -81,32 +82,20 @@ impl<T: BbsRepository, E: CreationEventRepository>
             counter!("auth_code_failure", "reason" => "rate_limited").increment(1);
             return Err(BbsPostAuthWithCodeError::RateLimited.into());
         }
-        let mut clients_responses = Vec::new();
-        for config in &input.captcha_like_configs {
-            let form_field_name = &config.widget.form_field_name;
-            let response = match input.responses.get(form_field_name) {
-                Some(r) => r.clone(),
-                None => {
-                    counter!("auth_code_failure", "reason" => "missing_captcha_response")
-                        .increment(1);
-                    tracing::error!(
-                        provider = %config.provider,
-                        field = %form_field_name,
-                        "captcha response not found in form"
-                    );
-                    return Err(BbsPostAuthWithCodeError::CaptchaError(
-                        CaptchaLikeError::FailedToVerifyCaptcha,
-                    )
-                    .into());
-                }
-            };
-            let provider_type = config.provider.to_lowercase();
-            clients_responses.push((
-                create_captcha_client(config, self.redis_conn.clone())?,
-                (response, input.origin_ip.clone()),
-                provider_type,
-            ));
-        }
+        let captcha = match self
+            .captcha
+            .prepare(&input.captcha_like_configs, &input.responses)
+        {
+            Ok(captcha) => captcha,
+            Err(CaptchaVerificationRunError::MissingResponse) => {
+                counter!("auth_code_failure", "reason" => "missing_captcha_response").increment(1);
+                return Err(BbsPostAuthWithCodeError::CaptchaError(
+                    CaptchaLikeError::FailedToVerifyCaptcha,
+                )
+                .into());
+            }
+            Err(CaptchaVerificationRunError::Client(e)) => return Err(e.into()),
+        };
         counter!("auth_code_request").increment(1);
 
         // Get all unauthed tokens with the auth code (non-IP checking)
@@ -180,19 +169,18 @@ impl<T: BbsRepository, E: CreationEventRepository>
             Ok(())
         };
 
-        let provider_types: Vec<String> = clients_responses.iter().map(|x| x.2.clone()).collect();
-        let handles = clients_responses
-            .iter()
-            .map(|x| x.0.verify_captcha(&x.1.0, &x.1.1))
-            .collect::<Vec<_>>();
-        let results = join_all(handles).await;
+        let verifications = captcha.run(&input.origin_ip).await;
 
         // Collect captured data from all verification results
         let mut captured_data_map = HashMap::<String, serde_json::Value>::new();
         let mut has_monocle_style_ip_validation = false;
 
-        for (r, provider_type) in results.into_iter().zip(provider_types.iter()) {
-            match r {
+        for CaptchaVerification {
+            provider_type,
+            result,
+        } in verifications
+        {
+            match result {
                 Ok(CaptchaVerificationOutput {
                     result: CaptchaLikeResult::Failure(CaptchaLikeError::FailedToVerifyIpAddress),
                     captured_data,
@@ -200,7 +188,7 @@ impl<T: BbsRepository, E: CreationEventRepository>
                 }) => {
                     // Store captured data even on IP verification failure
                     if let Some(data) = captured_data {
-                        captured_data_map.insert(provider.clone(), data);
+                        captured_data_map.insert(provider, data);
                     }
                     // IP verification failed, fall back to token IP check
                     assert_ip_equality(token.reduced_ip.clone(), &input.origin_ip)?
@@ -225,7 +213,7 @@ impl<T: BbsRepository, E: CreationEventRepository>
                 }) => {
                     // Store captured data on success
                     if let Some(data) = captured_data {
-                        captured_data_map.insert(provider.clone(), data);
+                        captured_data_map.insert(provider, data);
                     }
                     // Track if provider has built-in IP validation (Monocle)
                     if provider_type == "monocle" {
