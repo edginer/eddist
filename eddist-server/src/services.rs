@@ -3,6 +3,7 @@ use std::sync::Arc;
 use auth_with_code_service::AuthWithCodeService;
 use bind_token_to_user_service::BindTokenToUserService;
 use board_info_service::BoardInfoService;
+use captcha_verification_service::CaptchaVerificationService;
 use edge_token_validation_service::EdgeTokenValidationService;
 use kako_thread_retrieval_service::KakoThreadRetrievalService;
 use list_boards_service::ListBoardsService;
@@ -61,6 +62,7 @@ pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;
 pub mod captcha_config_cache;
+pub(crate) mod captcha_verification_service;
 pub(crate) mod edge_token_validation_service;
 pub(crate) mod kako_thread_retrieval_service;
 pub(crate) mod list_boards_service;
@@ -170,15 +172,16 @@ impl<
             Arc::new(RedisUserSessionStore::new(redis_conn.clone()));
         let oidc_state: Arc<dyn OidcStateStore> =
             Arc::new(RedisOidcStateStore::new(redis_conn.clone()));
+        let captcha = CaptchaVerificationService::new(redis_conn.clone());
         AppServiceContainer {
             auth_with_code: AuthWithCodeService::new(
                 bbs_repo.clone(),
                 auth_state.clone(),
-                redis_conn.clone(),
+                captcha.clone(),
                 pubsub.event_repo.clone(),
                 ctx.background_tasks.clone(),
             ),
-            reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), redis_conn.clone()),
+            reauth: ReAuthService::new(bbs_repo.clone(), auth_state.clone(), captcha),
             board_info: BoardInfoService::new(bbs_repo.clone(), ctx.board_info.clone()),
             edge_token_validation: EdgeTokenValidationService::new(bbs_repo.clone()),
             list_boards: ListBoardsService::new(bbs_repo.clone()),
