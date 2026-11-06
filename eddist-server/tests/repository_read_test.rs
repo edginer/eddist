@@ -24,6 +24,10 @@ struct TestDatabase {
 }
 
 impl TestDatabase {
+    fn orm(&self) -> sea_orm::DatabaseConnection {
+        sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(self.pool.clone())
+    }
+
     async fn new() -> Self {
         let container = Mysql::default().with_tag("8.0").start().await.unwrap();
         let port = container.get_host_port_ipv4(3306.tcp()).await.unwrap();
@@ -63,7 +67,7 @@ fn time(day: u32) -> NaiveDateTime {
 #[tokio::test]
 async fn notices_preserve_visibility_pagination_and_optional_fields() {
     let db = TestDatabase::new().await;
-    let repo = NoticeRepositoryImpl::new(db.pool.clone());
+    let repo = NoticeRepositoryImpl::new(db.orm());
     assert!(repo.get_notices_paginated(0, 2).await.unwrap().is_empty());
     assert_eq!(repo.count_notices().await.unwrap(), 0);
     assert!(repo.get_notice_by_slug("missing").await.unwrap().is_none());
@@ -141,7 +145,7 @@ async fn terms_select_latest_update_and_preserve_empty_result() {
         .execute(&db.pool)
         .await
         .unwrap();
-    let repo = TermsRepositoryImpl::new(db.pool.clone());
+    let repo = TermsRepositoryImpl::new(db.orm());
     assert!(repo.get_terms().await.unwrap().is_none());
 
     let mut latest_id = Uuid::nil();
