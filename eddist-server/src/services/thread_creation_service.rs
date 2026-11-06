@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    BbsCgiService, openai_moderation_service,
+    BbsCgiService,
     posting_preparation_service::{
         PostingPreparationInput, PostingPreparationService, PostingTarget, PreparedPosting,
     },
@@ -140,6 +140,7 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
         let db_result = bbs_repo.create_thread(creating_th).await;
         if db_result.is_ok() && is_thread_pub_enabled() {
             let settings = input.settings.clone();
+            let moderation = self.ctx.moderation.clone();
             self.ctx
                 .background_tasks
                 .spawn_detached("thread_event_publish", async move {
@@ -147,7 +148,7 @@ impl<T: BbsRepository + Clone, E: CreationEventRepository>
                         if settings.is_enabled(ServerSettingKey::AiModerationOnThread) {
                             let text =
                                 format!("{}\n{}", creating_th_clone.title, creating_th_clone.body);
-                            openai_moderation_service::moderate(&settings, &text).await
+                            moderation.moderate(&settings, &text).await
                         } else {
                             None
                         };

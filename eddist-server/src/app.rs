@@ -64,6 +64,7 @@ use crate::{
         board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         captcha_config_cache::CaptchaConfigCache,
         kako_thread_retrieval_service::KakoThreadRetrievalService,
+        openai_moderation_service::OpenAiModerationService,
         server_settings_cache::{ServerSettingKey, ServerSettingsCache},
         snapshot_cache::spawn_refresh_task,
         stats_counter::StatsCounter,
@@ -203,6 +204,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         user_creation_rate_limit: UserCreationRateLimit::default(),
         oidc_clients,
         background_tasks: BackgroundTasks::default(),
+        moderation: OpenAiModerationService::new(),
     };
 
     let periodic_tasks = PeriodicTasks(vec![

@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::{
-    BbsCgiService, openai_moderation_service,
+    BbsCgiService,
     posting_preparation_service::{
         PostingPreparationInput, PostingPreparationService, PostingTarget, PreparedPosting,
     },
@@ -166,6 +166,7 @@ impl<T: BbsRepository + Clone, P: PubRepository, E: CreationEventRepository>
 
         let event_repo = self.event_repo.clone();
         let settings = input.settings.clone();
+        let moderation = self.ctx.moderation.clone();
 
         self.ctx
             .background_tasks
@@ -175,7 +176,7 @@ impl<T: BbsRepository + Clone, P: PubRepository, E: CreationEventRepository>
                 if is_res_pub_enabled() {
                     let moderation_result =
                         if settings.is_enabled(ServerSettingKey::AiModerationOnRes) {
-                            openai_moderation_service::moderate(&settings, &cres.body).await
+                            moderation.moderate(&settings, &cres.body).await
                         } else {
                             None
                         };
