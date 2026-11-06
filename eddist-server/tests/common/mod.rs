@@ -1,5 +1,9 @@
 use axum_test::TestServer;
-use eddist::test_helpers::decode_sjis;
+mod app;
+pub mod fixtures;
+
+use fixtures::decode_sjis;
+use sea_orm::DatabaseConnection;
 use sqlx::mysql::MySqlPoolOptions;
 use sqlx::{MySql, Pool};
 use std::time::Duration;
@@ -11,6 +15,7 @@ pub struct TestContext {
     pub _mysql_container: ContainerAsync<Mysql>,
     pub _redis_container: ContainerAsync<Redis>,
     pub pool: Pool<MySql>,
+    pub db: DatabaseConnection,
     pub server: TestServer,
     pub redis_conn: redis::aio::ConnectionManager,
 }
@@ -100,7 +105,10 @@ impl TestContext {
 
         println!("Redis is ready.");
 
-        let app = eddist::create_test_app(pool.clone(), redis_conn.clone())
+        let db = eddist::database::connect_database(&database_url)
+            .await
+            .expect("Failed to connect through SeaORM");
+        let app = app::create_test_app(db.clone(), redis_conn.clone())
             .await
             .expect("Failed to build test app");
         let mut server = TestServer::new(app);
@@ -112,6 +120,7 @@ impl TestContext {
             _mysql_container: mysql_container,
             _redis_container: redis_container,
             pool,
+            db,
             server,
             redis_conn,
         }

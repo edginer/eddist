@@ -9,12 +9,12 @@ use axum::{
 use eddist::{
     app::{AppDependencies, build_app},
     config::ServerConfig,
+    database::connect_database,
 };
 use eddist_core::{tracing::init_tracing, utils::is_prod};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use metrics::describe_counter;
-use sqlx::mysql::MySqlPoolOptions;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower::Layer;
@@ -37,30 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let client = redis::Client::open(config.redis_url.as_str())?;
     let conn_mgr = client.get_connection_manager().await?;
 
-    let pool = MySqlPoolOptions::new()
-        .after_connect(|conn, _| {
-            use sqlx::Executor;
-            Box::pin(async move {
-                // Set transaction isolation level to `READ-COMMITTED`
-                conn.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
-                    .await
-                    .unwrap();
-                log::info!("Set transaction isolation level to `READ-COMMITTED`");
-
-                // Set TIME_TRUNCATE_FRACTIONAL mode to match chrono's %3f truncation behavior
-                conn.execute(
-                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                )
-                .await
-                .unwrap();
-                log::info!("Set TIME_TRUNCATE_FRACTIONAL mode");
-                Ok(())
-            })
-        })
-        .max_connections(8)
-        .acquire_timeout(Duration::from_secs(5))
-        .connect(&config.database_url)
-        .await?;
+    let db = connect_database(&config.database_url).await?;
 
     let s3_creds = aws_sdk_s3::config::Credentials::new(
         config.s3.access_key,
@@ -79,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let app = build_app(
         config.app,
         AppDependencies {
-            pool,
+            db,
             redis_conn: conn_mgr,
             s3_client: aws_sdk_s3::Client::from_conf(s3_config),
             s3_bucket_name: config.s3.bucket_name,

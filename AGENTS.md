@@ -105,7 +105,7 @@ cd docker-dev && docker compose up -d
 
 ### Backend
 - **Framework**: Axum with Tokio async runtime
-- **Database**: MySQL with SQLX (compile-time checked queries)
+- **Database**: MySQL with SeaORM in server/admin; SQLx remains in other services and test fixtures/migrations
 - **Cache/Pubsub**: Redis for caching and real-time updates
 - **Auth**: Auth0/OIDC for admin, authed_tokens for users
 - **Templating**: Handlebars for server-rendered pages
@@ -138,9 +138,9 @@ USE_CLOUDFLARE_CDN=true    # Enables CF-Connecting-IP header
 - All UUIDs stored as `BINARY(16)` — always use `BIN_TO_UUID()` / `UUID_TO_BIN()` in SQLX queries
 
 ### Repository Pattern
-- Migrated server repositories take a shared SeaORM `DatabaseConnection`.
+- Server repositories take a shared SeaORM `DatabaseConnection`, created once by `database::connect_database` (8 connections, 5-second acquisition timeout). Clone that connection for repositories and background refresh tasks.
 - User registration and token binding own their transactions inside `UserRepository`; application services do not pass database transaction types. Preserve `READ COMMITTED`, user-row locking, and canonical seed selection order.
-- The BBS repository temporarily holds the original SQLx pool alongside the adopted SeaORM connection while thread/response queries are migrated. Both handles must share one physical pool.
+- Posting and statistics transactions also explicitly use `READ COMMITTED`. Truncate application timestamps to milliseconds before binding rather than relying on MySQL session settings. Keep SQLx migrations and fixtures under test-only dependencies.
 - `eddist-cron` is the exception: it uses raw structs instead of the repository trait
 
 ### Admin API Type Generation

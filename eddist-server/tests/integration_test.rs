@@ -2,7 +2,7 @@ mod common;
 
 use axum::body::Bytes;
 use common::TestContext;
-use eddist::test_helpers::*;
+use common::fixtures::*;
 use eddist_core::redis_keys::thread_cache_key;
 use http::{HeaderName, HeaderValue};
 use redis::AsyncCommands;
@@ -132,7 +132,7 @@ async fn test_dat_database_failure_does_not_increment_not_found_counter() {
     let key = not_found_access_count_key("localhost");
     let mut redis_conn = ctx.redis_conn.clone();
     redis_conn.del::<_, ()>(&key).await.unwrap();
-    ctx.pool.close().await;
+    ctx.db.close_by_ref().await.unwrap();
 
     let response = ctx.server.get("/bbs/dat/1234567890.dat").await;
     assert_eq!(response.status_code(), 500);
@@ -196,7 +196,7 @@ async fn test_board_lookup_separates_missing_board_from_database_failure() {
         assert_eq!(ctx.server.get(path).await.status_code(), 404, "{path}");
     }
 
-    ctx.pool.close().await;
+    ctx.db.close_by_ref().await.unwrap();
     for path in paths {
         assert_eq!(ctx.server.get(path).await.status_code(), 500, "{path}");
     }
@@ -242,7 +242,7 @@ async fn test_user_page_internal_failure_keeps_session_cookie() {
         )
         .await
         .unwrap();
-    ctx.pool.close().await;
+    ctx.db.close_by_ref().await.unwrap();
 
     let response = ctx
         .server
@@ -294,7 +294,7 @@ async fn test_idp_registration_redirect_separates_unknown_idp_from_internal_fail
 
     assert_eq!(request().await.status_code(), 400);
 
-    ctx.pool.close().await;
+    ctx.db.close_by_ref().await.unwrap();
     let response = request().await;
     assert_eq!(response.status_code(), 500);
     assert!(response.headers().get("set-cookie").is_none());

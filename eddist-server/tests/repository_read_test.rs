@@ -34,6 +34,9 @@ use uuid::Uuid;
 #[path = "support/core_read.rs"]
 mod core_read;
 
+#[path = "support/database_connection.rs"]
+mod database_connection;
+
 #[path = "support/repository_benchmark.rs"]
 mod repository_benchmark;
 
@@ -73,11 +76,11 @@ impl TestDatabase {
             let statements = statements.clone();
             move |info| statements.lock().unwrap().push(info.statement.sql.clone())
         });
-        (BbsRepositoryImpl::new(self.pool.clone(), db), statements)
+        (BbsRepositoryImpl::new(db), statements)
     }
 
     fn bbs(&self) -> BbsRepositoryImpl {
-        BbsRepositoryImpl::new(self.pool.clone(), self.orm())
+        BbsRepositoryImpl::new(self.orm())
     }
 
     async fn insert_board(&self, key: &str) -> Uuid {
@@ -86,6 +89,15 @@ impl TestDatabase {
             .bind(id.to_string()).bind(format!("板 {key}")).bind(key).bind("名無さん")
             .execute(&self.pool).await.unwrap();
         id
+    }
+
+    async fn url(&self) -> String {
+        let port = self
+            ._container
+            .get_host_port_ipv4(3306.tcp())
+            .await
+            .unwrap();
+        format!("mysql://root@127.0.0.1:{port}/test")
     }
 
     fn orm(&self) -> sea_orm::DatabaseConnection {
