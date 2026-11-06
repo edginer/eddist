@@ -201,15 +201,32 @@ async fn thread_write_state(
         .bind(id).fetch_one(&db.pool).await.unwrap()
 }
 
+fn assert_posting_statements(statements: &RecordedSql, expected: &[&str]) {
+    let statements = statements.lock().unwrap();
+    let verbs: Vec<_> = statements
+        .iter()
+        .filter_map(|sql| sql.split_whitespace().next())
+        .filter(|verb| ["SELECT", "INSERT", "UPDATE", "DELETE"].contains(verb))
+        .collect();
+    assert_eq!(verbs, expected, "unexpected model reload or extra DML");
+}
+
 #[tokio::test]
 async fn posting_thread_and_first_response_are_atomic_and_classify_conflicts() {
     let db = TestDatabase::new().await;
-    let repo = db.bbs();
+    let (repo, statements) = db.bbs_with_statements();
     let board_id = db.insert_board("posting").await;
     let token = token_fixture("posting", "192.0.2.1", "123456");
     repo.create_authed_token(token.clone()).await.unwrap();
+    // The runtime pool will eventually stop setting TIME_TRUNCATE_FRACTIONAL.
+    sqlx::query("SET SESSION sql_mode = REPLACE(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL', '')")
+        .execute(&db.pool)
+        .await
+        .unwrap();
     let input = thread_fixture(board_id, token.id, 1_700_000_001);
+    statements.lock().unwrap().clear();
     repo.create_thread(input.clone()).await.unwrap();
+    assert_posting_statements(&statements, &["INSERT", "INSERT"]);
     let found = repo
         .get_thread_by_board_key_and_thread_number("posting", input.unix_time)
         .await
@@ -323,19 +340,25 @@ async fn posting_thread_and_first_response_are_atomic_and_classify_conflicts() {
 #[tokio::test]
 async fn posting_response_preserves_count_boundary_sage_precision_and_rollback() {
     let db = TestDatabase::new().await;
-    let repo = db.bbs();
+    let (repo, statements) = db.bbs_with_statements();
     let board_id = db.insert_board("reply").await;
     let token = token_fixture("reply", "192.0.2.1", "123456");
     repo.create_authed_token(token.clone()).await.unwrap();
     let thread = thread_fixture(board_id, token.id, 1_700_000_002);
     repo.create_thread(thread.clone()).await.unwrap();
+    sqlx::query("SET SESSION sql_mode = REPLACE(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL', '')")
+        .execute(&db.pool)
+        .await
+        .unwrap();
     for (count, sage) in [(998, true), (999, false), (1000, true)] {
         sqlx::query("UPDATE threads SET response_count = ?, active = FALSE, archived = TRUE, last_modified_at = ?, sage_last_modified_at = ? WHERE id = ?")
             .bind(count).bind(time(1)).bind(time(1)).bind(thread.thread_id).execute(&db.pool).await.unwrap();
         let mut res = response_fixture(&thread, count + 1);
         res.is_sage = sage;
         res.mail = if sage { "sage" } else { "email@example.com" }.into();
+        statements.lock().unwrap().clear();
         repo.create_response(res.clone()).await.unwrap();
+        assert_posting_statements(&statements, &["UPDATE", "INSERT"]);
         let stored_at = eddist_entity::db_time::truncate_to_millis(res.created_at.naive_utc());
         assert_eq!(
             thread_write_state(&db, thread.thread_id).await,
