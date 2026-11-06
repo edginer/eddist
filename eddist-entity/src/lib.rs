@@ -7,6 +7,7 @@ pub mod board_info;
 pub mod board_ng_word;
 pub mod cap;
 pub mod captcha_config;
+pub mod daily_stats;
 pub mod db_time;
 pub mod idp;
 pub mod ng_word;

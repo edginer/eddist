@@ -85,7 +85,7 @@ fn time(day: u32) -> NaiveDateTime {
 #[tokio::test]
 async fn stats_preserve_jst_calendar_date_range_and_order() {
     let db = TestDatabase::new().await;
-    let repo = StatsRepositoryImpl::new(db.pool.clone());
+    let repo = StatsRepositoryImpl::new(db.orm());
     // Record the SQLx calendar contract independently of the host's timezone.
     for (utc, expected) in [
         ("2020-01-01T14:59:59Z", "2020-01-01"),
@@ -165,10 +165,22 @@ async fn stats_preserve_jst_calendar_date_range_and_order() {
 #[tokio::test]
 async fn stats_flush_adds_per_board_and_rolls_back_the_entire_snapshot() {
     let db = TestDatabase::with_max_connections(4).await;
-    let repo = StatsRepositoryImpl::new(db.pool.clone());
+    let mut orm = db.orm();
+    let statements = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    orm.set_metric_callback({
+        let statements = statements.clone();
+        move |info| statements.lock().unwrap().push(info.statement.sql.clone())
+    });
+    let repo = StatsRepositoryImpl::new(orm);
     repo.flush_board_stats(&[("a".into(), 10, 2), ("b".into(), 20, 3)])
         .await
         .unwrap();
+    // No model reload SELECT is needed: one DML statement per snapshot entry.
+    {
+        let sql = statements.lock().unwrap();
+        assert_eq!(sql.len(), 2);
+        assert!(sql.iter().all(|sql| sql.starts_with("INSERT INTO")));
+    }
     sqlx::query("UPDATE daily_stats SET created_at = ? WHERE board_key = 'a'")
         .bind(time(1))
         .execute(&db.pool)
@@ -178,6 +190,7 @@ async fn stats_flush_adds_per_board_and_rolls_back_the_entire_snapshot() {
         .await
         .unwrap();
     repo.flush_board_stats(&[]).await.unwrap();
+    repo.flush_board_stats(&[("a".into(), 0, 0)]).await.unwrap();
     let left = [("a".into(), 2, 1)];
     let right = [("a".into(), 3, 1)];
     let (left, right) = tokio::join!(
