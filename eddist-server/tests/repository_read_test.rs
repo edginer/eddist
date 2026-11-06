@@ -30,7 +30,19 @@ struct TestDatabase {
     _container: ContainerAsync<Mysql>,
 }
 
+type RecordedSql = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
+
 impl TestDatabase {
+    fn bbs_with_statements(&self) -> (BbsRepositoryImpl, RecordedSql) {
+        let mut db = self.orm();
+        let statements = RecordedSql::default();
+        db.set_metric_callback({
+            let statements = statements.clone();
+            move |info| statements.lock().unwrap().push(info.statement.sql.clone())
+        });
+        (BbsRepositoryImpl::new(self.pool.clone(), db), statements)
+    }
+
     fn bbs(&self) -> BbsRepositoryImpl {
         BbsRepositoryImpl::new(self.pool.clone(), self.orm())
     }
@@ -104,7 +116,7 @@ fn token_fixture(name: &str, ip: &str, code: &str) -> CreatingAuthedToken {
 #[tokio::test]
 async fn token_reads_preserve_filters_all_fields_and_nullable_values() {
     let db = TestDatabase::new().await;
-    let repo = db.bbs();
+    let (repo, statements) = db.bbs_with_statements();
     let first = token_fixture("first", "192.0.2.1", "shared");
     let second = token_fixture("second", "2001:db8:abcd:1234::1", "shared");
     let other = token_fixture("other", "192.0.2.1", "other");
@@ -221,12 +233,19 @@ async fn token_reads_preserve_filters_all_fields_and_nullable_values() {
         .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, second.id);
+    let sql = statements.lock().unwrap();
+    let selects: Vec<_> = sql.iter().filter(|sql| sql.starts_with("SELECT")).collect();
+    assert!(!selects.is_empty());
+    assert!(selects.iter().all(|sql| !sql.contains("additional_info")));
 }
 
 #[tokio::test]
 async fn token_lifecycle_preserves_json_null_precision_and_noop_updates() {
     let db = TestDatabase::new().await;
-    let repo = db.bbs();
+    let (repo, statements) = db.bbs_with_statements();
+    // The repository must truncate before binding, even when MySQL would round.
+    sqlx::query("SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(@@sql_mode, 'TIME_TRUNCATE_FRACTIONAL', ''))")
+        .execute(&db.pool).await.unwrap();
     let token = token_fixture("lifecycle", "::1", "code");
     repo.create_authed_token(token.clone()).await.unwrap();
     let authed_at = time(2).with_nanosecond(999_600_000).unwrap().and_utc();
@@ -234,6 +253,7 @@ async fn token_lifecycle_preserves_json_null_precision_and_noop_updates() {
         None,
         Some(serde_json::Value::Null),
         Some(serde_json::json!({"日本語": [1, true, null]})),
+        None,
     ] {
         repo.activate_authed_status(&token.token, "activated UA", authed_at, value.clone())
             .await
@@ -262,6 +282,8 @@ async fn token_lifecycle_preserves_json_null_precision_and_noop_updates() {
         .await
         .unwrap()
         .unwrap();
+    assert_eq!(row.created_at.timestamp(), token.created_at.timestamp());
+    assert_eq!(row.created_at.timestamp_subsec_nanos(), 999_000_000);
     assert!(row.validity);
     assert!(!row.require_reauth);
     assert_eq!(row.authed_ua.as_deref(), Some("activated UA"));
@@ -290,6 +312,13 @@ async fn token_lifecycle_preserves_json_null_precision_and_noop_updates() {
         .await
         .unwrap();
     repo.clear_require_reauth(token.id).await.unwrap();
+    let sql = statements.lock().unwrap();
+    // Fourteen explicit mutations and three explicit reads; no model reloads.
+    assert_eq!(sql.len(), 17);
+    assert_eq!(
+        sql.iter().filter(|sql| sql.starts_with("SELECT")).count(),
+        3
+    );
 }
 
 #[tokio::test]
