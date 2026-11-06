@@ -21,8 +21,6 @@ pub trait BbsRepository:
 #[derive(Debug, Clone)]
 pub struct BbsRepositoryImpl {
     pub(super) pool: MySqlPool,
-    // Used as the board/token/posting methods are migrated in later commits.
-    #[allow(dead_code)]
     pub(super) db: DatabaseConnection,
 }
 
