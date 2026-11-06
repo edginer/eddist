@@ -1,96 +1,93 @@
 use std::sync::Arc;
 
-use eddist_core::domain::res::get_1001_sjis_bytes;
+use eddist_core::domain::{board::BoardInfo, res::get_1001_sjis_bytes};
 use metrics::counter;
 
 use crate::{
-    domain::thread_res_list::ThreadResList, repositories::bbs_repository::BbsRepository,
+    domain::{thread::Thread, thread_res_list::ThreadResList},
+    repositories::bbs_repository::BbsRepository,
     stores::thread_dat_cache::ThreadDatCache,
 };
 
 use super::AppService;
 
+/// The cache and DB paths must append these exact bytes.
+fn stopper_message(board_info: &BoardInfo, thread: &Thread) -> Option<Vec<u8>> {
+    board_info.enable_1001_message.then(|| {
+        get_1001_sjis_bytes(
+            thread.thread_number,
+            thread.last_modified_at,
+            board_info.custom_1001_message.as_deref(),
+        )
+        .get_inner()
+    })
+}
+
 #[derive(Clone)]
-pub struct ThreadRetrievalService<T: BbsRepository>(T, Arc<dyn ThreadDatCache>);
+pub struct ThreadRetrievalService<T: BbsRepository> {
+    repo: T,
+    dat_cache: Arc<dyn ThreadDatCache>,
+}
 
 impl<T: BbsRepository> ThreadRetrievalService<T> {
     pub fn new(repo: T, dat_cache: Arc<dyn ThreadDatCache>) -> Self {
-        Self(repo, dat_cache)
+        Self { repo, dat_cache }
     }
 
     async fn compute_stopper_bytes(&self, board_key: &str, thread_number: u64) -> Option<Vec<u8>> {
-        let board = self.0.get_board(board_key).await.ok()??;
-        let board_info = self.0.get_board_info(board.id).await.ok()??;
+        let board = self.repo.get_board(board_key).await.ok()??;
+        let board_info = self.repo.get_board_info(board.id).await.ok()??;
         if !board_info.enable_1001_message {
             return None;
         }
-        let th = self
-            .0
+        let thread = self
+            .repo
             .get_thread_by_board_key_and_thread_number(board_key, thread_number)
             .await
             .ok()??;
-        Some(
-            get_1001_sjis_bytes(
-                th.thread_number,
-                th.last_modified_at,
-                board_info.custom_1001_message.as_deref(),
-            )
-            .get_inner(),
-        )
+        stopper_message(&board_info, &thread)
     }
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw, DatRetrievalError>
+impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, DatContent, DatRetrievalError>
     for ThreadRetrievalService<T>
 {
     async fn execute(
         &self,
         input: ThreadRetrievalServiceInput,
-    ) -> Result<ThreadResListRaw, DatRetrievalError> {
-        match self.1.read(&input.board_key, input.thread_number).await {
-            Ok(chunks) if !chunks.is_empty() => {
+    ) -> Result<DatContent, DatRetrievalError> {
+        match self
+            .dat_cache
+            .read(&input.board_key, input.thread_number)
+            .await
+        {
+            Ok(mut chunks) if !chunks.is_empty() => {
                 counter!("dat_retrieval", "source" => "cache").increment(1);
 
-                // Must compute stopper before the 304 check so total_len
-                // includes it (the ETag byte-size encodes the full payload).
-                let stopper = if chunks.len() >= 1000 {
-                    self.compute_stopper_bytes(&input.board_key, input.thread_number)
+                if chunks.len() >= 1000
+                    && let Some(stopper) = self
+                        .compute_stopper_bytes(&input.board_key, input.thread_number)
                         .await
-                } else {
-                    None
-                };
-
-                let raw_len: usize = chunks.iter().map(|c| c.len()).sum();
-                let total_len = raw_len + stopper.as_ref().map(|b| b.len()).unwrap_or(0);
-
-                if input.expected_byte_size == Some(total_len) {
-                    return Ok(ThreadResListRaw { raw: None });
+                {
+                    chunks.push(stopper);
                 }
 
-                let mut raw = Vec::with_capacity(total_len);
-                for chunk in chunks {
-                    raw.extend_from_slice(&chunk);
-                }
-                if let Some(s) = stopper {
-                    raw.extend_from_slice(&s);
-                }
-
-                Ok(ThreadResListRaw { raw: Some(raw) })
+                Ok(DatContent::new(chunks))
             }
             _ => {
                 counter!("dat_retrieval", "source" => "db").increment(1);
-                let Some(board) = self.0.get_board(&input.board_key).await? else {
+                let Some(board) = self.repo.get_board(&input.board_key).await? else {
                     return Err(DatRetrievalError::BoardNotFound);
                 };
                 let board_info = self
-                    .0
+                    .repo
                     .get_board_info(board.id)
                     .await?
                     .ok_or(DatRetrievalError::BoardNotFound)?;
 
                 let th = self
-                    .0
+                    .repo
                     .get_thread_by_board_key_and_thread_number(
                         &input.board_key,
                         input.thread_number,
@@ -99,29 +96,24 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, ThreadResListRaw,
                 let Some(th) = th else {
                     return Err(DatRetrievalError::ThreadNotFound);
                 };
-                let responses = self.0.get_responses(th.id).await?;
+                let responses = self.repo.get_responses(th.id).await?;
 
-                let response_count = th.response_count;
-                let thread_number = th.thread_number;
-                let last_modified_at = th.last_modified_at;
+                let stopper = if th.response_count >= 1000 {
+                    stopper_message(&board_info, &th)
+                } else {
+                    None
+                };
+
                 let th_res_list = ThreadResList {
                     thread: th,
                     res_list: responses,
                 };
-                let mut raw = th_res_list.get_sjis_thread_res_list(&board.default_name);
-
-                if response_count >= 1000 && board_info.enable_1001_message {
-                    raw.extend_from_slice(
-                        &get_1001_sjis_bytes(
-                            thread_number,
-                            last_modified_at,
-                            board_info.custom_1001_message.as_deref(),
-                        )
-                        .get_inner(),
-                    );
+                let mut chunks = th_res_list.get_sjis_list_thread_res_list(&board.default_name);
+                if let Some(s) = stopper {
+                    chunks.push(s);
                 }
 
-                Ok(ThreadResListRaw { raw: Some(raw) })
+                Ok(DatContent::new(chunks))
             }
         }
     }
@@ -140,19 +132,30 @@ pub enum DatRetrievalError {
 pub struct ThreadRetrievalServiceInput {
     pub board_key: String,
     pub thread_number: u64,
-    /// Byte size extracted from the client's If-None-Match ETag. When the
-    /// cache total matches this value the service returns `ThreadResListRaw { raw: None }`
-    /// (not-modified signal) without allocating the response body.
-    pub expected_byte_size: Option<usize>,
 }
 
+/// Shift-JIS dat chunks, kept separate until a response body is needed.
 #[derive(Debug, Clone)]
-pub struct ThreadResListRaw {
-    raw: Option<Vec<u8>>,
+pub struct DatContent {
+    chunks: Vec<Vec<u8>>,
+    byte_size: usize,
 }
 
-impl ThreadResListRaw {
-    pub fn raw(self) -> Option<Vec<u8>> {
-        self.raw
+impl DatContent {
+    pub fn new(chunks: Vec<Vec<u8>>) -> Self {
+        let byte_size = chunks.iter().map(Vec::len).sum();
+        Self { chunks, byte_size }
+    }
+
+    pub fn byte_size(&self) -> usize {
+        self.byte_size
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        let mut raw = Vec::with_capacity(self.byte_size);
+        for chunk in self.chunks {
+            raw.extend_from_slice(&chunk);
+        }
+        raw
     }
 }
