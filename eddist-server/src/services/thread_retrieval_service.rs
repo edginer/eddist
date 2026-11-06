@@ -50,48 +50,30 @@ impl<T: BbsRepository> ThreadRetrievalService<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, DatReadResult, DatRetrievalError>
+impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, DatContent, DatRetrievalError>
     for ThreadRetrievalService<T>
 {
     async fn execute(
         &self,
         input: ThreadRetrievalServiceInput,
-    ) -> Result<DatReadResult, DatRetrievalError> {
+    ) -> Result<DatContent, DatRetrievalError> {
         match self
             .dat_cache
             .read(&input.board_key, input.thread_number)
             .await
         {
-            Ok(chunks) if !chunks.is_empty() => {
+            Ok(mut chunks) if !chunks.is_empty() => {
                 counter!("dat_retrieval", "source" => "cache").increment(1);
 
-                // Must compute stopper before the 304 check so total_len
-                // includes it (the ETag byte-size encodes the full payload).
-                let stopper = if chunks.len() >= 1000 {
-                    self.compute_stopper_bytes(&input.board_key, input.thread_number)
+                if chunks.len() >= 1000
+                    && let Some(stopper) = self
+                        .compute_stopper_bytes(&input.board_key, input.thread_number)
                         .await
-                } else {
-                    None
-                };
-
-                let raw_len: usize = chunks.iter().map(|c| c.len()).sum();
-                let total_len = raw_len + stopper.as_ref().map(|b| b.len()).unwrap_or(0);
-
-                if input.expected_byte_size == Some(total_len) {
-                    return Ok(DatReadResult::Unchanged {
-                        byte_size: total_len,
-                    });
+                {
+                    chunks.push(stopper);
                 }
 
-                let mut raw = Vec::with_capacity(total_len);
-                for chunk in chunks {
-                    raw.extend_from_slice(&chunk);
-                }
-                if let Some(s) = stopper {
-                    raw.extend_from_slice(&s);
-                }
-
-                Ok(DatReadResult::Found(raw))
+                Ok(DatContent::new(chunks))
             }
             _ => {
                 counter!("dat_retrieval", "source" => "db").increment(1);
@@ -126,12 +108,12 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, DatReadResult, Da
                     thread: th,
                     res_list: responses,
                 };
-                let mut raw = th_res_list.get_sjis_thread_res_list(&board.default_name);
+                let mut chunks = th_res_list.get_sjis_list_thread_res_list(&board.default_name);
                 if let Some(s) = stopper {
-                    raw.extend_from_slice(&s);
+                    chunks.push(s);
                 }
 
-                Ok(DatReadResult::Found(raw))
+                Ok(DatContent::new(chunks))
             }
         }
     }
@@ -150,12 +132,30 @@ pub enum DatRetrievalError {
 pub struct ThreadRetrievalServiceInput {
     pub board_key: String,
     pub thread_number: u64,
-    /// Only checked against the cache, where a match skips materializing the payload.
-    pub expected_byte_size: Option<usize>,
 }
 
+/// Shift-JIS dat chunks, kept separate until a response body is needed.
 #[derive(Debug, Clone)]
-pub enum DatReadResult {
-    Found(Vec<u8>),
-    Unchanged { byte_size: usize },
+pub struct DatContent {
+    chunks: Vec<Vec<u8>>,
+    byte_size: usize,
+}
+
+impl DatContent {
+    pub fn new(chunks: Vec<Vec<u8>>) -> Self {
+        let byte_size = chunks.iter().map(Vec::len).sum();
+        Self { chunks, byte_size }
+    }
+
+    pub fn byte_size(&self) -> usize {
+        self.byte_size
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        let mut raw = Vec::with_capacity(self.byte_size);
+        for chunk in self.chunks {
+            raw.extend_from_slice(&chunk);
+        }
+        raw
+    }
 }
