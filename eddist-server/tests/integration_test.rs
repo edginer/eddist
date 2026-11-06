@@ -98,6 +98,15 @@ async fn test_core_dat_abone_and_1001_bytes_match_database_and_cache() {
         ctx.redis_conn.clone().llen::<_, usize>(&key).await.unwrap(),
         1000
     );
+    // Distinguish a real cache hit from a second, identical DB read. The 1001
+    // metadata remains available, but response bytes now deliberately differ.
+    sqlx::query(
+        "UPDATE responses SET body = 'DB-only marker' WHERE thread_id = ? AND res_order = 1",
+    )
+    .bind(thread)
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
     let cached = ctx.server.get(&format!("/coredat/dat/{number}.dat")).await;
     assert_eq!(cached.status_code(), 200);
     assert_eq!(cached.as_bytes().as_ref(), expected);

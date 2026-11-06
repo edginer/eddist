@@ -10,6 +10,10 @@ const WARMUP: usize = 5;
 const SAMPLES: usize = 101;
 const PARALLEL_SAMPLES: usize = 31;
 
+// Match the server binary's allocator for the measured decoding/allocation work.
+#[global_allocator]
+static BENCHMARK_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 async fn measure<F, Fut, T>(mut operation: F, samples: usize) -> serde_json::Value
 where
     F: FnMut() -> Fut,
@@ -126,7 +130,7 @@ async fn seed(
 /// EDDIST_BENCH_OUTPUT=/private/tmp/core-sqlx.json EDDIST_BENCH_LABEL=sqlx-core \
 /// SQLX_OFFLINE=true cargo test -p eddist --test repository_read_test \
 /// repository_benchmark::core_read_benchmark -- --ignored --exact --nocapture
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "opt-in repeatable MySQL latency, output, statement and EXPLAIN capture"]
 async fn core_read_benchmark() {
     let output = std::env::var("EDDIST_BENCH_OUTPUT")
@@ -278,12 +282,19 @@ async fn core_read_benchmark() {
         .await;
         let concurrent = measure(
             || async {
-                let results = futures::future::join_all(
-                    (0..4).map(|_| repo.get_threads_with_metadent(board)),
-                )
-                .await;
-                for result in results {
-                    assert_eq!(result.unwrap().len(), threads);
+                let start = std::sync::Arc::new(tokio::sync::Barrier::new(5));
+                let mut reads = tokio::task::JoinSet::new();
+                for _ in 0..4 {
+                    let repo = repo.clone();
+                    let start = start.clone();
+                    reads.spawn(async move {
+                        start.wait().await;
+                        repo.get_threads_with_metadent(board).await.unwrap().len()
+                    });
+                }
+                start.wait().await;
+                while let Some(result) = reads.join_next().await {
+                    assert_eq!(result.unwrap(), threads);
                 }
             },
             PARALLEL_SAMPLES,
@@ -293,6 +304,6 @@ async fn core_read_benchmark() {
         fixtures.push(serde_json::json!({"threads": threads, "responses_per_thread": responses, "outcomes": outcomes, "statements_per_read": 1, "queries": shapes,
             "thread_list": list_times, "single_thread": single_times, "responses": res_times, "metadent": meta_times, "metadent_parallel_4_batch": concurrent}));
     }
-    let result = serde_json::json!({"label": label, "mysql_version": version, "pool_max_connections": 8, "acquire_timeout_seconds": 5, "token_count": 50, "analyze_after_bulk_load": true, "warmup": WARMUP, "samples": SAMPLES, "parallel_samples": PARALLEL_SAMPLES, "parallelism": 4, "units": "milliseconds; parallel measurements are the full batch of four reads", "fixtures": fixtures});
+    let result = serde_json::json!({"label": label, "mysql_version": version, "pool_max_connections": 8, "acquire_timeout_seconds": 5, "token_count": 50, "analyze_after_bulk_load": true, "warmup": WARMUP, "samples": SAMPLES, "parallel_samples": PARALLEL_SAMPLES, "parallelism": 4, "runtime_worker_threads": 4, "allocator": "mimalloc", "parallel_execution": "four spawned tasks starting at a barrier", "units": "milliseconds; parallel measurements are the full batch of four reads", "fixtures": fixtures});
     std::fs::write(output, serde_json::to_vec_pretty(&result).unwrap()).unwrap();
 }

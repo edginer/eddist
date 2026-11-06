@@ -4,7 +4,8 @@ use eddist_core::domain::res::ResView;
 use eddist_entity::{db_time, response, thread};
 use sea_orm::{
     ActiveValue::Set,
-    ConnectionTrait, EntityTrait, IsolationLevel, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, IsolationLevel, QueryFilter,
+    QueryOrder, QuerySelect, TransactionTrait,
     sea_query::{Expr, ExprTrait, Query, UpdateStatement},
 };
 use uuid::Uuid;
@@ -20,22 +21,24 @@ pub trait ResponseRepository: Send + Sync + 'static {
 #[async_trait::async_trait]
 impl ResponseRepository for BbsRepositoryImpl {
     async fn get_responses(&self, thread_id: Uuid) -> anyhow::Result<Vec<ResView>> {
-        let responses = sqlx::query_as!(
-            SelectionRes,
-            r#"SELECT
-                author_name,
-                mail,
-                body,
-                created_at,
-                author_id,
-                is_abone AS "is_abone: bool",
-                is_abone_keep_id AS "is_abone_keep_id: bool"
-            FROM responses WHERE thread_id = ?
-            ORDER BY res_order, id"#,
-            thread_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        use response::Column;
+        let responses = response::Entity::find()
+            .select_only()
+            .columns([
+                Column::AuthorName,
+                Column::Mail,
+                Column::Body,
+                Column::CreatedAt,
+                Column::AuthorId,
+                Column::IsAbone,
+                Column::IsAboneKeepId,
+            ])
+            .filter(Column::ThreadId.eq(thread_id))
+            .order_by_asc(Column::ResOrder)
+            .order_by_asc(Column::Id)
+            .into_model::<SelectionRes>()
+            .all(&self.db)
+            .await?;
 
         Ok(responses
             .into_iter()
@@ -119,7 +122,7 @@ pub(super) fn response_model(res: CreatingRes) -> anyhow::Result<response::Activ
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromQueryResult)]
 struct SelectionRes {
     author_name: String,
     mail: String,
