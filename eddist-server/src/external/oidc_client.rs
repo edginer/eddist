@@ -15,27 +15,31 @@ pub struct OidcClient {
     client_secret: ClientSecret,
     metadata: CoreProviderMetadata,
     redirect_url: RedirectUrl,
+    http_client: reqwest::Client,
 }
 
 impl OidcClient {
-    pub async fn new(
+    pub fn new(
         client_id: ClientId,
         client_secret: openidconnect::ClientSecret,
         oidc_config: CoreProviderMetadata,
         base_url: &str,
-    ) -> Self {
+        http_client: reqwest::Client,
+    ) -> anyhow::Result<Self> {
         let mut id_token_signing_alg_values_supported =
             oidc_config.id_token_signing_alg_values_supported().clone();
         id_token_signing_alg_values_supported.push(CoreJwsSigningAlgorithm::HmacSha256); // for some IdP that doesn't show correct alg in metadata
 
         let metadata = oidc_config
             .set_id_token_signing_alg_values_supported(id_token_signing_alg_values_supported);
-        Self {
+        Ok(Self {
             client_id,
             client_secret,
             metadata,
-            redirect_url: RedirectUrl::new(format!("{base_url}/user/auth/callback")).unwrap(),
-        }
+            redirect_url: RedirectUrl::new(format!("{base_url}/user/auth/callback"))
+                .map_err(|e| anyhow::anyhow!("invalid OIDC redirect URL: {e}"))?,
+            http_client,
+        })
     }
 
     pub fn create_authz_request(&self, state: String) -> (Url, Nonce, PkceCodeVerifier) {
@@ -77,7 +81,7 @@ impl OidcClient {
             .map_err(|e| anyhow::anyhow!("failed to build code exchange request: {e}"))?
             .set_pkce_verifier(pkce_verifier)
             .set_redirect_uri(std::borrow::Cow::Borrowed(&self.redirect_url))
-            .request_async(&reqwest::Client::new())
+            .request_async(&self.http_client)
             .await
             .map_err(|e| anyhow::anyhow!("failed to exchange code with idp: {e}"))?;
 

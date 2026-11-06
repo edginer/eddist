@@ -4,6 +4,7 @@ use crate::{
     config::AppConfig,
     domain::service::{
         bbscgi_auth_service::UserCreationRateLimit, board_info_service::BoardInfoCache,
+        oidc_client_service::OidcClientRegistry,
     },
     services::{
         captcha_config_cache::CaptchaConfigCache, server_settings_cache::ServerSettingsCache,
@@ -22,5 +23,6 @@ pub struct AppContext {
     pub board_info: BoardInfoCache,
     pub stats: StatsCounter,
     pub user_creation_rate_limit: UserCreationRateLimit,
+    pub oidc_clients: Arc<OidcClientRegistry>,
     pub background_tasks: BackgroundTasks,
 }

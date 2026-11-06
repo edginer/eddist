@@ -1,47 +1,47 @@
 use std::sync::Arc;
 
 use crate::{
-    config::AppConfig,
-    domain::{service::oidc_client_service::OidcClientService, user::user_reg_state::UserRegState},
-    repositories::idp_repository::IdpRepository,
+    domain::{
+        service::oidc_client_service::{MetadataFreshness, OidcClientRegistry},
+        user::user_reg_state::UserRegState,
+    },
     stores::oidc_state_store::OidcStateStore,
 };
 
 use super::AppService;
 
 #[derive(Clone)]
-pub struct UserRegIdpRedirectionService<I: IdpRepository> {
-    idp_repo: I,
+pub struct UserRegIdpRedirectionService {
+    oidc_clients: Arc<OidcClientRegistry>,
     oidc_state: Arc<dyn OidcStateStore>,
-    config: Arc<AppConfig>,
 }
 
-impl<I: IdpRepository + Clone> UserRegIdpRedirectionService<I> {
-    pub fn new(idp_repo: I, oidc_state: Arc<dyn OidcStateStore>, config: Arc<AppConfig>) -> Self {
+impl UserRegIdpRedirectionService {
+    pub fn new(oidc_clients: Arc<OidcClientRegistry>, oidc_state: Arc<dyn OidcStateStore>) -> Self {
         Self {
-            idp_repo,
+            oidc_clients,
             oidc_state,
-            config,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<I: IdpRepository + Clone>
+impl
     AppService<
         UserRegIdpRedirectionServiceInput,
         UserRegIdpRedirectionServiceOutput,
         UserRegIdpRedirectionError,
-    > for UserRegIdpRedirectionService<I>
+    > for UserRegIdpRedirectionService
 {
     async fn execute(
         &self,
         input: UserRegIdpRedirectionServiceInput,
     ) -> Result<UserRegIdpRedirectionServiceOutput, UserRegIdpRedirectionError> {
-        let idp_clients_svc = OidcClientService::new(self.idp_repo.clone(), self.config.clone());
-        let idp_clients = idp_clients_svc.get_idp_clients().await?;
-
-        let Some((_, idp_client)) = idp_clients.get(&input.idp_name) else {
+        let Some((_, idp_client)) = self
+            .oidc_clients
+            .get(&input.idp_name, MetadataFreshness::Cached)
+            .await?
+        else {
             return Err(UserRegIdpRedirectionError::UnknownIdp);
         };
 
