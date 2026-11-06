@@ -78,7 +78,9 @@ impl<T: BbsRepository> AppService<ThreadRetrievalServiceInput, DatReadResult, Da
                 let total_len = raw_len + stopper.as_ref().map(|b| b.len()).unwrap_or(0);
 
                 if input.expected_byte_size == Some(total_len) {
-                    return Ok(DatReadResult::Unchanged);
+                    return Ok(DatReadResult::Unchanged {
+                        byte_size: total_len,
+                    });
                 }
 
                 let mut raw = Vec::with_capacity(total_len);
@@ -155,5 +157,5 @@ pub struct ThreadRetrievalServiceInput {
 #[derive(Debug, Clone)]
 pub enum DatReadResult {
     Found(Vec<u8>),
-    Unchanged,
+    Unchanged { byte_size: usize },
 }

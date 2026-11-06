@@ -85,7 +85,6 @@ pub struct SJisResponseBuilder {
     status_code: StatusCode,
     cookies: CookieJar,
     headers: Vec<(String, String)>,
-    if_none_match: Option<String>,
     etag: Option<String>,
 }
 
@@ -104,20 +103,12 @@ impl SJisResponseBuilder {
             status_code: StatusCode::OK,
             cookies: CookieJar::new(),
             headers: Vec::new(),
-            if_none_match: None,
             etag: None,
         }
     }
 
     pub fn with_etag(self, etag: Option<String>) -> Self {
         Self { etag, ..self }
-    }
-
-    pub fn if_none_match(self, value: Option<String>) -> Self {
-        Self {
-            if_none_match: value,
-            ..self
-        }
     }
 
     pub fn server_ttl(self, max_age: usize) -> Self {
@@ -174,22 +165,6 @@ impl SJisResponseBuilder {
 
         // Use pre-computed ETag only for full (non-partial) responses.
         let etag = self.etag.filter(|_| self.status_code == StatusCode::OK);
-
-        // Return 304 Not Modified when the client's cached ETag matches.
-        if let (Some(etag_val), Some(inm)) = (&etag, &self.if_none_match) {
-            let inm_trimmed = inm.trim();
-            if inm_trimmed == etag_val.as_str() || inm_trimmed == "*" {
-                let mut resp = Response::new(vec![].into());
-                *resp.status_mut() = StatusCode::NOT_MODIFIED;
-                let headers = resp.headers_mut();
-                headers.append("ETag", HeaderValue::from_str(etag_val).unwrap());
-                headers.append(
-                    "Cache-Control",
-                    HeaderValue::from_str(&cache_control_value).unwrap(),
-                );
-                return SJisResponse(resp);
-            }
-        }
 
         let mut resp = Response::new(body_bytes.into());
         let headers = resp.headers_mut();

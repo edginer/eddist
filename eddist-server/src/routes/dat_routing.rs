@@ -1,4 +1,4 @@
-use core::str;
+use core::{fmt::Display, str};
 
 use axum::{
     body::Body,
@@ -62,7 +62,7 @@ struct DatEtag {
     byte_size: usize,
 }
 
-/// Quotes are optional: some clients send the unquoted `W/bbs-...` form.
+/// Accept unquoted tags as the previous size-only parser did.
 fn parse_dat_etag(value: &str) -> Option<DatEtag> {
     let inner = value.trim();
     let inner = inner.strip_prefix("W/").unwrap_or(inner);
@@ -89,7 +89,7 @@ impl DatEtag {
 
 /// Conditional request state for one dat response.
 struct DatConditions {
-    /// The raw `If-None-Match` value, echoed on a 304.
+    /// The request's `If-None-Match` value, used for conditional response checks.
     if_none_match: Option<String>,
     /// Byte size from `If-None-Match` when the tag names this board and thread and
     /// no Range applies; lets the cache path skip materializing the payload.
@@ -197,14 +197,34 @@ fn dat_retrieval_error_response(
     }
 }
 
-fn not_modified_response(if_none_match: Option<String>) -> Response {
-    let mut builder = Response::builder()
+fn dat_etag(board_key: &str, thread_number: impl Display, byte_size: usize) -> String {
+    format!("W/\"{board_key}-{thread_number}-{byte_size}\"")
+}
+
+fn matches_current_etag(if_none_match: Option<&str>, etag: &str) -> bool {
+    if_none_match.is_some_and(|value| {
+        let value = value.trim();
+        value == etag || value == "*"
+    })
+}
+
+fn not_modified_response(etag: String, cache_control: &str) -> Response {
+    Response::builder()
         .status(StatusCode::NOT_MODIFIED)
-        .header("Cache-Control", "max-age=5,s-maxage=1");
-    if let Some(etag) = if_none_match {
-        builder = builder.header("ETag", etag);
+        .header("Cache-Control", cache_control)
+        .header("ETag", etag)
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn dat_read_response(path: &DatPath, conditions: DatConditions, result: DatReadResult) -> Response {
+    match result {
+        DatReadResult::Unchanged { byte_size } => not_modified_response(
+            dat_etag(&path.board_key, path.thread_number, byte_size),
+            "max-age=5,s-maxage=1",
+        ),
+        DatReadResult::Found(raw) => dat_found_response(path, conditions, raw),
     }
-    builder.body(Body::empty()).unwrap()
 }
 
 /// Builds the full or partial dat response. The ETag is only attached to (and only
@@ -218,23 +238,20 @@ fn dat_found_response(path: &DatPath, conditions: DatConditions, raw: Vec<u8>) -
         }
     };
 
-    let (if_none_match, etag) = if is_partial {
-        (None, None)
+    let etag = if is_partial {
+        None
     } else {
-        let etag = Some(format!(
-            "W/\"{}-{}-{}\"",
-            path.board_key,
-            path.thread_number,
-            raw.len()
-        ));
-        (conditions.if_none_match, etag)
+        let etag = dat_etag(&path.board_key, path.thread_number, raw.len());
+        if matches_current_etag(conditions.if_none_match.as_deref(), &etag) {
+            return not_modified_response(etag, "max-age=5,s-maxage=1");
+        }
+        Some(etag)
     };
 
     SJisResponseBuilder::new(SJisStr::from_unchecked_vec(raw))
         .content_type(SjisContentType::TextPlain)
         .client_ttl(5)
         .server_ttl(1)
-        .if_none_match(if_none_match)
         .with_etag(etag)
         .status_code(if is_partial {
             StatusCode::PARTIAL_CONTENT
@@ -275,10 +292,7 @@ pub async fn get_dat_txt(
         }
     };
 
-    match result {
-        DatReadResult::Unchanged => not_modified_response(conditions.if_none_match),
-        DatReadResult::Found(raw) => dat_found_response(&path, conditions, raw),
-    }
+    dat_read_response(&path, conditions, result)
 }
 
 /// Archived dat files may be stored as UTF-8 (converted) or as raw Shift-JIS.
@@ -289,6 +303,25 @@ fn kako_dat_to_sjis(bytes: Vec<u8>) -> SJisStr {
     } else {
         SJisStr::from_unchecked_vec(bytes)
     }
+}
+
+fn kako_dat_found_response(
+    board_key: &str,
+    thread_number: &str,
+    if_none_match: Option<&str>,
+    raw: Vec<u8>,
+) -> Response {
+    let etag = dat_etag(board_key, thread_number, raw.len());
+    if matches_current_etag(if_none_match, &etag) {
+        return not_modified_response(etag, "s-maxage=3600");
+    }
+
+    SJisResponseBuilder::new(kako_dat_to_sjis(raw))
+        .content_type(SjisContentType::TextPlain)
+        .server_ttl(3600)
+        .with_etag(Some(etag))
+        .build()
+        .into_response()
 }
 
 pub async fn get_kako_dat_txt(
@@ -321,26 +354,9 @@ pub async fn get_kako_dat_txt(
         }
     };
 
-    let etag = Some(format!(
-        "W/\"{}-{}-{}\"",
-        board_key,
-        thread_number,
-        result.len()
-    ));
-    let sjis_str = kako_dat_to_sjis(result);
+    let if_none_match = headers.get("If-None-Match").and_then(|v| v.to_str().ok());
 
-    let if_none_match = headers
-        .get("If-None-Match")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-
-    SJisResponseBuilder::new(sjis_str)
-        .content_type(SjisContentType::TextPlain)
-        .server_ttl(3600)
-        .if_none_match(if_none_match)
-        .with_etag(etag)
-        .build()
-        .into_response()
+    kako_dat_found_response(&board_key, thread_number, if_none_match, result)
 }
 
 #[cfg(test)]
@@ -502,5 +518,176 @@ mod tests {
         headers.insert("User-Agent", "Xeno/1.0".parse().unwrap());
         let conditions = DatConditions::parse(&headers, &path);
         assert_eq!(conditions.range, DatRange::Full);
+    }
+
+    #[tokio::test]
+    async fn found_and_unchanged_reads_return_the_same_not_modified_response() {
+        let path = dat_path();
+        let raw = SJisStr::from("名前<>メール<>日時<>本文<>題名\n").get_inner();
+        let byte_size = raw.len();
+        let etag = dat_etag(&path.board_key, path.thread_number, byte_size);
+        let mut headers = HeaderMap::new();
+        headers.insert("If-None-Match", etag.parse().unwrap());
+
+        for result in [
+            DatReadResult::Found(raw),
+            DatReadResult::Unchanged { byte_size },
+        ] {
+            let response = dat_read_response(&path, DatConditions::parse(&headers, &path), result);
+            assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+            assert_eq!(response.headers()["ETag"], etag);
+            assert_eq!(response.headers()["Cache-Control"], "max-age=5,s-maxage=1");
+            assert!(!response.headers().contains_key("If-None-Match"));
+            assert!(
+                axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn full_reads_return_shift_jis_when_the_request_tag_does_not_match() {
+        let path = dat_path();
+        let raw = SJisStr::from("名前<>メール<>日時<>本文<>題名\n").get_inner();
+        let etag = dat_etag(&path.board_key, path.thread_number, raw.len());
+
+        for request_tag in [
+            None,
+            Some(dat_etag(&path.board_key, path.thread_number, raw.len() + 1)),
+            Some(dat_etag("other", path.thread_number, raw.len())),
+        ] {
+            let mut headers = HeaderMap::new();
+            if let Some(request_tag) = request_tag {
+                headers.insert("If-None-Match", request_tag.parse().unwrap());
+            }
+            let response = dat_read_response(
+                &path,
+                DatConditions::parse(&headers, &path),
+                DatReadResult::Found(raw.clone()),
+            );
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()["ETag"], etag);
+            assert_eq!(
+                response.headers()["Content-Type"],
+                "text/plain; charset=Shift_JIS;"
+            );
+            assert!(!response.headers().contains_key("If-None-Match"));
+            assert_eq!(
+                axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap()
+                    .as_ref(),
+                raw
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn full_reads_still_match_the_wildcard() {
+        let path = dat_path();
+        let raw = b"dat body\n".to_vec();
+        let etag = dat_etag(&path.board_key, path.thread_number, raw.len());
+        let mut headers = HeaderMap::new();
+        headers.insert("If-None-Match", "*".parse().unwrap());
+
+        let response = dat_read_response(
+            &path,
+            DatConditions::parse(&headers, &path),
+            DatReadResult::Found(raw),
+        );
+        assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(response.headers()["ETag"], etag);
+        assert!(
+            axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn unchanged_reads_generate_the_current_etag_instead_of_echoing_the_request() {
+        let path = dat_path();
+        let mut headers = HeaderMap::new();
+        headers.insert("If-None-Match", "W/bbs-1234567890-4096".parse().unwrap());
+        let conditions = DatConditions::parse(&headers, &path);
+        assert_eq!(conditions.known_byte_size, Some(4096));
+
+        let response = dat_read_response(
+            &path,
+            conditions,
+            DatReadResult::Unchanged { byte_size: 4096 },
+        );
+        assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(response.headers()["ETag"], r#"W/"bbs-1234567890-4096""#);
+    }
+
+    #[tokio::test]
+    async fn partial_reads_skip_conditional_checks_but_xeno_gets_a_full_response() {
+        let path = dat_path();
+        let raw = b"dat body\n".to_vec();
+        let etag = dat_etag(&path.board_key, path.thread_number, raw.len());
+        let mut headers = HeaderMap::new();
+        headers.insert("If-None-Match", etag.parse().unwrap());
+        headers.insert("Range", "bytes=3-".parse().unwrap());
+        headers.insert("User-Agent", "Mozilla/5.0".parse().unwrap());
+
+        let response = dat_read_response(
+            &path,
+            DatConditions::parse(&headers, &path),
+            DatReadResult::Found(raw.clone()),
+        );
+        assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
+        assert!(!response.headers().contains_key("ETag"));
+        assert_eq!(
+            axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .as_ref(),
+            &raw[3..]
+        );
+
+        headers.insert("User-Agent", "Xeno/1.0".parse().unwrap());
+        let response = dat_read_response(
+            &path,
+            DatConditions::parse(&headers, &path),
+            DatReadResult::Found(raw),
+        );
+        assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(response.headers()["ETag"], etag);
+    }
+
+    #[tokio::test]
+    async fn archived_responses_keep_their_etag_cache_policy_and_shift_jis_body() {
+        let text = "名前<>メール<>日時<>本文<>題名\n";
+        let sjis_bytes = SJisStr::from(text).get_inner();
+
+        for raw in [text.as_bytes().to_vec(), sjis_bytes.clone()] {
+            // Archived ETags continue to describe the stored bytes before conversion.
+            let etag = dat_etag("bbs", "1234567890", raw.len());
+            for (request_tag, expected_status) in [
+                (None, StatusCode::OK),
+                (Some(etag.as_str()), StatusCode::NOT_MODIFIED),
+                (Some("*"), StatusCode::NOT_MODIFIED),
+                (Some(r#"W/"other-1234567890-1""#), StatusCode::OK),
+            ] {
+                let response =
+                    kako_dat_found_response("bbs", "1234567890", request_tag, raw.clone());
+                assert_eq!(response.status(), expected_status);
+                assert_eq!(response.headers()["ETag"], etag);
+                assert_eq!(response.headers()["Cache-Control"], "s-maxage=3600");
+                assert!(!response.headers().contains_key("If-None-Match"));
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                if expected_status == StatusCode::OK {
+                    assert_eq!(body.as_ref(), sjis_bytes);
+                } else {
+                    assert!(body.is_empty());
+                }
+            }
+        }
     }
 }

@@ -755,6 +755,20 @@ async fn test_dat_etag_is_scoped_to_its_resource() {
             .await;
         assert_eq!(response.status_code(), 200, "{foreign}");
     }
+
+    // The database path applies the same conditional check after a cache miss.
+    ctx.redis_conn.del::<_, ()>(&dat_key).await.unwrap();
+    let response = ctx
+        .server
+        .get(&dat_path)
+        .add_header(
+            HeaderName::from_static("if-none-match"),
+            HeaderValue::from_str(&etag).unwrap(),
+        )
+        .await;
+    assert_eq!(response.status_code(), 304);
+    assert_eq!(response.headers()["etag"], etag);
+    assert!(response.as_bytes().is_empty());
 }
 
 #[tokio::test]
