@@ -44,6 +44,8 @@ uuid.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["charset"] }
 eddist-core.workspace = true
+eddist-entity.workspace = true
+sea-orm.workspace = true
 sha3.workspace = true
 sha2.workspace = true
 futures.workspace = true

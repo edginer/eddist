@@ -13,6 +13,7 @@ use axum_prometheus::PrometheusMetricLayer;
 use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
+use sea_orm::SqlxMySqlConnector;
 use tokio::task::JoinHandle;
 use tower_http::{
     catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
@@ -164,6 +165,10 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         s3_bucket_name,
     } = deps;
 
+    // Adopt the existing pool so SQLx and migrated repositories share its limits
+    // and physical-connection session settings throughout the migration.
+    let db = SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
+
     let server_settings_repo = ServerSettingsRepositoryImpl::new(pool.clone());
     let captcha_config_repo = CaptchaConfigRepositoryImpl::new(pool.clone());
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
@@ -234,7 +239,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     ]);
 
     let services = AppServiceContainer::new(
-        BbsRepositoryImpl::new(pool.clone()),
+        BbsRepositoryImpl::new(pool.clone(), db.clone()),
         UserRepositoryImpl::new(pool.clone()),
         idp_repo,
         redis_conn.clone(),
