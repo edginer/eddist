@@ -240,7 +240,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
 
     let services = AppServiceContainer::new(
         BbsRepositoryImpl::new(pool.clone(), db.clone()),
-        UserRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(db.clone()),
         idp_repo,
         redis_conn.clone(),
         PubSubRepos {
