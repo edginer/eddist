@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use anyhow::{Context, anyhow, ensure};
 use eddist_core::utils::slugify;
-use sqlx::MySqlPool;
+use eddist_entity::captcha_config;
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
+    QuerySelect,
+};
 use uuid::Uuid;
 
 use crate::domain::captcha_like::{
@@ -10,7 +14,7 @@ use crate::domain::captcha_like::{
     HttpMethod, RequestFormat,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromQueryResult)]
 struct CaptchaConfigRow {
     id: Uuid,
     name: String,
@@ -256,44 +260,44 @@ pub trait CaptchaConfigRepository: Send + Sync + 'static {
 
 #[derive(Debug, Clone)]
 pub struct CaptchaConfigRepositoryImpl {
-    pool: MySqlPool,
+    db: DatabaseConnection,
 }
 
 impl CaptchaConfigRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        Self { pool }
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
     }
 }
 
 #[async_trait::async_trait]
 impl CaptchaConfigRepository for CaptchaConfigRepositoryImpl {
     async fn get_active_captcha_configs(&self) -> anyhow::Result<Vec<CaptchaProviderConfig>> {
-        let rows = sqlx::query_as!(
-            CaptchaConfigRow,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                name,
-                provider,
-                site_key,
-                secret,
-                base_url,
-                widget_form_field_name,
-                widget_script_url,
-                widget_html,
-                widget_script_handler,
-                capture_fields AS "capture_fields: serde_json::Value",
-                verification AS "verification: serde_json::Value",
-                is_active AS "is_active: bool",
-                display_order,
-                endpoint_usage
-            FROM captcha_configs
-            WHERE is_active = 1
-            ORDER BY display_order ASC, created_at ASC
-            "#
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        use captcha_config::Column;
+        let rows = captcha_config::Entity::find()
+            .select_only()
+            .columns([
+                Column::Id,
+                Column::Name,
+                Column::Provider,
+                Column::SiteKey,
+                Column::Secret,
+                Column::BaseUrl,
+                Column::WidgetFormFieldName,
+                Column::WidgetScriptUrl,
+                Column::WidgetHtml,
+                Column::WidgetScriptHandler,
+                Column::CaptureFields,
+                Column::Verification,
+                Column::IsActive,
+                Column::DisplayOrder,
+                Column::EndpointUsage,
+            ])
+            .filter(Column::IsActive.eq(true))
+            .order_by_asc(Column::DisplayOrder)
+            .order_by_asc(Column::CreatedAt)
+            .into_model::<CaptchaConfigRow>()
+            .all(&self.db)
+            .await?;
 
         collect_valid_configs(rows)
     }

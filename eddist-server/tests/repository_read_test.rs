@@ -89,8 +89,8 @@ async fn notices_preserve_visibility_pagination_and_optional_fields() {
         ),
     ] {
         let id = Uuid::now_v7();
-        sqlx::query("INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email, hide_from_list) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .bind(id).bind(slug).bind(format!("お知らせ {slug}"))
+        sqlx::query("INSERT INTO notices (id, slug, title, content, created_at, updated_at, published_at, author_email, hide_from_list) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(id.to_string()).bind(slug).bind(format!("お知らせ {slug}"))
             .bind("本文\n日本語").bind(time(1)).bind(time(2)).bind(published_at)
             .bind(email).bind(hidden).execute(&db.pool).await.unwrap();
         ids.push(id);
@@ -154,8 +154,8 @@ async fn terms_select_latest_update_and_preserve_empty_result() {
         if day == 3 {
             latest_id = id;
         }
-        sqlx::query("INSERT INTO terms (id, content, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)")
-            .bind(id).bind(format!("規約 {day}")).bind(time(1)).bind(time(day)).bind(updated_by)
+        sqlx::query("INSERT INTO terms (id, content, created_at, updated_at, updated_by) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)")
+            .bind(id.to_string()).bind(format!("規約 {day}")).bind(time(1)).bind(time(day)).bind(updated_by)
             .execute(&db.pool).await.unwrap();
     }
     let terms = repo.get_terms().await.unwrap().unwrap();
@@ -164,8 +164,8 @@ async fn terms_select_latest_update_and_preserve_empty_result() {
     assert_eq!(terms.created_at, time(1));
     assert_eq!(terms.updated_at, time(3));
     assert_eq!(terms.updated_by.as_deref(), Some("editor@example.com"));
-    sqlx::query("UPDATE terms SET updated_by = NULL WHERE id = ?")
-        .bind(latest_id)
+    sqlx::query("UPDATE terms SET updated_by = NULL WHERE id = UUID_TO_BIN(?)")
+        .bind(latest_id.to_string())
         .execute(&db.pool)
         .await
         .unwrap();
@@ -184,7 +184,7 @@ async fn terms_select_latest_update_and_preserve_empty_result() {
 #[tokio::test]
 async fn settings_and_idps_preserve_values_and_disabled_providers() {
     let db = TestDatabase::new().await;
-    let settings = ServerSettingsRepositoryImpl::new(db.pool.clone());
+    let settings = ServerSettingsRepositoryImpl::new(db.orm());
     assert!(
         settings
             .get_all()
@@ -193,8 +193,8 @@ async fn settings_and_idps_preserve_values_and_disabled_providers() {
             .get(ServerSettingKey::CloseNewAuthentication)
             .is_none()
     );
-    sqlx::query("INSERT INTO server_settings (id, setting_key, value, created_at, updated_at) VALUES (?, 'bbs.close_new_authentication', 'true', ?, ?)")
-        .bind(Uuid::now_v7()).bind(time(1)).bind(time(1)).execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO server_settings (id, setting_key, value, created_at, updated_at) VALUES (UUID_TO_BIN(?), 'bbs.close_new_authentication', 'true', ?, ?)")
+        .bind(Uuid::now_v7().to_string()).bind(time(1)).bind(time(1)).execute(&db.pool).await.unwrap();
     assert!(
         settings
             .get_all()
@@ -214,13 +214,13 @@ async fn settings_and_idps_preserve_values_and_disabled_providers() {
             .is_enabled(ServerSettingKey::CloseNewAuthentication)
     );
 
-    let idps = IdpRepositoryImpl::new(db.pool.clone());
+    let idps = IdpRepositoryImpl::new(db.orm());
     assert!(idps.get_idps().await.unwrap().is_empty());
     let mut ids = Vec::new();
     for (name, enabled, logo) in [("enabled", true, Some("<svg/>")), ("disabled", false, None)] {
         let id = Uuid::now_v7();
-        sqlx::query("INSERT INTO idps (id, idp_name, idp_display_name, idp_logo_svg, oidc_config_url, client_id, client_secret, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-            .bind(id).bind(name).bind(format!("認証 {name}")).bind(logo)
+        sqlx::query("INSERT INTO idps (id, idp_name, idp_display_name, idp_logo_svg, oidc_config_url, client_id, client_secret, enabled) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, ?)")
+            .bind(id.to_string()).bind(name).bind(format!("認証 {name}")).bind(logo)
             .bind("https://idp.example/.well-known/openid-configuration").bind("client-id")
             .bind("encrypted-secret").bind(enabled).execute(&db.pool).await.unwrap();
         ids.push(id);
@@ -249,7 +249,7 @@ async fn settings_and_idps_preserve_values_and_disabled_providers() {
 #[tokio::test]
 async fn restrictions_preserve_expiry_boundary_order_and_enum_mapping() {
     let db = TestDatabase::new().await;
-    let repo = UserRestrictionRepositoryImpl::new(db.pool.clone());
+    let repo = UserRestrictionRepositoryImpl::new(db.orm());
     assert!(repo.get_all_active_rules().await.unwrap().is_empty());
     sqlx::query("SET timestamp = 1893456000")
         .execute(&db.pool)
@@ -268,8 +268,8 @@ async fn restrictions_preserve_expiry_boundary_order_and_enum_mapping() {
         (4, Some("2030-01-01 00:00:00.000"), "USER_AGENT", "BOTH"),
     ] {
         let id = Uuid::now_v7();
-        sqlx::query("INSERT INTO user_restriction_rules (id, name, rule_type, target, rule_value, expires_at, created_at, updated_at, created_by_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .bind(id).bind(format!("規制 {day}")).bind(rule_type).bind(target).bind("123")
+        sqlx::query("INSERT INTO user_restriction_rules (id, name, rule_type, target, rule_value, expires_at, created_at, updated_at, created_by_email) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(id.to_string()).bind(format!("規制 {day}")).bind(rule_type).bind(target).bind("123")
             .bind(expires_at).bind(time(day)).bind(time(4)).bind("admin@example.com").execute(&db.pool).await.unwrap();
         ids.push(id);
     }
@@ -289,8 +289,8 @@ async fn restrictions_preserve_expiry_boundary_order_and_enum_mapping() {
     assert_eq!(rules[1].rule_type, RestrictionRuleType::IP);
     assert_eq!(rules[1].target, RestrictionTarget::Both);
     assert!(rules[1].expires_at.is_none());
-    sqlx::query("UPDATE user_restriction_rules SET target = 'invalid' WHERE id = ?")
-        .bind(ids[0])
+    sqlx::query("UPDATE user_restriction_rules SET target = 'invalid' WHERE id = UUID_TO_BIN(?)")
+        .bind(ids[0].to_string())
         .execute(&db.pool)
         .await
         .unwrap();
@@ -302,7 +302,7 @@ async fn restrictions_preserve_expiry_boundary_order_and_enum_mapping() {
 #[tokio::test]
 async fn captcha_preserves_active_filter_order_json_and_invalid_snapshot_handling() {
     let db = TestDatabase::new().await;
-    let repo = CaptchaConfigRepositoryImpl::new(db.pool.clone());
+    let repo = CaptchaConfigRepositoryImpl::new(db.orm());
     assert!(repo.get_active_captcha_configs().await.unwrap().is_empty());
     for (name, order, day, active) in [
         ("second", 1, 2, true),
@@ -310,8 +310,8 @@ async fn captcha_preserves_active_filter_order_json_and_invalid_snapshot_handlin
         ("last", 2, 1, true),
         ("inactive", 0, 1, false),
     ] {
-        sqlx::query("INSERT INTO captcha_configs (id, name, provider, site_key, secret, capture_fields, is_active, display_order, endpoint_usage, created_at, updated_at) VALUES (?, ?, 'turnstile', 'site-key', 'secret', ?, ?, ?, 'all', ?, ?)")
-            .bind(Uuid::now_v7()).bind(name).bind(serde_json::json!(["hostname"]))
+        sqlx::query("INSERT INTO captcha_configs (id, name, provider, site_key, secret, capture_fields, is_active, display_order, endpoint_usage, created_at, updated_at) VALUES (UUID_TO_BIN(?), ?, 'turnstile', 'site-key', 'secret', ?, ?, ?, 'all', ?, ?)")
+            .bind(Uuid::now_v7().to_string()).bind(name).bind(serde_json::json!(["hostname"]))
             .bind(active).bind(order).bind(time(day)).bind(time(day)).execute(&db.pool).await.unwrap();
     }
     let rows = repo.get_active_captcha_configs().await.unwrap();

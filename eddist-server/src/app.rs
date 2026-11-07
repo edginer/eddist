@@ -169,11 +169,11 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     // and physical-connection session settings throughout the migration.
     let db = SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
 
-    let server_settings_repo = ServerSettingsRepositoryImpl::new(pool.clone());
-    let captcha_config_repo = CaptchaConfigRepositoryImpl::new(pool.clone());
-    let user_restriction_repo = UserRestrictionRepositoryImpl::new(pool.clone());
+    let server_settings_repo = ServerSettingsRepositoryImpl::new(db.clone());
+    let captcha_config_repo = CaptchaConfigRepositoryImpl::new(db.clone());
+    let user_restriction_repo = UserRestrictionRepositoryImpl::new(db.clone());
     let stats_repo = StatsRepositoryImpl::new(pool.clone());
-    let idp_repo = IdpRepositoryImpl::new(pool.clone());
+    let idp_repo = IdpRepositoryImpl::new(db.clone());
 
     let (server_settings, captcha_configs, user_restrictions) = tokio::try_join!(
         async {
