@@ -13,7 +13,7 @@ use axum_prometheus::PrometheusMetricLayer;
 use eddist_core::domain::board::{BoardInfo, validate_board_key};
 use handlebars::Handlebars;
 use http::{HeaderMap, Request, StatusCode};
-use sea_orm::SqlxMySqlConnector;
+use sea_orm::DatabaseConnection;
 use tokio::task::JoinHandle;
 use tower_http::{
     catch_panic::CatchPanicLayer, classify::ServerErrorsFailureClass, timeout::TimeoutLayer,
@@ -123,7 +123,7 @@ impl Drop for PeriodicTasks {
 }
 
 pub struct AppDependencies {
-    pub pool: sqlx::MySqlPool,
+    pub db: DatabaseConnection,
     pub redis_conn: redis::aio::ConnectionManager,
     pub s3_client: aws_sdk_s3::Client,
     pub s3_bucket_name: String,
@@ -159,15 +159,11 @@ impl App {
 /// load failure aborts startup instead of serving with empty settings or rules.
 pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Result<App> {
     let AppDependencies {
-        pool,
+        db,
         redis_conn,
         s3_client,
         s3_bucket_name,
     } = deps;
-
-    // Adopt the existing pool so SQLx and migrated repositories share its limits
-    // and physical-connection session settings throughout the migration.
-    let db = SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
 
     let server_settings_repo = ServerSettingsRepositoryImpl::new(db.clone());
     let captcha_config_repo = CaptchaConfigRepositoryImpl::new(db.clone());
@@ -239,7 +235,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     ]);
 
     let services = AppServiceContainer::new(
-        BbsRepositoryImpl::new(pool.clone(), db.clone()),
+        BbsRepositoryImpl::new(db.clone()),
         UserRepositoryImpl::new(db.clone()),
         idp_repo,
         redis_conn.clone(),

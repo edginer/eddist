@@ -1,10 +1,19 @@
-//! Opt-in, disposable-MySQL measurements shared by the pre/post migration commits.
-use super::*;
-use eddist::repositories::bbs_repository::ThreadStatus;
+//! Opt-in repository latency, query shape, and output measurements against disposable MySQL.
+// This target uses only the setup and input fixtures needed for measurements.
+#[allow(dead_code)]
+#[path = "support/repository.rs"]
+mod repository_support;
+
+use eddist::repositories::bbs_repository::{
+    AuthedTokenRepository, BbsRepositoryImpl, ResponseRepository, ThreadRepository, ThreadStatus,
+};
+use eddist_core::domain::client_info::ClientInfo;
 use eddist_core::domain::tinker::Tinker;
+use repository_support::{TestDatabase, time, token_fixture};
 use sha2::{Digest, Sha256};
 use sqlx::{AssertSqlSafe, Executor, QueryBuilder, Row, SqlSafeStr};
 use std::{future::Future, time::Instant};
+use uuid::Uuid;
 
 const WARMUP: usize = 5;
 const SAMPLES: usize = 101;
@@ -128,8 +137,8 @@ async fn seed(
 /// Run this test alone: it temporarily enables the general log on its own
 /// disposable MySQL container to capture actual executed SQL, never production.
 /// EDDIST_BENCH_OUTPUT=/private/tmp/core-sqlx.json EDDIST_BENCH_LABEL=sqlx-core \
-/// SQLX_OFFLINE=true cargo test -p eddist --test repository_read_test \
-/// repository_benchmark::core_read_benchmark -- --ignored --exact --nocapture
+/// SQLX_OFFLINE=true cargo test -p eddist --test repository_benchmark \
+/// core_read_benchmark -- --ignored --exact --nocapture
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "opt-in repeatable MySQL latency, output, statement and EXPLAIN capture"]
 async fn core_read_benchmark() {
@@ -137,8 +146,33 @@ async fn core_read_benchmark() {
         .expect("set EDDIST_BENCH_OUTPUT to the JSON output path");
     let label = std::env::var("EDDIST_BENCH_LABEL")
         .expect("set EDDIST_BENCH_LABEL to identify the measured commit");
-    let db = TestDatabase::with_max_connections(8).await;
-    let repo = db.bbs();
+    let mut db = TestDatabase::with_max_connections(8).await;
+    // Diagnostic controls stay in the test harness. The default measures the
+    // unchanged production factory, including the server's default isolation.
+    let connection_mode =
+        std::env::var("EDDIST_BENCH_CONNECTION").unwrap_or_else(|_| "native".to_owned());
+    if connection_mode == "native-read-committed" {
+        db.pool
+            .execute("SET GLOBAL transaction_isolation = 'READ-COMMITTED'")
+            .await
+            .unwrap();
+    }
+    let connection = match connection_mode.as_str() {
+        "native" | "native-read-committed" => eddist::database::connect_database(&db.url().await)
+            .await
+            .unwrap(),
+        "adopted-fixture" => db.orm(),
+        other => panic!("unsupported EDDIST_BENCH_CONNECTION: {other}"),
+    };
+    let connection_source = if connection_mode == "adopted-fixture" {
+        "adopted SQLx fixture"
+    } else {
+        "native SeaORM"
+    };
+    // Keep setup, ANALYZE and reads on the same physical pool, as in the SQLx
+    // baseline. SQLx is only the test fixture/observation interface here.
+    db.pool = connection.get_mysql_connection_pool().clone();
+    let repo = BbsRepositoryImpl::new(connection);
     let version: String = sqlx::query_scalar("SELECT VERSION()")
         .fetch_one(&db.pool)
         .await
@@ -304,6 +338,6 @@ async fn core_read_benchmark() {
         fixtures.push(serde_json::json!({"threads": threads, "responses_per_thread": responses, "outcomes": outcomes, "statements_per_read": 1, "queries": shapes,
             "thread_list": list_times, "single_thread": single_times, "responses": res_times, "metadent": meta_times, "metadent_parallel_4_batch": concurrent}));
     }
-    let result = serde_json::json!({"label": label, "mysql_version": version, "pool_max_connections": 8, "acquire_timeout_seconds": 5, "token_count": 50, "analyze_after_bulk_load": true, "warmup": WARMUP, "samples": SAMPLES, "parallel_samples": PARALLEL_SAMPLES, "parallelism": 4, "runtime_worker_threads": 4, "allocator": "mimalloc", "parallel_execution": "four spawned tasks starting at a barrier", "units": "milliseconds; parallel measurements are the full batch of four reads", "fixtures": fixtures});
+    let result = serde_json::json!({"label": label, "connection_source": connection_source, "connection_mode": connection_mode, "mysql_version": version, "pool_max_connections": 8, "acquire_timeout_seconds": 5, "token_count": 50, "analyze_after_bulk_load": true, "warmup": WARMUP, "samples": SAMPLES, "parallel_samples": PARALLEL_SAMPLES, "parallelism": 4, "runtime_worker_threads": 4, "allocator": "mimalloc", "parallel_execution": "four spawned tasks starting at a barrier", "units": "milliseconds; parallel measurements are the full batch of four reads", "fixtures": fixtures});
     std::fs::write(output, serde_json::to_vec_pretty(&result).unwrap()).unwrap();
 }

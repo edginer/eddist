@@ -2,8 +2,8 @@ use chrono::{DateTime, Datelike, Days, FixedOffset, NaiveDate, Utc};
 use eddist_entity::daily_stats;
 use sea_orm::{
     ActiveValue::Set,
-    ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
-    QuerySelect, TransactionTrait,
+    ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, IsolationLevel, QueryFilter,
+    QueryOrder, QuerySelect, TransactionTrait,
     sea_query::{Expr, ExprTrait, OnConflict},
 };
 
@@ -114,7 +114,10 @@ impl StatsRepository for StatsRepositoryImpl {
         // Use the app clock once per operation. A snapshot crossing JST midnight
         // is attributed to the day the flush began, rather than split per row.
         let today = jst_date(Utc::now());
-        let tx = self.db.begin().await?;
+        let tx = self
+            .db
+            .begin_with_config(Some(IsolationLevel::ReadCommitted), None)
+            .await?;
 
         for (board_key, response_delta, thread_delta) in snapshot {
             stats_upsert(today, board_key, *response_delta, *thread_delta)
