@@ -1,10 +1,19 @@
-//! Opt-in, disposable-MySQL measurements shared by the pre/post migration commits.
-use super::*;
-use eddist::repositories::bbs_repository::ThreadStatus;
+//! Opt-in repository latency, query shape, and output measurements against disposable MySQL.
+// This target uses only the setup and input fixtures needed for measurements.
+#[allow(dead_code)]
+#[path = "support/repository.rs"]
+mod repository_support;
+
+use eddist::repositories::bbs_repository::{
+    AuthedTokenRepository, BbsRepositoryImpl, ResponseRepository, ThreadRepository, ThreadStatus,
+};
+use eddist_core::domain::client_info::ClientInfo;
 use eddist_core::domain::tinker::Tinker;
+use repository_support::{TestDatabase, time, token_fixture};
 use sha2::{Digest, Sha256};
 use sqlx::{AssertSqlSafe, Executor, QueryBuilder, Row, SqlSafeStr};
 use std::{future::Future, time::Instant};
+use uuid::Uuid;
 
 const WARMUP: usize = 5;
 const SAMPLES: usize = 101;
@@ -128,8 +137,8 @@ async fn seed(
 /// Run this test alone: it temporarily enables the general log on its own
 /// disposable MySQL container to capture actual executed SQL, never production.
 /// EDDIST_BENCH_OUTPUT=/private/tmp/core-sqlx.json EDDIST_BENCH_LABEL=sqlx-core \
-/// SQLX_OFFLINE=true cargo test -p eddist --test repository_read_test \
-/// repository_benchmark::core_read_benchmark -- --ignored --exact --nocapture
+/// SQLX_OFFLINE=true cargo test -p eddist --test repository_benchmark \
+/// core_read_benchmark -- --ignored --exact --nocapture
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "opt-in repeatable MySQL latency, output, statement and EXPLAIN capture"]
 async fn core_read_benchmark() {
