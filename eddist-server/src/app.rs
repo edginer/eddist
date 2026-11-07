@@ -253,8 +253,8 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
 
     let state = AppState {
         services,
-        notice_repo: NoticeRepositoryImpl::new(pool.clone()),
-        terms_repo: TermsRepositoryImpl::new(pool.clone()),
+        notice_repo: NoticeRepositoryImpl::new(db.clone()),
+        terms_repo: TermsRepositoryImpl::new(db.clone()),
         stats_repo,
         template_engine: Arc::new(load_template_engine()),
         ctx,

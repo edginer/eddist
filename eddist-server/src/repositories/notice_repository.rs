@@ -1,5 +1,10 @@
 use eddist_core::domain::notice::{Notice, NoticeListItem};
-use sqlx::{MySqlPool, query_as};
+use eddist_entity::notice;
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+    sea_query::{Expr, ExprTrait},
+};
 use uuid::Uuid;
 
 #[async_trait::async_trait]
@@ -15,13 +20,31 @@ pub trait NoticeRepository: Send + Sync + 'static {
 
 #[derive(Debug, Clone)]
 pub struct NoticeRepositoryImpl {
-    pool: MySqlPool,
+    db: DatabaseConnection,
 }
 
 impl NoticeRepositoryImpl {
-    pub fn new(pool: MySqlPool) -> Self {
-        NoticeRepositoryImpl { pool }
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
     }
+}
+
+#[derive(FromQueryResult)]
+struct NoticeListRow {
+    id: Uuid,
+    slug: String,
+    title: String,
+    published_at: chrono::NaiveDateTime,
+}
+
+fn published_notices() -> sea_orm::Select<notice::Entity> {
+    notice::Entity::find().filter(
+        Expr::col((notice::Entity, notice::Column::PublishedAt)).lte(Expr::current_timestamp()),
+    )
+}
+
+fn listed_notices() -> sea_orm::Select<notice::Entity> {
+    published_notices().filter(notice::Column::HideFromList.eq(false))
 }
 
 #[async_trait::async_trait]
@@ -32,64 +55,51 @@ impl NoticeRepository for NoticeRepositoryImpl {
         limit: u32,
     ) -> anyhow::Result<Vec<NoticeListItem>> {
         let offset = page * limit;
-        let notices = query_as!(
-            NoticeListItem,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                slug,
-                title,
-                published_at
-            FROM notices
-            WHERE published_at <= NOW() AND hide_from_list = FALSE
-            ORDER BY published_at DESC
-            LIMIT ? OFFSET ?
-            "#,
-            limit,
-            offset
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let notices = listed_notices()
+            .select_only()
+            .columns([
+                notice::Column::Id,
+                notice::Column::Slug,
+                notice::Column::Title,
+                notice::Column::PublishedAt,
+            ])
+            .order_by_desc(notice::Column::PublishedAt)
+            .limit(u64::from(limit))
+            .offset(u64::from(offset))
+            .into_model::<NoticeListRow>()
+            .all(&self.db)
+            .await?;
 
-        Ok(notices)
+        Ok(notices
+            .into_iter()
+            .map(|row| NoticeListItem {
+                id: row.id,
+                slug: row.slug,
+                title: row.title,
+                published_at: row.published_at,
+            })
+            .collect())
     }
 
     async fn get_notice_by_slug(&self, slug: &str) -> anyhow::Result<Option<Notice>> {
-        let notice = query_as!(
-            Notice,
-            r#"
-            SELECT
-                id AS "id: Uuid",
-                slug,
-                title,
-                content,
-                created_at,
-                updated_at,
-                published_at,
-                author_email,
-                hide_from_list AS "hide_from_list: bool"
-            FROM notices
-            WHERE slug = ? AND published_at <= NOW()
-            "#,
-            slug
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(notice)
+        Ok(published_notices()
+            .filter(notice::Column::Slug.eq(slug))
+            .one(&self.db)
+            .await?
+            .map(|row| Notice {
+                id: row.id,
+                slug: row.slug,
+                title: row.title,
+                content: row.content,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                published_at: row.published_at,
+                author_email: row.author_email,
+                hide_from_list: row.hide_from_list,
+            }))
     }
 
     async fn count_notices(&self) -> anyhow::Result<i64> {
-        let count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as count
-            FROM notices
-            WHERE published_at <= NOW() AND hide_from_list = FALSE
-            "#
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(count)
+        Ok(i64::try_from(listed_notices().count(&self.db).await?)?)
     }
 }
