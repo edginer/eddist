@@ -8,6 +8,111 @@ use http::{HeaderName, HeaderValue};
 use redis::AsyncCommands;
 
 #[tokio::test]
+async fn test_core_dat_abone_and_1001_bytes_match_database_and_cache() {
+    use eddist_core::domain::{res::ResView, sjis_str::SJisStr};
+    let ctx = TestContext::new().await;
+    let board = create_test_board(&ctx.pool, "coredat", "テスト板").await;
+    let (token, _) = create_test_authed_token(&ctx.pool, "127.0.0.1", "coredat").await;
+    let number = 1_577_836_800;
+    let title = "日本語のスレッド";
+    let thread = create_test_thread(&ctx.pool, board, number, title, token).await;
+    let at = chrono::NaiveDate::from_ymd_opt(2020, 1, 2)
+        .unwrap()
+        .and_hms_milli_opt(3, 4, 5, 999)
+        .unwrap()
+        .and_utc();
+    let mut chunks = Vec::new();
+    for (order, abone, keep_id) in [(1, false, false), (2, true, true), (3, true, false)] {
+        let body = format!("投稿{order}<br>本文");
+        let id = create_test_response(&ctx.pool, board, thread, token, order, &body).await;
+        sqlx::query(
+            "UPDATE responses SET created_at = ?, is_abone = ?, is_abone_keep_id = ? WHERE id = ?",
+        )
+        .bind(at)
+        .bind(abone)
+        .bind(keep_id)
+        .bind(id)
+        .execute(&ctx.pool)
+        .await
+        .unwrap();
+        chunks.push(
+            ResView {
+                author_name: "名無しさん".into(),
+                mail: "".into(),
+                body,
+                created_at: at,
+                author_id: "test-id".into(),
+                is_abone: abone,
+                is_abone_keep_id: keep_id,
+            }
+            .get_sjis_bytes("名無しさん", (order == 1).then_some(title))
+            .get_inner(),
+        );
+    }
+    let mut batch = sqlx::QueryBuilder::new(
+        "INSERT INTO responses (id, author_name, mail, body, created_at, author_id, ip_addr, authed_token_id, board_id, thread_id, res_order, client_info) ",
+    );
+    batch.push_values(4..=1000, |mut row, order| {
+        row.push_bind(uuid::Uuid::now_v7()).push_bind("名無しさん").push_bind("").push_bind("続き")
+            .push_bind(at).push_bind("test-id").push_bind("127.0.0.1").push_bind(token)
+            .push_bind(board).push_bind(thread).push_bind(order)
+            .push_bind(serde_json::json!({"user_agent":"Test UA","ip_addr":"127.0.0.1","asn_num":0,"tinker":null}));
+    });
+    batch.build().execute(&ctx.pool).await.unwrap();
+    for _ in 4..=1000 {
+        chunks.push(
+            ResView {
+                author_name: "名無しさん".into(),
+                mail: "".into(),
+                body: "続き".into(),
+                created_at: at,
+                author_id: "test-id".into(),
+                is_abone: false,
+                is_abone_keep_id: false,
+            }
+            .get_sjis_bytes("名無しさん", None)
+            .get_inner(),
+        );
+    }
+    let mut expected: Vec<u8> = chunks.iter().flatten().copied().collect();
+    sqlx::query("UPDATE threads SET active = FALSE, response_count = 1000, last_modified_at = ? WHERE id = ?")
+        .bind(at).bind(thread).execute(&ctx.pool).await.unwrap();
+    sqlx::query("UPDATE boards_info SET enable_1001_message = TRUE, custom_1001_message = '完了しました<br>次のスレッドへ' WHERE id = ?")
+        .bind(board).execute(&ctx.pool).await.unwrap();
+    expected.extend(
+        SJisStr::from("1001<><>Over 1000 Thread<>完了しました<br>次のスレッドへ<>\n").get_inner(),
+    );
+    let key = thread_cache_key("coredat", number as u64);
+    ctx.redis_conn.clone().del::<_, ()>(&key).await.unwrap();
+    let first = ctx.server.get(&format!("/coredat/dat/{number}.dat")).await;
+    assert_eq!(first.status_code(), 200);
+    assert_eq!(first.as_bytes().as_ref(), expected);
+    // The DB read does not populate Redis. Seed the same 1000 stored chunks
+    // explicitly so the second request exercises the cache's 1001 path.
+    ctx.redis_conn
+        .clone()
+        .rpush::<_, _, usize>(&key, &chunks)
+        .await
+        .unwrap();
+    assert_eq!(
+        ctx.redis_conn.clone().llen::<_, usize>(&key).await.unwrap(),
+        1000
+    );
+    // Distinguish a real cache hit from a second, identical DB read. The 1001
+    // metadata remains available, but response bytes now deliberately differ.
+    sqlx::query(
+        "UPDATE responses SET body = 'DB-only marker' WHERE thread_id = ? AND res_order = 1",
+    )
+    .bind(thread)
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+    let cached = ctx.server.get(&format!("/coredat/dat/{number}.dat")).await;
+    assert_eq!(cached.status_code(), 200);
+    assert_eq!(cached.as_bytes().as_ref(), expected);
+}
+
+#[tokio::test]
 async fn test_auth_code_missing_or_empty_is_bad_request() {
     let ctx = TestContext::new().await;
     for form in [

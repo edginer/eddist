@@ -31,6 +31,12 @@ use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners:
 use testcontainers_modules::mysql::Mysql;
 use uuid::Uuid;
 
+#[path = "support/core_read.rs"]
+mod core_read;
+
+#[path = "support/repository_benchmark.rs"]
+mod repository_benchmark;
+
 struct TestDatabase {
     pool: MySqlPool,
     _container: ContainerAsync<Mysql>,
