@@ -172,7 +172,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     let server_settings_repo = ServerSettingsRepositoryImpl::new(db.clone());
     let captcha_config_repo = CaptchaConfigRepositoryImpl::new(db.clone());
     let user_restriction_repo = UserRestrictionRepositoryImpl::new(db.clone());
-    let stats_repo = StatsRepositoryImpl::new(pool.clone());
+    let stats_repo = StatsRepositoryImpl::new(db.clone());
     let idp_repo = IdpRepositoryImpl::new(db.clone());
 
     let (server_settings, captcha_configs, user_restrictions) = tokio::try_join!(
