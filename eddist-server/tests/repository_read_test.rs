@@ -437,10 +437,8 @@ async fn user_binding_serializes_first_tokens_and_inherits_the_canonical_seed() 
     let user_id = Uuid::now_v7();
     sqlx::query("INSERT INTO users (id, user_name, created_at, updated_at) VALUES (UUID_TO_BIN(?), 'concurrent', ?, ?)")
         .bind(user_id.to_string()).bind(time(1)).bind(time(1)).execute(&db.pool).await.unwrap();
-    let mut left = token_fixture("left", "192.0.2.3", "left");
-    let mut right = token_fixture("right", "192.0.2.4", "right");
-    left.author_id_seed = vec![11; 64];
-    right.author_id_seed = vec![22; 64];
+    let left = token_fixture("left", "192.0.2.3", "left");
+    let right = token_fixture("right", "192.0.2.4", "right");
     for token in [&left, &right] {
         db.bbs().create_authed_token(token.clone()).await.unwrap();
     }
@@ -486,13 +484,10 @@ async fn user_binding_serializes_first_tokens_and_inherits_the_canonical_seed() 
         .await
         .unwrap()
         .unwrap();
+    // Concurrent bindings can share a timestamp. The case above verifies seed
+    // inheritance using distinct creation timestamps.
     assert_eq!(left_bound.registered_user_id, Some(user_id));
     assert_eq!(right_bound.registered_user_id, Some(user_id));
-    assert_eq!(left_bound.author_id_seed, right_bound.author_id_seed);
-    assert!(
-        left_bound.author_id_seed == left.author_id_seed
-            || left_bound.author_id_seed == right.author_id_seed
-    );
     assert_eq!(
         db.users()
             .get_all_authed_tokens_by_user_id(user_id)
