@@ -25,8 +25,10 @@ pub struct BbsRepositoryImpl {
 }
 
 impl BbsRepositoryImpl {
-    pub fn new(pool: MySqlPool, db: DatabaseConnection) -> BbsRepositoryImpl {
-        BbsRepositoryImpl { pool, db }
+    pub fn new(db: DatabaseConnection) -> Self {
+        // The remaining SQLx queries use a handle to the SeaORM-owned pool.
+        let pool = db.get_mysql_connection_pool().clone();
+        Self { pool, db }
     }
 }
 
@@ -48,7 +50,7 @@ mod tests {
             .connect_lazy("mysql://localhost/test")
             .unwrap();
         let db = SqlxMySqlConnector::from_sqlx_mysql_pool(pool.clone());
-        let repo = BbsRepositoryImpl::new(pool.clone(), db);
+        let repo = BbsRepositoryImpl::new(db);
         pool.close().await;
         assert!(repo.pool.is_closed());
         assert!(repo.db.get_mysql_connection_pool().is_closed());

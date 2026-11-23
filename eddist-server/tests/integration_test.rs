@@ -1,8 +1,7 @@
 mod common;
 
 use axum::body::Bytes;
-use common::TestContext;
-use eddist::test_helpers::*;
+use common::{TestContext, fixtures::*};
 use eddist_core::redis_keys::thread_cache_key;
 use http::{HeaderName, HeaderValue};
 use redis::AsyncCommands;
