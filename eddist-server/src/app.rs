@@ -367,14 +367,33 @@ async fn get_api_boards(State(state): State<AppState>) -> impl IntoResponse {
     resp
 }
 
-async fn get_api_client_config(State(state): State<AppState>) -> impl IntoResponse {
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum AppFeature {
+    UserRegistration,
+    SafeMode,
+}
+
+async fn get_app_metadata(State(state): State<AppState>) -> impl IntoResponse {
     let settings = state.ctx.server_settings.snapshot();
-    let enable_user_registration = settings.is_enabled(ServerSettingKey::EnableIdpLinking);
-    let enable_safe_mode = settings.is_enabled(ServerSettingKey::EnableSafeMode);
+    let enabled_features = [
+        settings
+            .is_enabled(ServerSettingKey::EnableIdpLinking)
+            .then_some(AppFeature::UserRegistration),
+        settings
+            .is_enabled(ServerSettingKey::EnableSafeMode)
+            .then_some(AppFeature::SafeMode),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 
     let mut resp = Json(serde_json::json!({
-        "enable_user_registration": enable_user_registration,
-        "enable_safe_mode": enable_safe_mode,
+        "schema_version": 1,
+        "domain": state.ctx.config.base_url_host,
+        "bbs_name": state.ctx.config.bbs_name,
+        "enabled_features": enabled_features,
+        "version": option_env!("EDDIST_VERSION").unwrap_or("dev"),
     }))
     .into_response();
     resp.headers_mut()
@@ -452,7 +471,10 @@ fn create_app(app_state: AppState) -> Router {
         .route("/api/notices/latest", get(get_latest_notices))
         .route("/api/notices", get(get_notices_paginated))
         .route("/api/notices/{slug}", get(get_notice_by_slug))
-        .route("/api/client-config", get(get_api_client_config))
+        .route(
+            "/.well-known/appspecific/cc.eddibb.eddist.json",
+            get(get_app_metadata),
+        )
         .route("/api/stats", get(get_stats))
         .route(
             "/api/{boardKey}/unsafe-thread-ids",

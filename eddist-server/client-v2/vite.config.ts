@@ -25,6 +25,10 @@ export default defineConfig(
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
+        "/.well-known/appspecific/cc.eddibb.eddist.json": {
+          target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
+          changeOrigin: true,
+        },
         "^/.+/subject.txt": {
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,

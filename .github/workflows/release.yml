@@ -44,6 +44,8 @@ jobs:
       - name: Build eddist-admin-client
         run: pnpm -F eddist-admin-client build
       - name: Build
+        env:
+          EDDIST_VERSION: ${{ github.ref_name }}
         run: cargo build --release
       - name: rm .dockerignore
         run: rm .dockerignore
