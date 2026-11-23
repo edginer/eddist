@@ -2,8 +2,8 @@
 use chrono::{NaiveDate, NaiveDateTime, Timelike};
 use eddist::repositories::{
     bbs_repository::{
-        AuthedTokenRepository, BoardRepository, CreateThreadError, ResponseRepository,
-        ThreadRepository,
+        AuthedTokenRepository, BbsRepositoryImpl, BoardRepository, CreateThreadError,
+        ResponseRepository, ThreadRepository,
     },
     captcha_config_repository::{CaptchaConfigRepository, CaptchaConfigRepositoryImpl},
     idp_repository::{IdpRepository, IdpRepositoryImpl},
@@ -11,7 +11,7 @@ use eddist::repositories::{
     server_settings_repository::{ServerSettingsRepository, ServerSettingsRepositoryImpl},
     stats_repository::{StatsRepository, StatsRepositoryImpl},
     terms_repository::{TermsRepository, TermsRepositoryImpl},
-    user_repository::UserRepository,
+    user_repository::{UserRepository, UserRepositoryImpl},
     user_restriction_repository::{UserRestrictionRepository, UserRestrictionRepositoryImpl},
 };
 use eddist_core::{
@@ -27,7 +27,11 @@ use uuid::Uuid;
 
 #[path = "support/repository.rs"]
 mod repository_support;
+
 use repository_support::*;
+
+#[path = "repository/posting.rs"]
+mod posting;
 
 #[path = "repository/users.rs"]
 mod users;
@@ -56,14 +60,8 @@ mod restrictions;
 #[path = "repository/captcha.rs"]
 mod captcha;
 
-#[path = "repository/database_connection.rs"]
-mod database_connection;
-
-#[path = "repository/posting.rs"]
-mod posting;
-
 #[path = "repository/core_reads.rs"]
 mod core_reads;
 
-#[path = "support/repository_benchmark.rs"]
-mod repository_benchmark;
+#[path = "repository/database_connection.rs"]
+mod database_connection;

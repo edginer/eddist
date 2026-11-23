@@ -28,7 +28,6 @@ rand.workspace = true
 redis = { workspace = true, features = ["connection-manager"] }
 serde.workspace = true
 serde_json.workspace = true
-sqlx = { workspace = true, features = ["migrate"] }
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true
@@ -65,6 +64,7 @@ toml.workspace = true
 mimalloc = { workspace = true }
 
 [dev-dependencies]
+sqlx = { workspace = true, features = ["migrate"] }
 eddist-core = { workspace = true, features = ["test-utils"] }
 testcontainers.workspace = true
 testcontainers-modules.workspace = true
