@@ -107,10 +107,6 @@ impl<U: UserRepository + Clone, B: BbsRepository + Clone>
 }
 
 impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackService<U, B> {
-    async fn bind_token(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
-        bind_token(&self.user_repo, user_id, token_id).await
-    }
-
     async fn register_user_with_idp(
         &self,
         user_reg_state: UserRegState,
@@ -192,7 +188,9 @@ impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackSe
             && token.validity
             && token.registered_user_id.is_none()
         {
-            self.bind_token(user_id, token.id).await?;
+            self.user_repo
+                .bind_user_authed_token(user_id, token.id)
+                .await?;
         }
 
         let user_sid = self.sessions.create(user_id).await?;
@@ -257,7 +255,9 @@ impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackSe
                     && token.validity
                     && token.registered_user_id.is_none()
                 {
-                    self.bind_token(user.id, token.id).await?;
+                    self.user_repo
+                        .bind_user_authed_token(user.id, token.id)
+                        .await?;
                     Some(browser_token)
                 } else {
                     // No valid unbound browser token — create and activate a new one.
@@ -281,7 +281,9 @@ impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackSe
                     self.bbs_repo
                         .activate_authed_status(&new_token.token, &user_agent, created_at, None)
                         .await?;
-                    self.bind_token(user.id, new_token.id).await?;
+                    self.user_repo
+                        .bind_user_authed_token(user.id, new_token.id)
+                        .await?;
                     Some(new_token.token)
                 };
 
@@ -302,15 +304,8 @@ async fn bind_existing_user_token<U: UserRepository>(
             "user is disabled".to_string(),
         ));
     }
-    Ok(bind_token(repo, user.id, token_id).await?)
-}
-
-async fn bind_token<U: UserRepository>(
-    repo: &U,
-    user_id: Uuid,
-    token_id: Uuid,
-) -> anyhow::Result<()> {
-    repo.bind_user_authed_token(user_id, token_id).await
+    repo.bind_user_authed_token(user.id, token_id).await?;
+    Ok(())
 }
 
 pub struct UserAuthzIdpCallbackServiceInput {
