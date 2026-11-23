@@ -3,7 +3,9 @@ use eddist_core::domain::{
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
 };
-use sqlx::{query, query_as, types::Json};
+use eddist_entity::{db_time, thread};
+use sea_orm::{ActiveValue::Set, DbErr, EntityTrait, IsolationLevel, SqlErr, TransactionTrait};
+use sqlx::{query_as, types::Json};
 use uuid::Uuid;
 
 use crate::domain::{authed_token::AuthedToken, thread::Thread};
@@ -49,8 +51,8 @@ pub enum CreateThreadError {
     Other(#[from] anyhow::Error),
 }
 
-impl From<sqlx::Error> for CreateThreadError {
-    fn from(e: sqlx::Error) -> Self {
+impl From<DbErr> for CreateThreadError {
+    fn from(e: DbErr) -> Self {
         Self::Other(e.into())
     }
 }
@@ -297,83 +299,53 @@ impl ThreadRepository for BbsRepositoryImpl {
     }
 
     async fn create_thread(&self, thread: CreatingThread) -> Result<(), CreateThreadError> {
-        let metadent = Option::<&str>::from(thread.metadent).unwrap_or("");
-        let (response_id, thread_id, board_id) =
-            (thread.response_id, thread.thread_id, thread.board_id);
-        let client_info_json =
-            serde_json::to_string(&thread.client_info).map_err(anyhow::Error::from)?;
+        let created_at = db_time::truncate_to_millis(thread.created_at.naive_utc());
+        let model = thread::ActiveModel {
+            id: Set(thread.thread_id),
+            board_id: Set(thread.board_id),
+            thread_number: Set(thread.unix_time as i64),
+            last_modified_at: Set(created_at),
+            sage_last_modified_at: Set(created_at),
+            title: Set(thread.title),
+            authed_token_id: Set(thread.authed_token_id),
+            metadent: Set(Option::<&str>::from(thread.metadent).unwrap_or("").into()),
+            response_count: Set(1),
+            ..Default::default()
+        };
+        let first_response =
+            super::response::response_model(eddist_core::domain::pubsub_repository::CreatingRes {
+                id: thread.response_id,
+                created_at: thread.created_at,
+                body: thread.body,
+                name: thread.name,
+                mail: thread.mail,
+                author_ch5id: thread.author_ch5id,
+                authed_token_id: thread.authed_token_id,
+                ip_addr: thread.ip_addr,
+                thread_id: thread.thread_id,
+                board_id: thread.board_id,
+                client_info: thread.client_info,
+                res_order: 1,
+                is_sage: false,
+                moderation_result: thread.moderation_result,
+            })?;
 
-        let th_query = query!(
-            r"INSERT INTO threads
-                (
-                    id,
-                    board_id,
-                    thread_number,
-                    last_modified_at,
-                    sage_last_modified_at,
-                    title,
-                    authed_token_id,
-                    metadent,
-                    response_count
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
-            thread_id,
-            board_id,
-            thread.unix_time as i64,
-            thread.created_at,
-            thread.created_at,
-            thread.title,
-            thread.authed_token_id,
-            metadent
-        );
-
-        let res_query = query!(
-            r"
-            INSERT INTO responses
-                (
-                    id,
-                    author_name,
-                    mail,
-                    author_id,
-                    body,
-                    thread_id,
-                    board_id,
-                    ip_addr,
-                    authed_token_id,
-                    created_at,
-                    client_info,
-                    res_order
-                )
-                VALUES
-                (
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?,
-                    ?, 1
-                )",
-            response_id,
-            thread.name,
-            thread.mail,
-            thread.author_ch5id,
-            thread.body,
-            thread_id,
-            board_id,
-            thread.ip_addr,
-            thread.authed_token_id,
-            thread.created_at,
-            client_info_json,
-        );
-
-        let mut tx = self.pool.begin().await?;
-        th_query.execute(&mut *tx).await.map_err(|e| {
-            if e.as_database_error()
-                .is_some_and(|de| de.is_unique_violation())
-            {
-                CreateThreadError::ThreadNumberConflict
-            } else {
-                e.into()
-            }
-        })?;
-        res_query.execute(&mut *tx).await?;
+        let tx = self
+            .db
+            .begin_with_config(Some(IsolationLevel::ReadCommitted), None)
+            .await?;
+        thread::Entity::insert(model)
+            .exec_without_returning(&tx)
+            .await
+            .map_err(|e| match e.sql_err() {
+                Some(SqlErr::UniqueConstraintViolation(_)) => {
+                    CreateThreadError::ThreadNumberConflict
+                }
+                _ => e.into(),
+            })?;
+        eddist_entity::response::Entity::insert(first_response)
+            .exec_without_returning(&tx)
+            .await?;
         tx.commit().await?;
 
         Ok(())

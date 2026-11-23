@@ -1,7 +1,12 @@
 use chrono::{NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::pubsub_repository::CreatingRes;
 use eddist_core::domain::res::ResView;
-use sqlx::query;
+use eddist_entity::{db_time, response, thread};
+use sea_orm::{
+    ActiveValue::Set,
+    ConnectionTrait, EntityTrait, IsolationLevel, TransactionTrait,
+    sea_query::{Expr, ExprTrait, Query, UpdateStatement},
+};
 use uuid::Uuid;
 
 use super::BbsRepositoryImpl;
@@ -47,77 +52,71 @@ impl ResponseRepository for BbsRepositoryImpl {
     }
 
     async fn create_response(&self, res: CreatingRes) -> anyhow::Result<()> {
-        let (res_id, th_id, board_id) = (res.id, res.thread_id, res.board_id);
-        let client_info_json = serde_json::to_string(&res.client_info)?;
-
-        let th_query = query!(
-            "UPDATE threads SET
-                last_modified_at = ?,
-                response_count = response_count + 1,
-                sage_last_modified_at = (
-                    CASE
-                        WHEN ? THEN sage_last_modified_at
-                        ELSE ?
-                    END
-                ),
-                active = (
-                    CASE
-                        WHEN response_count >= 1000 THEN 0
-                        ELSE 1
-                    END
-                )
-            WHERE id = ?
-        ",
-            res.created_at,
-            res.is_sage,
-            res.created_at,
-            th_id,
-        );
-
-        let res_query = query!(
-            r"
-            INSERT INTO responses
-                (
-                    id,
-                    author_name,
-                    mail,
-                    author_id,
-                    body,
-                    thread_id,
-                    board_id,
-                    ip_addr,
-                    authed_token_id,
-                    created_at,
-                    client_info,
-                    res_order
-                )
-                VALUES
-                (
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?,
-                    ?, ?
-                )",
-            res_id,
-            res.name,
-            res.mail,
-            res.author_ch5id,
-            res.body,
-            th_id,
-            board_id,
-            res.ip_addr,
-            res.authed_token_id,
-            res.created_at,
-            client_info_json,
-            res.res_order,
-        );
-
-        let mut tx = self.pool.begin().await?;
-        th_query.execute(&mut *tx).await?;
-        res_query.execute(&mut *tx).await?;
+        let update = thread_response_update(&res);
+        let model = response_model(res)?;
+        let tx = self
+            .db
+            .begin_with_config(Some(IsolationLevel::ReadCommitted), None)
+            .await?;
+        tx.execute(&update).await?;
+        response::Entity::insert(model)
+            .exec_without_returning(&tx)
+            .await?;
         tx.commit().await?;
 
         Ok(())
     }
+}
+
+// MySQL evaluates SET assignments from left to right. Calculate active from the
+// old count before incrementing it, so PostgreSQL's old-row evaluation agrees.
+fn thread_response_update(res: &CreatingRes) -> UpdateStatement {
+    use thread::Column;
+    let created_at = db_time::truncate_to_millis(res.created_at.naive_utc());
+    Query::update()
+        .table(thread::Entity)
+        .values([
+            (
+                Column::Active,
+                Expr::case(Expr::col(Column::ResponseCount).add(1).gte(1000), false)
+                    .finally(true)
+                    .into(),
+            ),
+            (
+                Column::ResponseCount,
+                Expr::col(Column::ResponseCount).add(1),
+            ),
+            (Column::LastModifiedAt, Expr::value(created_at)),
+            (
+                Column::SageLastModifiedAt,
+                Expr::case(
+                    Expr::val(res.is_sage),
+                    Expr::col(Column::SageLastModifiedAt),
+                )
+                .finally(created_at)
+                .into(),
+            ),
+        ])
+        .and_where(Expr::col(Column::Id).eq(res.thread_id))
+        .to_owned()
+}
+
+pub(super) fn response_model(res: CreatingRes) -> anyhow::Result<response::ActiveModel> {
+    Ok(response::ActiveModel {
+        id: Set(res.id),
+        author_name: Set(res.name),
+        mail: Set(res.mail),
+        body: Set(res.body),
+        created_at: Set(db_time::truncate_to_millis(res.created_at.naive_utc())),
+        author_id: Set(res.author_ch5id),
+        ip_addr: Set(res.ip_addr),
+        authed_token_id: Set(res.authed_token_id),
+        board_id: Set(res.board_id),
+        thread_id: Set(res.thread_id),
+        client_info: Set(serde_json::to_value(res.client_info)?),
+        res_order: Set(res.res_order),
+        ..Default::default()
+    })
 }
 
 #[derive(Debug)]
@@ -129,4 +128,46 @@ struct SelectionRes {
     author_id: String,
     is_abone: bool,
     is_abone_keep_id: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::sea_query::{MysqlQueryBuilder, PostgresQueryBuilder};
+
+    #[test]
+    fn response_update_uses_old_count_before_incrementing_in_both_dialects() {
+        let res = CreatingRes {
+            id: Uuid::nil(),
+            created_at: Utc::now(),
+            body: String::new(),
+            name: String::new(),
+            mail: String::new(),
+            author_ch5id: String::new(),
+            authed_token_id: Uuid::nil(),
+            ip_addr: String::new(),
+            thread_id: Uuid::nil(),
+            board_id: Uuid::nil(),
+            client_info: Default::default(),
+            res_order: 1000,
+            is_sage: true,
+            moderation_result: None,
+        };
+        let update = thread_response_update(&res);
+        for sql in [
+            update.to_string(MysqlQueryBuilder),
+            update.to_string(PostgresQueryBuilder),
+        ] {
+            let normalized: String = sql
+                .chars()
+                .filter(|ch| !matches!(ch, '`' | '"' | ' ' | '(' | ')'))
+                .collect();
+            assert!(normalized.contains("SETactive=CASEWHENresponse_count+1>=1000THENFALSEELSETRUEEND,response_count=response_count+1,"), "{sql}");
+            assert!(
+                normalized
+                    .contains("sage_last_modified_at=CASEWHENTRUETHENsage_last_modified_atELSE"),
+                "{sql}"
+            );
+        }
+    }
 }
