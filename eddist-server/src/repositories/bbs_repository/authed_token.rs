@@ -1,6 +1,10 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use eddist_core::domain::ip_addr::{IpAddr, ReducedIpAddr};
-use sqlx::query;
+use eddist_entity::{authed_token, db_time::truncate_to_millis};
+use sea_orm::{
+    ActiveValue::Set, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect,
+    sea_query::Expr,
+};
 use uuid::Uuid;
 
 use crate::domain::authed_token::AuthedToken;
@@ -35,73 +39,49 @@ pub trait AuthedTokenRepository: Send + Sync + 'static {
     ) -> anyhow::Result<()>;
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()>;
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()>;
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>>;
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()>;
+}
+
+fn token_select() -> sea_orm::Select<authed_token::Entity> {
+    use authed_token::Column;
+    authed_token::Entity::find().select_only().columns([
+        Column::Id,
+        Column::Token,
+        Column::OriginIp,
+        Column::ReducedOriginIp,
+        Column::AsnNum,
+        Column::WritingUa,
+        Column::AuthedUa,
+        Column::AuthCode,
+        Column::CreatedAt,
+        Column::AuthedAt,
+        Column::Validity,
+        Column::LastWroteAt,
+        Column::AuthorIdSeed,
+        Column::RequireUserRegistration,
+        Column::RegisteredUserId,
+        Column::RequireReauth,
+    ])
 }
 
 #[async_trait::async_trait]
 impl AuthedTokenRepository for BbsRepositoryImpl {
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as!(
-            SelectionAuthedToken,
-            r#"SELECT
-                id AS "id: Uuid",
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                auth_code,
-                created_at,
-                authed_at,
-                validity AS "validity: bool",
-                last_wrote_at,
-                author_id_seed,
-                require_user_registration AS "require_user_registration: bool",
-                registered_user_id AS "registered_user_id?: Uuid",
-                require_reauth AS "require_reauth: bool"
-            FROM authed_tokens WHERE token = ?"#,
-            token
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(SelectionAuthedToken::into_authed_token))
+        Ok(token_select()
+            .filter(authed_token::Column::Token.eq(token))
+            .into_model::<SelectionAuthedToken>()
+            .one(&self.db)
+            .await?
+            .map(SelectionAuthedToken::into_authed_token))
     }
 
     async fn get_authed_token_by_id(&self, id: Uuid) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as!(
-            SelectionAuthedToken,
-            r#"SELECT
-                id AS "id: Uuid",
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                auth_code,
-                created_at,
-                authed_at,
-                validity AS "validity: bool",
-                last_wrote_at,
-                author_id_seed,
-                require_user_registration AS "require_user_registration: bool",
-                registered_user_id AS "registered_user_id?: Uuid",
-                require_reauth AS "require_reauth: bool"
-            FROM authed_tokens WHERE id = ?"#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(SelectionAuthedToken::into_authed_token))
+        Ok(token_select()
+            .filter(authed_token::Column::Id.eq(id))
+            .into_model::<SelectionAuthedToken>()
+            .one(&self.db)
+            .await?
+            .map(SelectionAuthedToken::into_authed_token))
     }
 
     async fn get_authed_token_by_origin_ip_and_auth_code(
@@ -109,105 +89,49 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         reduced_ip: &str,
         auth_code: &str,
     ) -> anyhow::Result<Option<AuthedToken>> {
-        let row = sqlx::query_as!(
-            SelectionAuthedToken,
-            r#"SELECT
-                id AS "id: Uuid",
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                auth_code,
-                created_at,
-                authed_at,
-                validity AS "validity: bool",
-                last_wrote_at,
-                author_id_seed,
-                require_user_registration AS "require_user_registration: bool",
-                registered_user_id AS "registered_user_id?: Uuid",
-                require_reauth AS "require_reauth: bool"
-            FROM authed_tokens WHERE reduced_origin_ip = ? AND auth_code = ?"#,
-            reduced_ip,
-            auth_code
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(SelectionAuthedToken::into_authed_token))
+        Ok(token_select()
+            .filter(authed_token::Column::ReducedOriginIp.eq(reduced_ip))
+            .filter(authed_token::Column::AuthCode.eq(auth_code))
+            .into_model::<SelectionAuthedToken>()
+            .one(&self.db)
+            .await?
+            .map(SelectionAuthedToken::into_authed_token))
     }
 
     async fn get_unauthed_authed_token_by_auth_code(
         &self,
         auth_code: &str,
     ) -> anyhow::Result<Vec<AuthedToken>> {
-        let rows = sqlx::query_as!(
-            SelectionAuthedToken,
-            r#"SELECT
-                id AS "id: Uuid",
-                token,
-                origin_ip,
-                reduced_origin_ip,
-                asn_num,
-                writing_ua,
-                authed_ua,
-                auth_code,
-                created_at,
-                authed_at,
-                validity AS "validity: bool",
-                last_wrote_at,
-                author_id_seed,
-                require_user_registration AS "require_user_registration: bool",
-                registered_user_id AS "registered_user_id?: Uuid",
-                require_reauth AS "require_reauth: bool"
-            FROM authed_tokens WHERE auth_code = ? AND validity = false"#,
-            auth_code
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
+        Ok(token_select()
+            .filter(authed_token::Column::AuthCode.eq(auth_code))
+            .filter(authed_token::Column::Validity.eq(false))
+            .into_model::<SelectionAuthedToken>()
+            .all(&self.db)
+            .await?
             .into_iter()
             .map(SelectionAuthedToken::into_authed_token)
             .collect())
     }
 
-    async fn create_authed_token(&self, authed_token: CreatingAuthedToken) -> anyhow::Result<()> {
-        let ip_addr = authed_token.origin_ip.to_string();
-        let reduced_ip = ReducedIpAddr::from(authed_token.origin_ip).to_string();
-
-        query!(
-            "INSERT INTO authed_tokens
-                (
-                    id,
-                    token,
-                    origin_ip,
-                    reduced_origin_ip,
-                    asn_num,
-                    writing_ua,
-                    auth_code,
-                    created_at,
-                    validity,
-                    author_id_seed,
-                    require_user_registration
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            authed_token.id,
-            authed_token.token,
-            ip_addr,
-            reduced_ip,
-            authed_token.asn_num,
-            authed_token.writing_ua,
-            authed_token.auth_code,
-            authed_token.created_at,
-            false,
-            authed_token.author_id_seed,
-            authed_token.require_user_registration,
-        )
-        .execute(&self.pool)
+    async fn create_authed_token(&self, token: CreatingAuthedToken) -> anyhow::Result<()> {
+        let ip_addr = token.origin_ip.to_string();
+        let reduced_ip = ReducedIpAddr::from(token.origin_ip).to_string();
+        authed_token::Entity::insert(authed_token::ActiveModel {
+            id: Set(token.id),
+            token: Set(token.token),
+            origin_ip: Set(ip_addr),
+            reduced_origin_ip: Set(reduced_ip),
+            asn_num: Set(token.asn_num),
+            writing_ua: Set(token.writing_ua),
+            auth_code: Set(token.auth_code),
+            created_at: Set(truncate_to_millis(token.created_at.naive_utc())),
+            validity: Set(false),
+            author_id_seed: Set(token.author_id_seed),
+            require_user_registration: Set(token.require_user_registration),
+            ..Default::default()
+        })
+        .exec_without_returning(&self.db)
         .await?;
-
         Ok(())
     }
 
@@ -218,19 +142,18 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         authed_time: DateTime<Utc>,
         additional_info: Option<serde_json::Value>,
     ) -> anyhow::Result<()> {
-        let additional_info_json = additional_info.and_then(|v| serde_json::to_string(&v).ok());
-
-        query!(
-            "UPDATE authed_tokens SET validity = ?, authed_ua = ?, authed_at = ?, additional_info = ? WHERE token = ?",
-            true,
-            authed_ua,
-            authed_time,
-            additional_info_json,
-            token,
-        )
-        .execute(&self.pool)
-        .await?;
-
+        use authed_token::Column;
+        authed_token::Entity::update_many()
+            .col_expr(Column::Validity, Expr::value(true))
+            .col_expr(Column::AuthedUa, Expr::value(authed_ua))
+            .col_expr(
+                Column::AuthedAt,
+                Expr::value(truncate_to_millis(authed_time.naive_utc())),
+            )
+            .col_expr(Column::AdditionalInfo, Expr::value(additional_info))
+            .filter(Column::Token.eq(token))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
@@ -239,62 +162,40 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         token_id: Uuid,
         last_wrote: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        query!(
-            "UPDATE authed_tokens SET last_wrote_at = ? WHERE id = ?",
-            last_wrote,
-            token_id,
-        )
-        .execute(&self.pool)
-        .await?;
-
+        authed_token::Entity::update_many()
+            .col_expr(
+                authed_token::Column::LastWroteAt,
+                Expr::value(truncate_to_millis(last_wrote.naive_utc())),
+            )
+            .filter(authed_token::Column::Id.eq(token_id))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     async fn revoke_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        query!(
-            "UPDATE authed_tokens SET validity = ? WHERE token = ?",
-            false,
-            token
-        )
-        .execute(&self.pool)
-        .await?;
-
+        authed_token::Entity::update_many()
+            .col_expr(authed_token::Column::Validity, Expr::value(false))
+            .filter(authed_token::Column::Token.eq(token))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     async fn delete_authed_token(&self, token: &str) -> anyhow::Result<()> {
-        query!("DELETE FROM authed_tokens WHERE token = ?", token)
-            .execute(&self.pool)
+        authed_token::Entity::delete_many()
+            .filter(authed_token::Column::Token.eq(token))
+            .exec(&self.db)
             .await?;
-
         Ok(())
     }
 
-    async fn update_authed_token_id_seed<'a>(
-        &'a self,
-        token_id: Uuid,
-        author_id_seed: Vec<u8>,
-        mut tx: sqlx::Transaction<'a, sqlx::MySql>,
-    ) -> anyhow::Result<sqlx::Transaction<'a, sqlx::MySql>> {
-        query!(
-            "UPDATE authed_tokens SET author_id_seed = ? WHERE id = ?",
-            author_id_seed,
-            token_id,
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        Ok(tx)
-    }
-
     async fn clear_require_reauth(&self, id: Uuid) -> anyhow::Result<()> {
-        query!(
-            "UPDATE authed_tokens SET require_reauth = 0 WHERE id = ?",
-            id
-        )
-        .execute(&self.pool)
-        .await?;
-
+        authed_token::Entity::update_many()
+            .col_expr(authed_token::Column::RequireReauth, Expr::value(false))
+            .filter(authed_token::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 }
@@ -312,7 +213,7 @@ pub struct CreatingAuthedToken {
     pub require_user_registration: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromQueryResult)]
 struct SelectionAuthedToken {
     id: Uuid,
     token: String,
