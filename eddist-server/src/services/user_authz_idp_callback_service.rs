@@ -5,7 +5,6 @@ use md5::Digest;
 use openidconnect::{AuthorizationCode, Nonce, PkceCodeVerifier};
 use rand::{RngExt, distr::Alphanumeric};
 use sha2::Sha256;
-use sqlx::MySql;
 use uuid::Uuid;
 
 use crate::{
@@ -23,7 +22,6 @@ use crate::{
         user_repository::{CreatingUser, UserRepository},
     },
     stores::{oidc_state_store::OidcStateStore, user_session_store::UserSessionStore},
-    utils::TransactionRepository,
 };
 use eddist_core::utils::to_hex;
 
@@ -57,7 +55,7 @@ impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackSe
 }
 
 #[async_trait::async_trait]
-impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository + Clone>
+impl<U: UserRepository + Clone, B: BbsRepository + Clone>
     AppService<
         UserAuthzIdpCallbackServiceInput,
         UserAuthzIdpCallbackServiceOutput,
@@ -108,13 +106,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
     }
 }
 
-impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository + Clone>
-    UserAuthzIdpCallbackService<U, B>
-{
-    async fn bind_token(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
-        bind_token(&self.user_repo, user_id, token_id).await
-    }
-
+impl<U: UserRepository + Clone, B: BbsRepository + Clone> UserAuthzIdpCallbackService<U, B> {
     async fn register_user_with_idp(
         &self,
         user_reg_state: UserRegState,
@@ -174,25 +166,17 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
         } else {
             let user_id = Uuid::now_v7();
 
-            let tx = self.user_repo.begin().await?;
-            let tx = self
-                .user_repo
-                .create_user_with_idp(
+            self.user_repo
+                .register_user_and_bind_token(
                     CreatingUser {
                         user_id,
                         user_name: user_name_generator(),
                         idp_id: idp.id,
                         idp_sub: sub_hash,
                     },
-                    tx,
+                    authed_token_uuid,
                 )
                 .await?;
-
-            let tx = self
-                .user_repo
-                .bind_user_authed_token(user_id, authed_token_uuid, tx)
-                .await?;
-            tx.commit().await?;
 
             user_id
         };
@@ -204,7 +188,9 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
             && token.validity
             && token.registered_user_id.is_none()
         {
-            self.bind_token(user_id, token.id).await?;
+            self.user_repo
+                .bind_user_authed_token(user_id, token.id)
+                .await?;
         }
 
         let user_sid = self.sessions.create(user_id).await?;
@@ -269,7 +255,9 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
                     && token.validity
                     && token.registered_user_id.is_none()
                 {
-                    self.bind_token(user.id, token.id).await?;
+                    self.user_repo
+                        .bind_user_authed_token(user.id, token.id)
+                        .await?;
                     Some(browser_token)
                 } else {
                     // No valid unbound browser token — create and activate a new one.
@@ -293,7 +281,9 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
                     self.bbs_repo
                         .activate_authed_status(&new_token.token, &user_agent, created_at, None)
                         .await?;
-                    self.bind_token(user.id, new_token.id).await?;
+                    self.user_repo
+                        .bind_user_authed_token(user.id, new_token.id)
+                        .await?;
                     Some(new_token.token)
                 };
 
@@ -304,7 +294,7 @@ impl<U: UserRepository + TransactionRepository<MySql> + Clone, B: BbsRepository 
     }
 }
 
-async fn bind_existing_user_token<U: UserRepository + TransactionRepository<MySql>>(
+async fn bind_existing_user_token<U: UserRepository>(
     repo: &U,
     user: &User,
     token_id: Uuid,
@@ -314,17 +304,7 @@ async fn bind_existing_user_token<U: UserRepository + TransactionRepository<MySq
             "user is disabled".to_string(),
         ));
     }
-    Ok(bind_token(repo, user.id, token_id).await?)
-}
-
-async fn bind_token<U: UserRepository + TransactionRepository<MySql>>(
-    repo: &U,
-    user_id: Uuid,
-    token_id: Uuid,
-) -> anyhow::Result<()> {
-    let tx = repo.begin().await?;
-    let tx = repo.bind_user_authed_token(user_id, token_id, tx).await?;
-    tx.commit().await?;
+    repo.bind_user_authed_token(user.id, token_id).await?;
     Ok(())
 }
 
@@ -355,7 +335,7 @@ pub enum UserAuthzIdpCallbackError {
     Other(#[from] anyhow::Error),
 }
 
-impl_from_for_other!(UserAuthzIdpCallbackError: sqlx::Error, uuid::Error);
+impl_from_for_other!(UserAuthzIdpCallbackError: uuid::Error);
 
 pub struct UserAuthzIdpCallbackServiceOutput {
     pub user_sid: String,
@@ -554,11 +534,7 @@ mod probe_tests {
         use super::*;
         use crate::repositories::user_repository::UserRepositoryImpl;
 
-        let pool = sqlx::mysql::MySqlPoolOptions::new()
-            .connect_lazy("mysql://root@localhost/test")
-            .unwrap();
-        pool.close().await;
-        let repo = UserRepositoryImpl::new(pool);
+        let repo = UserRepositoryImpl::new(Default::default());
         let now = Utc::now().naive_utc();
         let user = User {
             id: Uuid::now_v7(),
@@ -571,7 +547,7 @@ mod probe_tests {
         let error = bind_existing_user_token(&repo, &user, Uuid::now_v7())
             .await
             .unwrap_err();
-        // Any attempt to begin a transaction would instead fail with PoolClosed.
+        // Any attempted DB operation would fail on the disconnected connection.
         assert!(matches!(error, UserAuthzIdpCallbackError::Rejected(_)));
     }
 
