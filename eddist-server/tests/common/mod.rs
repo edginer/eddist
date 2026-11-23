@@ -1,6 +1,9 @@
 use axum_test::TestServer;
-use eddist::test_helpers::decode_sjis;
-use sqlx::mysql::MySqlPoolOptions;
+
+mod app;
+pub mod fixtures;
+
+use fixtures::decode_sjis;
 use sqlx::{MySql, Pool};
 use std::time::Duration;
 use testcontainers::ImageExt;
@@ -40,23 +43,10 @@ impl TestContext {
 
         let database_url = format!("mysql://root@127.0.0.1:{mysql_port}/test");
 
-        let pool = MySqlPoolOptions::new()
-            .after_connect(|conn, _| {
-                use sqlx::Executor;
-                Box::pin(async move {
-                    conn.execute(
-                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
-                    )
-                    .await
-                    .unwrap();
-                    Ok(())
-                })
-            })
-            .max_connections(5)
-            .acquire_timeout(Duration::from_secs(10))
-            .connect(&database_url)
+        let db = eddist::database::connect_database(&database_url)
             .await
             .expect("Failed to connect to MySQL");
+        let pool = db.get_mysql_connection_pool().clone();
 
         sqlx::migrate!("../migrations")
             .run(&pool)
@@ -100,7 +90,7 @@ impl TestContext {
 
         println!("Redis is ready.");
 
-        let app = eddist::create_test_app(pool.clone(), redis_conn.clone())
+        let app = app::create_test_app(db, redis_conn.clone())
             .await
             .expect("Failed to build test app");
         let mut server = TestServer::new(app);

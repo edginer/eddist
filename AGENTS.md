@@ -138,9 +138,9 @@ USE_CLOUDFLARE_CDN=true    # Enables CF-Connecting-IP header
 - All UUIDs stored as `BINARY(16)` — always use `BIN_TO_UUID()` / `UUID_TO_BIN()` in SQLX queries
 
 ### Repository Pattern
-- Migrated server repositories take a shared SeaORM `DatabaseConnection`.
+- Server repositories share the SeaORM `DatabaseConnection` from `database::connect_database` (8 connections, a 5-second acquisition timeout).
 - User registration and token binding own their transactions inside `UserRepository`; application services do not pass database transaction types. Preserve `READ COMMITTED`, user-row locking, and canonical seed selection order.
-- The BBS repository temporarily holds the original SQLx pool alongside the adopted SeaORM connection while thread/response queries are migrated. Both handles must share one physical pool.
+- The BBS repository clones the SQLx handle from that connection for its remaining thread/response queries. The factory configures `READ COMMITTED` and `TIME_TRUNCATE_FRACTIONAL` on each MySQL session while those queries still rely on them.
 - `eddist-cron` is the exception: it uses raw structs instead of the repository trait
 
 ### Admin API Type Generation

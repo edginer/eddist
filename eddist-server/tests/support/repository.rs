@@ -1,0 +1,133 @@
+use chrono::{NaiveDate, NaiveDateTime, Timelike};
+use eddist::repositories::{
+    bbs_repository::{BbsRepositoryImpl, CreatingAuthedToken},
+    user_repository::{CreatingUser, UserRepository, UserRepositoryImpl},
+};
+use eddist_core::domain::ip_addr::IpAddr;
+use sqlx::{MySqlPool, mysql::MySqlPoolOptions};
+use std::time::Duration;
+use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners::AsyncRunner};
+use testcontainers_modules::mysql::Mysql;
+use uuid::Uuid;
+
+pub(super) struct TestDatabase {
+    pub(super) pool: MySqlPool,
+    _container: ContainerAsync<Mysql>,
+}
+
+pub(super) type RecordedSql = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
+
+impl TestDatabase {
+    pub(super) fn users(&self) -> UserRepositoryImpl {
+        UserRepositoryImpl::new(self.orm())
+    }
+
+    pub(super) async fn register_user(
+        &self,
+        user: CreatingUser,
+        token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        self.users()
+            .register_user_and_bind_token(user, token_id)
+            .await
+    }
+
+    pub(super) async fn bind_user(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
+        self.users().bind_user_authed_token(user_id, token_id).await
+    }
+
+    pub(super) async fn insert_idp(&self, name: &str, enabled: bool) -> Uuid {
+        let id = Uuid::now_v7();
+        sqlx::query("INSERT INTO idps (id, idp_name, idp_display_name, oidc_config_url, client_id, client_secret, enabled) VALUES (UUID_TO_BIN(?), ?, ?, 'https://idp.example/config', 'client', 'encrypted', ?)")
+            .bind(id.to_string()).bind(name).bind(format!("認証 {name}")).bind(enabled).execute(&self.pool).await.unwrap();
+        id
+    }
+
+    pub(super) fn bbs_with_statements(&self) -> (BbsRepositoryImpl, RecordedSql) {
+        let mut db = self.orm();
+        let statements = RecordedSql::default();
+        db.set_metric_callback({
+            let statements = statements.clone();
+            move |info| statements.lock().unwrap().push(info.statement.sql.clone())
+        });
+        (BbsRepositoryImpl::new(db), statements)
+    }
+
+    pub(super) fn bbs(&self) -> BbsRepositoryImpl {
+        BbsRepositoryImpl::new(self.orm())
+    }
+
+    pub(super) async fn insert_board(&self, key: &str) -> Uuid {
+        let id = Uuid::now_v7();
+        sqlx::query("INSERT INTO boards (id, name, board_key, default_name) VALUES (UUID_TO_BIN(?), ?, ?, ?)")
+            .bind(id.to_string()).bind(format!("板 {key}")).bind(key).bind("名無さん")
+            .execute(&self.pool).await.unwrap();
+        id
+    }
+
+    pub(super) fn orm(&self) -> sea_orm::DatabaseConnection {
+        sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(self.pool.clone())
+    }
+
+    pub(super) async fn new() -> Self {
+        Self::with_max_connections(1).await
+    }
+
+    pub(super) async fn with_max_connections(max_connections: u32) -> Self {
+        let container = Mysql::default().with_tag("8.0").start().await.unwrap();
+        let port = container.get_host_port_ipv4(3306.tcp()).await.unwrap();
+        let pool = MySqlPoolOptions::new()
+            .max_connections(max_connections)
+            .acquire_timeout(Duration::from_secs(5))
+            .after_connect(|conn, _| {
+                Box::pin(async move {
+                    use sqlx::Executor;
+                    conn.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                        .await?;
+                    conn.execute(
+                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                    )
+                    .await?;
+                    Ok(())
+                })
+            })
+            .connect(&format!("mysql://root@127.0.0.1:{port}/test"))
+            .await
+            .unwrap();
+        sqlx::migrate!("../migrations").run(&pool).await.unwrap();
+        Self {
+            pool,
+            _container: container,
+        }
+    }
+}
+
+pub(super) fn time(day: u32) -> NaiveDateTime {
+    NaiveDate::from_ymd_opt(2020, 1, day)
+        .unwrap()
+        .and_hms_milli_opt(12, 34, 56, 123)
+        .unwrap()
+}
+
+pub(super) fn token_fixture(name: &str, ip: &str, code: &str) -> CreatingAuthedToken {
+    CreatingAuthedToken {
+        id: Uuid::now_v7(),
+        token: format!("token-{name}"),
+        origin_ip: IpAddr::new(ip.to_owned()),
+        asn_num: 64500,
+        writing_ua: format!("UA {name}"),
+        auth_code: code.to_owned(),
+        created_at: time(1).with_nanosecond(999_600_000).unwrap().and_utc(),
+        author_id_seed: (0..64).collect(),
+        require_user_registration: name == "first",
+    }
+}
+
+pub(super) fn user_fixture(idp_id: Uuid, name: &str) -> CreatingUser {
+    CreatingUser {
+        user_id: Uuid::now_v7(),
+        user_name: name.into(),
+        idp_id,
+        idp_sub: "1".repeat(64),
+    }
+}
