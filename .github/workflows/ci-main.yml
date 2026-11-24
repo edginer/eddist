@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
       - name: Setup Rust
         uses: hecrj/setup-rust-action@110f36749599534ca96628b82f52ae67e5d95a3c # v2.0.1
       - name: Load cache
@@ -46,6 +48,21 @@ jobs:
         run: pnpm -F eddist-client-v2 build
       - name: Build eddist-admin-client
         run: pnpm -F eddist-admin-client build
+      - name: Determine application version
+        shell: bash
+        run: |
+          revision=$(git rev-parse HEAD)
+          short_revision=${revision:0:7}
+          version="$short_revision"
+          # Use stable release tags from the first-parent history of main.
+          if tag=$(git describe --first-parent --tags --abbrev=0 \
+            --match 'v[0-9]*.[0-9]*.[0-9]*' \
+            --exclude 'v*[!0-9.]*' --exclude 'v*.*.*.*' \
+            --exclude 'v0[0-9]*' --exclude 'v*.0[0-9]*' HEAD 2>/dev/null); then
+            distance=$(git rev-list --first-parent --count "$tag"..HEAD)
+            version="${tag#v}+main.${distance}.g${short_revision}"
+          fi
+          printf 'EDDIST_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
       - name: Build
         run: cargo build --release
       - name: rm .dockerignore

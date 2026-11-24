@@ -4,6 +4,8 @@ use base64::Engine;
 use http::HeaderName;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 
+const DEFAULT_BBS_NAME: &str = "エッヂ掲示板";
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("{0} must be set")]
@@ -38,6 +40,8 @@ pub struct S3Config {
 #[derive(Clone)]
 pub struct AppConfig {
     pub base_url: String,
+    pub(crate) base_url_host: String,
+    pub(crate) bbs_name: String,
     pub tinker_secret: TinkerSecret,
     pub asn_header_name: HeaderName,
     pub restrict_thread_creation_on_no_tinker: bool,
@@ -129,7 +133,11 @@ impl AppConfig {
         let flag = |name: &str| lookup(name).as_deref() == Some("true");
 
         let base_url = lookup("BASE_URL").ok_or(ConfigError::Missing("BASE_URL"))?;
-        url::Url::parse(&base_url).map_err(|e| invalid("BASE_URL", e))?;
+        let base_url_host = url::Url::parse(&base_url)
+            .map_err(|e| invalid("BASE_URL", e))?
+            .host_str()
+            .ok_or_else(|| invalid("BASE_URL", "must include a host"))?
+            .to_owned();
 
         let tinker_secret = TinkerSecret::new(
             lookup("TINKER_SECRET").ok_or(ConfigError::Missing("TINKER_SECRET"))?,
@@ -152,6 +160,8 @@ impl AppConfig {
 
         Ok(Self {
             base_url,
+            base_url_host,
+            bbs_name: lookup("BBS_NAME").unwrap_or_else(|| DEFAULT_BBS_NAME.to_string()),
             tinker_secret,
             asn_header_name,
             restrict_thread_creation_on_no_tinker: flag("RESTRICT_THREAD_CREATION_ON_NO_TINKER"),
@@ -167,6 +177,8 @@ impl AppConfig {
         let secret = base64::engine::general_purpose::STANDARD.encode(uuid::Uuid::now_v7());
         Self {
             base_url: "http://localhost:8000".to_string(),
+            base_url_host: "localhost".to_string(),
+            bbs_name: DEFAULT_BBS_NAME.to_string(),
             tinker_secret: TinkerSecret::new(secret).expect("generated secret is base64"),
             asn_header_name: HeaderName::from_static("x-asn-num"),
             restrict_thread_creation_on_no_tinker: false,
@@ -212,6 +224,8 @@ mod tests {
             "https://account.r2.cloudflarestorage.com"
         );
         assert_eq!(config.s3.bucket_name, "bucket");
+        assert_eq!(config.app.base_url_host, "localhost");
+        assert_eq!(config.app.bbs_name, "エッヂ掲示板");
         assert_eq!(config.app.asn_header_name, "x-asn-num");
         assert!(config.app.metrics.enabled);
         assert!(!config.app.restrict_thread_creation_on_no_tinker);
@@ -219,10 +233,19 @@ mod tests {
     }
 
     #[test]
+    fn configured_bbs_name_is_used() {
+        let mut vars = valid_vars();
+        vars.insert("BBS_NAME", "テスト掲示板");
+        let config = ServerConfig::from_lookup(lookup(&vars)).unwrap();
+        assert_eq!(config.app.bbs_name, "テスト掲示板");
+    }
+
+    #[test]
     fn invalid_values_are_rejected_at_startup() {
         for (name, value) in [
             ("PORT", "eighty"),
             ("BASE_URL", "localhost"),
+            ("BASE_URL", "file:///eddist"),
             ("TINKER_SECRET", "not base64!"),
             ("TINKER_SECRET", ""),
             ("ASN_NUMBER_HEADER_NAME", "bad header"),

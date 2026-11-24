@@ -79,6 +79,37 @@ async fn test_apps_load_settings_before_serving_and_do_not_share_them() {
 }
 
 #[tokio::test]
+async fn test_app_metadata_replaces_client_config_endpoint() {
+    let ctx = TestContext::with_server_settings(&[("user.enable_idp_linking", "true")]).await;
+    let response = ctx
+        .server
+        .get("/.well-known/appspecific/cc.eddibb.eddist.json")
+        .add_header("host", "other.localhost")
+        .await;
+
+    assert_eq!(response.status_code(), 200);
+    assert_eq!(response.header("content-type"), "application/json");
+    assert_eq!(response.header("cache-control"), "s-maxage=60");
+    let metadata: serde_json::Value = response.json();
+    assert_eq!(metadata["schema_version"], 1);
+    assert_eq!(metadata["domain"], "localhost");
+    assert_eq!(metadata["bbs_name"], "エッヂ掲示板");
+    assert_eq!(
+        metadata["version"],
+        option_env!("EDDIST_VERSION").unwrap_or("dev"),
+    );
+    assert_eq!(
+        metadata["enabled_features"],
+        serde_json::json!(["user_registration"]),
+    );
+
+    assert_eq!(
+        ctx.server.get("/api/client-config").await.status_code(),
+        404
+    );
+}
+
+#[tokio::test]
 async fn test_board_lookup_separates_missing_board_from_database_failure() {
     let ctx = TestContext::with_server_settings(&[("bbs.enable_safe_mode", "true")]).await;
     let paths = [
