@@ -1,9 +1,10 @@
 use axum_test::TestServer;
-
 mod app;
 pub mod fixtures;
 
 use fixtures::decode_sjis;
+use sea_orm::DatabaseConnection;
+use sqlx::mysql::MySqlPoolOptions;
 use sqlx::{MySql, Pool};
 use std::time::Duration;
 use testcontainers::ImageExt;
@@ -14,6 +15,7 @@ pub struct TestContext {
     pub _mysql_container: ContainerAsync<Mysql>,
     pub _redis_container: ContainerAsync<Redis>,
     pub pool: Pool<MySql>,
+    pub db: DatabaseConnection,
     pub server: TestServer,
     pub redis_conn: redis::aio::ConnectionManager,
 }
@@ -43,10 +45,23 @@ impl TestContext {
 
         let database_url = format!("mysql://root@127.0.0.1:{mysql_port}/test");
 
-        let db = eddist::database::connect_database(&database_url)
+        let pool = MySqlPoolOptions::new()
+            .after_connect(|conn, _| {
+                use sqlx::Executor;
+                Box::pin(async move {
+                    conn.execute(
+                        "SET SESSION sql_mode = CONCAT(@@sql_mode, ',TIME_TRUNCATE_FRACTIONAL')",
+                    )
+                    .await
+                    .unwrap();
+                    Ok(())
+                })
+            })
+            .max_connections(5)
+            .acquire_timeout(Duration::from_secs(10))
+            .connect(&database_url)
             .await
             .expect("Failed to connect to MySQL");
-        let pool = db.get_mysql_connection_pool().clone();
 
         sqlx::migrate!("../migrations")
             .run(&pool)
@@ -90,7 +105,10 @@ impl TestContext {
 
         println!("Redis is ready.");
 
-        let app = app::create_test_app(db, redis_conn.clone())
+        let db = eddist::database::connect_database(&database_url)
+            .await
+            .expect("Failed to connect through SeaORM");
+        let app = app::create_test_app(db.clone(), redis_conn.clone())
             .await
             .expect("Failed to build test app");
         let mut server = TestServer::new(app);
@@ -102,6 +120,7 @@ impl TestContext {
             _mysql_container: mysql_container,
             _redis_container: redis_container,
             pool,
+            db,
             server,
             redis_conn,
         }

@@ -1,3 +1,4 @@
+//! Shared disposable-MySQL setup and inputs for repository integration tests and benchmarks.
 use chrono::{NaiveDate, NaiveDateTime, Timelike};
 use eddist::repositories::{
     bbs_repository::{BbsRepositoryImpl, CreatingAuthedToken, CreatingThread},
@@ -13,19 +14,19 @@ use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners:
 use testcontainers_modules::mysql::Mysql;
 use uuid::Uuid;
 
-pub(super) struct TestDatabase {
-    pub(super) pool: MySqlPool,
+pub(crate) struct TestDatabase {
+    pub(crate) pool: MySqlPool,
     _container: ContainerAsync<Mysql>,
 }
 
-pub(super) type RecordedSql = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
+pub(crate) type RecordedSql = std::sync::Arc<std::sync::Mutex<Vec<String>>>;
 
 impl TestDatabase {
-    pub(super) fn users(&self) -> UserRepositoryImpl {
+    pub(crate) fn users(&self) -> UserRepositoryImpl {
         UserRepositoryImpl::new(self.orm())
     }
 
-    pub(super) async fn register_user(
+    pub(crate) async fn register_user(
         &self,
         user: CreatingUser,
         token_id: Uuid,
@@ -35,18 +36,18 @@ impl TestDatabase {
             .await
     }
 
-    pub(super) async fn bind_user(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
+    pub(crate) async fn bind_user(&self, user_id: Uuid, token_id: Uuid) -> anyhow::Result<()> {
         self.users().bind_user_authed_token(user_id, token_id).await
     }
 
-    pub(super) async fn insert_idp(&self, name: &str, enabled: bool) -> Uuid {
+    pub(crate) async fn insert_idp(&self, name: &str, enabled: bool) -> Uuid {
         let id = Uuid::now_v7();
         sqlx::query("INSERT INTO idps (id, idp_name, idp_display_name, oidc_config_url, client_id, client_secret, enabled) VALUES (UUID_TO_BIN(?), ?, ?, 'https://idp.example/config', 'client', 'encrypted', ?)")
             .bind(id.to_string()).bind(name).bind(format!("認証 {name}")).bind(enabled).execute(&self.pool).await.unwrap();
         id
     }
 
-    pub(super) fn bbs_with_statements(&self) -> (BbsRepositoryImpl, RecordedSql) {
+    pub(crate) fn bbs_with_statements(&self) -> (BbsRepositoryImpl, RecordedSql) {
         let mut db = self.orm();
         let statements = RecordedSql::default();
         db.set_metric_callback({
@@ -56,11 +57,11 @@ impl TestDatabase {
         (BbsRepositoryImpl::new(db), statements)
     }
 
-    pub(super) fn bbs(&self) -> BbsRepositoryImpl {
+    pub(crate) fn bbs(&self) -> BbsRepositoryImpl {
         BbsRepositoryImpl::new(self.orm())
     }
 
-    pub(super) async fn insert_board(&self, key: &str) -> Uuid {
+    pub(crate) async fn insert_board(&self, key: &str) -> Uuid {
         let id = Uuid::now_v7();
         sqlx::query("INSERT INTO boards (id, name, board_key, default_name) VALUES (UUID_TO_BIN(?), ?, ?, ?)")
             .bind(id.to_string()).bind(format!("板 {key}")).bind(key).bind("名無さん")
@@ -68,15 +69,24 @@ impl TestDatabase {
         id
     }
 
-    pub(super) fn orm(&self) -> sea_orm::DatabaseConnection {
+    pub(crate) async fn url(&self) -> String {
+        let port = self
+            ._container
+            .get_host_port_ipv4(3306.tcp())
+            .await
+            .unwrap();
+        format!("mysql://root@127.0.0.1:{port}/test")
+    }
+
+    pub(crate) fn orm(&self) -> sea_orm::DatabaseConnection {
         sea_orm::SqlxMySqlConnector::from_sqlx_mysql_pool(self.pool.clone())
     }
 
-    pub(super) async fn new() -> Self {
+    pub(crate) async fn new() -> Self {
         Self::with_max_connections(1).await
     }
 
-    pub(super) async fn with_max_connections(max_connections: u32) -> Self {
+    pub(crate) async fn with_max_connections(max_connections: u32) -> Self {
         let container = Mysql::default().with_tag("8.0").start().await.unwrap();
         let port = container.get_host_port_ipv4(3306.tcp()).await.unwrap();
         let pool = MySqlPoolOptions::new()
@@ -105,14 +115,14 @@ impl TestDatabase {
     }
 }
 
-pub(super) fn time(day: u32) -> NaiveDateTime {
+pub(crate) fn time(day: u32) -> NaiveDateTime {
     NaiveDate::from_ymd_opt(2020, 1, day)
         .unwrap()
         .and_hms_milli_opt(12, 34, 56, 123)
         .unwrap()
 }
 
-pub(super) fn token_fixture(name: &str, ip: &str, code: &str) -> CreatingAuthedToken {
+pub(crate) fn token_fixture(name: &str, ip: &str, code: &str) -> CreatingAuthedToken {
     CreatingAuthedToken {
         id: Uuid::now_v7(),
         token: format!("token-{name}"),
@@ -126,7 +136,7 @@ pub(super) fn token_fixture(name: &str, ip: &str, code: &str) -> CreatingAuthedT
     }
 }
 
-pub(super) fn user_fixture(idp_id: Uuid, name: &str) -> CreatingUser {
+pub(crate) fn user_fixture(idp_id: Uuid, name: &str) -> CreatingUser {
     CreatingUser {
         user_id: Uuid::now_v7(),
         user_name: name.into(),
@@ -135,7 +145,7 @@ pub(super) fn user_fixture(idp_id: Uuid, name: &str) -> CreatingUser {
     }
 }
 
-pub(super) fn thread_fixture(board_id: Uuid, token_id: Uuid, number: u64) -> CreatingThread {
+pub(crate) fn thread_fixture(board_id: Uuid, token_id: Uuid, number: u64) -> CreatingThread {
     CreatingThread {
         thread_id: Uuid::now_v7(),
         response_id: Uuid::now_v7(),
@@ -160,7 +170,7 @@ pub(super) fn thread_fixture(board_id: Uuid, token_id: Uuid, number: u64) -> Cre
     }
 }
 
-pub(super) fn response_fixture(thread: &CreatingThread, order: i32) -> CreatingRes {
+pub(crate) fn response_fixture(thread: &CreatingThread, order: i32) -> CreatingRes {
     CreatingRes {
         id: Uuid::now_v7(),
         created_at: time(3).with_nanosecond(999_600_000).unwrap().and_utc(),

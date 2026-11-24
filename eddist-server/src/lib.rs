@@ -1,7 +1,6 @@
 pub use axum;
 pub use chrono;
 pub use handlebars::Handlebars;
-pub use sqlx;
 pub use uuid;
 
 mod shiftjis;
