@@ -3,9 +3,15 @@ use eddist_core::domain::{
     client_info::ClientInfo,
     ip_addr::{IpAddr, ReducedIpAddr},
 };
-use eddist_entity::{db_time, thread};
-use sea_orm::{ActiveValue::Set, DbErr, EntityTrait, IsolationLevel, SqlErr, TransactionTrait};
-use sqlx::{query_as, types::Json};
+use eddist_entity::{authed_token, board, db_time, response, thread};
+use futures::TryStreamExt;
+use sea_orm::{
+    ActiveValue::Set,
+    ColumnTrait, DbErr, EntityTrait, FromQueryResult, IsolationLevel, JoinType, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, RelationTrait, Select, SqlErr, TransactionTrait,
+    TryGetableFromJson,
+    sea_query::{Expr, ExprTrait, Query},
+};
 use uuid::Uuid;
 
 use crate::domain::{authed_token::AuthedToken, thread::Thread};
@@ -64,100 +70,18 @@ impl ThreadRepository for BbsRepositoryImpl {
         board_id: Uuid,
         status: ThreadStatus,
     ) -> anyhow::Result<Vec<Thread>> {
-        let threads = match status {
-            ThreadStatus::Active => {
-                query_as!(
-                    SelectionThread,
-                    r#"SELECT
-                        id AS "id: Uuid",
-                        board_id AS "board_id: Uuid",
-                        thread_number,
-                        last_modified_at,
-                        sage_last_modified_at,
-                        title,
-                        authed_token_id AS "authed_token_id: Uuid",
-                        metadent,
-                        response_count,
-                        no_pool AS "no_pool: bool",
-                        active AS "active: bool",
-                        archived AS "archived: bool",
-                        archive_converted AS "archive_converted: bool"
-                    FROM threads WHERE board_id = ? AND active = 1"#,
-                    board_id
-                )
-                .fetch_all(&self.pool)
-                .await
-            }
-            ThreadStatus::Archived => {
-                query_as!(
-                    SelectionThread,
-                    r#"SELECT
-                        id AS "id: Uuid",
-                        board_id AS "board_id: Uuid",
-                        thread_number,
-                        last_modified_at,
-                        sage_last_modified_at,
-                        title,
-                        authed_token_id AS "authed_token_id: Uuid",
-                        metadent,
-                        response_count,
-                        no_pool AS "no_pool: bool",
-                        active AS "active: bool",
-                        archived AS "archived: bool",
-                        archive_converted AS "archive_converted: bool"
-                    FROM threads WHERE board_id = ? AND archived = 1"#,
-                    board_id
-                )
-                .fetch_all(&self.pool)
-                .await
-            }
-            ThreadStatus::Inactive => {
-                query_as!(
-                    SelectionThread,
-                    r#"SELECT
-                        id AS "id: Uuid",
-                        board_id AS "board_id: Uuid",
-                        thread_number,
-                        last_modified_at,
-                        sage_last_modified_at,
-                        title,
-                        authed_token_id AS "authed_token_id: Uuid",
-                        metadent,
-                        response_count,
-                        no_pool AS "no_pool: bool",
-                        active AS "active: bool",
-                        archived AS "archived: bool",
-                        archive_converted AS "archive_converted: bool"
-                    FROM threads WHERE board_id = ? AND active = 0 AND archived = 0"#,
-                    board_id
-                )
-                .fetch_all(&self.pool)
-                .await
-            }
-            ThreadStatus::Unarchived => {
-                query_as!(
-                    SelectionThread,
-                    r#"SELECT
-                        id AS "id: Uuid",
-                        board_id AS "board_id: Uuid",
-                        thread_number,
-                        last_modified_at,
-                        sage_last_modified_at,
-                        title,
-                        authed_token_id AS "authed_token_id: Uuid",
-                        metadent,
-                        response_count,
-                        no_pool AS "no_pool: bool",
-                        active AS "active: bool",
-                        archived AS "archived: bool",
-                        archive_converted AS "archive_converted: bool"
-                    FROM threads WHERE board_id = ? AND archived = 0 ORDER BY sage_last_modified_at DESC"#,
-                    board_id
-                )
-                .fetch_all(&self.pool)
-                .await
-            }
-        }?;
+        let query = thread_select().filter(thread::Column::BoardId.eq(board_id));
+        let query = match status {
+            ThreadStatus::Active => query.filter(thread::Column::Active.eq(true)),
+            ThreadStatus::Archived => query.filter(thread::Column::Archived.eq(true)),
+            ThreadStatus::Inactive => query
+                .filter(thread::Column::Active.eq(false))
+                .filter(thread::Column::Archived.eq(false)),
+            ThreadStatus::Unarchived => query
+                .filter(thread::Column::Archived.eq(false))
+                .order_by_desc(thread::Column::SageLastModifiedAt),
+        };
+        let threads = query.into_model::<SelectionThread>().all(&self.db).await?;
 
         Ok(threads
             .into_iter()
@@ -169,57 +93,13 @@ impl ThreadRepository for BbsRepositoryImpl {
         &self,
         board_id: Uuid,
     ) -> anyhow::Result<Vec<(Thread, ClientInfo, AuthedToken)>> {
-        let threads = query_as!(
-            SelectionThreadWithMetadent,
-            r#"
-                SELECT
-                    t.id AS "id: Uuid",
-                    t.board_id AS "board_id: Uuid",
-                    t.thread_number AS thread_number,
-                    t.last_modified_at AS last_modified_at,
-                    t.sage_last_modified_at AS sage_last_modified_at,
-                    t.title AS title,
-                    t.authed_token_id AS "authed_token_id: Uuid",
-                    t.metadent AS metadent,
-                    t.response_count AS response_count,
-                    t.no_pool AS "no_pool: bool",
-                    t.active AS "active: bool",
-                    t.archived AS "archived: bool",
-                    t.archive_converted AS "archive_converted: bool",
-                    (
-                        SELECT r.client_info
-                        FROM responses r
-                        WHERE r.thread_id = t.id
-                        AND r.res_order = 1
-                    ) AS "client_info! : Json<ClientInfo>",
-                    at.token AS token,
-                    at.origin_ip AS origin_ip,
-                    at.reduced_origin_ip AS reduced_origin_ip,
-                    at.writing_ua AS writing_ua,
-                    at.authed_ua AS authed_ua,
-                    at.auth_code AS auth_code,
-                    at.created_at AS created_at,
-                    at.authed_at AS authed_at,
-                    at.validity AS "validity: bool",
-                    at.last_wrote_at AS last_wrote_at,
-                    at.author_id_seed AS author_id_seed,
-                    at.require_user_registration AS "require_user_registration: bool",
-                    at.registered_user_id AS "registered_user_id?: Uuid",
-                    at.require_reauth AS "require_reauth: bool"
-                FROM
-                    threads AS t
-                INNER JOIN
-                    authed_tokens AS at ON t.authed_token_id = at.id
-                WHERE
-                    t.board_id = ?
-                    AND t.archived = 0
-                ORDER BY
-                    t.sage_last_modified_at DESC
-"#,
-            board_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        // Decode typed rows as they arrive on large thread lists.
+        let threads = metadent_select(board_id)
+            .into_model::<SelectionThreadWithMetadent>()
+            .stream(&self.db)
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
 
         Ok(threads
             .into_iter()
@@ -268,32 +148,18 @@ impl ThreadRepository for BbsRepositoryImpl {
         board_key: &str,
         thread_number: u64,
     ) -> anyhow::Result<Option<Thread>> {
-        let th = query_as!(
-            SelectionThread,
-            r#"SELECT
-                id AS "id: Uuid",
-                board_id AS "board_id: Uuid",
-                thread_number,
-                last_modified_at,
-                sage_last_modified_at,
-                title,
-                authed_token_id AS "authed_token_id: Uuid",
-                metadent,
-                response_count,
-                no_pool AS "no_pool: bool",
-                active AS "active: bool",
-                archived AS "archived: bool",
-                archive_converted AS "archive_converted: bool"
-            FROM threads
-            WHERE thread_number = ?
-            AND board_id = (
-                SELECT id FROM boards WHERE board_key = ? LIMIT 1
-            )"#,
-            thread_number,
-            board_key,
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let board = board::Entity::find()
+            .select_only()
+            .column(board::Column::Id)
+            .filter(board::Column::BoardKey.eq(board_key))
+            .limit(1)
+            .into_query();
+        let th = thread_select()
+            .filter(thread::Column::ThreadNumber.eq(thread_number))
+            .filter(Expr::col((thread::Entity, thread::Column::BoardId)).eq(Expr::from(board)))
+            .into_model::<SelectionThread>()
+            .one(&self.db)
+            .await?;
 
         Ok(th.map(SelectionThread::into_thread))
     }
@@ -352,7 +218,63 @@ impl ThreadRepository for BbsRepositoryImpl {
     }
 }
 
-#[derive(Debug)]
+fn thread_select() -> Select<thread::Entity> {
+    use thread::Column;
+    thread::Entity::find().select_only().columns([
+        Column::Id,
+        Column::BoardId,
+        Column::ThreadNumber,
+        Column::LastModifiedAt,
+        Column::SageLastModifiedAt,
+        Column::Title,
+        Column::AuthedTokenId,
+        Column::Metadent,
+        Column::ResponseCount,
+        Column::NoPool,
+        Column::Active,
+        Column::Archived,
+        Column::ArchiveConverted,
+    ])
+}
+
+fn metadent_select(board_id: Uuid) -> Select<thread::Entity> {
+    // This scalar subquery must not gain LIMIT / DISTINCT or become an INNER
+    // JOIN: missing and duplicate first responses must still fail decoding/SQL.
+    let client_info = Query::select()
+        .column((response::Entity, response::Column::ClientInfo))
+        .from(response::Entity)
+        .and_where(
+            Expr::col((response::Entity, response::Column::ThreadId))
+                .equals((thread::Entity, thread::Column::Id)),
+        )
+        .and_where(Expr::col((response::Entity, response::Column::ResOrder)).eq(1))
+        .to_owned();
+    use authed_token::Column;
+    thread_select()
+        .column_as(Expr::from(client_info), "client_info")
+        .columns([
+            Column::Token,
+            Column::OriginIp,
+            Column::ReducedOriginIp,
+            Column::WritingUa,
+            Column::AuthedUa,
+            Column::AuthCode,
+            Column::CreatedAt,
+            Column::AuthedAt,
+            Column::Validity,
+            Column::LastWroteAt,
+            Column::AuthorIdSeed,
+            Column::RequireUserRegistration,
+            Column::RegisteredUserId,
+            Column::RequireReauth,
+        ])
+        .join(JoinType::InnerJoin, thread::Relation::AuthedToken.def())
+        .filter(thread::Column::BoardId.eq(board_id))
+        .filter(thread::Column::Archived.eq(false))
+        .order_by_desc(thread::Column::SageLastModifiedAt)
+}
+
+#[derive(Debug, FromQueryResult)]
 struct SelectionThread {
     id: Uuid,
     board_id: Uuid,
@@ -388,7 +310,15 @@ impl SelectionThread {
     }
 }
 
-#[derive(Debug)]
+// Decode the typed JSON directly, retaining SQL NULL and malformed JSON errors
+// without an intermediate serde_json::Value tree.
+#[derive(Debug, serde::Deserialize)]
+#[serde(transparent)]
+struct ClientInfoJson(ClientInfo);
+
+impl TryGetableFromJson for ClientInfoJson {}
+
+#[derive(Debug, FromQueryResult)]
 struct SelectionThreadWithMetadent {
     id: Uuid,
     board_id: Uuid,
@@ -403,7 +333,7 @@ struct SelectionThreadWithMetadent {
     active: bool,
     archived: bool,
     archive_converted: bool,
-    client_info: Json<ClientInfo>,
+    client_info: ClientInfoJson,
 
     token: String,
     origin_ip: String,
@@ -419,4 +349,40 @@ struct SelectionThreadWithMetadent {
     require_user_registration: bool,
     registered_user_id: Option<Uuid>,
     require_reauth: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::DbBackend;
+
+    #[test]
+    fn metadent_keeps_an_unlimited_scalar_subquery_in_both_dialects() {
+        for backend in [DbBackend::MySql, DbBackend::Postgres] {
+            let sql = metadent_select(Uuid::nil()).build(backend).to_string();
+            let sql = sql.replace(['`', '"'], "");
+            assert!(sql.contains("(SELECT responses.client_info FROM responses WHERE responses.thread_id = threads.id AND responses.res_order = 1) AS client_info"), "{sql}");
+            assert!(
+                sql.contains(
+                    "INNER JOIN authed_tokens ON threads.authed_token_id = authed_tokens.id"
+                ),
+                "{sql}"
+            );
+            assert!(
+                sql.contains(
+                    "AND threads.archived = FALSE ORDER BY threads.sage_last_modified_at DESC"
+                ),
+                "{sql}"
+            );
+            for forbidden in [
+                "JOIN responses",
+                "LIMIT",
+                "DISTINCT",
+                "additional_info",
+                "asn_num",
+            ] {
+                assert!(!sql.contains(forbidden), "unexpected {forbidden}: {sql}");
+            }
+        }
+    }
 }

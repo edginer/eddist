@@ -61,3 +61,9 @@ mod database_connection;
 
 #[path = "repository/posting.rs"]
 mod posting;
+
+#[path = "repository/core_reads.rs"]
+mod core_reads;
+
+#[path = "support/repository_benchmark.rs"]
+mod repository_benchmark;
