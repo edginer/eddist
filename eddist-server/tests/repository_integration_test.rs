@@ -1,7 +1,10 @@
 //! Repository behavior and transaction regression tests against disposable MySQL.
 use chrono::{NaiveDate, NaiveDateTime, Timelike};
 use eddist::repositories::{
-    bbs_repository::{AuthedTokenRepository, BoardRepository},
+    bbs_repository::{
+        AuthedTokenRepository, BoardRepository, CreateThreadError, ResponseRepository,
+        ThreadRepository,
+    },
     captcha_config_repository::{CaptchaConfigRepository, CaptchaConfigRepositoryImpl},
     idp_repository::{IdpRepository, IdpRepositoryImpl},
     notice_repository::{NoticeRepository, NoticeRepositoryImpl},
@@ -12,7 +15,11 @@ use eddist::repositories::{
     user_restriction_repository::{UserRestrictionRepository, UserRestrictionRepositoryImpl},
 };
 use eddist_core::{
-    domain::user_restriction::{RestrictionRuleType, RestrictionTarget},
+    domain::{
+        metadent::MetadentType,
+        res::ResView,
+        user_restriction::{RestrictionRuleType, RestrictionTarget},
+    },
     server_settings::ServerSettingKey,
 };
 use std::time::Duration;
@@ -51,3 +58,6 @@ mod captcha;
 
 #[path = "repository/database_connection.rs"]
 mod database_connection;
+
+#[path = "repository/posting.rs"]
+mod posting;

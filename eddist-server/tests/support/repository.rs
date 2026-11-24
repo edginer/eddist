@@ -1,9 +1,12 @@
 use chrono::{NaiveDate, NaiveDateTime, Timelike};
 use eddist::repositories::{
-    bbs_repository::{BbsRepositoryImpl, CreatingAuthedToken},
+    bbs_repository::{BbsRepositoryImpl, CreatingAuthedToken, CreatingThread},
     user_repository::{CreatingUser, UserRepository, UserRepositoryImpl},
 };
-use eddist_core::domain::ip_addr::IpAddr;
+use eddist_core::domain::{
+    client_info::ClientInfo, ip_addr::IpAddr, metadent::MetadentType,
+    pubsub_repository::CreatingRes,
+};
 use sqlx::{MySqlPool, mysql::MySqlPoolOptions};
 use std::time::Duration;
 use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners::AsyncRunner};
@@ -129,5 +132,49 @@ pub(super) fn user_fixture(idp_id: Uuid, name: &str) -> CreatingUser {
         user_name: name.into(),
         idp_id,
         idp_sub: "1".repeat(64),
+    }
+}
+
+pub(super) fn thread_fixture(board_id: Uuid, token_id: Uuid, number: u64) -> CreatingThread {
+    CreatingThread {
+        thread_id: Uuid::now_v7(),
+        response_id: Uuid::now_v7(),
+        title: "日本語スレッド &amp; タイトル".into(),
+        unix_time: number,
+        body: "本文<br>２行目".into(),
+        name: "投稿者 ◆test".into(),
+        mail: "sage".into(),
+        created_at: time(2).with_nanosecond(999_600_000).unwrap().and_utc(),
+        author_ch5id: "AuthorID".into(),
+        authed_token_id: token_id,
+        ip_addr: "2001:db8::1234".into(),
+        board_id,
+        metadent: MetadentType::VVVerbose,
+        client_info: ClientInfo {
+            user_agent: "UA 日本語".into(),
+            asn_num: 64501,
+            ip_addr: "2001:db8::1234".into(),
+            tinker: None,
+        },
+        moderation_result: None,
+    }
+}
+
+pub(super) fn response_fixture(thread: &CreatingThread, order: i32) -> CreatingRes {
+    CreatingRes {
+        id: Uuid::now_v7(),
+        created_at: time(3).with_nanosecond(999_600_000).unwrap().and_utc(),
+        body: format!("返信 {order}<br>日本語"),
+        name: "".into(),
+        mail: "sage".into(),
+        author_ch5id: "ReplyID".into(),
+        authed_token_id: thread.authed_token_id,
+        ip_addr: "192.0.2.10".into(),
+        thread_id: thread.thread_id,
+        board_id: thread.board_id,
+        client_info: thread.client_info.clone(),
+        res_order: order,
+        is_sage: true,
+        moderation_result: None,
     }
 }
