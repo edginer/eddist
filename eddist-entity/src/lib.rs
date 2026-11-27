@@ -1,3 +1,5 @@
+pub mod app_attest_key;
+pub mod app_credential;
 pub mod archived_response;
 pub mod archived_thread;
 pub mod authed_token;

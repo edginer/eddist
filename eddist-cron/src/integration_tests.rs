@@ -1,5 +1,7 @@
 use chrono::{NaiveDateTime, TimeDelta, Utc};
-use eddist_entity::{authed_token, board, thread, user, user_authed_token};
+use eddist_entity::{
+    app_attest_key, app_credential, authed_token, board, thread, user, user_authed_token,
+};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, DatabaseConnection, EntityTrait};
 use testcontainers::{ContainerAsync, ImageExt, core::IntoContainerPort, runners::AsyncRunner};
 use testcontainers_modules::mysql::Mysql;
@@ -61,6 +63,45 @@ async fn insert_token(
         registered_user_id: Set(registered_user_id),
         require_reauth: Set(false),
         author_id_seed: Set(vec![0; 64]),
+        is_app: Set(false),
+    }
+    .insert(db)
+    .await?;
+    Ok(id)
+}
+
+async fn insert_app_token(
+    db: &DatabaseConnection,
+    registered_at: NaiveDateTime,
+    verified_at: NaiveDateTime,
+) -> anyhow::Result<Uuid> {
+    let id = insert_token(db, registered_at, Some(registered_at), true, None, None).await?;
+    authed_token::ActiveModel {
+        id: Set(id),
+        is_app: Set(true),
+        ..Default::default()
+    }
+    .update(db)
+    .await?;
+    let key_hash = id.as_bytes().repeat(2);
+    app_credential::ActiveModel {
+        authed_token_id: Set(id),
+        platform: Set("ios".to_owned()),
+        scope_hash: Set(vec![0; 32]),
+        bearer_hash: Set(key_hash.clone()),
+        registration_key_hash: Set(key_hash.clone()),
+        registration_request_hash: Set(vec![0; 32]),
+        registered_at: Set(registered_at.and_utc()),
+        verified_at: Set(verified_at.and_utc()),
+        reattest_after: Set(verified_at.and_utc() + TimeDelta::days(7)),
+    }
+    .insert(db)
+    .await?;
+    app_attest_key::ActiveModel {
+        authed_token_id: Set(id),
+        key_id: Set(key_hash),
+        public_key: Set(vec![0; 65]),
+        counter: Set(1),
     }
     .insert(db)
     .await?;
@@ -97,6 +138,8 @@ async fn delete_stale_authed_tokens_keeps_referenced_and_recent_tokens() -> anyh
     .await?;
     let idle_never_wrote =
         insert_token(db, days_ago(401), Some(days_ago(401)), true, None, None).await?;
+    let recently_verified = insert_app_token(db, days_ago(800), days_ago(2)).await?;
+    let stale_app = insert_app_token(db, days_ago(800), days_ago(401)).await?;
     let active = insert_token(
         db,
         days_ago(800),
@@ -192,7 +235,7 @@ async fn delete_stale_authed_tokens_keeps_referenced_and_recent_tokens() -> anyh
         .delete_stale_authed_tokens(StaleAuthedTokenKind::Idle, days_ago(400), 1)
         .await?;
     idle.sort();
-    let mut expected_idle = vec![idle_old, idle_never_wrote];
+    let mut expected_idle = vec![idle_old, idle_never_wrote, stale_app];
     expected_idle.sort();
     assert_eq!(idle, expected_idle);
 
@@ -210,9 +253,28 @@ async fn delete_stale_authed_tokens_keeps_referenced_and_recent_tokens() -> anyh
         idle_registered,
         idle_user_linked,
         idle_thread_owner,
+        recently_verified,
     ];
     expected_remaining.sort();
     assert_eq!(remaining, expected_remaining);
+    assert!(
+        app_attest_key::Entity::find_by_id(recently_verified)
+            .one(db)
+            .await?
+            .is_some()
+    );
+    assert!(
+        app_credential::Entity::find_by_id(stale_app)
+            .one(db)
+            .await?
+            .is_none()
+    );
+    assert!(
+        app_attest_key::Entity::find_by_id(stale_app)
+            .one(db)
+            .await?
+            .is_none()
+    );
 
     Ok(())
 }

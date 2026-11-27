@@ -34,6 +34,7 @@ use crate::{
         user_restriction::user_restriction_middleware,
     },
     repositories::{
+        app_credentials_repository::AppCredentialsRepository,
         bbs_pubsub_repository::{RedisCreationEventRepository, RedisPubRepository},
         bbs_repository::BbsRepositoryImpl,
         captcha_config_repository::CaptchaConfigRepositoryImpl,
@@ -62,6 +63,7 @@ use crate::{
     },
     services::{
         AppService, AppServiceContainer, PubSubRepos,
+        app_attestation_service::{AppAttestationService, PROTOCOL_VERSION, Platform},
         board_info_service::{BoardInfoServiceInput, BoardInfoServiceOutput},
         captcha_config_cache::CaptchaConfigCache,
         kako_thread_retrieval_service::KakoThreadRetrievalService,
@@ -77,6 +79,8 @@ use crate::{
     template::load_template_engine,
     utils::CsrfState,
 };
+
+pub(crate) const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 const SETTINGS_REFRESH_INTERVAL: Duration = Duration::from_secs(300);
 const STATS_FLUSH_INTERVAL: Duration = Duration::from_secs(30);
@@ -102,12 +106,35 @@ pub struct AppState {
     pub redis_conn: redis::aio::ConnectionManager,
     pub shared_ng: Arc<dyn SharedNgStore>,
     pub not_found_penalty_cache: NotFoundPenaltyCache,
+    app_attestation: Arc<[AppAttestationService]>,
     _periodic_tasks: Arc<PeriodicTasks>,
 }
 
 impl AppState {
     pub fn get_container(&self) -> &Services {
         &self.services
+    }
+
+    pub(crate) fn active_app_attestations(&self) -> &[AppAttestationService] {
+        if self
+            .ctx
+            .server_settings
+            .snapshot()
+            .is_enabled(ServerSettingKey::EnableAppAttestation)
+        {
+            &self.app_attestation
+        } else {
+            &[]
+        }
+    }
+
+    pub(crate) fn active_app_attestation(
+        &self,
+        platform: Platform,
+    ) -> Option<&AppAttestationService> {
+        self.active_app_attestations()
+            .iter()
+            .find(|service| service.platform() == platform)
     }
 }
 
@@ -190,6 +217,13 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
     )?;
 
     let config = Arc::new(config);
+    let app_attestation = AppAttestationService::configured_services(
+        config.app_attestation.as_ref(),
+        redis_conn.clone(),
+        AppCredentialsRepository::new(db.clone()),
+    )
+    .context("failed to initialize app attestation")?
+    .into();
     // Discovery is lazy so an unreachable IdP does not block startup.
     let oidc_clients = Arc::new(OidcClientRegistry::new(
         Arc::new(idp_repo.clone()),
@@ -257,6 +291,7 @@ pub async fn build_app(config: AppConfig, deps: AppDependencies) -> anyhow::Resu
         shared_ng: Arc::new(RedisSharedNgStore::new(redis_conn.clone())),
         redis_conn,
         not_found_penalty_cache: NotFoundPenaltyCache::new(),
+        app_attestation,
         _periodic_tasks: Arc::new(periodic_tasks),
     };
 
@@ -388,14 +423,30 @@ async fn get_app_metadata(State(state): State<AppState>) -> impl IntoResponse {
     .flatten()
     .collect::<Vec<_>>();
 
-    let mut resp = Json(serde_json::json!({
+    let mut metadata = serde_json::json!({
         "schema_version": 1,
         "domain": state.ctx.config.base_url_host,
         "bbs_name": state.ctx.config.bbs_name,
         "enabled_features": enabled_features,
         "version": option_env!("EDDIST_VERSION").unwrap_or("dev"),
-    }))
-    .into_response();
+    });
+    let attestation: serde_json::Map<_, _> = state
+        .active_app_attestations()
+        .iter()
+        .map(|service| {
+            let platform = service.platform();
+            (
+                platform.as_str().to_owned(),
+                serde_json::json!({
+                    "provider": platform.provider_name(), "protocol_version": PROTOCOL_VERSION,
+                }),
+            )
+        })
+        .collect();
+    if !attestation.is_empty() {
+        metadata["attestation"] = serde_json::Value::Object(attestation);
+    }
+    let mut resp = Json(metadata).into_response();
     resp.headers_mut()
         .insert("Cache-Control", "s-maxage=60".parse().unwrap());
     resp
@@ -484,6 +535,7 @@ fn create_app(app_state: AppState) -> Router {
         // happen on every board page load.
         .route("/api/{boardKey}/shared-ng", get(get_shared_ng))
         .merge(ng_id_routes)
+        .merge(crate::routes::app_attestation::routes(&app_state))
         .nest("/user", user_routes(&app_state))
         .route(
             "/{boardKey}",
@@ -525,7 +577,7 @@ fn create_app(app_state: AppState) -> Router {
         }))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(10),
+            HTTP_REQUEST_TIMEOUT,
         ))
         // NOTE: comment out for now (is is not confirmed in twinkle environment)
         // .layer(CompressionLayer::new())

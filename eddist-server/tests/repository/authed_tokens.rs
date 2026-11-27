@@ -120,6 +120,19 @@ async fn token_reads_preserve_filters_all_fields_and_nullable_values() {
         .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, second.id);
+
+    let app = token_fixture("app", "192.0.2.1", "shared");
+    repo.create_authed_token(app.clone()).await.unwrap();
+    sqlx::query(
+        "UPDATE authed_tokens SET is_app = TRUE, validity = TRUE WHERE id = UUID_TO_BIN(?)",
+    )
+    .bind(app.id.to_string())
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    assert!(repo.get_authed_token(&app.token).await.unwrap().is_none());
+    assert!(repo.get_authed_token_by_id(app.id).await.unwrap().is_some());
+
     let sql = statements.lock().unwrap();
     let selects: Vec<_> = sql.iter().filter(|sql| sql.starts_with("SELECT")).collect();
     assert!(!selects.is_empty());

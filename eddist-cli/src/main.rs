@@ -4,9 +4,11 @@ use aws_sdk_s3::{
     config::{Credentials, Region},
     primitives::ByteStream,
 };
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use clap::{Parser, Subcommand};
-use eddist_core::domain::authed_token_backup::{AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup};
+use eddist_core::domain::authed_token_backup::{
+    APP_INTERNAL_TOKEN_PREFIX, AUTHED_TOKENS_S3_PREFIX, AuthedTokenBackup,
+};
 use eddist_entity::authed_token;
 use futures::StreamExt;
 use sea_orm::{
@@ -36,9 +38,9 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum AuthedTokensCommand {
-    /// Backup valid tokens from MySQL to S3
+    /// Backup valid browser tokens from MySQL to S3
     Backup,
-    /// Restore tokens from S3 into MySQL
+    /// Restore browser tokens from S3 into MySQL
     Recover,
     /// Show differences between DB and S3
     Validate,
@@ -106,14 +108,11 @@ async fn backup() -> Result<()> {
     let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
 
-    let rows = authed_token::Entity::find()
-        .filter(authed_token::Column::Validity.eq(true))
-        .all(&db)
-        .await?;
+    let rows = browser_tokens_for_backup().all(&db).await?;
     let rows = rows.into_iter().map(into_backup).collect::<Vec<_>>();
 
     let total = rows.len();
-    println!("Backing up {total} valid tokens...");
+    println!("Backing up {total} valid browser tokens...");
 
     let results = futures::stream::iter(rows)
         .map(|token| {
@@ -143,14 +142,19 @@ async fn backup() -> Result<()> {
     Ok(())
 }
 
+fn browser_tokens_for_backup() -> sea_orm::Select<authed_token::Entity> {
+    authed_token::Entity::find()
+        .filter(authed_token::Column::Validity.eq(true))
+        .filter(authed_token::Column::IsApp.eq(false))
+}
+
 async fn validate() -> Result<()> {
     let db = connect_database().await?;
     let (client, bucket_name) = make_s3_client()?;
 
-    let db_ids = authed_token::Entity::find()
+    let db_ids = browser_tokens_for_backup()
         .select_only()
         .column(authed_token::Column::Id)
-        .filter(authed_token::Column::Validity.eq(true))
         .into_tuple::<Uuid>()
         .all(&db)
         .await?
@@ -178,7 +182,7 @@ async fn validate() -> Result<()> {
         }
     }
 
-    println!("DB valid tokens: {}", db_ids.len());
+    println!("DB valid browser tokens: {}", db_ids.len());
     println!("S3 objects:      {}", s3_ids.len());
 
     let mut missing_from_s3 = db_ids.difference(&s3_ids).collect::<Vec<_>>();
@@ -246,31 +250,13 @@ async fn recover() -> Result<()> {
                     .await?;
                 let data = output.body.collect().await?.into_bytes();
                 let token: AuthedTokenBackup = serde_json::from_slice(&data)?;
-
-                let auth_code = token.auth_code.as_deref().unwrap_or("000000");
-
-                let result = authed_token::Entity::insert(authed_token::ActiveModel {
-                    id: Set(token.id),
-                    token: Set(token.token),
-                    origin_ip: Set(token.origin_ip),
-                    reduced_origin_ip: Set(token.reduced_origin_ip),
-                    writing_ua: Set(token.writing_ua),
-                    authed_ua: Set(token.authed_ua),
-                    auth_code: Set(auth_code.to_string()),
-                    created_at: Set(token.created_at),
-                    authed_at: Set(token.authed_at),
-                    validity: Set(true),
-                    // The backup only records writes up to its snapshot time. Give restored
-                    // tokens a fresh idle-retention window before the cleanup job runs.
-                    last_wrote_at: Set(Some(recovered_at)),
-                    asn_num: Set(token.asn_num),
-                    additional_info: Set(token.additional_info),
-                    author_id_seed: Set(token.author_id_seed),
-                    ..Default::default()
-                })
-                .on_conflict_do_nothing_on([authed_token::Column::Id])
-                .exec(&db)
-                .await?;
+                let Some(token) = browser_token_from_backup(token, recovered_at) else {
+                    return anyhow::Ok(false);
+                };
+                let result = authed_token::Entity::insert(token)
+                    .on_conflict_do_nothing_on([authed_token::Column::Id])
+                    .exec(&db)
+                    .await?;
 
                 anyhow::Ok(matches!(result, TryInsertResult::Inserted(_)))
             }
@@ -291,6 +277,64 @@ async fn recover() -> Result<()> {
     if errors > 0 {
         eprintln!("{errors} tokens failed to recover");
     }
-    println!("Done. Inserted {inserted}, skipped {skipped} already-existing tokens.");
+    println!("Done. Inserted {inserted}, skipped {skipped} existing or app tokens.");
     Ok(())
+}
+
+fn browser_token_from_backup(
+    token: AuthedTokenBackup,
+    recovered_at: NaiveDateTime,
+) -> Option<authed_token::ActiveModel> {
+    if token.token.starts_with(APP_INTERNAL_TOKEN_PREFIX) {
+        return None;
+    }
+    Some(authed_token::ActiveModel {
+        id: Set(token.id),
+        token: Set(token.token),
+        origin_ip: Set(token.origin_ip),
+        reduced_origin_ip: Set(token.reduced_origin_ip),
+        writing_ua: Set(token.writing_ua),
+        authed_ua: Set(token.authed_ua),
+        auth_code: Set(token.auth_code.unwrap_or_else(|| "000000".to_string())),
+        created_at: Set(token.created_at),
+        authed_at: Set(token.authed_at),
+        validity: Set(true),
+        is_app: Set(false),
+        // Give restored tokens a fresh idle-retention window.
+        last_wrote_at: Set(Some(recovered_at)),
+        asn_num: Set(token.asn_num),
+        additional_info: Set(token.additional_info),
+        author_id_seed: Set(token.author_id_seed),
+        ..Default::default()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_backups_restore_browser_tokens_only() {
+        let recovered_at = Utc::now().naive_utc();
+        let backup = |token: &str| -> AuthedTokenBackup {
+            serde_json::from_value(serde_json::json!({
+                "id": Uuid::nil(), "token": token, "origin_ip": "192.0.2.1",
+                "reduced_origin_ip": "192.0.2.0", "asn_num": 0, "writing_ua": "test",
+                "created_at": "2020-01-01T00:00:00", "author_id_seed": [0],
+            }))
+            .unwrap()
+        };
+        assert!(
+            browser_token_from_backup(
+                backup("app:08fc465d-95b2-45d3-a981-7fe5e6d232d0"),
+                recovered_at
+            )
+            .is_none()
+        );
+        let browser =
+            browser_token_from_backup(backup("test-browser-token"), recovered_at).unwrap();
+        assert_eq!(browser.validity, Set(true));
+        assert_eq!(browser.is_app, Set(false));
+        assert_eq!(browser.last_wrote_at, Set(Some(recovered_at)));
+    }
 }

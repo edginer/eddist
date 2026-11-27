@@ -77,6 +77,13 @@ const KNOWN_SETTINGS: SettingDefinition[] = [
     type: "boolean",
   },
   {
+    key: "bbs.enable_app_attestation",
+    label: "Enable App Attestation",
+    description:
+      "Allow app token registration and renewal for configured platforms. Changes can take up to 5 minutes to apply.",
+    type: "boolean",
+  },
+  {
     key: "ai.llm_moderation_on_thread",
     label: "Enable LLM Moderation for Threads",
     description:
