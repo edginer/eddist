@@ -58,6 +58,7 @@ macro_rules! impl_from_for_other {
     };
 }
 
+pub(crate) mod app_attestation_service;
 pub(crate) mod auth_with_code_service;
 pub(crate) mod bind_token_to_user_service;
 pub(crate) mod board_info_service;

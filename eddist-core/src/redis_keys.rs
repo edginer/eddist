@@ -70,6 +70,18 @@ pub fn reauth_lock_key(token_id: &str) -> String {
     format!("reauth:lock:{token_id}")
 }
 
+pub fn app_attestation_challenge_key(scope: &str, subject: &str, id: &str) -> String {
+    format!("app-attestation:challenge:{scope}:{subject}:{id}")
+}
+
+pub fn app_attestation_rate_limit_key(scope: &str, ip: &str) -> String {
+    format!("app-attestation:rate:{scope}:{ip}")
+}
+
+pub fn play_integrity_registration_quota_key(project_id: &str, day: &str) -> String {
+    format!("app-attestation:play-integrity:registrations:{project_id}:{day}")
+}
+
 pub fn unsafe_threads_key(board_key: &str) -> String {
     format!("bbs:safe_mode:unsafe_threads:{board_key}")
 }

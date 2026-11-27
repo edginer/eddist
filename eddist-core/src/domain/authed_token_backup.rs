@@ -4,7 +4,10 @@ use uuid::Uuid;
 /// S3 key prefix for authed token backups.
 pub const AUTHED_TOKENS_S3_PREFIX: &str = "authed_tokens";
 
-/// Snapshot of an authed token stored in S3 for disaster recovery.
+/// Reserved prefix for internal app token values. Older backups can contain these as well.
+pub const APP_INTERNAL_TOKEN_PREFIX: &str = "app:";
+
+/// Snapshot of a browser token stored in S3 for disaster recovery.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthedTokenBackup {
     pub id: Uuid,

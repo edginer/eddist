@@ -21,6 +21,7 @@ pub struct Model {
     pub registered_user_id: Option<Uuid>,
     pub require_reauth: bool,
     pub author_id_seed: Vec<u8>,
+    pub is_app: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

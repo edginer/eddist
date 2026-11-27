@@ -6,6 +6,7 @@ pub use uuid;
 
 mod shiftjis;
 pub mod repositories {
+    pub(crate) mod app_credentials_repository;
     pub mod bbs_pubsub_repository;
     pub mod bbs_repository;
     pub mod captcha_config_repository;
@@ -48,11 +49,14 @@ pub(crate) mod stores;
 pub mod tasks;
 mod template;
 pub(crate) mod external {
+    pub(crate) mod app_attest;
     pub mod captcha_like_client;
     pub mod oidc_client;
+    pub(crate) mod play_integrity;
 }
 pub(crate) mod utils;
 mod routes {
+    pub(crate) mod app_attestation;
     pub mod auth_code;
     pub mod bbs_cgi;
     pub mod dat_routing;

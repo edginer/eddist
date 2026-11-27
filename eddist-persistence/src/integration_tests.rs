@@ -78,6 +78,7 @@ async fn insert_fixture(db: &DatabaseConnection) -> anyhow::Result<Fixture> {
         registered_user_id: Set(None),
         require_reauth: Set(false),
         author_id_seed: Set(vec![0; 64]),
+        is_app: Set(false),
     }
     .insert(db)
     .await?;

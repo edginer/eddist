@@ -69,6 +69,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
     async fn get_authed_token(&self, token: &str) -> anyhow::Result<Option<AuthedToken>> {
         Ok(token_select()
             .filter(authed_token::Column::Token.eq(token))
+            .filter(authed_token::Column::IsApp.eq(false))
             .into_model::<SelectionAuthedToken>()
             .one(&self.db)
             .await?
@@ -92,6 +93,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         Ok(token_select()
             .filter(authed_token::Column::ReducedOriginIp.eq(reduced_ip))
             .filter(authed_token::Column::AuthCode.eq(auth_code))
+            .filter(authed_token::Column::IsApp.eq(false))
             .into_model::<SelectionAuthedToken>()
             .one(&self.db)
             .await?
@@ -105,6 +107,7 @@ impl AuthedTokenRepository for BbsRepositoryImpl {
         Ok(token_select()
             .filter(authed_token::Column::AuthCode.eq(auth_code))
             .filter(authed_token::Column::Validity.eq(false))
+            .filter(authed_token::Column::IsApp.eq(false))
             .into_model::<SelectionAuthedToken>()
             .all(&self.db)
             .await?

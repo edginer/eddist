@@ -2,10 +2,10 @@ use chrono::{NaiveDateTime, TimeZone, Utc};
 use eddist_core::domain::{client_info::ClientInfo, res::ResView};
 use eddist_entity::support::{board_id_by_key, thread_number_from_db, thread_number_to_db};
 use eddist_entity::{
-    archived_response, archived_thread, authed_token, board, board_info, response, thread,
-    user_authed_token,
+    app_credential, archived_response, archived_thread, authed_token, board, board_info, response,
+    thread, user_authed_token,
 };
-use sea_orm::sea_query::{Expr, Func, LockType, Query};
+use sea_orm::sea_query::{Expr, Func, Query};
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait, ExprTrait,
     QueryFilter, QueryOrder, QuerySelect, QueryTrait, TransactionTrait,
@@ -365,6 +365,24 @@ fn stale_authed_token_condition(kind: StaleAuthedTokenKind, cutoff: NaiveDateTim
                     Expr::col(authed_token::Column::AuthedAt),
                 ]))
                 .lt(cutoff),
+            )
+            .add(
+                Condition::any()
+                    .add(authed_token::Column::IsApp.eq(false))
+                    .add(Expr::not_exists(
+                        Query::select()
+                            .column(app_credential::Column::AuthedTokenId)
+                            .from(app_credential::Entity)
+                            .and_where(
+                                Expr::col((
+                                    app_credential::Entity,
+                                    app_credential::Column::AuthedTokenId,
+                                ))
+                                .eq(Expr::col((authed_token::Entity, authed_token::Column::Id))),
+                            )
+                            .and_where(app_credential::Column::VerifiedAt.gte(cutoff))
+                            .to_owned(),
+                    )),
             ),
     };
 
@@ -416,16 +434,25 @@ impl Repository {
             cursor = last;
             let is_last_batch = (candidates.len() as u64) < batch_size;
 
-            // Re-check under lock: the token may have written since the unlocked scan.
             let tx = self.0.begin().await?;
-            let mut locking = authed_token::Entity::find()
+            let ids = authed_token::Entity::find()
                 .select_only()
                 .column(authed_token::Column::Id)
                 .filter(authed_token::Column::Id.is_in(candidates))
-                .filter(stale_authed_token_condition(kind, cutoff));
-            QueryTrait::query(&mut locking)
-                .lock_with_tables(LockType::Update, [authed_token::Entity]);
-            let ids = locking.into_tuple::<Uuid>().all(&tx).await?;
+                .lock_exclusive()
+                .into_tuple::<Uuid>()
+                .all(&tx)
+                .await?;
+            // Take the read snapshot after locking the parents. A refresh locks the same
+            // parent before updating its app credential's verified_at.
+            let ids = authed_token::Entity::find()
+                .select_only()
+                .column(authed_token::Column::Id)
+                .filter(authed_token::Column::Id.is_in(ids))
+                .filter(stale_authed_token_condition(kind, cutoff))
+                .into_tuple::<Uuid>()
+                .all(&tx)
+                .await?;
 
             if !ids.is_empty() {
                 authed_token::Entity::delete_many()

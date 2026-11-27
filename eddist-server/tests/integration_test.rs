@@ -94,6 +94,7 @@ async fn test_app_metadata_replaces_client_config_endpoint() {
     assert_eq!(metadata["schema_version"], 1);
     assert_eq!(metadata["domain"], "localhost");
     assert_eq!(metadata["bbs_name"], "エッヂ掲示板");
+    assert!(metadata.get("attestation").is_none());
     assert_eq!(
         metadata["version"],
         option_env!("EDDIST_VERSION").unwrap_or("dev"),
@@ -106,6 +107,16 @@ async fn test_app_metadata_replaces_client_config_endpoint() {
     assert_eq!(
         ctx.server.get("/api/client-config").await.status_code(),
         404
+    );
+    let response = ctx
+        .server
+        .post("/api/app/attestation/challenges")
+        .json(&serde_json::json!({"platform": "ios", "purpose": "register"}))
+        .await;
+    assert_eq!(response.status_code(), 403);
+    assert_eq!(
+        response.json::<serde_json::Value>()["error"],
+        "attestation_disabled"
     );
 }
 
